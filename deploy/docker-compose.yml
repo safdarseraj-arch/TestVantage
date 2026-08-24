@@ -1,0 +1,117 @@
+# TestVantage production stack — PostgreSQL + Redis + 2 API nodes + nginx
+# From onlinetest folder:
+#   npm run build
+#   copy .env.production.example to .env.production and build with VITE_PLATFORM_SCALE=1
+#   npm run stack:up
+# Open http://localhost:8080
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: testvantage
+      POSTGRES_USER: tv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tv_secret_change_me}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tv -d testvantage']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pix2text:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.pix2text
+    environment:
+      P2T_HOST: 0.0.0.0
+      P2T_PORT: 8503
+    expose:
+      - '8503'
+    restart: unless-stopped
+
+  api1:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      NODE_ENV: production
+      TESTVANTAGE_API_PORT: 3001
+      TESTVANTAGE_API_HOST: 0.0.0.0
+      TESTVANTAGE_INSTANCE_ID: api-1
+      DATABASE_URL: postgres://tv:${POSTGRES_PASSWORD:-tv_secret_change_me}@postgres:5432/testvantage
+      REDIS_URL: redis://redis:6379
+      TESTVANTAGE_REQUIRE_POSTGRES: '1'
+      TESTVANTAGE_REQUIRE_REDIS: '1'
+      TESTVANTAGE_ADMIN_EMAIL: ${TESTVANTAGE_ADMIN_EMAIL:-admin@testvantage.com}
+      TESTVANTAGE_ADMIN_PASSWORD: ${TESTVANTAGE_ADMIN_PASSWORD:-tv_secret_change_me}
+      TESTVANTAGE_ADMIN_NAME: ${TESTVANTAGE_ADMIN_NAME:-Admin}
+      TESTVANTAGE_CORS_ORIGIN: ${TESTVANTAGE_CORS_ORIGIN:-*}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_VISION_MODEL: ${GEMINI_VISION_MODEL:-gemini-3.5-flash}
+      PIX2TEXT_URL: http://pix2text:8503
+      PIX2TEXT_ENABLED: ${PIX2TEXT_ENABLED:-auto}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pix2text:
+        condition: service_started
+    expose:
+      - '3001'
+
+  api2:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      NODE_ENV: production
+      TESTVANTAGE_API_PORT: 3001
+      TESTVANTAGE_API_HOST: 0.0.0.0
+      TESTVANTAGE_INSTANCE_ID: api-2
+      DATABASE_URL: postgres://tv:${POSTGRES_PASSWORD:-tv_secret_change_me}@postgres:5432/testvantage
+      REDIS_URL: redis://redis:6379
+      TESTVANTAGE_REQUIRE_POSTGRES: '1'
+      TESTVANTAGE_REQUIRE_REDIS: '1'
+      TESTVANTAGE_ADMIN_EMAIL: ${TESTVANTAGE_ADMIN_EMAIL:-admin@testvantage.com}
+      TESTVANTAGE_ADMIN_PASSWORD: ${TESTVANTAGE_ADMIN_PASSWORD:-tv_secret_change_me}
+      TESTVANTAGE_ADMIN_NAME: ${TESTVANTAGE_ADMIN_NAME:-Admin}
+      TESTVANTAGE_CORS_ORIGIN: ${TESTVANTAGE_CORS_ORIGIN:-*}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_VISION_MODEL: ${GEMINI_VISION_MODEL:-gemini-3.5-flash}
+      PIX2TEXT_URL: http://pix2text:8503
+      PIX2TEXT_ENABLED: ${PIX2TEXT_ENABLED:-auto}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pix2text:
+        condition: service_started
+    expose:
+      - '3001'
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - '8080:80'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../dist:/usr/share/nginx/html:ro
+    depends_on:
+      - api1
+      - api2
+
+volumes:
+  pgdata:

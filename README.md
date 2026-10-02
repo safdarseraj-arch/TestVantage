@@ -30,9 +30,11 @@ npm run start
 
 ### Admin
 - `/login` → **Admin** tab
-- Default (local only): `admin@testvantage.com` / `admin123`
-- **Before go-live:** set `TESTVANTAGE_ADMIN_PASSWORD` in `.env` to a strong secret
+- Staff bootstrap (local only): `admin@testvantage.com` / `admin123` — **change this in Admin**. Do not share with students.
+- **Before public hosting:** set `TESTVANTAGE_ADMIN_PASSWORD` in `.env` / `.env.production` to a strong secret
 - Access: Question Bank, Create Test, Admin panel, School Management
+
+Live product mode is **on by default** (no fake official PYQ, no seed leaderboard). To restore local demo seeds for staff testing only, set `VITE_ALLOW_DEMO_SEED=1` in `.env` and press F5.
 
 ## Features
 
@@ -88,5 +90,7 @@ npm run stack:logs         # view logs
 ```
 
 Health: `GET /api/health` and `GET /api/ready`.
+
+**OneDrive / Windows dev folder:** `npm run live:build` automatically builds on local disk (`scripts/onedrive-build.mjs` → `%LOCALAPPDATA%\testvantage-build`) because synced `node_modules` makes Vite sit on `transforming…` for 15–30+ minutes. First run also copies `node_modules` (5–10 min). On a **Linux cloud server**, `npm run live:deploy` usually builds in **2–5 minutes**.
 
 **Secrets:** keep API keys in server `.env` only (`GEMINI_API_KEY`, etc.). Never use `VITE_*` for secrets.

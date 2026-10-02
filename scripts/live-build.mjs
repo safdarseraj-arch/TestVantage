@@ -23,8 +23,13 @@ if (!existsSync(prodEnv)) {
 const onOneDrive = /OneDrive/i.test(ROOT)
 if (onOneDrive) {
   console.log(
-    'OneDrive folder detected — Vite cache uses %TEMP%. Production build may take 5–15 min; wait for "built in".',
+    'OneDrive folder — building on local disk (AppData) to avoid Vite hanging on "transforming…".',
   )
+  const offDrive = spawnSync(process.execPath, ['scripts/onedrive-build.mjs'], {
+    cwd: ROOT,
+    stdio: 'inherit',
+  })
+  process.exit(offDrive.status ?? 1)
 }
 
 const result = spawnSync('npx', ['vite', 'build', '--mode', 'production', '--logLevel', 'info'], {

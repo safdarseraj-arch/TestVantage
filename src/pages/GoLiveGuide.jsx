@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import PortalPage from '../components/PortalPage'
 import {
   GO_LIVE_PARTS,
@@ -7,8 +8,10 @@ import {
   GO_LIVE_SUMMARY_LINE,
 } from '../data/goLiveGuide'
 import { loadLaunchChecks, saveLaunchChecks } from '../utils/launchChecklist'
+import { signedInHomePath } from '../utils/userProfiles'
 
 export default function GoLiveGuide() {
+  const { isAdmin, session } = useAuth()
   const [checks, setChecks] = useState(() => loadLaunchChecks())
 
   const toggle = useCallback((id) => {
@@ -18,6 +21,24 @@ export default function GoLiveGuide() {
       return next
     })
   }, [])
+
+  if (!isAdmin) {
+    const to = signedInHomePath(session)
+    return (
+      <div className="page go-live-guide-page">
+        <Navigate to={to} replace />
+        <section className="card" style={{ maxWidth: 480, margin: '2rem auto' }}>
+          <h1>Not available</h1>
+          <p className="form-hint">
+            The go-live guide is only for the founder admin. Opening your home.
+          </p>
+          <Link to={to} className="btn btn-primary">
+            Continue
+          </Link>
+        </section>
+      </div>
+    )
+  }
 
   const handlePrint = () => window.print()
 
@@ -54,6 +75,12 @@ export default function GoLiveGuide() {
         <p className="form-hint golive-progress golive-screen-only">
           Progress: <strong>{doneCount}</strong> of <strong>{totalCount}</strong> steps checked
         </p>
+        <div className="golive-progress-bar-wrap golive-screen-only" aria-hidden="true">
+          <div
+            className="golive-progress-bar-fill"
+            style={{ width: `${totalCount ? Math.round((doneCount / totalCount) * 100) : 0}%` }}
+          />
+        </div>
         <div className="golive-readiness-row golive-screen-only">
           <span>Live checklist also in Admin → Go-live readiness</span>
           <Link to={GO_LIVE_READINESS_URL} className="btn btn-ghost btn-sm">

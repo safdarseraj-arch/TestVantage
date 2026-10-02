@@ -81,6 +81,9 @@ export default function AdminPanel() {
           <Link to="/question-bank" className="btn btn-ghost btn-sm">
             Question bank
           </Link>
+          <Link to="/question-bank/reports" className="btn btn-ghost btn-sm">
+            Question reports
+          </Link>
         </>
       }
     >
@@ -141,6 +144,23 @@ export default function AdminPanel() {
         </p>
         <Link to="/admin/schools" className="btn btn-primary">
           Open School Management
+        </Link>
+      </section>
+
+      <section className="card">
+        <h2>Demo logins</h2>
+        <p className="form-hint">
+          Practice accounts (labeled Demo). Log out, then open Sign in and tap Try as student /
+          teacher / staff / admin. They are not real people.
+        </p>
+        <ul className="form-hint">
+          <li>Student — student@testvantage.com / student123</li>
+          <li>Teacher — teacher@testvantage.com / teacher123</li>
+          <li>Staff — staff@testvantage.com / staff123</li>
+          <li>Admin — admin@testvantage.com / admin123</li>
+        </ul>
+        <Link to="/login" className="btn btn-ghost btn-sm">
+          Open sign-in page
         </Link>
       </section>
 

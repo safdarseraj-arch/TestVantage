@@ -28,7 +28,8 @@ export const GO_LIVE_PARTS = [
         title: 'Upload and tag your questions',
         lines: [
           'Upload questions (single, PDF crop, bulk, etc.).',
-          'Open Review & publish → fix Untagged and PYQ items.',
+          'Open Review & publish → fix Untagged items.',
+          'Official PYQ: import NTA / Advanced / NEET PDFs under Approve official papers — do not use fake dated catalog.',
           'Publish questions when they show Ready.',
         ],
       },
@@ -69,18 +70,18 @@ export const GO_LIVE_PARTS = [
         id: 'b6',
         title: 'Rent a cloud computer (VPS)',
         lines: [
-          'Sign up with a host (e.g. DigitalOcean, AWS, Azure, Hostinger VPS).',
-          'Choose at least 2 GB RAM and Ubuntu (or similar Linux).',
-          'Note the server’s public IP address.',
+          'Use DigitalOcean Droplet with the Docker Marketplace image (4 GB RAM). Pix2Text needs the extra memory.',
+          'Do not run npm run live:deploy on this slow OneDrive laptop — run it on the droplet.',
+          'Note the droplet’s public IP address.',
         ],
       },
       {
         id: 'b7',
         title: 'Point your domain to the server',
         lines: [
-          'Buy or use a domain (e.g. testvantage.yourschool.com).',
-          'In DNS settings, add an A record pointing to the server IP.',
-          'Wait 15–60 minutes for DNS to update.',
+          'You already own testvantages.com at Cloudflare. Keep DNS in Cloudflare.',
+          'Add an A record for @ (and www if you use it) pointing to the droplet IP.',
+          'Wait 15–60 minutes for DNS to update. Do not change nameservers.',
         ],
       },
       {
@@ -112,9 +113,10 @@ export const GO_LIVE_PARTS = [
         id: 'c10',
         title: 'Set production passwords (important)',
         lines: [
-          'Copy .env.production.example → rename to .env.production.',
+          'Change every CHANGE_ME password in .env.production before students use the live site.',
+          'Copy .env.production.example → rename to .env.production (if you do not have one yet).',
           'Change POSTGRES_PASSWORD and TESTVANTAGE_ADMIN_PASSWORD to strong secrets.',
-          'Set TESTVANTAGE_CORS_ORIGIN to your public site (https://your-domain.com).',
+          'Set TESTVANTAGE_CORS_ORIGIN to your public site (https://testvantages.com).',
           'Optional: add GEMINI_API_KEY for cloud OCR and AI solutions (server only).',
         ],
       },

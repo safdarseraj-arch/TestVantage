@@ -46,6 +46,12 @@ export const VISION = {
   maxBodyBytes: Number(process.env.TESTVANTAGE_VISION_MAX_BODY) || 18 * 1024 * 1024,
 }
 
+/** Mathpix OCR (images + PDFs). Keys stay on the server — never VITE_*. */
+export const MATHPIX = {
+  maxBodyBytes: Number(process.env.TESTVANTAGE_MATHPIX_MAX_BODY) || 40 * 1024 * 1024,
+  pollTimeoutMs: Number(process.env.MATHPIX_POLL_TIMEOUT_MS) || 5 * 60 * 1000,
+}
+
 /** Pix2Text formula OCR sidecar (Docker or local `p2t serve -p 8503`). */
 export const PIX2TEXT = {
   /** Base URL without trailing slash. Local: http://127.0.0.1:8503 · Docker: http://pix2text:8503 */

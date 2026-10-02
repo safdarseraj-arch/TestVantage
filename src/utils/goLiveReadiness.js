@@ -34,7 +34,7 @@ export function getGoLiveChecklistStatic() {
       area: 'Student',
       feature: 'Practice & PYQ bank',
       status: 'ready',
-      note: 'Topic drills and previous-year papers.',
+      note: 'Shows imported, approved papers only. Empty until staff upload official NTA PDFs — no fake dated catalog.',
     },
     {
       id: 'ocr-upload',
@@ -55,7 +55,7 @@ export function getGoLiveChecklistStatic() {
       area: 'Upload',
       feature: 'Offline / Online save + Sync',
       status: 'partial',
-      note: 'Online sync needs API running (npm run api).',
+      note: 'Online is the default save mode. Start API (port 3001) so Sync is real, not a demo label.',
     },
     {
       id: 'question-bank',
@@ -90,7 +90,7 @@ export function getGoLiveChecklistStatic() {
       area: 'Platform',
       feature: 'Login (student / teacher / admin)',
       status: 'partial',
-      note: 'Local accounts only — move to server auth before public launch.',
+      note: 'Student register and staff login work. On this computer, accounts stay in Cursor’s browser until you host (live:deploy uses server login).',
     },
     {
       id: 'postgres-redis',

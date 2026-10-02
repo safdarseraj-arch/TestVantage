@@ -16,6 +16,12 @@ dist-ssr
 .env.production
 .dev-server.lock
 .dev-server.log
+data/gemini-scq-trial-progress.json
+data/gemini-scq-trial-drafts.json
+
+# Python (python/localai)
+__pycache__/
+*.py[cod]
 
 # Editor directories and files
 .vscode/*

@@ -21,6 +21,9 @@ function tryLoad(path) {
 }
 
 tryLoad(ENV_PATH)
-if (process.env.NODE_ENV === 'production' || existsSync(PROD_ENV_PATH)) {
+tryLoad(join(ROOT_DIR, '.env.local'))
+// Local `npm run api` must not load Docker hostnames (postgres/redis) from
+// .env.production — that made startup hang on getaddrinfo ENOTFOUND postgres.
+if (process.env.NODE_ENV === 'production') {
   tryLoad(PROD_ENV_PATH)
 }

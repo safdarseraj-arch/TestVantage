@@ -8,10 +8,13 @@ import asyncio
 
 import numpy as np
 from google import genai
+from google.genai import types
 
 client = genai.Client()
 
-_EMBEDDING_MODEL = "text-embedding-004"
+# text-embedding-004 is gone from the v1beta API. Keep 768 dims to match question_bank.embedding.
+_EMBEDDING_MODEL = "gemini-embedding-001"
+_EMBEDDING_DIM = 768
 _DUPLICATE_THRESHOLD = 0.85
 
 
@@ -19,6 +22,7 @@ def _embed_sync(text: str) -> list[float]:
     response = client.models.embed_content(
         model=_EMBEDDING_MODEL,
         contents=text,
+        config=types.EmbedContentConfig(output_dimensionality=_EMBEDDING_DIM),
     )
     embeddings = getattr(response, "embeddings", None) or []
     if not embeddings:
@@ -30,7 +34,7 @@ def _embed_sync(text: str) -> list[float]:
 
 
 async def get_embedding(text: str) -> list[float]:
-    """Return an embedding vector for ``text`` using ``text-embedding-004``."""
+    """Return a 768-d embedding for ``text`` using ``gemini-embedding-001``."""
     stripped = (text or "").strip()
     if not stripped:
         raise ValueError("Cannot embed empty text.")

@@ -32,5 +32,7 @@ console.log('\n2/3 — Starting Docker stack (Postgres + Redis + Pix2Text + API 
 run('npm', ['run', 'stack:up'])
 
 console.log('\n3/3 — Live platform ready at http://localhost:8080')
-console.log('Next: set TESTVANTAGE_CORS_ORIGIN + HTTPS (deploy/nginx-ssl.conf.example).')
+console.log(
+  'Next: set VITE_PUBLIC_SITE_URL=https://www.testvantages.com, TESTVANTAGE_CORS_ORIGIN (comma list), + HTTPS (deploy/nginx-ssl.conf.example).',
+)
 console.log('Health: http://localhost:8080/api/health  ·  Admin login at /login\n')

@@ -1,0 +1,22 @@
+TestVantages Hybrid AI — quick handoff (Oct 2026)
+
+START (daily)
+1. Press F5 in Cursor (or Ctrl+Shift+P → Run Task → 1. Start TestVantages). Keep the bottom terminal panel open.
+2. Open the site in Cursor's browser: http://127.0.0.1:5173/question-bank
+3. Hybrid AI API docs (when Postgres + .env are set): http://127.0.0.1:5173/docs
+
+WHERE HYBRID AI LIVES
+- Nav: Question Bank area → Hybrid AI (http://127.0.0.1:5173/question-bank/ai-generate)
+- Staff drafts by slice: http://127.0.0.1:5173/question-bank?subBank=ai (Hybrid AI tab; similar PYQ uses ?subBank=similar_pyq)
+- Code: src/utils/hybridAiClient.js → /api/generate/batch and /api/questions/clone-scaled (5173 proxies to FastAPI internally)
+- PYQ similar/replica: Official PYQ review panels (clone-scaled); practice pools: /practice/pyq and /practice/similar-pyq
+
+AUTO-PUBLISH
+- Hybrid AI saves drafts with approval_status pending — students do not see them until approved in Question Bank.
+- Official PYQ pending store never auto-publishes (Approve & publish only).
+
+ANALYTICS
+- POST /api/test-results/attempt stores Bloom levels; GET /api/analytics/student-performance?student_id=… needs Postgres (DATABASE_URL).
+
+FUTURE (out of scope)
+- Official PYQ Mathpix 2024/2026 ingestion pipeline

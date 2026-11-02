@@ -7,8 +7,10 @@ import {
   subjectLabel,
   PYQ_STYLE_YEARS,
   trialExamLabel,
+  stemPreview,
 } from '../utils/geminiScqTrial.js'
 import { buildBatchPayloadFromTrialJob, queueBatch } from '../utils/hybridAiClient.js'
+import { syncHybridAiAfterJob } from '../utils/hybridAiSync.js'
 import {
   listPyqStyleSlots,
   formatPyqDatePretty,
@@ -105,7 +107,17 @@ export default function PyqGeminiGeneratePanel({ onImported }) {
       const data = await queueBatch(payload)
       setLog(
         `Hybrid AI queued ${SCQ_TRIAL_COUNT} draft(s) for ${slotLabel} (${data.status || 'Job Queued'}). ` +
-          'New items land in the AI sub_bank — open Hybrid AI in the nav or Review when synced.',
+          'Waiting until Postgres has the new draft before sync.',
+      )
+      const synced = await syncHybridAiAfterJob({
+        attempts: 24,
+        intervalMs: 5000,
+        jobId: data?.job_id,
+      })
+      setLog(
+        synced?.added
+          ? `Synced ${synced.added} draft(s). Open Saved → Draft → Hybrid AI (?subBank=ai).`
+          : 'Hybrid AI finished. Open Saved → Draft → Hybrid AI (?subBank=ai) and use Sync if the new draft is not listed yet.',
       )
       onImported?.()
     } catch (e) {

@@ -136,6 +136,7 @@ const GeneratorDashboard = lazyPage(
   () => import('./components/GeneratorDashboard.jsx'),
   'Hybrid AI',
 )
+const BookUpload = lazyPage(() => import('./pages/BookUpload.jsx'), 'Book ingest')
 
 function RouteLoading({ label = 'Loading…' }) {
   const [stuck, setStuck] = useState(false)
@@ -267,6 +268,14 @@ export default function App() {
           element={
             <RequirePermission permission={PERMS.UPLOAD_QUESTIONS}>
               {withSuspense(<GeneratorDashboard />, 'Loading Hybrid AI…')}
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="question-bank/book-ingest"
+          element={
+            <RequirePermission permission={PERMS.UPLOAD_QUESTIONS}>
+              {withSuspense(<BookUpload />, 'Loading book ingest…')}
             </RequirePermission>
           }
         />

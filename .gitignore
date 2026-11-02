@@ -18,6 +18,7 @@ dist-ssr
 .dev-server.log
 data/gemini-scq-trial-progress.json
 data/gemini-scq-trial-drafts.json
+data/official_pyq_originals/
 
 # Python (python/localai)
 __pycache__/
@@ -33,3 +34,11 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# Local scratch, debug dumps and browser-storage copies (never commit)
+scripts/_*
+build-*.txt
+live-build-*.txt
+dev-start-log.txt
+regression-run-log.txt
+*.traineddata

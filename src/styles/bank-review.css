@@ -1,0 +1,556 @@
+/* Dedicated Review & Publish workspace */
+
+.bank-review-page .portal-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bank-review-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bank-review-workflow-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.bank-review-workflow-head h3 {
+  margin: 0 0 0.25rem;
+}
+
+.bank-review-status-tabs {
+  flex-shrink: 0;
+}
+
+.bank-review-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.bank-review-mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.bank-review-mode-card strong {
+  font-size: 1.35rem;
+  line-height: 1.1;
+  color: var(--text-h, #0f172a);
+}
+
+.bank-review-mode-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-h, #0f172a);
+}
+
+.bank-review-mode-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+  line-height: 1.3;
+}
+
+.bank-review-mode-card:hover {
+  border-color: var(--primary, #2563eb);
+}
+
+.bank-review-mode-card.active {
+  border-color: var(--primary, #2563eb);
+  background: color-mix(in srgb, var(--primary, #2563eb) 6%, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary, #2563eb) 25%, transparent);
+}
+
+.bank-review-mode-card.tone-ok.active strong {
+  color: #15803d;
+}
+
+.bank-review-mode-card.tone-error.active strong {
+  color: #b91c1c;
+}
+
+.bank-review-mode-card.tone-accent.active strong {
+  color: #7c3aed;
+}
+
+.bank-review-page .bank-review-board-card {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  width: 100%;
+  text-align: center;
+}
+
+.bank-review-page .bank-review-board-card:hover {
+  filter: brightness(0.97);
+}
+
+.bank-review-pyq-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+}
+
+.bank-review-pyq-year {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 8rem;
+}
+
+.bank-review-pyq-year select {
+  font-weight: 400;
+}
+
+.bank-review-pyq-hint {
+  margin: 0;
+  flex: 1;
+  min-width: 12rem;
+}
+
+.bank-review-queue-layout {
+  padding: 0;
+  overflow: hidden;
+}
+
+.bank-review-sort-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 0 0.25rem;
+  border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+  margin-bottom: 0.75rem;
+}
+
+.bank-review-sort-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 10rem;
+}
+
+.bank-review-sort-field select {
+  min-width: 12rem;
+}
+
+.bank-review-sort-hint {
+  flex: 1 1 12rem;
+  margin: 0;
+  align-self: center;
+}
+
+.bank-review-queue-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.bank-review-queue-head h3 {
+  margin: 0 0 0.25rem;
+}
+
+.bank-review-queue-of {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-muted, #64748b);
+}
+
+.bank-review-queue-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bank-review-queue-pos {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  margin-right: 0.25rem;
+}
+
+.bank-review-empty {
+  padding: 1.5rem 1rem;
+}
+
+.bank-review-queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(70vh, 52rem);
+  overflow-y: auto;
+}
+
+.bank-review-page-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.bank-review-queue-list + .bank-review-page-bar {
+  border-bottom: none;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.bank-review-page-range,
+.bank-review-page-pos {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+
+.bank-review-page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.bank-review-queue-item {
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+.bank-review-queue-item.selected {
+  background: color-mix(in srgb, var(--primary, #2563eb) 5%, #fff);
+}
+
+.bank-review-queue-select {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem 0.35rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.bank-review-queue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.bank-review-queue-id {
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary, #2563eb);
+}
+
+.bank-review-pyq-year-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.bank-review-queue-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.35rem;
+}
+
+.bank-review-tag-chip {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.bank-review-queue-preview {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text, #334155);
+  line-height: 1.4;
+}
+
+.bank-review-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 1rem 0.75rem;
+}
+
+.bank-review-queue-item.quick-tag-open .quick-tag-panel {
+  margin: 0 1rem 0.75rem;
+}
+
+.bank-hub-top-tab-link {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.bank-hub-top-tab-count-warn {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .bank-review-mode-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.gemini-scq-trial {
+  margin-bottom: 1rem;
+}
+
+.gemini-scq-trial-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.75rem 0;
+}
+
+.gemini-trial-type-picks {
+  margin-bottom: 0.75rem;
+}
+
+.gemini-type-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 10rem;
+}
+
+.gemini-trial-chapter-picks {
+  margin-bottom: 0.75rem;
+}
+
+.gemini-chapter-picks-hint {
+  flex-basis: 100%;
+  margin: 0 0 0.35rem;
+}
+
+.gemini-selection-summary {
+  margin-top: 0.25rem;
+}
+
+.gemini-count-error {
+  color: #b91c1c;
+  margin-top: 0.25rem;
+}
+
+.gemini-scq-trial-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.gemini-scq-trial-log {
+  max-height: 16rem;
+  overflow: auto;
+  padding: 0.75rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  white-space: pre-wrap;
+}
+
+.gemini-scq-trial-live {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.gemini-scq-trial-live h4 {
+  margin: 0 0 0.5rem;
+}
+
+.gemini-scq-trial-now {
+  font-weight: 600;
+  margin: 0.25rem 0;
+}
+
+.gemini-scq-trial-stem {
+  font-size: 0.9rem;
+  color: #334155;
+  margin: 0.35rem 0;
+}
+
+.gemini-scq-trial-live-error,
+.gemini-scq-trial-errors {
+  color: #b45309;
+  margin: 0.35rem 0;
+}
+
+.gemini-scq-trial-errors {
+  padding-left: 1.2rem;
+}
+
+.pyq-make-similar {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.pyq-make-similar h4 {
+  margin: 0 0 0.35rem;
+}
+
+.pyq-make-similar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+}
+
+.pyq-make-similar.is-compact {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.pyq-make-similar-seed {
+  max-width: 100%;
+  min-width: 12rem;
+}
+
+.extraction-summary-table-wrap {
+  margin: 0.75rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary, #2563eb) 4%, #fff);
+}
+
+.extraction-summary-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+}
+
+.extraction-summary-expected {
+  font-weight: 500;
+  color: var(--text-muted, #64748b);
+}
+
+.extraction-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.extraction-summary-table th,
+.extraction-summary-table td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  text-align: left;
+  vertical-align: top;
+}
+
+.extraction-summary-table th {
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+
+.extraction-row-ok td:first-child {
+  border-left: 3px solid #16a34a;
+}
+
+.extraction-row-warn td:first-child {
+  border-left: 3px solid #d97706;
+}
+
+.extraction-row-bad td:first-child {
+  border-left: 3px solid #dc2626;
+}
+
+.extraction-summary-hint.ok {
+  color: #15803d;
+}
+
+.extraction-summary-hint.warn {
+  color: #b45309;
+}
+
+.bank-upload-verify-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 960px) {
+  .bank-upload-verify-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bank-upload-split-scroll {
+  max-height: 28rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.bank-upload-split-card {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.bank-upload-split-card header {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: var(--text-muted, #64748b);
+}
+
+.bank-upload-split-opt {
+  margin-top: 0.25rem;
+}
+
+.bank-upload-verify-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}

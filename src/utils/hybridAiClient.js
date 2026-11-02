@@ -1,8 +1,14 @@
 /**
- * Thin client for TestVantage Hybrid AI (FastAPI on port 8000, proxied via /api).
+ * Thin client for TestVantages Hybrid AI — same-origin `/api/*` via Vite (127.0.0.1:5173).
  * Use instead of direct Gemini /vision/scq-trial for question generation and clones.
  */
 import { API_BASE } from '../config/platform.js'
+import {
+  mapExamSlugToHybridLabel,
+  mapSubjectSlugToHybridLabel,
+  mapTrialTypeMixToHybridCode,
+  resolveHybridCurriculumTags,
+} from './hybridMetadata.js'
 import { isOfficialPyq } from './pyqDetect.js'
 
 export class HybridAiError extends Error {
@@ -22,19 +28,36 @@ export class HybridAiError extends Error {
  */
 async function postHybridJson(path, body, opts = {}) {
   const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : 120_000
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(timeoutMs),
-  })
+  const offline =
+    'TestVantages Hybrid AI is not running (port 8000). Press F5 and keep the bottom terminal open.'
+  let res
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+  } catch (err) {
+    if (err instanceof HybridAiError) throw err
+    const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : ''
+    if (name === 'TimeoutError' || name === 'AbortError') {
+      throw new HybridAiError(
+        'Hybrid AI did not answer in time. Press F5 and keep the bottom terminal open.',
+      )
+    }
+    throw new HybridAiError(offline)
+  }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     const detail =
       (typeof data.detail === 'string' && data.detail) ||
       (Array.isArray(data.detail) && data.detail[0]?.msg) ||
-      data.error ||
-      `Hybrid AI request failed (${res.status})`
+      (typeof data.error === 'string' && data.error) ||
+      (typeof data.message === 'string' && data.message) ||
+      (res.status === 503
+        ? 'TestVantages Hybrid AI is not running (port 8000). Press F5 and keep the bottom terminal open.'
+        : `Hybrid AI request failed (${res.status})`)
     throw new HybridAiError(String(detail), { status: res.status, body: data })
   }
   return data
@@ -45,54 +68,84 @@ export function queueBatch(payload) {
   return postHybridJson('/generate/batch', payload)
 }
 
+/** Persist the pattern flag on a Hybrid pool row. Local bank update is separate. */
+export function markHybridQuestionPattern(questionId, isPattern = true) {
+  const id = encodeURIComponent(String(questionId ?? '').trim())
+  return postHybridJson(`/questions/${id}/pattern`, { is_pattern: Boolean(isPattern) })
+}
+
 /** Queue scaled similar / duplicate clones from a parent question. */
 export function queueCloneScaled(payload) {
   return postHybridJson('/questions/clone-scaled', payload)
 }
 
-const EXAM_SLUG_TO_HYBRID = {
-  'jee-main': 'JEE Main',
-  'jee-advanced': 'JEE Advanced',
-  neet: 'NEET',
+/** Suggested bank tags, answer, and solution. Does not save the question. */
+export function fillOfficialPyqTags(body) {
+  return postHybridJson('/official-pyq/fill-tags', body, { timeoutMs: 90_000 })
 }
 
-const SUBJECT_SLUG_TO_HYBRID = {
-  mathematics: 'Mathematics',
-  physics: 'Physics',
-  chemistry: 'Chemistry',
+/** One similar question for a pending replica. Does not approve or publish. */
+export function requestOfficialPyqReplicaQuestion(body) {
+  return postHybridJson('/official-pyq/replica-question', body, { timeoutMs: 120_000 })
 }
 
-const TRIAL_TYPE_TO_HYBRID = {
-  single_correct: 'Single Choice',
-  multiple_correct: 'Multiple Choice',
-  numerical: 'Numerical',
-  integer: 'Numerical',
-  true_false: 'Single Choice',
-  matrix_match: 'Single Choice',
-  passage_scq: 'Single Choice',
-  passage_mcq: 'Multiple Choice',
+/** Four difficulties of one parent question. Does not approve or publish. */
+export function requestOfficialPyqReplicaSet(body) {
+  return postHybridJson('/official-pyq/replica-set', body, { timeoutMs: 180_000 })
+}
+
+/** Live token estimate for clone batches (FastAPI /api/clones/estimate-tokens). */
+export function estimateCloneTokens(body) {
+  return postHybridJson('/clones/estimate-tokens', body, { timeoutMs: 45_000 })
+}
+
+/** @param {Record<string, unknown>} payload @param {{ includeSyllabus?: boolean, eligibleForCaching?: boolean }} opts */
+export function withCloneCachingOptions(payload, opts = {}) {
+  const includeSyllabus = Boolean(opts.includeSyllabus)
+  const eligibleForCaching = Boolean(opts.eligibleForCaching)
+  const use_caching_optimizer = eligibleForCaching || includeSyllabus
+  return use_caching_optimizer ? { ...payload, use_caching_optimizer: true } : payload
+}
+
+/**
+ * Upload a textbook PDF for cached-context ingestion.
+ * @param {File} file
+ * @param {{ signal?: AbortSignal }} [opts]
+ */
+export async function uploadBookCached(file, opts = {}) {
+  const form = new FormData()
+  form.append('file', file, file.name || 'upload.pdf')
+  const subject = String(opts.subject ?? '').trim()
+  if (subject) {
+    form.append('subject_form', subject)
+  }
+  const res = await fetch(`${API_BASE}/ingest/book-cached`, {
+    method: 'POST',
+    body: form,
+    signal: opts.signal,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const detail =
+      (typeof data.detail === 'string' && data.detail) ||
+      data.error ||
+      `Book upload failed (${res.status})`
+    throw new HybridAiError(String(detail), { status: res.status, body: data })
+  }
+  return data
 }
 
 /** @param {unknown} examId */
 export function mapExamSlugToHybrid(examId) {
-  const key = String(examId ?? 'jee-main').trim().toLowerCase()
-  return EXAM_SLUG_TO_HYBRID[key] || 'JEE Main'
+  return mapExamSlugToHybridLabel(examId)
 }
 
 /** @param {unknown} subjectSlug @param {unknown} [chapter] */
 export function mapSubjectSlugToHybrid(subjectSlug, chapter) {
-  const key = String(subjectSlug ?? '').trim().toLowerCase()
-  if (SUBJECT_SLUG_TO_HYBRID[key]) return SUBJECT_SLUG_TO_HYBRID[key]
-  if (key === 'biology') {
-    const c = String(chapter ?? '')
-    if (/zoology|human|animal|reproduction|health|biotechnology/i.test(c)) return 'Zoology'
-    return 'Botany'
-  }
-  const raw = String(subjectSlug ?? 'General').trim()
-  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'General'
+  return mapSubjectSlugToHybridLabel(subjectSlug, chapter)
 }
 
-/** @param {unknown} toughness 1 10 */
+/** @param {unknown} toughness 1–10 */
 export function mapToughnessToHybridDifficulty(toughness) {
   const t = Number(toughness)
   if (Number.isFinite(t)) {
@@ -104,13 +157,7 @@ export function mapToughnessToHybridDifficulty(toughness) {
 
 /** @param {unknown} typeMix */
 export function mapTrialTypeMixToHybrid(typeMix) {
-  if (typeMix === 'all' || typeMix == null) return 'Single Choice'
-  const list = Array.isArray(typeMix) ? typeMix : [typeMix]
-  for (const raw of list) {
-    const id = String(raw ?? '').trim()
-    if (TRIAL_TYPE_TO_HYBRID[id]) return TRIAL_TYPE_TO_HYBRID[id]
-  }
-  return 'Single Choice'
+  return mapTrialTypeMixToHybridCode(typeMix)
 }
 
 /**
@@ -119,12 +166,26 @@ export function mapTrialTypeMixToHybrid(typeMix) {
  * @param {unknown} typeMix
  */
 export function buildBatchPayloadFromTrialJob(job, count, typeMix) {
-  const chapter = String(job.chapter ?? job.section ?? 'General').trim() || 'General'
+  const tags = resolveHybridCurriculumTags(job.subject, {
+    section: job.section,
+    unit: job.unit,
+    chapter: job.chapter,
+    topic: job.topic,
+  })
+  const chapter = tags.mapped
+    ? tags.chapter
+    : String(job.chapter ?? '').trim() || String(job.section ?? 'General').trim() || 'General'
   return {
     exam: mapExamSlugToHybrid(job.examId),
     subject: mapSubjectSlugToHybrid(job.subject, chapter),
+    unit: tags.mapped ? tags.unit : undefined,
+    section: tags.mapped ? tags.unit : undefined,
     chapter,
+    topic: tags.topic || undefined,
     difficulty: mapToughnessToHybridDifficulty(job.seedToughness),
+    toughness_level: Number.isFinite(Number(job.seedToughness))
+      ? Math.min(10, Math.max(1, Math.round(Number(job.seedToughness))))
+      : undefined,
     question_type: mapTrialTypeMixToHybrid(typeMix),
     count: Math.max(1, Math.min(100, Number(count) || 1)),
   }
@@ -149,12 +210,18 @@ export function similarClonePayloadFromSeed(seed, opts = {}) {
   const count = Math.max(1, Number(opts.count) || 3)
   const difficultyOffset = Number(opts.difficultyOffset)
   const offset = Number.isFinite(difficultyOffset) ? Math.min(2, Math.max(-1, difficultyOffset)) : 1
+  const chapter = String(seed.chapter ?? seed.section ?? 'General').trim() || 'General'
+  const examSlug = seed.examPatternId || (Array.isArray(seed.examIds) ? seed.examIds[0] : null) || 'jee-main'
   return {
     parent_question_id: String(seed.id ?? '').trim(),
     source_question_text: formatQuestionSourceText(seed),
     count,
     difficulty_offset: offset,
     parent_is_pyq: isOfficialPyq(seed) || seed?.officialPyq === true,
+    subject: mapSubjectSlugToHybridLabel(seed.subject, chapter),
+    exam: mapExamSlugToHybridLabel(examSlug),
+    chapter,
+    topic: seed.topic ? String(seed.topic) : undefined,
   }
 }
 

@@ -46,7 +46,40 @@ _SCHEMA_PATCHES: tuple[str, ...] = (
     CREATE INDEX IF NOT EXISTS ix_question_bank_meta_filter
       ON question_bank (chapter, topic, difficulty, bloom_level);
     """,
+    "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS sub_bank_type VARCHAR(32)",
+    "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS parent_id VARCHAR(128)",
+    "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS is_child BOOLEAN",
+    "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS approval_status VARCHAR(32)",
+    """
+    UPDATE question_bank
+    SET sub_bank_type = 'ai'
+    WHERE sub_bank_type IS NULL OR TRIM(sub_bank_type) = '';
+    """,
+    """
+    UPDATE question_bank
+    SET approval_status = 'PENDING_REVIEW'
+    WHERE approval_status IS NULL OR TRIM(approval_status) = '';
+    """,
+    """
+    UPDATE question_bank
+    SET is_child = FALSE
+    WHERE is_child IS NULL;
+    """,
     "ALTER TABLE test_results ADD COLUMN IF NOT EXISTS time_spent_ms INTEGER",
+    "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS unit VARCHAR(256)",
+    "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS needs_action BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS is_pattern BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE question_bank ADD COLUMN IF NOT EXISTS toughness_level INTEGER",
+    """
+    UPDATE question_bank
+    SET needs_action = FALSE
+    WHERE needs_action IS NULL;
+    """,
+    """
+    UPDATE question_bank
+    SET is_pattern = FALSE
+    WHERE is_pattern IS NULL;
+    """,
 )
 
 _DEFAULT_URL = "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/testvantages"

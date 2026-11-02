@@ -4,13 +4,9 @@ import {
   SIMILAR_FROM_PYQ_COUNTS,
   SIMILAR_FROM_PYQ_DEFAULT_COUNT,
 } from '../utils/geminiScqTrial.js'
-import { AI_SIMILAR_SOURCE } from '../utils/pyqDetect.js'
 import { canSeedSimilarFromQuestion } from '../utils/pyqDetect.js'
-import {
-  queueCloneScaled,
-  similarClonePayloadFromSeed,
-  HYBRID_AI_ROUTE,
-} from '../utils/hybridAiClient.js'
+import { HYBRID_AI_ROUTE } from '../utils/hybridAiClient.js'
+import { CloneModalTrigger } from './CloneModal.jsx'
 
 /**
  * SECONDARY: queue 3 or 5 similar clones from one question via Hybrid AI.
@@ -30,28 +26,9 @@ export default function PyqMakeSimilarPanel({
   onSaved,
 }) {
   const [count, setCount] = useState(SIMILAR_FROM_PYQ_DEFAULT_COUNT)
-  const [busy, setBusy] = useState(false)
   const [log, setLog] = useState('')
 
   if (!seed || !canSeedSimilarFromQuestion(seed)) return null
-
-  const onGenerate = async () => {
-    setBusy(true)
-    setLog(`Queuing Hybrid AI for ${count} similar clone(s)…`)
-    try {
-      const payload = similarClonePayloadFromSeed(seed, { count, difficultyOffset: 1 })
-      const data = await queueCloneScaled(payload)
-      const batchId = data.batch_id ? ` (batch ${data.batch_id})` : ''
-      setLog(
-        `Hybrid AI queued ${count} ${AI_SIMILAR_SOURCE} clone job(s)${batchId}. Clones save to the AI bank when the job finishes — review before students see them. Parent: ${seed.id}.`,
-      )
-      onSaved?.()
-    } catch (e) {
-      setLog(e instanceof Error ? e.message : 'Similar generate failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
     <div className={`pyq-make-similar-inline${compact ? ' compact' : ''}`}>
@@ -62,23 +39,19 @@ export default function PyqMakeSimilarPanel({
           <Link to={HYBRID_AI_ROUTE}>Hybrid AI</Link>.
         </p>
       )}
-      <div className="pyq-make-similar-actions">
-        <select
-          value={String(count)}
-          disabled={busy}
-          onChange={(e) => setCount(Number(e.target.value))}
-          aria-label="How many similar questions"
-        >
-          {SIMILAR_FROM_PYQ_COUNTS.map((n) => (
-            <option key={n} value={String(n)}>
-              {n} similar
-            </option>
-          ))}
-        </select>
-        <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={onGenerate}>
-          {busy ? 'Queuing…' : `Make ${count} similar (Hybrid AI)`}
-        </button>
-      </div>
+      <CloneModalTrigger
+        seed={seed}
+        count={count}
+        onCountChange={setCount}
+        countOptions={SIMILAR_FROM_PYQ_COUNTS}
+        compact={compact}
+        onSaved={() => {
+          setLog(
+            `Hybrid AI queued ${count} similar clone(s). Clones save to the AI bank when the job finishes — review before students see them. Parent: ${seed.id}.`,
+          )
+          onSaved?.()
+        }}
+      />
       {log ? <p className="form-hint">{log}</p> : null}
       {!compact && (
         <p className="form-hint cc-sub">

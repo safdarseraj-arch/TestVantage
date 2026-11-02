@@ -1,0 +1,19 @@
+﻿TestVantage - Postgres on your PC (simple steps)
+================================================
+
+Already done:
+- PostgreSQL 17 installed
+- Service postgresql-x64-17 (Running)
+- Database: testvantages
+- .env points at 127.0.0.1:5432
+
+ONE step left - pgvector:
+1. Open folder: onlinetest\scripts
+2. Double-click install-pgvector-admin.bat
+3. Click Yes on the Windows permission prompt
+4. Press F5 in Cursor
+
+Optional check in pgAdmin on database testvantages:
+   CREATE EXTENSION IF NOT EXISTS vector;
+
+Then open http://127.0.0.1:5173/question-bank and use Sync.

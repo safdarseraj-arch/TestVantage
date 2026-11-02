@@ -1016,13 +1016,13 @@ export async function handleApiRequest(req, res) {
         try {
           data = text ? JSON.parse(text) : {}
         } catch {
-          data = { error: text || 'Invalid response from TestVantage AI API' }
+          data = { error: text || 'Invalid response from TestVantages AI API' }
         }
         sendJson(res, upstream.status, data)
       } catch {
         sendJson(res, 503, {
           error:
-            'TestVantage AI API is not running. Start FastAPI (uvicorn main:app --port 8000) and try again.',
+            'TestVantages AI API is not running. Start FastAPI (uvicorn main:app --port 8000) and try again.',
         })
       }
       return

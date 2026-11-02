@@ -70,23 +70,37 @@ def apply_master_pool_filters(
 
 
 def bank_row_to_pick_dict(row: AIQuestionBank) -> dict[str, Any]:
+    from hybrid_latex_sanitize import HYBRID_AI_SOURCE_LABEL
+    from hybrid_metadata import default_marking_for_question_type
+
+    needs = bool(getattr(row, "needs_action", False))
+    qtype = "" if needs else str(row.question_type or "")
     return {
         "id": row.question_id,
         "question_id": row.question_id,
-        "exam": row.exam,
-        "subject": row.subject,
-        "chapter": row.chapter,
-        "topic": row.topic,
-        "difficulty": row.difficulty,
+        "exam": "" if needs else row.exam,
+        "subject": "" if needs else row.subject,
+        "chapter": "" if needs else row.chapter,
+        "unit": None if needs else row.unit,
+        "section": None if needs else row.unit,
+        "topic": None if needs else row.topic,
+        "difficulty": "" if needs else row.difficulty,
         "bloom_level": row.bloom_level,
-        "question_type": row.question_type,
+        "question_type": qtype,
         "question_text": row.question_text,
         "text": row.question_text,
         "options": row.options,
         "correct_answer": row.correct_answer,
+        "step_by_step_solution": row.step_by_step_solution,
         "sub_bank_type": row.sub_bank_type,
         "parent_id": row.parent_id,
         "is_child": row.is_child,
+        "approval_status": row.approval_status,
+        "needs_action": needs,
+        "is_pattern": bool(getattr(row, "is_pattern", False)),
+        "toughness_level": None if needs else getattr(row, "toughness_level", None),
+        "source": "" if needs else HYBRID_AI_SOURCE_LABEL,
+        "marking": None if needs or not qtype else default_marking_for_question_type(qtype),
     }
 
 
@@ -101,6 +115,7 @@ async def fetch_master_pool_rows(
     difficulty: str | None = None,
     bloom_levels: Sequence[str] | None = None,
     limit: int | None = None,
+    approved_only: bool = True,
 ) -> list[dict[str, Any]]:
     stmt = apply_master_pool_filters(
         master_question_pool_select(),
@@ -111,7 +126,9 @@ async def fetch_master_pool_rows(
         topic=topic,
         difficulty=difficulty,
         bloom_levels=bloom_levels,
+        approved_only=approved_only,
     )
+    stmt = stmt.order_by(AIQuestionBank.question_id.desc())
     if limit is not None and limit > 0:
         stmt = stmt.limit(limit)
     rows = (await session.scalars(stmt)).all()

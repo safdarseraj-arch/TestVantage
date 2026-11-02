@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sync question bank</title>
+  </head>
+  <body>
+    <script>
+      const KEY = 'testvantage-uploaded-questions'
+      const BACKUP = 'testvantage-uploaded-questions-backup'
+      const ALLOWED = ['http://localhost:5173', 'http://127.0.0.1:5173']
+
+      window.addEventListener('message', function (event) {
+        if (!ALLOWED.includes(event.origin)) return
+        if (event.data?.type !== 'testvantage-bank-sync' || !event.data.json) return
+        try {
+          localStorage.setItem(KEY, event.data.json)
+          localStorage.setItem(BACKUP, event.data.json)
+        } catch (e) {
+          console.warn('Bank mirror write failed', e)
+        }
+      })
+    </script>
+  </body>
+</html>

@@ -58,13 +58,13 @@ export default function GoLiveGuide() {
             Print / Save as PDF
           </button>
           <Link to="/tour" className="btn btn-ghost btn-sm golive-screen-only">
-            TestVantage Tour
+            TestVantages Tour
           </Link>
         </>
       }
     >
       <div className="golive-print-header" aria-hidden="true">
-        <h1>TestVantage — Go Live Guide</h1>
+        <h1>TestVantages — Go Live Guide</h1>
         <p>Follow steps in order · {new Date().toLocaleDateString()}</p>
       </div>
 
@@ -95,7 +95,7 @@ export default function GoLiveGuide() {
           <li>Click <strong>Print / Save as PDF</strong> above (or press Ctrl+P).</li>
           <li>Choose <strong>Save as PDF</strong> or <strong>Microsoft Print to PDF</strong>.</li>
           <li>Turn on <strong>Background graphics</strong> if your printer dialog has that option.</li>
-          <li>Save the file — e.g. <code>TestVantage-Go-Live-Guide.pdf</code></li>
+          <li>Save the file — e.g. <code>TestVantages-Go-Live-Guide.pdf</code></li>
         </ol>
       </section>
 
@@ -197,7 +197,7 @@ export default function GoLiveGuide() {
           </li>
         </ul>
         <p className="form-hint golive-print-url">
-          TestVantage · Go-live guide · {typeof window !== 'undefined' ? window.location.origin : ''}/go-live-guide
+          TestVantages · Go-live guide · {typeof window !== 'undefined' ? window.location.origin : ''}/go-live-guide
         </p>
       </footer>
     </PortalPage>

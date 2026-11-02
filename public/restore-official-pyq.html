@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Restore Official PYQ Paper 2</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.45; }
+    .ok { color: #0a7; } .err { color: #c30; } code { background: #f4f4f4; padding: 0.1em 0.35em; }
+  </style>
+</head>
+<body>
+  <h1>Restore Official PYQ Paper 2</h1>
+  <p>
+    Puts <strong>JEE Advanced 2024 Paper 2</strong> back on <strong>Pending approval</strong>
+    from the saved snapshot (healed OCR). Does <strong>not</strong> Approve.
+    Leaves <strong>Paper 1 Published</strong> alone — does not touch the Question Bank.
+  </p>
+  <p id="status">Working…</p>
+  <p><a id="go" href="/official-pyq" hidden>Open Official PYQ</a></p>
+  <script>
+    (async function () {
+      const status = document.getElementById('status')
+      const go = document.getElementById('go')
+      try {
+        const res = await fetch('/official-pyq-store-snapshot.json', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Snapshot file missing (' + res.status + ')')
+        const payload = await res.json()
+        const paper2 = payload.itemPaper2
+        if (!paper2 || !(paper2.questions || []).length) {
+          throw new Error('Snapshot has no Paper 2 questions')
+        }
+
+        const healed = Object.assign({}, paper2, {
+          status: 'pending_review',
+          reviewedAt: undefined,
+          rejectReason: '',
+          questionCount: (paper2.questions || []).length,
+          hasOcr: String(paper2.preparedText || '').trim().length >= 80,
+        })
+
+        let existing = null
+        try {
+          existing = JSON.parse(localStorage.getItem('testvantage-official-pyq-pending') || 'null')
+        } catch (e) {
+          existing = null
+        }
+        const papers = Array.isArray(existing && existing.papers) ? existing.papers.slice() : []
+        const isPaper2 = function (p) {
+          if (!p) return false
+          if (p.id && healed.id && p.id === healed.id) return true
+          const s = String(p.session || '') + ' ' + String(p.paperLabel || '') + ' ' + String(p.paperId || '')
+          return /paper\s*2/i.test(s)
+        }
+        // Keep every non–Paper-2 row as-is (including Published Paper 1).
+        const kept = papers.filter(function (p) { return !isPaper2(p) })
+        kept.push(healed)
+        const merged = { papers: kept, updatedAt: Date.now(), version: (existing && existing.version) || 1 }
+
+        localStorage.setItem('testvantage-official-pyq-pending', JSON.stringify(merged))
+        try {
+          sessionStorage.setItem('testvantage-official-pyq-pending-backup', JSON.stringify(merged))
+        } catch (e) { /* optional */ }
+
+        const summaries = merged.papers.map(function (p) {
+          return {
+            id: p.id,
+            paperId: p.paperId,
+            paperLabel: p.paperLabel,
+            status: p.status,
+            year: p.year,
+            exam: p.exam,
+            session: p.session,
+            sourceLabel: p.sourceLabel,
+            questionCount: (p.questions || []).length,
+            expectedQuestionCount: p.expectedQuestionCount,
+            hasOcr: String(p.preparedText || '').trim().length >= 80,
+            importedAt: p.importedAt,
+          }
+        })
+        localStorage.setItem(
+          'testvantage-official-pyq-pending-list',
+          JSON.stringify({ papers: summaries, updatedAt: Date.now() }),
+        )
+        localStorage.setItem(
+          'testvantage-official-pyq-pending-item:' + healed.id,
+          JSON.stringify(healed),
+        )
+
+        try {
+          sessionStorage.setItem(
+            'testvantage-official-pyq-ui',
+            JSON.stringify({ filter: 'pending_review', openId: healed.id }),
+          )
+        } catch (e) { /* optional */ }
+
+        const pending = summaries.filter(function (p) { return p.status === 'pending_review' }).length
+        const approved = summaries.filter(function (p) { return p.status === 'approved' }).length
+        status.className = 'ok'
+        status.textContent =
+          'Paper 2 restored to Pending (' + (healed.questions || []).length +
+          ' questions). Other papers left alone. Pending tabs: ' + pending +
+          ', Published: ' + approved + '.'
+        go.hidden = false
+        setTimeout(function () { location.href = '/official-pyq' }, 900)
+      } catch (err) {
+        status.className = 'err'
+        status.textContent = 'Restore failed: ' + (err && err.message ? err.message : String(err))
+      }
+    })()
+  </script>
+</body>
+</html>

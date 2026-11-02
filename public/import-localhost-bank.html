@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Import from localhost</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 28rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Import from localhost</h1>
+    <p id="status">Loading bank from localhost…</p>
+    <iframe
+      id="relay"
+      title="localhost bank"
+      src="http://localhost:5173/copy-bank-to-127.html?relay=parent"
+      style="width: 0; height: 0; border: 0; position: absolute; opacity: 0"
+    ></iframe>
+    <script>
+      const port = location.port || '5173'
+      const status = document.getElementById('status')
+      const KEY = 'testvantage-bank-pending-127'
+
+      window.addEventListener('message', function (event) {
+        if (event.origin !== 'http://localhost:5173') return
+        if (event.data?.type !== 'testvantage-bank-merge') return
+        const payload = event.data.payload
+        const n = payload?.questions?.length ?? 0
+        if (n > 0) {
+          try {
+            sessionStorage.setItem(KEY, JSON.stringify(payload))
+            sessionStorage.setItem('testvantage-bank-copy-result', String(n))
+          } catch (e) {
+            status.textContent = 'Storage full: ' + e.message
+            return
+          }
+          status.textContent = 'Copied ' + n + ' question(s). Opening Question Bank…'
+          setTimeout(function () {
+            location.replace(
+              'http://127.0.0.1:' + port + '/question-bank?hub=view&view=all',
+            )
+          }, 500)
+        } else {
+          status.textContent =
+            'localhost has 0 questions. Open http://localhost:5173 in this browser to verify, or import a JSON backup.'
+        }
+      })
+
+      setTimeout(function () {
+        if (status.textContent.indexOf('Copied') === -1 && status.textContent.indexOf('0 questions') === -1) {
+          status.innerHTML =
+            'Could not reach localhost:5173. Start the app (RUN-APP.bat), then open this page again.<br><br>' +
+            '<a href="/question-bank">Back to Question Bank</a>'
+        }
+      }, 12000)
+    </script>
+  </body>
+</html>

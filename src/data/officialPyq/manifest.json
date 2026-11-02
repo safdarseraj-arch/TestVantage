@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "note": "Run node scripts/fetch-official-pyq.mjs to refresh portal probes. Official sources only — no coaching scrapes.",
+  "portals": [],
+  "slots": []
+}

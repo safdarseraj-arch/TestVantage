@@ -1,0 +1,144 @@
+---
+
+description: OCR upload pipeline — diagrams, passages, hybrid images, option crops (do not bypass)
+
+globs: onlinetest/src/**/*.{js,jsx}
+
+alwaysApply: false
+
+---
+
+
+
+# Question upload pipeline (canonical)
+
+
+
+When changing OCR upload, save, preview, or bank migration for questions, follow these modules — do not duplicate logic in UI components.
+
+
+
+## Regression gate (required before merge)
+
+
+
+```bash
+
+cd onlinetest && npm run test:regression
+
+```
+
+
+
+- **Persist (all saves)**: `src/utils/persistUpload.js` — `normalizeStemForStorage`, `persistPassageBundleFields`, `persistQuestionForBank`; do not save stems with `normalizeMathText` alone
+
+- **Contracts**: `src/utils/uploadRegressionContracts.js` — passage PIVQ/PSCQ whole-set, figure image, exam allowlist
+
+- **Save path** must use `buildPassageSubQuestionPayload` + `assertPassageSetStorageConsistent` (same rules as tests)
+
+- **New bug fix** → add fixture/assertion in contracts + a case in `scripts/test-*.mjs`
+
+- **Bank shape change** → bump `CURRENT_BANK_MIGRATE_VERSION` in `questionBank.js` (exported) + header comment; `test-bank-migrate-version.mjs` enforces sync
+
+
+
+## Diagram / stem image
+
+
+
+- **Detect**: `stemDiagramDetect.js` — `stemLikelyNeedsDiagramImage`, `shouldUseDiagramSplitWorkflow`, `shouldShowQuestionStemImage`, `isValidDiagramStemImage`
+
+- **Crop + save**: `figureQuestionImage.js` — `cropDiagramFromImageSource`, `resolveFigureImageForSave`, `buildStoredFigureImageFields`, `normalizeFigureQuestionOnMigrate`
+
+- **Auto-crop**: `autoDetectDiagram.js` — structural runs; never store full-page OCR as figure (`stemTextInImage: true` on figure questions is stripped on migrate)
+
+- **Persist contract**: figure questions → `questionImage` + `stemImageCrop: true` + `stemTextInImage: false`
+
+- **Integer/numerical**: multi-pass crop with top/bottom margins when no MCQ options; keep valid manual crop on save if auto re-crop fails
+
+- **UI**: `QuestionBank.jsx` save path must call `resolveFigureImageForSave`; on `diagram_missing` open split crop tool
+
+
+
+## Passage (2+ sub-questions)
+
+
+
+- **Parse**: `parsePassageUpload.js` — `looksLikePassageMultiMcq`, `resolvePassageUpload`, integer line-start stems (`Partial pressure of`, `In final conditions`)
+
+- **Dedupe display**: `passage.js` — `trimPassageBodyText`, `passageSubQuestionDisplayText`, `shouldShowPassageImageInViewer`, `normalizePassageQuestionStorage`
+
+- **Rules**: passage text = story + “Answer the following questions:” only; sub-question text = stem only; no full-page `passageImage` when passage text is long (text-only integer passages)
+
+- **PIVQ / PSCQ**: metadata type applies to **every** row in the set (`passage_integer` / `passage_scq` on parent + all `passageId` children); enforced by `uploadRegressionContracts.js`
+
+- **PIVQ answer modes** (`passageSubAnswer.js`): each sub-question is **IVQ** (`correctInteger` 0–9999) or **NVQ** (`correctNumerical` + tolerance); UI radios in `PassageSplitPanel.jsx`; `buildPassageSubQuestionPayload` + `assertPassageSetStorageConsistent` accept either; exam uses `QuestionInput` integer vs `NumericalAnswerInput` by `passageQuestionUsesNumerical(q)`; score in `scoring.js` `passage_integer` branch
+
+- **Save**: `savePassageBundle` → `buildPassageSubQuestionPayload`; children inherit type on load via `normalizePassageQuestionStorage`; edit load must pass `correctInteger`, `correctNumerical`, `answerMode` in `loadPassageSetIntoForm`
+
+- **OCR order**: detect/split passage **before** attaching full `questionImage`; clear `qText` when passage bundle is active; hide single-question preview when `passageBundle` is set
+
+
+
+## Exam metadata types
+
+
+
+- **Source**: `examPatterns.js` — `EXAM_METADATA_QUESTION_TYPES`, `getAllowedQuestionTypeIdsForExams`
+
+- JEE Main: SCQ, IVQ · NEET: SCQ, IVQ, PSCQ · JEE Advanced: all 7
+
+- UI may still offer PIVQ/PSCQ when exams are tagged; tests import production modules (no duplicated allowlists in scripts)
+
+
+
+## MCQ option graphs (A–D)
+
+
+
+- **Detect placeholders**: `graphOptionOcr.js`
+
+- **Auto-crop**: `autoDetectOptions.js` — `autoCropMcqOptions` (2×2 or four rows); wire via `autoCropOptionsFromSource` in `QuestionBank.jsx`
+
+
+
+## Bank migration
+
+
+
+- Version: `export const CURRENT_BANK_MIGRATE_VERSION` in `questionBank.js`; bump when changing stored shape
+
+- Every load/repair/save: `persistQuestionForBank(q, allQuestions)` (passage hygiene + stem math + PIVQ rows + figure migrate). Bump `CURRENT_BANK_MIGRATE_VERSION` when shape changes (v25+ persist pipeline).
+
+- **v26**: F(a,b) OCR guard in `fixOcrSeriesAndLimits.js`; evaluate-sum `+F$\\left` merge (`fixRunawayInlineMath.js` — `repairPrematureDollarBeforeLeft`, `repairEvaluateSumMathBlock`)
+
+- **v27**: F$\\left shard repair + auto-save bank when `persistQuestionForBank` changes stems on load (compare by id in `loadUploadedQuestions`)
+
+- After changing migration, run `npm run test:regression`
+
+
+
+## Stem math (LaTeX / KaTeX)
+
+
+
+- **Storage**: `stemStorage.js` → `normalizeStemForStorage` (never call `prepareTextForMathTextDisplay` from `migrateStoredQuestions.js` without import — use `stemStorage`)
+
+- **Display**: `prepareMathForRender.js` → `prepareTextForMathTextDisplay`; `MathText.jsx` runs it again + `unwrapEnglishDollarBlocks`
+
+- **Repairs**: `fixRunawayInlineMath.js` — do not use broad `([A-Za-z])$\\left` replace (causes `\\left\\left`); keep `+F$` / `F$` before `\\left` only; `isEnglishHeavyMath` must return false when `\\left`/`\\right` present
+
+- **Test**: `scripts/test-math-left-right.mjs`
+
+
+
+## Question Bank browse order
+
+
+
+- **Filters**: `BankQuestionFilters.jsx` + `bankListFilters.js` — Subject → Unit → Chapter → Topic (cascading), Type, Toughness; list sorted same order
+
+- **Untagged**: `isQuestionMetaClassified` — needs **Subject + Unit + Chapter + Type** only (topic/exams/toughness optional) → else **Untagged** group; filter Subject → **Untagged (N)**
+
+- **Authoring**: `QuestionMetadataForm.jsx` uses the same 1–6 labels (Unit = `section` in storage)
+

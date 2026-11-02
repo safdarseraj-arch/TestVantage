@@ -1,0 +1,185 @@
+{
+  "schema_version": "1.0",
+  "source_type": "previous_year_paper",
+  "source_type_detected": false,
+  "stats": {
+    "question_count": 4,
+    "passage_count": 1,
+    "incomplete_count": 0,
+    "with_figures": 1,
+    "removed_noise_lines": 11,
+    "mean_confidence": 0.9
+  },
+  "passages": [
+    {
+      "id": "p1",
+      "title": "Passage / Comprehension",
+      "text": "Paragraph\n\nA solid sphere of mass $M$ and radius $R$ rolls without slipping down an\nincline of angle $\\theta$. The moment of inertia of the sphere about its own\ncentre is $2 M R^{2} / 5$, and the coefficient of friction is large enough that\nslipping never occurs anywhere along the incline.",
+      "question_numbers": [
+        19,
+        20
+      ],
+      "figures": [],
+      "is_complete": true,
+      "issues": []
+    }
+  ],
+  "questions": [
+    {
+      "number": 17,
+      "printed_number": 17,
+      "stem": "The circuit shown in the figure carries a steady current. The\npotential difference across $R_{2}$ is\n\\includegraphics{https://cdn.mathpix.com/cropped/2024_p2_circuit.jpg?height=210&width=340&top_left_y=95&top_left_x=180}",
+      "options": [
+        "$\\frac{I R_{2}}{2}$",
+        "$I R_{2}$",
+        "$2 I R_{2}$",
+        "$\\frac{I R_{2}}{4}$"
+      ],
+      "option_labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "figures": [
+        "https://cdn.mathpix.com/cropped/2024_p2_circuit.jpg?height=210&width=340&top_left_y=95&top_left_x=180"
+      ],
+      "question_type": "single_correct",
+      "passage_id": null,
+      "is_complete": true,
+      "issues": [],
+      "confidence": 0.9,
+      "matching_lists": null,
+      "source_type": "previous_year_paper"
+    },
+    {
+      "number": 18,
+      "printed_number": 18,
+      "stem": "Match each entry in List-I with the appropriate entry in List-II.\n\nList-I\n(P) Isothermal process\n(Q) Adiabatic process\n(R) Isochoric process\n(S) Isobaric process\n\nList-II\n(1) $\\Delta U=0$\n(2) $Q=0$\n(3) $W=0$\n(4) $\\Delta P=0$",
+      "options": [
+        "P-1, Q-2, R-3, S-4",
+        "P-2, Q-1, R-4, S-3",
+        "P-3, Q-4, R-1, S-2",
+        "P-4, Q-3, R-2, S-1"
+      ],
+      "option_labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "figures": [],
+      "question_type": "match_the_column",
+      "passage_id": null,
+      "is_complete": true,
+      "issues": [],
+      "confidence": 0.9,
+      "matching_lists": {
+        "list_i_title": "List-I",
+        "list_ii_title": "List-II",
+        "list_i": [
+          {
+            "label": "(P)",
+            "text": "Isothermal process"
+          },
+          {
+            "label": "(Q)",
+            "text": "Adiabatic process"
+          },
+          {
+            "label": "(R)",
+            "text": "Isochoric process"
+          },
+          {
+            "label": "(S)",
+            "text": "Isobaric process"
+          }
+        ],
+        "list_ii": [
+          {
+            "label": "(1)",
+            "text": "$\\Delta U=0$"
+          },
+          {
+            "label": "(2)",
+            "text": "$Q=0$"
+          },
+          {
+            "label": "(3)",
+            "text": "$W=0$"
+          },
+          {
+            "label": "(4)",
+            "text": "$\\Delta P=0$"
+          }
+        ],
+        "is_complete": true
+      },
+      "source_type": "previous_year_paper"
+    },
+    {
+      "number": 19,
+      "printed_number": 19,
+      "stem": "The acceleration of the centre of mass of the sphere is",
+      "options": [
+        "$\\frac{5 g \\sin \\theta}{7}$",
+        "$g \\sin \\theta$",
+        "$\\frac{2 g \\sin \\theta}{5}$",
+        "$\\frac{g \\sin \\theta}{2}$"
+      ],
+      "option_labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "figures": [],
+      "question_type": "comprehension_child",
+      "passage_id": "p1",
+      "is_complete": true,
+      "issues": [],
+      "confidence": 0.9,
+      "matching_lists": null,
+      "source_type": "previous_year_paper"
+    },
+    {
+      "number": 20,
+      "printed_number": 20,
+      "stem": "The total kinetic energy after the sphere descends a height $h$ is",
+      "options": [
+        "$M g h$",
+        "$\\frac{5 M g h}{7}$",
+        "$\\frac{2 M g h}{7}$",
+        "$\\frac{M g h}{2}$"
+      ],
+      "option_labels": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "figures": [],
+      "question_type": "comprehension_child",
+      "passage_id": "p1",
+      "is_complete": true,
+      "issues": [],
+      "confidence": 0.9,
+      "matching_lists": null,
+      "source_type": "previous_year_paper"
+    }
+  ],
+  "removed_noise": [
+    "answer_key_section: ANSWER KEY\n17. (B) 18. (A) 19. (A) 20. (A)",
+    "exam_metadata: JEE (Advanced) 2024 Paper 2",
+    "publisher: FIITJEE Publications",
+    "page_number: Page 7",
+    "section_header: SECTION 1 (Maximum Marks: 12)",
+    "section_instruction: - This section contains THREE (03) questions.",
+    "marking_scheme: - Full Marks : +3 If ONLY the correct option is chosen.",
+    "marking_scheme: - Zero Marks : 0 If none of the options is chosen.",
+    "watermark: Space for rough work",
+    "page_number: Page 8",
+    "publisher: FIITJEE Publications"
+  ],
+  "warnings": []
+}

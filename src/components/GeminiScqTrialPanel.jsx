@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE } from '../config/platform.js'
 import {
@@ -6,6 +6,17 @@ import {
   queueBatch,
   HYBRID_AI_ROUTE,
 } from '../utils/hybridAiClient.js'
+import {
+  clearHybridAiJobPending,
+  fetchHybridAiPoolCount,
+  hybridJobFailedAfterQueueMessage,
+  hybridSyncUserMessage,
+  markHybridAiJobPending,
+  postgresHasNoHybridAiRows,
+  syncHybridAiAfterJob,
+} from '../utils/hybridAiSync.js'
+import { peekUploadedQuestions } from '../utils/questionBank.js'
+import { countHybridAiDrafts } from '../utils/questionBankSubBank.js'
 import {
   TRIAL_DEFAULT_COUNT,
   TRIAL_COUNT_OPTIONS,
@@ -25,8 +36,6 @@ import {
   sleepMs,
   isQuotaError,
   quotaBackoffMs,
-  countTrialDraftsBySubject,
-  stemPreview,
   PYQ_STYLE_YEARS,
   toughnessMixHint,
   trialExamLabel,
@@ -52,7 +61,7 @@ function phaseLabel(phase) {
 }
 
 /**
- * Teacher-side practice generation — queues TestVantage Hybrid AI batch jobs per chapter.
+ * Teacher-side practice generation — queues TestVantages Hybrid AI batch jobs per chapter.
  * Legacy Gemini /vision/scq-trial script paths are retired; use Generate buttons or Hybrid AI nav.
  */
 export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessage }) {
@@ -73,8 +82,6 @@ export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessa
   const [log, setLog] = useState([])
   const [live, setLive] = useState(null)
   const [liveError, setLiveError] = useState('')
-  const pollBusy = useRef(false)
-
   const countResolved = useMemo(
     () => resolveTrialCount(countPicker, customCount),
     [countPicker, customCount],
@@ -83,78 +90,41 @@ export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessa
 
   useEffect(() => {
     let cancelled = false
-    const tick = async () => {
-      if (pollBusy.current) return
-      pollBusy.current = true
+    const pingHybridApi = async () => {
       try {
-        let res = await fetch(`${API_BASE}/vision/scq-trial/live`, {
+        const res = await fetch(`${API_BASE}/health`, {
           signal: AbortSignal.timeout(8000),
         })
-        let data = await res.json().catch(() => ({}))
-        let fromApi = res.ok && Boolean(data && (data.ok || data.totals))
-        if (!fromApi) {
-          const fileRes = await fetch(`/gemini-scq-trial-live.json?t=${Date.now()}`, {
-            signal: AbortSignal.timeout(4000),
-          })
-          const fileData = await fileRes.json().catch(() => ({}))
-          if (fileRes.ok && (fileData.ok || fileData.totals)) {
-            data = fileData
-            fromApi = false
-          }
-        }
+        const data = await res.json().catch(() => ({}))
         if (cancelled) return
-        if (data && (data.ok || data.totals)) setLive(data)
-        if (res.ok && (data.ok || data.totals) && fromApi) {
-          if (data.geminiKeyPresent === false) {
-            setLiveError(
-              'GEMINI_API_KEY is missing. Add it to onlinetest/.env, then press F5 so the API on port 3001 can read it.',
-            )
-          } else {
-            setLiveError('')
-          }
-        } else if (!cancelled) {
-          setLiveError(
-            data.error ||
-              'API server (port 3001) is off. Keep the bottom panel open (Ctrl+J then Ctrl+`), then press F5 once.',
-          )
+        if (res.ok && data.ok !== false && data.database === 'ready') {
+          setLiveError('')
+          return
         }
+        const detail =
+          (typeof data.detail === 'string' && data.detail) ||
+          (typeof data.error === 'string' && data.error) ||
+          (data.database === 'unavailable'
+            ? 'Hybrid AI Postgres is not ready. Start Postgres, press F5, then retry Generate. See POSTGRES-SETUP-SIMPLE.txt.'
+            : res.status === 503
+              ? 'TestVantages Hybrid AI is not running (port 8000). Press F5 and keep the bottom terminal open.'
+              : `Hybrid AI health check failed (${res.status}).`)
+        setLiveError(String(detail))
       } catch {
         if (!cancelled) {
-          try {
-            const fileRes = await fetch(`/gemini-scq-trial-live.json?t=${Date.now()}`, {
-              signal: AbortSignal.timeout(4000),
-            })
-            const fileData = await fileRes.json().catch(() => ({}))
-            if (!cancelled && fileRes.ok && (fileData.ok || fileData.totals)) setLive(fileData)
-          } catch {
-            /* last log file missing */
-          }
-          if (!cancelled) {
-            setLiveError(
-              'API server (port 3001) is off. Keep the bottom panel open (Ctrl+J then Ctrl+`), then press F5 once.',
-            )
-          }
+          setLiveError(
+            'TestVantages Hybrid AI is not running (port 8000). Press F5 and keep the bottom terminal open.',
+          )
         }
-      } finally {
-        pollBusy.current = false
       }
     }
-    tick()
-    const id = window.setInterval(tick, 1500)
+    void pingHybridApi()
+    const id = window.setInterval(() => void pingHybridApi(), 30_000)
     return () => {
       cancelled = true
       window.clearInterval(id)
     }
   }, [])
-
-  const pushHeartbeat = (payload) => {
-    fetch(`${API_BASE}/vision/scq-trial/heartbeat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(4000),
-    }).catch(() => {})
-  }
 
   const subjectsForExam =
     examId === 'neet'
@@ -202,21 +172,11 @@ export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessa
     return Object.fromEntries(ids.map((id) => [id, listTrialChapters(examId, id).length]))
   }, [examId])
 
-  const appendLog = (line, extra = {}) => {
+  const appendLog = (line, _extra = {}) => {
     setLog((prev) => [...prev.slice(-80), line])
-    pushHeartbeat({
-      logLine: line,
-      lastStem: extra.lastStem,
-      lastChapter: extra.lastChapter,
-      lastSubject: extra.lastSubject,
-      running: extra.running,
-      error: extra.error,
-      errorKey: extra.errorKey,
-      level: extra.level,
-    })
   }
 
-  const generateOneChapter = async (job, bankSnapshot) => {
+  const generateOneChapter = async (job) => {
     const resolved = resolveTrialCount(
       job.countPicker ?? countPicker,
       job.customCount ?? customCount,
@@ -225,11 +185,11 @@ export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessa
     const count = job.count ?? resolved.count
     const typeMix = job.typeMix ?? (typeMixMode === 'all' ? 'all' : selectedTypes)
     const payload = buildBatchPayloadFromTrialJob({ ...job, count, typeMix }, count, typeMix)
-    await queueBatch(payload)
+    const data = await queueBatch(payload)
     return {
-      saved: count,
+      queued: count,
+      jobId: data?.job_id || '',
       duplicates: 0,
-      nextBank: bankSnapshot,
       pyqBank: Boolean(job.pyqStyle),
       hybridQueued: true,
     }
@@ -284,10 +244,19 @@ export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessa
           ? ` PYQ-style (AI) into PYQ bank — ${trialExamLabel(examId)} ${pyqYear} (actual toughness, not 40/30/30).`
           : ` Types: ${trialTypeMixLabel(examId, typeMix)}.`),
     ])
-    let bankSnapshot = [...questions]
-    let totalSaved = 0
+    let totalQueued = 0
     let totalDup = 0
     let totalErr = 0
+    const jobIds = []
+    let baselinePoolAiCount = 0
+    try {
+      baselinePoolAiCount = await fetchHybridAiPoolCount()
+    } catch (e) {
+      onMessage?.('error', e instanceof Error ? e.message : 'Hybrid AI pool check failed.')
+      setBusy(false)
+      return
+    }
+    markHybridAiJobPending({ baselinePoolAiCount, questionsQueued: count * stamped.length })
     try {
       for (let i = 0; i < stamped.length; i++) {
         const job = stamped[i]
@@ -308,16 +277,16 @@ export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessa
         let attempt = 0
         while (attempt < 4) {
           try {
-            const out = await generateOneChapter(job, bankSnapshot)
-            bankSnapshot = out.nextBank
-            totalSaved += out.saved
+            const out = await generateOneChapter(job)
+            totalQueued += out.queued
             totalDup += out.duplicates
+            if (out.jobId) jobIds.push(out.jobId)
             appendLog(
-              `  saved ${out.saved} ${out.pyqBank ? 'to PYQ bank' : 'draft(s)'}` +
+              `  queued ${out.queued} for Hybrid AI` +
+                (out.pyqBank ? ' (PYQ-style → AI sub_bank when done)' : ' (drafts after sync)') +
                 (out.duplicates ? `, ${out.duplicates} duplicate_review` : ''),
               {
-                running: { ...running, phase: 'saved', generatingIndex: out.saved },
-                lastStem: stemPreview(out.nextBank[0]?.text, 140),
+                running: { ...running, phase: 'saved', generatingIndex: out.queued },
                 lastChapter: job.chapter,
                 lastSubject: job.subject,
               },
@@ -347,23 +316,58 @@ export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessa
         onRefresh?.()
         if (i < jobs.length - 1) await sleepMs(SCQ_TRIAL_GAP_MS)
       }
-      const summary = countTrialDraftsBySubject(bankSnapshot)
       onMessage?.(
-        totalErr && !totalSaved ? 'error' : 'success',
-        usePyq
-          ? `Hybrid AI queued ${totalSaved} PYQ-style batch job(s)` +
-              (totalErr ? `, ${totalErr} chapter error(s)` : '') +
-              `. Items land in the AI sub_bank when jobs finish.`
-          : `Hybrid AI queued ${totalSaved} batch job(s)` +
-              (totalErr ? `, ${totalErr} chapter error(s)` : '') +
-              `. See ${HYBRID_AI_ROUTE} or Saved questions when synced.`,
+        totalErr && !totalQueued ? 'error' : 'info',
+        totalErr && !totalQueued
+          ? `Could not queue Hybrid AI (${totalErr} chapter error(s)).`
+          : `Queued ${totalQueued} question(s) on Hybrid AI` +
+              (totalErr ? ` (${totalErr} chapter error(s))` : '') +
+              `. Waiting for Hybrid AI to finish in Postgres (30–90s)…`,
       )
       appendLog(
-        `Done. Saved ${totalSaved}. Duplicates ${totalDup}. Errors ${totalErr}.` +
-          (usePyq ? ' Destination: PYQ bank.' : ` Trial rows now ${summary.drafts}.`),
+        `Queued ${totalQueued} on Hybrid AI. Duplicates ${totalDup}. Errors ${totalErr}. Waiting for Postgres…`,
       )
+      let syncOut = { added: 0, ids: [], poolCount: undefined }
+      if (totalQueued && !totalErr) {
+        try {
+          syncOut = await syncHybridAiAfterJob({
+            attempts: 24,
+            intervalMs: 5000,
+            baselinePoolAiCount,
+            jobIds,
+          })
+        } catch (syncErr) {
+          const msg = hybridJobFailedAfterQueueMessage(syncErr)
+          onMessage?.('error', msg)
+          appendLog(`Sync error: ${msg}`, { level: 'error' })
+        }
+      }
+      onRefresh?.()
+      const hybridDrafts = countHybridAiDrafts(peekUploadedQuestions())
+      if (syncOut.added > 0) {
+        onMessage?.(
+          'success',
+          usePyq
+            ? `Synced ${syncOut.added} PYQ-style Hybrid AI draft(s). Open Saved → Draft → Hybrid AI sub-bank.`
+            : `Synced ${syncOut.added} Hybrid AI draft(s). Open Saved → Draft → Hybrid AI sub-bank.`,
+        )
+        appendLog(`Synced ${syncOut.added} draft(s) into the bank (${hybridDrafts} Hybrid AI drafts total).`)
+      } else if (totalQueued && !totalErr) {
+        if (postgresHasNoHybridAiRows(syncOut)) {
+          const emptyMsg =
+            hybridSyncUserMessage(syncOut, { localHybridDraftCount: hybridDrafts }) ??
+            'Postgres still has 0 Hybrid AI rows — generation likely failed (check GEMINI_API_KEY).'
+          onMessage?.('error', emptyMsg)
+          appendLog(emptyMsg, { level: 'error' })
+        } else {
+          onMessage?.(
+            'info',
+            'Hybrid AI is still drafting. Open Saved questions → Sync from Hybrid AI in a minute, or wait for auto-sync.',
+          )
+          appendLog('No new rows yet — job may still be running. Use Sync from Hybrid AI on Saved questions.')
+        }
+      }
     } finally {
-      pushHeartbeat({ running: null, logLine: 'In-tab generate finished.' })
       setBusy(false)
       onRefresh?.()
     }
@@ -396,7 +400,7 @@ export default function GeminiScqTrialPanel({ questions = [], onRefresh, onMessa
         <strong>Ctrl+J</strong> then <strong>Ctrl+`</strong>) and press F5 if the API is not running.
       </p>
       <p className="form-hint">
-        Jobs run on the TestVantage AI service (port 8000). About{' '}
+        Jobs run on TestVantages Hybrid AI (same site, <code>/api</code> on 5173). About{' '}
         {Math.round(SCQ_TRIAL_GAP_MS / 1000)} seconds between chapter queues to avoid overload.
       </p>
       <p className="form-hint">

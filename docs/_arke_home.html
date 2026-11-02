@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARKE Scholars | Ab Dream College Ki Bari Hai — NEET / JEE / Foundation</title>
+  <meta name="description" content="Join India&#039;s most prestigious online institute. IITian + Doctor faculty, AI-driven mentorship, HD live classes for JEE, NEET, and Foundation. Rising Beyond Limits from Kota.">
+  <meta name="theme-color" content="#0a0e27">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ARKE Scholars | Ab Dream College Ki Bari Hai — NEET / JEE / Foundation">
+  <meta property="og:description" content="Join India&#039;s most prestigious online institute. IITian + Doctor faculty, AI-driven mentorship, HD live classes for JEE, NEET, and Foundation. Rising Beyond Limits from Kota.">
+  <meta property="og:image" content="/uploads/arke-logo.png">
+
+  <link rel="icon" type="image/webp" href="/uploads/favicon.webp">
+
+  <!-- Tailwind + Fonts -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+  <!-- ARKE Lead Form widget JS — powers [lead-form] shortcode (OTP verification, AJAX submit, step transitions) -->
+  <script src="/assets/js/arke-forms.js" defer></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'surface': '#0a0e27',
+            'surface-container-lowest': '#050818',
+            'surface-container-low': '#0f1332',
+            'surface-container': '#151a3b',
+            'surface-container-high': '#1c2247',
+            'on-surface': '#f0f2f7',
+            'on-surface-variant': '#a8b0c8',
+            'primary-container': '#f4b942',
+            'on-primary-container': '#412d00',
+            'tertiary-container': '#70cdff',
+          },
+          fontFamily: {
+            'display': ['"Plus Jakarta Sans"', 'sans-serif'],
+            'body': ['Inter', 'sans-serif'],
+          },
+          spacing: {
+            'container-margin': '20px',
+            'section-gap': '90px',
+          },
+          fontSize: {
+            'display-lg': ['clamp(2.5rem, 6vw, 4.5rem)', {lineHeight: '1.05', letterSpacing: '-0.02em', fontWeight: '800'}],
+            'display-md': ['clamp(2rem, 5vw, 3.25rem)', {lineHeight: '1.1', letterSpacing: '-0.01em', fontWeight: '800'}],
+            'headline-lg': ['clamp(1.75rem, 4vw, 2.25rem)', {lineHeight: '1.2', fontWeight: '700'}],
+            'headline-md': ['clamp(1.25rem, 3vw, 1.5rem)', {lineHeight: '1.3', fontWeight: '700'}],
+            'body-lg': ['18px', {lineHeight: '28px'}],
+            'body-md': ['16px', {lineHeight: '24px'}],
+            'label-lg': ['14px', {lineHeight: '20px', letterSpacing: '0.05em', fontWeight: '600'}],
+            'label-sm': ['12px', {lineHeight: '16px', fontWeight: '500'}],
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* ===== BASE ===== */
+    body {
+      background-color: #0a0e27;
+      color: #f0f2f7;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    ::-webkit-scrollbar { width: 10px; }
+    ::-webkit-scrollbar-track { background: #050818; }
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #f4b942, #e6a930);
+      border-radius: 10px;
+    }
+    .text-balance { text-wrap: balance; }
+
+    /* ===== BACKGROUND GRID (subtle) ===== */
+    .bg-grid {
+      background-image:
+        linear-gradient(rgba(244,185,66,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(244,185,66,0.035) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* ===== GLASS CARDS ===== */
+    .glass-card {
+      background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 1.25rem;
+      transition: border-color 0.4s ease, transform 0.4s ease, box-shadow 0.4s ease;
+    }
+    .glass-card-strong {
+      background: linear-gradient(135deg, rgba(244,185,66,0.10) 0%, rgba(255,255,255,0.02) 100%);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(244,185,66,0.20);
+      border-radius: 1.75rem;
+    }
+
+    /* Small decorative gold corner on premium cards */
+    .glass-card::before, .glass-card-strong::before {
+      content: '';
+      position: absolute;
+      top: 0; right: 0;
+      width: 60px; height: 60px;
+      background: radial-gradient(circle at top right, rgba(244,185,66,0.15), transparent 70%);
+      border-radius: inherit;
+      pointer-events: none;
+    }
+    .glass-card, .glass-card-strong { position: relative; }
+
+    /* ===== GOLD GRADIENT TEXT ===== */
+    .text-gradient-gold {
+      background: linear-gradient(135deg, #ffd999 0%, #f4b942 40%, #ffd999 100%);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: goldShimmer 6s ease-in-out infinite;
+    }
+    @keyframes goldShimmer {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn-primary {
+      background: linear-gradient(135deg, #f4b942 0%, #e6a930 100%);
+      color: #412d00;
+      font-weight: 700;
+      padding: 14px 30px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: 0 6px 20px rgba(244,185,66,0.25);
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(244,185,66,0.45);
+    }
+    /* Shimmer sweep on hover */
+    .btn-primary::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -120%;
+      width: 60%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      transform: skewX(-25deg);
+      transition: left 0.7s ease;
+    }
+    .btn-primary:hover::after { left: 130%; }
+
+    .btn-secondary {
+      background: transparent;
+      border: 2px solid rgba(244,185,66,0.4);
+      color: #f4b942;
+      font-weight: 700;
+      padding: 12px 28px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .btn-secondary:hover {
+      background: rgba(244,185,66,0.08);
+      border-color: #f4b942;
+      color: #ffd999;
+    }
+
+    /* ===== SECTION EYEBROW (elite pill with glowing dot) ===== */
+    .section-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px 6px 12px;
+      background: rgba(244,185,66,0.08);
+      border: 1px solid rgba(244,185,66,0.25);
+      border-radius: 999px;
+      color: #f4b942;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .section-eyebrow::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f4b942;
+      box-shadow: 0 0 10px #f4b942;
+      animation: dotPulse 2s ease-in-out infinite;
+    }
+    @keyframes dotPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 10px #f4b942; }
+      50% { opacity: 0.5; box-shadow: 0 0 4px #f4b942; }
+    }
+
+    /* ===== STAT NUMBER ===== */
+    .stat-num {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 1;
+      background: linear-gradient(135deg, #ffd999, #f4b942);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* ===== GOLD GLOW ===== */
+    .gold-glow { box-shadow: 0 0 60px rgba(244,185,66,0.14); }
+    .gold-glow-strong { box-shadow: 0 0 100px rgba(244,185,66,0.22); }
+
+    /* ===== REVEAL ANIMATIONS ===== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.75s ease, transform 0.75s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+
+    /* ===== HEADER ===== */
+    .site-header {
+      background: rgba(10,14,39,0.55);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+    }
+    .site-header.scrolled {
+      background: rgba(10,14,39,0.92);
+      border-bottom-color: rgba(244,185,66,0.20);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+
+    /* ===== NAV LINK (elegant sliding underline) ===== */
+    .nav-link {
+      position: relative;
+      padding: 8px 2px;
+      color: #a8b0c8;
+      font-weight: 500;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+      transition: color 0.3s ease;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #f4b942, #ffd999);
+      transition: all 0.35s ease;
+      transform: translateX(-50%);
+      border-radius: 2px;
+    }
+    .nav-link:hover,
+    .nav-link.active {
+      color: #f4b942;
+    }
+    .nav-link:hover::after,
+    .nav-link.active::after {
+      width: 100%;
+    }
+
+    /* ===== MOBILE MENU ===== */
+    .mobile-menu {
+      transform: translateX(100%);
+      transition: transform 0.4s ease;
+      pointer-events: none;
+    }
+    .mobile-menu.open {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+    .mobile-menu.open .mobile-backdrop { opacity: 1; }
+    .mobile-backdrop {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    /* ===== WHATSAPP FLOATING BUTTON ===== */
+    .whatsapp-float {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      background: #25D366;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      box-shadow: 0 10px 28px rgba(37,211,102,0.45), 0 0 0 4px rgba(37,211,102,0.15);
+      z-index: 999;
+      transition: transform 0.3s ease;
+    }
+    .whatsapp-float:hover {
+      transform: scale(1.08);
+    }
+    .whatsapp-float::before {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 2px solid #25D366;
+      opacity: 0.7;
+      animation: pulseRing 2.2s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes pulseRing {
+      0%   { transform: scale(1);   opacity: 0.7; }
+      70%  { transform: scale(1.5); opacity: 0;   }
+      100% { transform: scale(1.5); opacity: 0;   }
+    }
+    @media (max-width: 480px) {
+      .whatsapp-float { bottom: 18px; right: 18px; width: 56px; height: 56px; }
+    }
+
+    /* ===== FLOATING PHONE MOCKUP ANIMATION ===== */
+    @keyframes floatY {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-14px); }
+    }
+    .animate-float { animation: floatY 6s ease-in-out infinite; }
+
+    /* ===== TESTIMONIAL DECORATIVE QUOTE MARK ===== */
+    .testimonial-card { position: relative; overflow: hidden; }
+    .testimonial-card::after {
+      content: '\201C';
+      position: absolute;
+      top: -30px;
+      right: 18px;
+      font-family: 'Plus Jakarta Sans', serif;
+      font-size: 160px;
+      line-height: 1;
+      color: rgba(244,185,66,0.10);
+      font-weight: 800;
+      pointer-events: none;
+    }
+
+    /* ===== FAQ ACCORDION ===== */
+    [data-faq-item] [data-faq-body] {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease, padding 0.4s ease;
+    }
+    [data-faq-item].faq-open [data-faq-body] {
+      max-height: 400px;
+      padding-top: 1rem;
+    }
+    [data-faq-item] [data-faq-icon] { transition: transform 0.3s ease; }
+    [data-faq-item].faq-open [data-faq-icon] { transform: rotate(45deg); }
+
+    /* ===== FOOTER SOCIAL ICONS ===== */
+    .social-icon {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      color: #a8b0c8;
+      transition: all 0.3s ease;
+    }
+    .social-icon:hover {
+      color: #f4b942;
+      border-color: #f4b942;
+      background: rgba(244,185,66,0.10);
+      transform: translateY(-3px);
+    }
+  </style>
+</head>
+<body class="font-body antialiased">
+
+<!-- ============================================================ -->
+<!-- HEADER                                                       -->
+<!-- ============================================================ -->
+<header id="siteHeader" class="site-header fixed top-0 w-full z-50 h-20">
+  <div class="max-w-7xl mx-auto h-full px-container-margin flex items-center justify-between">
+
+    <!-- LOGO (single PNG only — text removed) -->
+    <a href="/" class="flex items-center shrink-0" aria-label="ARKE Scholars — Home">
+      <img src="/uploads/arke-logo.png" alt="ARKE Scholars" class="h-12 md:h-14 w-auto" width="140" height="56">
+    </a>
+
+    <!-- DESKTOP NAV -->
+    <nav class="hidden lg:flex items-center gap-10" aria-label="Primary">
+      <a href="#courses"   class="nav-link ">JEE</a>
+      <a href="https://arkescholars.com/neet-2027-dropper-batch?utm_source=web_menu"   class="nav-link ">NEET</a>
+      <a href="#courses"   class="nav-link ">Foundation</a>
+      <a href="/contact-us" class="nav-link ">Contact Us</a>
+      <a href="/app"       class="nav-link ">App</a>
+    </nav>
+
+    <!-- RIGHT: Enroll Now + mobile toggle -->
+    <div class="flex items-center gap-3">
+      <a href="#hero-form" class="btn-primary text-sm hidden sm:inline-flex">
+        <span class="material-symbols-outlined text-[18px]">verified</span>
+        Enroll Now
+      </a>
+      <button id="mobileMenuBtn"
+              class="lg:hidden w-11 h-11 rounded-lg border border-white/15 flex items-center justify-center text-on-surface hover:border-primary-container hover:text-primary-container transition-colors"
+              aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- MOBILE MENU DRAWER -->
+<div id="mobileMenu" class="mobile-menu fixed inset-0 z-[60] lg:hidden">
+  <div class="mobile-backdrop absolute inset-0 bg-black/70 backdrop-blur-sm" id="mobileBackdrop"></div>
+  <div class="absolute right-0 top-0 h-full w-[85%] max-w-sm bg-surface-container border-l border-white/10 p-6 pt-20 overflow-y-auto">
+    <button id="mobileClose"
+            class="absolute top-5 right-5 w-11 h-11 rounded-full flex items-center justify-center text-on-surface hover:bg-white/10 transition-colors"
+            aria-label="Close menu">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+
+    <nav class="flex flex-col gap-1.5" aria-label="Mobile primary">
+      <a href="#courses" class="nav-close p-4 rounded-xl text-on-surface hover:bg-primary-container/10 hover:text-primary-container transition-colors flex items-center gap-3 font-medium">
+        <span class="material-symbols-outlined text-primary-container">rocket_launch</span> JEE
+      </a>
+      <a href="#courses" class="nav-close p-4 rounded-xl text-on-surface hover:bg-primary-container/10 hover:text-primary-container transition-colors flex items-center gap-3 font-medium">
+        <span class="material-symbols-outlined text-primary-container">medical_services</span> NEET
+      </a>
+      <a href="#courses" class="nav-close p-4 rounded-xl text-on-surface hover:bg-primary-container/10 hover:text-primary-container transition-colors flex items-center gap-3 font-medium">
+        <span class="material-symbols-outlined text-primary-container">school</span> Foundation
+      </a>
+      <a href="/contact-us" class="nav-close p-4 rounded-xl text-on-surface hover:bg-primary-container/10 hover:text-primary-container transition-colors flex items-center gap-3 font-medium">
+        <span class="material-symbols-outlined text-primary-container">support_agent</span> Contact Us
+      </a>
+      <a href="/app" class="nav-close p-4 rounded-xl text-on-surface hover:bg-primary-container/10 hover:text-primary-container transition-colors flex items-center gap-3 font-medium">
+        <span class="material-symbols-outlined text-primary-container">smartphone</span> App
+      </a>
+    </nav>
+
+    <a href="#hero-form" class="nav-close btn-primary w-full mt-8 justify-center">
+      <span class="material-symbols-outlined text-[18px]">verified</span>
+      Enroll Now
+    </a>
+
+    <div class="mt-8 pt-6 border-t border-white/10 space-y-3 text-sm">
+      <a href="tel:+917607151617"
+         class="flex items-center gap-3 text-on-surface-variant hover:text-primary-container transition-colors">
+        <span class="material-symbols-outlined text-primary-container text-[20px]">phone</span>
+        +917607151617      </a>
+      <a href="/cdn-cgi/l/email-protection#b7d4d8d9c3d6d4c3f7d6c5dcd2c4d4dfd8dbd6c5c499d4d8da" class="flex items-center gap-3 text-on-surface-variant hover:text-primary-container transition-colors">
+        <span class="material-symbols-outlined text-primary-container text-[20px]">mail</span>
+        <span class="__cf_email__" data-cfemail="593a36372d383a2d19382b323c2a3a313635382b2a773a3634">[email&#160;protected]</span>      </a>
+    </div>
+  </div>
+</div>
+
+<main class="pt-20">
+<!-- ============================================================ -->
+<!-- 1. HERO SECTION                                              -->
+<!-- ============================================================ -->
+<section class="relative overflow-hidden min-h-[500px] md:min-h-[580px] flex items-center bg-grid">
+  <!-- decorative background blobs -->
+  <div class="absolute top-1/4 -left-32 w-96 h-96 bg-primary-container/10 blur-[130px] rounded-full pointer-events-none" aria-hidden="true"></div>
+  <div class="absolute bottom-0 right-0 w-[500px] h-[500px] bg-tertiary-container/6 blur-[140px] rounded-full pointer-events-none" aria-hidden="true"></div>
+  <!-- subtle star specks -->
+  <div class="absolute inset-0 opacity-40 pointer-events-none" aria-hidden="true"
+       style="background-image: radial-gradient(1px 1px at 20% 30%, rgba(244,185,66,0.5) 50%, transparent), radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,0.4) 50%, transparent), radial-gradient(1px 1px at 85% 20%, rgba(244,185,66,0.4) 50%, transparent); background-size: 100% 100%;"></div>
+
+  <div class="relative max-w-7xl mx-auto px-container-margin w-full grid lg:grid-cols-2 gap-12 lg:gap-16 items-center py-6 lg:py-10">
+
+    <!-- LEFT: Headline + Stats -->
+    <div class="space-y-8 reveal visible">
+      <span class="section-eyebrow">Elite Learning Platform</span>
+
+      <h1 class="font-display font-extrabold leading-[1.05] text-on-surface text-balance text-display-lg">
+        Ab <span class="text-gradient-gold">Dream College</span><br>
+        Ki Bari Hai
+      </h1>
+
+      <p class="text-body-lg text-on-surface-variant max-w-lg leading-relaxed">
+        Join India's most prestigious online institute. High-tech digital classes and personalized mentorship for
+        <strong class="text-on-surface">JEE</strong>,
+        <strong class="text-on-surface">NEET</strong>, and
+        <strong class="text-on-surface">Foundation</strong>.
+      </p>
+
+      <!-- Stats row -->
+      <div class="flex gap-8 md:gap-14 pt-2">
+        <div>
+          <div class="stat-num">15k<span class="text-primary-container">+</span></div>
+          <div class="text-on-surface-variant text-label-sm uppercase tracking-[0.15em] mt-2 font-medium">Selections</div>
+        </div>
+        <div>
+          <div class="stat-num">200<span class="text-primary-container">+</span></div>
+          <div class="text-on-surface-variant text-label-sm uppercase tracking-[0.15em] mt-2 font-medium">IITian Faculty</div>
+        </div>
+        <div>
+          <div class="stat-num">4.9<span class="text-primary-container text-2xl">/5</span></div>
+          <div class="text-on-surface-variant text-label-sm uppercase tracking-[0.15em] mt-2 font-medium">User Rating</div>
+        </div>
+      </div>
+
+      <!-- Trust markers -->
+      <div class="flex flex-wrap items-center gap-x-5 gap-y-2 pt-4 text-on-surface-variant text-label-sm">
+        <span class="flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-primary-container text-[18px]">verified</span> ISO Certified
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-primary-container text-[18px]">workspace_premium</span> Top 10 in Kota
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-primary-container text-[18px]">groups</span> 15,000+ Aspirants
+        </span>
+      </div>
+    </div>
+
+    <!-- RIGHT: LEAD FORM (real widget) -->
+    <div id="hero-form" class="reveal visible reveal-delay-2 scroll-mt-24">
+              <div class="lead-form-widget glass-card p-8 gold-glow" id="lead-form-66b9b143">
+            <form class="arke-lead-form"
+                  data-form-name="ARKE Homepage"
+                  data-form-id="lead-form-66b9b143"
+                  data-otp="false"
+                  data-whatsapp="false"
+                  data-email="false"
+                  data-state="false"
+                  data-board="false"
+                  data-postsubmit="true"
+                  data-redirect=""
+                  autocomplete="off"
+                  novalidate>
+
+                <!-- Error banner (JS toggles display when it needs to show a message) -->
+                <div class="arke-form-error mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm" style="display:none" role="alert"></div>
+
+                <!-- ============ STEP 1: Name + Mobile (+ optional target/class) ============ -->
+                <div class="arke-step-1">
+                    <span class="section-eyebrow mb-4">START YOUR JOURNEY</span>
+                    <h3 class="font-display font-extrabold text-headline-md mt-4 mb-6 leading-tight">
+                        Get Free Counselling                    </h3>
+
+                    <div class="form-row mb-4">
+                        <label class="block text-sm font-medium text-on-surface-variant mb-2">Full Name <span class="text-red-400">*</span></label>
+                        <input type="text" name="name" required minlength="2" maxlength="100"
+                               autocomplete="name"
+                               class="w-full px-4 py-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface focus:border-primary-container focus:outline-none"
+                               placeholder="Your name">
+                    </div>
+
+                    <div class="form-row mb-4">
+                        <label class="block text-sm font-medium text-on-surface-variant mb-2">Mobile Number <span class="text-red-400">*</span></label>
+                        <div class="flex">
+                            <span class="px-3 py-3 bg-surface-container-high rounded-l-xl border border-r-0 border-outline-variant text-on-surface-variant">+91</span>
+                            <input type="tel" name="mobile" required pattern="[6-9][0-9]{9}" maxlength="10" inputmode="numeric"
+                                   autocomplete="tel-national"
+                                   class="flex-1 px-4 py-3 rounded-r-xl bg-surface-container border border-outline-variant text-on-surface focus:border-primary-container focus:outline-none"
+                                   placeholder="9876543210">
+                        </div>
+                    </div>
+
+                                        <div class="form-row mb-4">
+                        <label class="block text-sm font-medium text-on-surface-variant mb-2">Target Exam <span class="text-red-400">*</span></label>
+                        <select name="target" required class="w-full px-4 py-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface focus:border-primary-container focus:outline-none">
+                            <option value="">Select target...</option>
+                            <option value="jee">JEE Main + Advanced</option>
+                            <option value="neet">NEET</option>
+                            <option value="foundation">Foundation</option>
+                        </select>
+                    </div>
+                    
+                                        <div class="form-row mb-4">
+                        <label class="block text-sm font-medium text-on-surface-variant mb-2">Class <span class="text-red-400">*</span></label>
+                        <select name="class" required class="w-full px-4 py-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface focus:border-primary-container focus:outline-none">
+                            <option value="">Select class...</option>
+                            <option value="8">Class 8</option>
+                            <option value="9">Class 9</option>
+                            <option value="10">Class 10</option>
+                            <option value="11">Class 11</option>
+                            <option value="12">Class 12</option>
+                            <option value="dropper">Dropper</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Honeypot (invisible to real users; bots often fill anything named 'website') -->
+                    <input type="text" name="website" tabindex="-1" autocomplete="off"
+                           style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0"
+                           aria-hidden="true">
+
+                    <!-- CRITICAL: type="button" (not "submit") — JS binds click, we don't want browser default submit -->
+                    <button type="button" class="arke-step-1-submit btn-primary w-full mt-2" data-loading-text="Please wait...">
+                        Enroll Now                    </button>
+                </div>
+
+                
+                                <!-- ============ SUCCESS (JS shows this after /api/lead-submit returns success) ============ -->
+                <div class="arke-form-success" style="display:none">
+                    <div class="text-center py-6">
+                        <div class="text-6xl mb-4">&check;</div>
+                        <h3 class="font-display font-extrabold text-headline-md mb-3 text-primary-container">
+                            Thank You!
+                        </h3>
+                        <p class="arke-success-msg text-on-surface-variant">
+                            Thank you! Our counsellor will contact you within 24 hours.                        </p>
+                    </div>
+                </div>
+                            </form>
+        </div>
+            </div>
+
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2. COURSES                                                   -->
+<!-- ============================================================ -->
+<section id="courses" class="py-12 max-w-7xl mx-auto px-container-margin">
+  <div class="text-center mb-14 reveal">
+    <span class="section-eyebrow mb-4">Our Programs</span>
+    <h2 class="font-display font-extrabold text-headline-lg md:text-display-md mt-4 mb-4 text-balance">
+      Pioneering Excellence Across <span class="text-gradient-gold">Domains</span>
+    </h2>
+    <p class="text-on-surface-variant max-w-2xl mx-auto text-body-lg">
+      Choose your path to success with our specialized, high-impact curriculum designed by top industry experts.
+    </p>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-6 lg:gap-8">
+
+        <div class="glass-card p-8 lg:p-10 group hover:border-primary-container/50 hover:-translate-y-2 hover:shadow-[0_20px_50px_rgba(244,185,66,0.15)] transition-all duration-500 reveal reveal-delay-1">
+      <div class="course-icon w-16 h-16 bg-primary-container/10 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-primary-container transition-colors duration-500">
+        <span class="material-symbols-outlined text-primary-container group-hover:text-on-primary-container text-[36px] transition-colors duration-500">rocket_launch</span>
+      </div>
+      <h3 class="font-display font-bold text-headline-md mb-3">JEE Main &amp; Advanced</h3>
+      <p class="text-on-surface-variant mb-6 text-body-md leading-relaxed">Comprehensive engineering entrance coaching with conceptual depth and rigorous problem-solving sessions.</p>
+      <ul class="space-y-3 mb-8 text-on-surface-variant text-label-lg">
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          Daily Practice Sheets        </li>
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          All India Test Series        </li>
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          Personalized Mentorship        </li>
+              </ul>
+      <button class="w-full btn-secondary group-hover:bg-primary-container group-hover:text-on-primary-container group-hover:border-primary-container">
+        Explore JEE        <span class="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+      </button>
+    </div>
+        <div class="glass-card p-8 lg:p-10 group hover:border-primary-container/50 hover:-translate-y-2 hover:shadow-[0_20px_50px_rgba(244,185,66,0.15)] transition-all duration-500 reveal reveal-delay-2">
+      <div class="course-icon w-16 h-16 bg-primary-container/10 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-primary-container transition-colors duration-500">
+        <span class="material-symbols-outlined text-primary-container group-hover:text-on-primary-container text-[36px] transition-colors duration-500">medical_services</span>
+      </div>
+      <h3 class="font-display font-bold text-headline-md mb-3">NEET (Medical)</h3>
+      <p class="text-on-surface-variant mb-6 text-body-md leading-relaxed">Precision-focused medical coaching focusing on Biology, Physics, and Chemistry through visualization techniques.</p>
+      <ul class="space-y-3 mb-8 text-on-surface-variant text-label-lg">
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          NCERT Word-to-Word        </li>
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          3D Biology Sessions        </li>
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          Doubt Counter 24/7        </li>
+              </ul>
+      <button class="w-full btn-secondary group-hover:bg-primary-container group-hover:text-on-primary-container group-hover:border-primary-container">
+        Explore NEET        <span class="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+      </button>
+    </div>
+        <div class="glass-card p-8 lg:p-10 group hover:border-primary-container/50 hover:-translate-y-2 hover:shadow-[0_20px_50px_rgba(244,185,66,0.15)] transition-all duration-500 reveal reveal-delay-3">
+      <div class="course-icon w-16 h-16 bg-primary-container/10 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-primary-container transition-colors duration-500">
+        <span class="material-symbols-outlined text-primary-container group-hover:text-on-primary-container text-[36px] transition-colors duration-500">school</span>
+      </div>
+      <h3 class="font-display font-bold text-headline-md mb-3">Foundation (8–10)</h3>
+      <p class="text-on-surface-variant mb-6 text-body-md leading-relaxed">Build a rock-solid conceptual base for competitive exams like Olympiads, NTSE, and early-stage JEE/NEET prep.</p>
+      <ul class="space-y-3 mb-8 text-on-surface-variant text-label-lg">
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          Cognitive Development        </li>
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          NTSE Preparation        </li>
+                <li class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary-container text-[18px]" style="font-variation-settings:'FILL' 1">check_circle</span>
+          Critical Thinking Lab        </li>
+              </ul>
+      <button class="w-full btn-secondary group-hover:bg-primary-container group-hover:text-on-primary-container group-hover:border-primary-container">
+        Explore Foundation        <span class="material-symbols-outlined text-[18px] group-hover:translate-x-1 transition-transform">arrow_forward</span>
+      </button>
+    </div>
+    
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3. FACULTY SHOWCASE                                          -->
+<!-- ============================================================ -->
+<section id="faculty" class="py-12 bg-surface-container-low/40 relative overflow-hidden">
+  <div class="max-w-7xl mx-auto px-container-margin">
+    <div class="mb-12 reveal">
+      <div class="max-w-xl">
+        <span class="section-eyebrow mb-4">Faculty</span>
+        <h2 class="font-display font-extrabold text-headline-lg md:text-display-md mt-4 mb-4 text-balance">
+          India's <span class="text-gradient-gold">Leading Minds</span>
+        </h2>
+        <p class="text-on-surface-variant text-body-lg">
+          Our educators are not just teachers — they are IITians and Doctors who have navigated the path themselves.
+        </p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="group reveal reveal-delay-1">
+        <div class="relative rounded-2xl overflow-hidden aspect-[3/4] mb-4 glass-card border-white/8 group-hover:border-primary-container/40 group-hover:-translate-y-1 transition-all duration-500">
+          <!-- placeholder icon while real photos aren't uploaded -->
+          <div class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-lowest">
+            <span class="material-symbols-outlined text-primary-container/25 group-hover:text-primary-container/45 transition-colors duration-500"
+                  style="font-size:120px;font-variation-settings:'FILL' 1">person</span>
+          </div>
+          <!-- gradient overlay -->
+          <div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/50 to-transparent"></div>
+          <!-- badge -->
+          <div class="absolute bottom-4 left-4 right-4">
+            <span class="bg-primary-container text-on-primary-container font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-tighter inline-block shadow-lg">
+              99.9 Percentile Maker            </span>
+          </div>
+        </div>
+        <h4 class="font-display font-bold text-headline-md mb-1">Dr. Arjun Sharma</h4>
+        <p class="text-on-surface-variant text-label-lg">Senior Physics, IIT Bombay</p>
+      </div>
+            <div class="group reveal reveal-delay-2">
+        <div class="relative rounded-2xl overflow-hidden aspect-[3/4] mb-4 glass-card border-white/8 group-hover:border-primary-container/40 group-hover:-translate-y-1 transition-all duration-500">
+          <!-- placeholder icon while real photos aren't uploaded -->
+          <div class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-lowest">
+            <span class="material-symbols-outlined text-primary-container/25 group-hover:text-primary-container/45 transition-colors duration-500"
+                  style="font-size:120px;font-variation-settings:'FILL' 1">person</span>
+          </div>
+          <!-- gradient overlay -->
+          <div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/50 to-transparent"></div>
+          <!-- badge -->
+          <div class="absolute bottom-4 left-4 right-4">
+            <span class="bg-primary-container text-on-primary-container font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-tighter inline-block shadow-lg">
+              Gold Medalist, AIIMS            </span>
+          </div>
+        </div>
+        <h4 class="font-display font-bold text-headline-md mb-1">Dr. Neha Varma</h4>
+        <p class="text-on-surface-variant text-label-lg">Head of Biology, AIIMS Delhi</p>
+      </div>
+            <div class="group reveal reveal-delay-3">
+        <div class="relative rounded-2xl overflow-hidden aspect-[3/4] mb-4 glass-card border-white/8 group-hover:border-primary-container/40 group-hover:-translate-y-1 transition-all duration-500">
+          <!-- placeholder icon while real photos aren't uploaded -->
+          <div class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-lowest">
+            <span class="material-symbols-outlined text-primary-container/25 group-hover:text-primary-container/45 transition-colors duration-500"
+                  style="font-size:120px;font-variation-settings:'FILL' 1">person</span>
+          </div>
+          <!-- gradient overlay -->
+          <div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/50 to-transparent"></div>
+          <!-- badge -->
+          <div class="absolute bottom-4 left-4 right-4">
+            <span class="bg-primary-container text-on-primary-container font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-tighter inline-block shadow-lg">
+              IIT Kanpur Alumnus            </span>
+          </div>
+        </div>
+        <h4 class="font-display font-bold text-headline-md mb-1">Prof. Rahul K.</h4>
+        <p class="text-on-surface-variant text-label-lg">Mathematics Expert, 15+ Yrs</p>
+      </div>
+            <div class="group reveal reveal-delay-4">
+        <div class="relative rounded-2xl overflow-hidden aspect-[3/4] mb-4 glass-card border-white/8 group-hover:border-primary-container/40 group-hover:-translate-y-1 transition-all duration-500">
+          <!-- placeholder icon while real photos aren't uploaded -->
+          <div class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-surface-container-low to-surface-container-lowest">
+            <span class="material-symbols-outlined text-primary-container/25 group-hover:text-primary-container/45 transition-colors duration-500"
+                  style="font-size:120px;font-variation-settings:'FILL' 1">person</span>
+          </div>
+          <!-- gradient overlay -->
+          <div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/50 to-transparent"></div>
+          <!-- badge -->
+          <div class="absolute bottom-4 left-4 right-4">
+            <span class="bg-primary-container text-on-primary-container font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-tighter inline-block shadow-lg">
+              PhD, Organic Chem            </span>
+          </div>
+        </div>
+        <h4 class="font-display font-bold text-headline-md mb-1">Dr. Sneha Roy</h4>
+        <p class="text-on-surface-variant text-label-lg">Chemistry, BHU Scholar</p>
+      </div>
+          </div>
+
+    <p class="mt-8 text-center text-on-surface-variant text-label-sm italic">
+      Real faculty photos will be uploaded via FileZilla — placeholders shown for now.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 4. WHY ARKE                                                  -->
+<!-- ============================================================ -->
+<section class="py-12 max-w-7xl mx-auto px-container-margin">
+  <div class="grid md:grid-cols-3 gap-12 items-start">
+    <div class="md:col-span-1 reveal">
+      <span class="section-eyebrow mb-4">Why Us</span>
+      <h2 class="font-display font-extrabold text-headline-lg md:text-display-md mt-4 mb-4 text-balance">
+        Why ARKE is your<br><span class="text-gradient-gold">Best Choice</span>
+      </h2>
+      <p class="text-on-surface-variant text-body-lg leading-relaxed">
+        We combine traditional excellence with modern digital pedagogy to create a learning experience that delivers results.
+      </p>
+    </div>
+
+    <div class="md:col-span-2 grid sm:grid-cols-2 gap-5">
+            <div class="glass-card p-6 flex gap-4 hover:border-primary-container/40 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(244,185,66,0.1)] transition-all duration-500 reveal reveal-delay-1">
+        <div class="bg-primary-container/10 w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary-container">psychology</span>
+        </div>
+        <div>
+          <h4 class="font-bold mb-1 text-on-surface">Personalized Coaching</h4>
+          <p class="text-on-surface-variant text-label-lg leading-relaxed">Customized learning paths based on your strong and weak points.</p>
+        </div>
+      </div>
+            <div class="glass-card p-6 flex gap-4 hover:border-primary-container/40 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(244,185,66,0.1)] transition-all duration-500 reveal reveal-delay-2">
+        <div class="bg-primary-container/10 w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary-container">live_tv</span>
+        </div>
+        <div>
+          <h4 class="font-bold mb-1 text-on-surface">HD Live Classes</h4>
+          <p class="text-on-surface-variant text-label-lg leading-relaxed">Interactive sessions with real-time doubt clearing and polling.</p>
+        </div>
+      </div>
+            <div class="glass-card p-6 flex gap-4 hover:border-primary-container/40 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(244,185,66,0.1)] transition-all duration-500 reveal reveal-delay-3">
+        <div class="bg-primary-container/10 w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary-container">quiz</span>
+        </div>
+        <div>
+          <h4 class="font-bold mb-1 text-on-surface">Instant Doubt Solving</h4>
+          <p class="text-on-surface-variant text-label-lg leading-relaxed">Ask doubts 24/7 on our app and get video solutions instantly.</p>
+        </div>
+      </div>
+            <div class="glass-card p-6 flex gap-4 hover:border-primary-container/40 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(244,185,66,0.1)] transition-all duration-500 reveal reveal-delay-4">
+        <div class="bg-primary-container/10 w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary-container">analytics</span>
+        </div>
+        <div>
+          <h4 class="font-bold mb-1 text-on-surface">Performance Analytics</h4>
+          <p class="text-on-surface-variant text-label-lg leading-relaxed">In-depth AI reports to track your improvement over time.</p>
+        </div>
+      </div>
+          </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 5. APP DOWNLOAD                                              -->
+<!-- ============================================================ -->
+<section id="app" class="py-12 overflow-hidden">
+  <div class="max-w-7xl mx-auto px-container-margin">
+    <div class="glass-card-strong p-10 md:p-16 relative flex flex-col md:flex-row items-center gap-10 lg:gap-16 gold-glow overflow-hidden reveal">
+      <div class="absolute -bottom-32 -left-32 w-80 h-80 bg-primary-container/12 blur-[110px] rounded-full pointer-events-none"></div>
+      <div class="absolute -top-32 -right-32 w-80 h-80 bg-tertiary-container/8 blur-[110px] rounded-full pointer-events-none"></div>
+
+      <div class="md:w-1/2 relative">
+        <span class="section-eyebrow mb-4">Mobile App</span>
+        <h2 class="font-display font-extrabold text-headline-lg md:text-display-md mt-4 mb-6 leading-tight text-balance">
+          Padho <span class="text-gradient-gold">Kabhi Bhi</span>, Kahin Bhi
+        </h2>
+        <p class="text-on-surface-variant text-body-lg mb-8 leading-relaxed">
+          ARKE Scholars app brings the classroom to your pocket. Offline downloads, practice tests, and live notifications so you never miss a lecture.
+        </p>
+        <div class="flex flex-wrap gap-4 items-stretch">
+          <!-- Combined Play Store + App Store — Coming Soon (not clickable) -->
+          <div class="bg-surface-container-lowest border border-white/15 px-6 py-3.5 rounded-xl flex items-center gap-3">
+            <div class="flex items-center gap-1.5">
+              <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" class="text-on-surface-variant" aria-hidden="true">
+                <path d="M14.222 9.374c1.037-.61 1.037-2.137 0-2.748L11.528 5.04 8.32 8l3.207 2.96zm-3.595 2.116L7.583 8.68 1.03 14.73c.201 1.029 1.36 1.61 2.303 1.055zM1 13.396V2.603L6.846 8zM1.03 1.27l6.553 6.05 3.044-2.81L3.333.215C2.39-.341 1.231.24 1.03 1.27"/>
+              </svg>
+              <span class="w-px h-6 bg-white/15"></span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" class="text-on-surface-variant" aria-hidden="true">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
+            </div>
+            <div class="text-left">
+              <p class="text-[10px] uppercase opacity-60 leading-none tracking-widest">Play Store &amp; App Store</p>
+              <p class="font-bold text-body-lg leading-tight text-primary-container">Coming Soon</p>
+            </div>
+          </div>
+
+          <!-- Direct APK Download button
+               TODO: replace href with actual APK URL when uploaded to /uploads/arke-app.apk
+               The `download` attribute forces the browser to save the file instead of navigating. -->
+          <a href="/uploads/arke-app.apk" download
+             class="btn-primary text-body-lg">
+            <span class="material-symbols-outlined text-[22px]">download</span>
+            Download App
+          </a>
+        </div>
+      </div>
+
+      <div class="md:w-1/2 flex justify-center relative">
+        <!-- Phone mockup with auto-rotating image carousel -->
+        <div class="relative w-64 h-[500px] bg-surface-container-lowest rounded-[2.5rem] border-4 border-white/10 p-3 shadow-2xl animate-float">
+          <!-- Notch -->
+          <div class="absolute top-3 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-full z-20"></div>
+
+          <!-- Screen: 4 slides fading in/out -->
+          <div class="w-full h-full rounded-[2rem] relative overflow-hidden bg-surface-container-lowest phone-carousel">
+            <img src="/uploads/media/2026/07/whatsapp-image-2026-07-03-at-23-59-26-4cc59fe6.webp"
+                 alt="ARKE App preview 1"
+                 class="phone-slide absolute inset-0 w-full h-full object-cover active"
+                 loading="lazy">
+            <img src="/uploads/media/2026/07/whatsapp-image-2026-07-03-at-23-59-25-1-68b94b17.webp"
+                 alt="ARKE App preview 2"
+                 class="phone-slide absolute inset-0 w-full h-full object-cover"
+                 loading="lazy">
+            <img src="/uploads/media/2026/07/whatsapp-image-2026-07-03-at-23-59-25-6950208e.webp"
+                 alt="ARKE App preview 3"
+                 class="phone-slide absolute inset-0 w-full h-full object-cover"
+                 loading="lazy">
+            <img src="/uploads/media/2026/07/whatsapp-image-2026-07-03-at-23-59-24-36299a0c.webp"
+                 alt="ARKE App preview 4"
+                 class="phone-slide absolute inset-0 w-full h-full object-cover"
+                 loading="lazy">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Carousel styles — kept inline near markup for atomicity -->
+  <style>
+    .phone-slide { opacity: 0; transition: opacity 0.8s ease; }
+    .phone-slide.active { opacity: 1; }
+  </style>
+</section>
+
+<!-- ============================================================ -->
+<!-- 6. TESTIMONIALS                                              -->
+<!-- ============================================================ -->
+<section class="py-12 max-w-7xl mx-auto px-container-margin">
+  <div class="text-center mb-12 reveal">
+    <span class="section-eyebrow mb-4">Success Stories</span>
+    <h2 class="font-display font-extrabold text-headline-lg md:text-display-md mt-4 mb-4 text-balance">
+      Stories of <span class="text-gradient-gold">Triumph</span>
+    </h2>
+    <p class="text-on-surface-variant text-body-lg">Hear from those who made it to their dream colleges with us.</p>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-6">
+        <div class="testimonial-card glass-card p-7 hover:border-primary-container/40 hover:-translate-y-1 transition-all duration-500 reveal reveal-delay-1">
+      <div class="flex gap-1 mb-4 text-primary-container relative z-10">
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+              </div>
+      <p class="text-on-surface text-body-md leading-relaxed mb-6 relative z-10">
+        "The way Dr. Sharma explains Physics concepts is magic. Maine kabhi socha nahi tha ki numericals itne easy ho sakte hain. ARKE is truly best!"
+      </p>
+      <div class="flex items-center gap-3 border-t border-white/10 pt-4 relative z-10">
+        <div class="w-11 h-11 rounded-full bg-primary-container/15 border border-primary-container/30 flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary-container">person</span>
+        </div>
+        <div>
+          <p class="font-bold text-on-surface text-body-md">Aman Rathore</p>
+          <p class="text-primary-container text-label-sm font-bold">IIT Delhi, AIR 142</p>
+        </div>
+      </div>
+    </div>
+        <div class="testimonial-card glass-card p-7 hover:border-primary-container/40 hover:-translate-y-1 transition-all duration-500 reveal reveal-delay-2">
+      <div class="flex gap-1 mb-4 text-primary-container relative z-10">
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+              </div>
+      <p class="text-on-surface text-body-md leading-relaxed mb-6 relative z-10">
+        "Detailed analysis reports helped me identify my weak spots in Organic Chem. The study material is so elite and concise. Highly recommend to NEET aspirants."
+      </p>
+      <div class="flex items-center gap-3 border-t border-white/10 pt-4 relative z-10">
+        <div class="w-11 h-11 rounded-full bg-primary-container/15 border border-primary-container/30 flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary-container">person</span>
+        </div>
+        <div>
+          <p class="font-bold text-on-surface text-body-md">Isha Gupta</p>
+          <p class="text-primary-container text-label-sm font-bold">AIIMS Jodhpur, AIR 88</p>
+        </div>
+      </div>
+    </div>
+        <div class="testimonial-card glass-card p-7 hover:border-primary-container/40 hover:-translate-y-1 transition-all duration-500 reveal reveal-delay-3">
+      <div class="flex gap-1 mb-4 text-primary-container relative z-10">
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+                <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">star</span>
+              </div>
+      <p class="text-on-surface text-body-md leading-relaxed mb-6 relative z-10">
+        "Joining Foundation course in Class 9 was my best decision. Concepts crystal clear ho gaye before Class 11. ARKE teachers are super supportive."
+      </p>
+      <div class="flex items-center gap-3 border-t border-white/10 pt-4 relative z-10">
+        <div class="w-11 h-11 rounded-full bg-primary-container/15 border border-primary-container/30 flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-primary-container">person</span>
+        </div>
+        <div>
+          <p class="font-bold text-on-surface text-body-md">Rohan Mehra</p>
+          <p class="text-primary-container text-label-sm font-bold">NTSE Scholar, Class 10</p>
+        </div>
+      </div>
+    </div>
+      </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 7. FAQ                                                       -->
+<!-- ============================================================ -->
+<section id="faqs" class="py-12 max-w-4xl mx-auto px-container-margin">
+  <div class="text-center mb-12 reveal">
+    <span class="section-eyebrow mb-4">FAQs</span>
+    <h2 class="font-display font-extrabold text-headline-lg md:text-display-md mt-4 mb-4 text-balance">
+      Frequently Asked <span class="text-gradient-gold">Questions</span>
+    </h2>
+  </div>
+
+  <div class="space-y-3">
+        <div data-faq-item class="glass-card overflow-hidden faq-open reveal reveal-delay-1">
+      <button data-faq-toggle class="w-full p-5 flex justify-between items-center text-left hover:bg-white/[0.03] transition-colors">
+        <span class="font-bold text-on-surface text-body-lg">How are the live classes conducted?</span>
+        <span data-faq-icon class="material-symbols-outlined text-primary-container shrink-0 ml-4">add</span>
+      </button>
+      <div data-faq-body class="px-5">
+        <p class="text-on-surface-variant text-body-md leading-relaxed pb-5">Live classes happen daily on our HD streaming platform. Each session is interactive — you can ask doubts in real-time, participate in polls, and access the recorded session anytime in your dashboard.</p>
+      </div>
+    </div>
+        <div data-faq-item class="glass-card overflow-hidden  reveal reveal-delay-2">
+      <button data-faq-toggle class="w-full p-5 flex justify-between items-center text-left hover:bg-white/[0.03] transition-colors">
+        <span class="font-bold text-on-surface text-body-lg">What if I miss a live class?</span>
+        <span data-faq-icon class="material-symbols-outlined text-primary-container shrink-0 ml-4">add</span>
+      </button>
+      <div data-faq-body class="px-5">
+        <p class="text-on-surface-variant text-body-md leading-relaxed pb-5">No worries — every class is recorded and uploaded within 30 minutes. You also get a downloadable summary PDF and notes prepared by our faculty.</p>
+      </div>
+    </div>
+        <div data-faq-item class="glass-card overflow-hidden  reveal reveal-delay-3">
+      <button data-faq-toggle class="w-full p-5 flex justify-between items-center text-left hover:bg-white/[0.03] transition-colors">
+        <span class="font-bold text-on-surface text-body-lg">Can I ask doubts after the class?</span>
+        <span data-faq-icon class="material-symbols-outlined text-primary-container shrink-0 ml-4">add</span>
+      </button>
+      <div data-faq-body class="px-5">
+        <p class="text-on-surface-variant text-body-md leading-relaxed pb-5">Absolutely. Use our 24/7 Doubt Counter via the app. Our subject experts respond within 30 minutes during peak hours. Video solutions are also available for popular doubts.</p>
+      </div>
+    </div>
+        <div data-faq-item class="glass-card overflow-hidden  reveal reveal-delay-4">
+      <button data-faq-toggle class="w-full p-5 flex justify-between items-center text-left hover:bg-white/[0.03] transition-colors">
+        <span class="font-bold text-on-surface text-body-lg">Is there a fee scholarship?</span>
+        <span data-faq-icon class="material-symbols-outlined text-primary-container shrink-0 ml-4">add</span>
+      </button>
+      <div data-faq-body class="px-5">
+        <p class="text-on-surface-variant text-body-md leading-relaxed pb-5">Yes — based on our ARKE Scholarship Test (AST). High scorers can get up to 100% scholarship. Contact our counsellor for details.</p>
+      </div>
+    </div>
+      </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 8. FINAL CTA                                                 -->
+<!-- ============================================================ -->
+<section class="py-12 max-w-7xl mx-auto px-container-margin">
+  <div class="glass-card-strong p-10 md:p-16 text-center relative overflow-hidden gold-glow-strong reveal">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-primary-container/15 blur-[130px] rounded-full pointer-events-none"></div>
+    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-primary-container/15 blur-[130px] rounded-full pointer-events-none"></div>
+
+    <div class="relative">
+      <h2 class="font-display font-extrabold text-headline-lg md:text-display-md mb-4 text-balance">
+        Join the <span class="text-gradient-gold">Elite Club</span> of Scholars
+      </h2>
+      <p class="text-on-surface-variant text-body-lg max-w-2xl mx-auto mb-8 leading-relaxed">
+        Don't settle for average. Train with India's best faculty and give your career the elite start it deserves. Batches are filling fast.
+      </p>
+      <div class="flex justify-center">
+        <a href="#hero-form" class="btn-primary text-body-lg">
+          <span class="material-symbols-outlined text-[20px]">verified</span>
+          Enroll Now
+        </a>
+      </div>
+      <p class="text-on-surface-variant text-label-sm mt-6 flex items-center justify-center gap-4 flex-wrap">
+        <span class="flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-primary-container text-[16px]">lock</span> 100% Secure Payment
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-primary-container text-[16px]">workspace_premium</span> Scholarship Available
+        </span>
+      </p>
+    </div>
+  </div>
+</section>
+
+
+</main><!-- /main from header.php -->
+
+<!-- ============================================================ -->
+<!-- FOOTER                                                       -->
+<!-- ============================================================ -->
+<footer class="relative bg-surface-container-lowest border-t border-white/5 pt-14 pb-8 mt-8">
+  <!-- top gold accent line -->
+  <div class="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-px bg-gradient-to-r from-transparent via-primary-container to-transparent"></div>
+
+  <div class="max-w-7xl mx-auto px-container-margin">
+
+    <!-- 12-col grid: Brand(3) + Explore(2) + Institution(2) + Get In Touch(5) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 mb-14">
+
+      <!-- BRAND COLUMN -->
+      <div class="lg:col-span-3">
+        <a href="/" class="inline-block mb-6" aria-label="ARKE Scholars — Home">
+          <img src="/uploads/arke-logo.png" alt="ARKE Scholars" class="h-14 w-auto" width="140" height="56">
+        </a>
+        <p class="text-on-surface-variant text-body-md leading-relaxed mb-6">
+          Empowering the next generation of leaders through world-class digital education.
+        </p>
+
+        <!-- SOCIAL ICONS: Instagram, YouTube, LinkedIn -->
+        <div class="flex gap-3">
+          <a href="https://www.instagram.com/arke_neet/" target="_blank" rel="noopener" aria-label="Instagram" class="social-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069M12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12s.014 3.668.072 4.948c.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24s3.668-.014 4.948-.072c4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948s-.014-3.667-.072-4.947c-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0m0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324M12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8m6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881"/>
+            </svg>
+          </a>
+          <a href="https://www.youtube.com/@ARKENEETxSPSkota" target="_blank" rel="noopener" aria-label="YouTube" class="social-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814M9.545 15.568V8.432L15.818 12z"/>
+            </svg>
+          </a>
+          <a href="https://linkedin.com/company/arkescholars" target="_blank" rel="noopener" aria-label="LinkedIn" class="social-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.063 2.063 0 1 1 2.063 2.065m1.782 13.019H3.555V9h3.564zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- EXPLORE -->
+      <div class="lg:col-span-2">
+        <h5 class="font-bold text-on-surface mb-5 text-label-lg uppercase tracking-widest">Explore</h5>
+        <ul class="space-y-3 text-on-surface-variant text-body-md">
+          <li><a href="#courses" class="hover:text-primary-container transition-colors">JEE (Main + Advanced)</a></li>
+          <li><a href="#courses" class="hover:text-primary-container transition-colors">NEET (Medical)</a></li>
+          <li><a href="#courses" class="hover:text-primary-container transition-colors">Foundation 8–10</a></li>
+        </ul>
+      </div>
+
+      <!-- INSTITUTION (Careers + Legal merged) -->
+      <div class="lg:col-span-2">
+        <h5 class="font-bold text-on-surface mb-5 text-label-lg uppercase tracking-widest">Institution</h5>
+        <ul class="space-y-3 text-on-surface-variant text-body-md">
+          <li><a href="/careers" class="hover:text-primary-container transition-colors">Careers</a></li>
+          <li><a href="/contact-us" class="hover:text-primary-container transition-colors">Contact Us</a></li>
+          <li><a href="/privacy-policy" class="hover:text-primary-container transition-colors">Privacy Policy</a></li>
+          <li><a href="/terms-of-service" class="hover:text-primary-container transition-colors">Terms of Service</a></li>
+          <li><a href="/support" class="hover:text-primary-container transition-colors">Support</a></li>
+        </ul>
+      </div>
+
+      <!-- GET IN TOUCH (compact, Nurturise-style) -->
+      <div id="contact" class="lg:col-span-5 scroll-mt-24">
+        <h5 class="font-bold text-on-surface mb-5 text-label-lg uppercase tracking-widest">Get In Touch</h5>
+
+        <div class="space-y-3.5 mb-6 text-on-surface-variant text-body-md">
+          <div class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-primary-container text-[20px] mt-0.5 shrink-0">location_on</span>
+            <span>C-402, Aashirwad Aanandam, P.I.P, KOTA Rajasthan 324005</span>
+          </div>
+
+          <a href="tel:+917607151617"
+             class="flex items-center gap-3 hover:text-primary-container transition-colors group">
+            <span class="material-symbols-outlined text-primary-container text-[20px] shrink-0">phone</span>
+            <span>+917607151617</span>
+          </a>
+
+          <a href="/cdn-cgi/l/email-protection#caa9a5a4beaba9be8aabb8a1afb9a9a2a5a6abb8b9e4a9a5a7" class="flex items-center gap-3 hover:text-primary-container transition-colors group">
+            <span class="material-symbols-outlined text-primary-container text-[20px] shrink-0">mail</span>
+            <span><span class="__cf_email__" data-cfemail="72111d1c06131106321300191701111a1d1e1300015c111d1f">[email&#160;protected]</span></span>
+          </a>
+        </div>
+
+        <!-- Compact pill buttons: WhatsApp + Call Now -->
+        <div class="flex flex-wrap gap-3">
+          <a href="https://wa.me/+917607151617?text=Hi%20I%20want%20to%20know%20more%20about%20your%20courses."
+             target="_blank" rel="noopener"
+             class="inline-flex items-center gap-2 bg-[#25D366] text-white font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-[#20BC5A] hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(37,211,102,0.35)] transition-all">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.463 3.488A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413"/>
+            </svg>
+            WhatsApp
+          </a>
+
+          <a href="tel:+917607151617"
+             class="inline-flex items-center gap-2 bg-primary-container text-on-primary-container font-semibold px-5 py-2.5 rounded-full text-sm hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(244,185,66,0.4)] transition-all">
+            <span class="material-symbols-outlined text-[18px]">call</span>
+            Call Now
+          </a>
+        </div>
+
+        <p class="text-on-surface-variant text-label-sm mt-4 flex items-center gap-1.5 opacity-75">
+          <span class="material-symbols-outlined text-primary-container text-[14px]">schedule</span>
+          Mon–Sat, 11 AM to 7 PM IST
+        </p>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div class="pt-8 border-t border-white/8 flex flex-col md:flex-row justify-between items-center gap-4">
+      <p class="text-on-surface-variant text-body-md text-center md:text-left">
+        &copy; 2026 ARKE Scholars. All rights reserved. Made with
+        <span class="text-primary-container">&hearts;</span> in Kota.
+      </p>
+      <p class="text-primary-container text-label-lg font-bold uppercase tracking-widest">
+        Rising Beyond Limits
+      </p>
+    </div>
+  </div>
+</footer>
+
+<!-- FLOATING WHATSAPP BUTTON (always visible) -->
+<a href="https://wa.me/+917607151617?text=Hi%20I%20want%20to%20know%20more%20about%20your%20courses."
+   target="_blank" rel="noopener"
+   class="whatsapp-float"
+   aria-label="Chat with us on WhatsApp">
+  <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347M12.05 21.785h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884M20.463 3.488A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413"/>
+  </svg>
+</a>
+
+<!-- ============================================================ -->
+<!-- SITE-WIDE SCRIPTS                                            -->
+<!-- ============================================================ -->
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+  // ---------- Reveal on scroll ----------
+  (function () {
+    const revealObs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          revealObs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+  })();
+
+  // ---------- Header scroll shadow ----------
+  (function () {
+    const h = document.getElementById('siteHeader');
+    if (!h) return;
+    const onScroll = () => {
+      if (window.scrollY > 20) h.classList.add('scrolled');
+      else h.classList.remove('scrolled');
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  })();
+
+  // ---------- Mobile menu ----------
+  (function () {
+    const btn      = document.getElementById('mobileMenuBtn');
+    const menu     = document.getElementById('mobileMenu');
+    const closeBtn = document.getElementById('mobileClose');
+    const backdrop = document.getElementById('mobileBackdrop');
+    if (!btn || !menu) return;
+
+    const open = () => {
+      menu.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+    };
+    const close = () => {
+      menu.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    };
+
+    btn.addEventListener('click', open);
+    closeBtn && closeBtn.addEventListener('click', close);
+    backdrop && backdrop.addEventListener('click', close);
+    document.querySelectorAll('.nav-close').forEach(a => a.addEventListener('click', close));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  })();
+
+  // ---------- FAQ accordion ----------
+  (function () {
+    document.querySelectorAll('[data-faq-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = btn.closest('[data-faq-item]');
+        item && item.classList.toggle('faq-open');
+      });
+    });
+  })();
+
+  // ---------- Phone mockup image carousel (app section) ----------
+  (function () {
+    const slides = document.querySelectorAll('.phone-slide');
+    if (slides.length < 2) return;
+    let idx = 0;
+    setInterval(() => {
+      slides[idx].classList.remove('active');
+      idx = (idx + 1) % slides.length;
+      slides[idx].classList.add('active');
+    }, 2800);
+  })();
+</script>
+
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925" integrity="sha512-d9sL6GJLXn6fInD1+TVXhTcQOsmxeHfmHAvwGDIxp5TO+uo1fiWW7mHomMj4MLRlCsJDTqXzWLHJFFlPCEIj/A==" data-cf-beacon='{"version":"2024.11.0","token":"8b941c427f824ed897bae4e8956df83f","r":1}' crossorigin="anonymous"></script>
+</body>
+</html>

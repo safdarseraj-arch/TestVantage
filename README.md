@@ -1,11 +1,11 @@
-# TestVantage
+# TestVantages
 
 JEE / NEET–style mock test platform — React 18 + Vite 6.
 
 ## Run locally (recommended)
 
 1. Open this project in **Cursor**.
-2. Press **F5** (or **Ctrl+Shift+B**), or run task **1. Start TestVantage**.
+2. Press **F5** (or **Ctrl+Shift+B**), or run task **1. Start TestVantages**.
 3. Wait until the bottom panel shows the server is ready.
 4. Open Cursor’s built-in browser to:
 

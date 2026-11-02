@@ -1,0 +1,532 @@
+.qr-page {
+  max-width: 960px;
+}
+
+.qr-step-title {
+  margin: 1.35rem 0 0.4rem;
+  font-size: 1.05rem;
+  color: var(--text-h, #0f172a);
+}
+
+.qr-step-title.is-locked {
+  opacity: 0.55;
+}
+
+.qr-step-wait {
+  color: #64748b;
+}
+
+.qr-exam-grid {
+  margin-bottom: 0.5rem;
+}
+
+.qr-filter-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-width: 28rem;
+  margin: 0.65rem 0 0.25rem;
+}
+
+.qr-filter-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  color: #334155;
+  font-weight: 650;
+}
+
+.qr-filter-label.is-locked {
+  opacity: 0.7;
+}
+
+.qr-filter-label select {
+  font: inherit;
+  font-weight: 500;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.qr-filter-label select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.qr-subject-row,
+.qr-chapter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.qr-chip {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.qr-chip.is-active {
+  background: color-mix(in srgb, var(--qr-chip, #4f46e5) 16%, #fff);
+  border-color: var(--qr-chip, #4f46e5);
+  color: #1e1b4b;
+  font-weight: 650;
+}
+
+.qr-chip--chapter.is-active {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+
+.qr-search-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 22rem;
+  margin: 0.5rem 0 0.85rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.qr-search-label input {
+  font: inherit;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.qr-chapter-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.qr-chapter-group h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.92rem;
+  color: #334155;
+}
+
+.qr-subtabs {
+  margin-top: 0.55rem;
+}
+
+.qr-jee-doc {
+  margin: 1.25rem 0 2rem;
+  padding: 1rem 1.1rem 1.6rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.qr-jee-doc-body {
+  position: relative;
+  z-index: 1;
+  line-height: 1.62;
+  color: #0f172a;
+}
+
+.qr-jee-doc-body p {
+  margin: 0.55rem 0;
+}
+
+.qr-jee-doc-body h1,
+.qr-jee-doc-body h2,
+.qr-jee-doc-body h3 {
+  margin: 1.15rem 0 0.45rem;
+  color: #1e3a8a;
+}
+
+.qr-jee-doc-body h1 {
+  font-size: 1.22rem;
+}
+
+.qr-jee-doc-body h2 {
+  font-size: 1.06rem;
+}
+
+.qr-jee-doc-body h3 {
+  font-size: 0.98rem;
+}
+
+.qr-jee-doc-body.is-scroll {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 0.45rem;
+}
+
+.qr-jee-doc-body ul,
+.qr-jee-doc-body ol {
+  margin: 0.35rem 0 0.75rem;
+  padding-left: 1.35rem;
+}
+
+.qr-jee-doc-body li {
+  margin: 0.28rem 0;
+}
+
+.qr-jee-doc-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.92rem;
+}
+
+.qr-jee-doc-body th,
+.qr-jee-doc-body td {
+  border: 1px solid #e2e8f0;
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.qr-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0;
+}
+
+.qr-tab {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qr-tab.is-active {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #1e1b4b;
+  font-weight: 650;
+}
+
+.qr-tab-sub {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.qr-strategy-family {
+  position: relative;
+  z-index: 1;
+  margin: 1.1rem 0 0;
+}
+
+.qr-strategy-family-title {
+  margin: 0 0 0.45rem;
+  font-size: 1.02rem;
+  color: #334155;
+}
+
+.qr-strategy-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.7rem;
+  margin: 0 0 0.4rem;
+}
+
+.qr-badge {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.qr-badge.is-pyq {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.qr-badge.is-extra {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.qr-strategy-year {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.qr-strategy-section {
+  position: relative;
+  z-index: 1;
+  margin: 0.25rem 0 0.35rem;
+  font-size: 1.12rem;
+  color: #1e3a8a;
+}
+
+.qr-strategy-list {
+  position: relative;
+  z-index: 1;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qr-strategy-card {
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.qr-strategy-card h3 {
+  margin: 0 0 0.45rem;
+  font-size: 1.08rem;
+  color: #1e3a8a;
+}
+
+.qr-strategy-problem,
+.qr-strategy-outline {
+  margin: 0.4rem 0;
+  line-height: 1.55;
+}
+
+.qr-strategy-label {
+  margin: 0.65rem 0 0.25rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.qr-strategy-options {
+  margin: 0.35rem 0 0.7rem;
+  padding-left: 0;
+  list-style: none;
+}
+
+.qr-strategy-options li {
+  margin: 0.2rem 0;
+}
+
+.qr-strategy-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.qr-strategy-steps li {
+  margin: 0.3rem 0;
+}
+
+.qr-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin: 1.5rem 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.qr-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.qr-source {
+  margin: 0;
+  font-weight: 650;
+  color: #1e3a8a;
+}
+
+.qr-ai-note,
+.qr-empty {
+  width: 100%;
+}
+
+.qr-sheet {
+  position: relative;
+  overflow: hidden;
+  padding: 1.5rem 1.4rem 2rem;
+  border: 1px solid #c7d2fe;
+  border-radius: 16px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.qr-sheet-watermark {
+  position: absolute;
+  inset: -20%;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 3.5rem 5rem;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.07;
+}
+
+.qr-sheet-watermark span {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #4338ca;
+  transform: rotate(-28deg);
+  white-space: nowrap;
+}
+
+.qr-sheet-head,
+.qr-block {
+  position: relative;
+  z-index: 1;
+}
+
+.qr-sheet-kicker {
+  margin: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #4338ca;
+}
+
+.qr-sheet-head h2 {
+  margin: 0.2rem 0 0.25rem;
+  font-size: 1.7rem;
+  line-height: 1.25;
+}
+
+.qr-sheet-meta {
+  margin: 0;
+  color: #475569;
+}
+
+.qr-block h3 {
+  margin: 1.35rem 0 0.65rem;
+  font-size: 1.15rem;
+  color: #1e3a8a;
+}
+
+.qr-defs {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.qr-def dt {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.qr-def dd {
+  margin: 0.25rem 0 0;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: #1e293b;
+}
+
+.qr-formulas,
+.qr-points {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+.qr-formulas li,
+.qr-points li {
+  margin: 0.7rem 0;
+}
+
+.qr-formula-name {
+  margin: 0 0 0.3rem;
+  font-weight: 700;
+}
+
+.qr-formula-math {
+  overflow-x: auto;
+  padding: 0.35rem 0;
+}
+
+.qr-formula-note {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+@media print {
+  .app-chrome,
+  .prepare-page-hero,
+  .qr-filters,
+  .qr-toolbar,
+  .qr-tabs,
+  .qr-jee-doc,
+  .no-print {
+    display: none !important;
+  }
+
+  .qr-page,
+  .page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .qr-sheet {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .qr-sheet-watermark {
+    opacity: 0.11;
+    position: fixed;
+  }
+
+  .qr-sheet-head h2 {
+    font-size: 1.5rem;
+  }
+
+  .qr-def dd,
+  .qr-formulas,
+  .qr-points {
+    font-size: 1rem;
+  }
+}
+
+.qr-formula-card {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.qr-formula-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.qr-pin-btn.is-pinned {
+  background: #f0fdfa;
+  border-color: #0f766e;
+  color: #115e59;
+}
+
+.formula-pocket-page .qr-block h3 {
+  margin-top: 1.25rem;
+}

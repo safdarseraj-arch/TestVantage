@@ -81,7 +81,7 @@ export default function LaunchChecklist() {
             <div className="launch-doc-brand">
               <span className="launch-doc-mark">TV</span>
               <div>
-                <strong>TestVantage</strong>
+                <strong>TestVantages</strong>
                 <span>Launch readiness checklist</span>
               </div>
             </div>
@@ -166,7 +166,7 @@ export default function LaunchChecklist() {
 
           <footer className="launch-doc-footer">
             <p>
-              TestVantage — JEE · NEET · Advanced mock tests. Keep building in Cursor until Phase 2
+              TestVantages — JEE · NEET · Advanced mock tests. Keep building in Cursor until Phase 2
               is complete, then deploy to cloud for public access.
             </p>
           </footer>

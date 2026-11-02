@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Export bank — TestVantages</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 32rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Export question bank</h1>
+    <p id="status">Working…</p>
+    <script>
+      const KEY = 'testvantage-uploaded-questions'
+      const TARGETS = ['http://localhost:5173', 'http://127.0.0.1:5173']
+      const relay = new URLSearchParams(location.search).get('relay') === '1'
+      const el = document.getElementById('status')
+
+      let bank
+      try {
+        bank = JSON.parse(localStorage.getItem(KEY) || '{"questions":[]}')
+      } catch {
+        bank = { questions: [] }
+      }
+      const count = Array.isArray(bank.questions) ? bank.questions.length : 0
+
+      if (relay && window.opener) {
+        let sent = false
+        for (const t of TARGETS) {
+          try {
+            window.opener.postMessage({ type: 'testvantage-bank-merge', payload: bank }, t)
+            sent = true
+            el.textContent = 'Sent ' + count + ' question(s) to port 5173. Closing…'
+            setTimeout(() => window.close(), 600)
+            break
+          } catch (_) {}
+        }
+        if (!sent) {
+          el.textContent =
+            'Could not send to 5173. Keep http://localhost:5173/merge-banks open and try again.'
+        }
+      } else {
+        const blob = new Blob([JSON.stringify(bank, null, 2)], { type: 'application/json' })
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = 'testvantage-bank-port-' + (location.port || '0') + '.json'
+        a.click()
+        el.textContent =
+          count > 0
+            ? 'Downloaded ' + count + ' questions. Merge on http://localhost:5173/merge-banks'
+            : 'No questions on port ' + (location.port || '?') + '.'
+      }
+    </script>
+  </body>
+</html>

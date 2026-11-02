@@ -1,0 +1,358 @@
+/* Printable TestVantages site map */
+
+.sitemap-page .portal-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sitemap-intro {
+  padding: 1rem 1.15rem;
+  line-height: 1.55;
+}
+
+.sitemap-intro p {
+  margin: 0 0 0.5rem;
+}
+
+.sitemap-live-note {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+}
+
+.sitemap-jump {
+  padding: 1rem 1.15rem;
+}
+
+.sitemap-jump-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+}
+
+.sitemap-jump-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sitemap-jump-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #334155;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sitemap-jump-link:hover {
+  border-color: #a5b4fc;
+  color: #4338ca;
+  background: #eef2ff;
+}
+
+.sitemap-jump-staff,
+.sitemap-staff-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  vertical-align: middle;
+}
+
+.sitemap-staff-lead {
+  margin: 0 0 0.25rem;
+}
+
+.sitemap-journeys {
+  padding: 1rem 1.15rem;
+}
+
+.sitemap-journeys h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1.05rem;
+}
+
+.sitemap-journey-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.85rem;
+}
+
+.sitemap-journey-card {
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #e8ecf4;
+  background: #f8fafc;
+}
+
+.sitemap-journey-card h3 {
+  margin: 0 0 0.55rem;
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.sitemap-flow-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.15rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sitemap-flow-step {
+  display: inline-block;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.sitemap-flow-arrow {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0 0.1rem;
+}
+
+.sitemap-role-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sitemap-role-title {
+  margin: 0.5rem 0 0;
+  font-size: 1.15rem;
+  color: #0f172a;
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid #e8ecf4;
+}
+
+.sitemap-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.sitemap-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem 0.65rem;
+}
+
+.sitemap-section-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.sitemap-section-head h2 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+}
+
+.sitemap-section .sitemap-flow-strip {
+  padding: 0 1.1rem 0.75rem;
+}
+
+.sitemap-table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid #f1f5f9;
+}
+
+.sitemap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.sitemap-table th,
+.sitemap-table td {
+  padding: 0.55rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.sitemap-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.sitemap-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sitemap-page-link {
+  font-weight: 700;
+  color: #4f46e5;
+  text-decoration: none;
+}
+
+.sitemap-page-link:hover {
+  text-decoration: underline;
+}
+
+.sitemap-page-label {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sitemap-path {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  background: transparent;
+}
+
+.sitemap-col-where {
+  color: #475569;
+  font-size: 0.8rem;
+  max-width: 16rem;
+}
+
+.sitemap-col-open {
+  white-space: nowrap;
+  width: 5.5rem;
+  vertical-align: middle;
+}
+
+.sitemap-open-btn {
+  font-weight: 600;
+}
+
+.sitemap-open-na {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.sitemap-footer {
+  padding: 1rem 1.15rem;
+}
+
+.sitemap-footer h3 {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+}
+
+.sitemap-bookmarks {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+  line-height: 1.7;
+}
+
+.sitemap-bookmarks code {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+@media print {
+  .sidebar,
+  .topbar,
+  .portal-page-actions,
+  .sitemap-print-btn {
+    display: none !important;
+  }
+
+  .app-shell {
+    display: block !important;
+  }
+
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .sitemap-page {
+    box-shadow: none !important;
+  }
+
+  .sitemap-page-link {
+    color: #000 !important;
+    text-decoration: none !important;
+  }
+
+  .sitemap-section,
+  .sitemap-journeys,
+  .sitemap-intro,
+  .sitemap-jump,
+  .sitemap-footer {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+
+  .sitemap-role-block {
+    break-before: page;
+  }
+
+  .sitemap-role-block:first-of-type {
+    break-before: auto;
+  }
+}
+
+.how-we-compare-page .compare-note p {
+  margin: 0 0 0.65rem;
+  line-height: 1.55;
+}
+
+.how-we-compare-page .compare-product-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0.75rem;
+}
+
+.compare-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .compare-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.compare-feature-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  line-height: 1.5;
+}
+
+.compare-feature-list li {
+  margin: 0.55rem 0;
+}
+
+.compare-table td {
+  vertical-align: top;
+  font-size: 0.88rem;
+}

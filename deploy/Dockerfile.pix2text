@@ -1,0 +1,19 @@
+# Pix2Text formula OCR sidecar for TestVantage (JEE/NEET math uploads).
+# First start downloads models (~1–2 GB) — allow several minutes.
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgomp1 \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir 'pix2text[serve]>=1.1.4'
+
+ENV P2T_HOST=0.0.0.0
+ENV P2T_PORT=8503
+
+EXPOSE 8503
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8503/docs', timeout=8)"
+
+CMD ["p2t", "serve", "-H", "0.0.0.0", "-p", "8503", "-l", "en"]

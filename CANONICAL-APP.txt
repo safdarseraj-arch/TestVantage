@@ -1,0 +1,8 @@
+This is the ONLY copy of the TestVantages app.
+
+All question-upload fixes (passage, MTC, PIVQ, graphs, bank) live here.
+
+Do not create or use another onlinetest folder elsewhere in this repo.
+
+Start: double-click ../../START-HERE.bat (repo root)
+Cursor: open ../../TestVantage.code-workspace (repo root)

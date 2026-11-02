@@ -49,6 +49,10 @@ SUB_BANK_TYPES: tuple[SubBankType, ...] = (
 
 APPROVAL_STATUS_PENDING_REVIEW = "PENDING_REVIEW"
 APPROVAL_STATUS_APPROVED = "APPROVED"
+# Incomplete Hybrid AI stems stay in the pool but must not be treated as approved.
+APPROVAL_STATUS_NEEDS_FIX = "NEEDS_FIX"
+# Failed completeness check: draft tray "Needs action", not a ready Hybrid AI card.
+APPROVAL_STATUS_NEEDS_ACTION = "NEEDS_ACTION"
 
 _SUB_BANK_TYPE_CHECK = (
     "sub_bank_type IN ('normal', 'pyq', 'ai', 'similar_pyq')"
@@ -118,12 +122,29 @@ def generate_clone_batch_id() -> str:
 
 
 def generate_child_question_id(parent_id: str, index: int) -> str:
-    """Return ``{parent_id}C{index}`` (index is 1-based, e.g. MBS20002 + 1 -> MBS20002C1)."""
+    """Return ``{parent_id}C{index}`` (index is 1-based, e.g. MAM00001I + 1 -> MAM00001IC1)."""
     if not (parent_id or "").strip():
         raise ValueError("parent_id must be non-empty")
     if index < 1:
         raise ValueError("index must be >= 1")
     return f"{parent_id.strip()}C{index}"
+
+
+def next_child_question_index(parent_id: str, existing_ids: Sequence[str]) -> int:
+    """Smallest C number not already used on this parent (C1, C2, … are never reused)."""
+    parent = (parent_id or "").strip()
+    if not parent:
+        raise ValueError("parent_id must be non-empty")
+    pattern = re.compile(rf"^{re.escape(parent)}C(\d+)$")
+    used: set[int] = set()
+    for raw in existing_ids:
+        match = pattern.match(str(raw or "").strip())
+        if match:
+            used.add(int(match.group(1)))
+    index = 1
+    while index in used:
+        index += 1
+    return index
 
 
 def generate_test_result_row_id() -> str:
@@ -157,6 +178,8 @@ class AIQuestionBank(Base):
     exam: Mapped[str] = mapped_column(String(64), nullable=False)
     subject: Mapped[str] = mapped_column(String(64), nullable=False)
     chapter: Mapped[str] = mapped_column(String(256), nullable=False)
+    # Curriculum unit (Algebra, Calculus, …). Chapter stays the nested chapter name.
+    unit: Mapped[str | None] = mapped_column(String(256), nullable=True)
     topic: Mapped[str | None] = mapped_column(String(256), nullable=True)
     question_type: Mapped[str] = mapped_column(String(64), nullable=False)
     difficulty: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -185,6 +208,22 @@ class AIQuestionBank(Base):
         default=False,
         server_default=false(),
     )
+    # Failed Hybrid check. Ready drafts stay False and keep curriculum tags.
+    needs_action: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
+    # Marked so a similar / replica batch can be requested later.
+    is_pattern: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
+    # T1–T10. Selects Flash vs Pro at generation time.
+    toughness_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class AIQuestionCloneBatch(Base):

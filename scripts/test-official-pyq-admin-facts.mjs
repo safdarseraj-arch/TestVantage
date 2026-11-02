@@ -1,0 +1,279 @@
+/**
+ * Admin-confirmed paper facts: slots, pre-fill from instructions, passage and
+ * junk card removal, the facts check, and the one-card check that must not
+ * report paper-level count lines.
+ */
+import assert from 'node:assert/strict'
+import {
+  applyAdminFactsToQuestions,
+  cutAdminPassagesFromOcr,
+  draftAdminFacts,
+  enforceAdminFactsOnQuestions,
+  parsePassageGroups,
+  validateAdminFacts,
+} from '../src/utils/officialPyqAdminFacts.js'
+import { stampSubjectsFromPaper } from '../src/utils/parsePaperSectionMap.js'
+import {
+  fillOfficialPyqPairPassages,
+  officialPyqCardHasMistakenPassage,
+  peelOfficialPyqCardForDisplay,
+} from '../src/utils/passage.js'
+import { reviewOfficialPyqCards } from '../src/utils/officialPyqUnifiedCheck.js'
+import { officialPyqContentReviewMessages } from '../src/utils/officialPyqReviewFlags.js'
+import { keepAdminEditedOfficialPyqCards } from '../src/utils/officialPyqPendingStore.js'
+
+let passed = 0
+function test(name, fn) {
+  try {
+    fn()
+    passed += 1
+  } catch (err) {
+    console.error(`FAIL: ${name}`)
+    throw err
+  }
+}
+
+const jeePattern = {
+  totalQuestions: 57,
+  subjectOrder: ['physics', 'chemistry', 'mathematics'],
+  numbering: 'restart',
+  samePattern: true,
+  pattern: {
+    rows: [
+      { from: 1, to: 6, type: 'multiple_correct', options: 4 },
+      { from: 7, to: 12, type: 'numerical', options: 0 },
+      { from: 13, to: 19, type: 'single_correct', options: 4 },
+    ],
+    passages: '7-8, 9-10, 11-12',
+  },
+}
+
+test('passage groups parse and reject bad pieces', () => {
+  const { groups, bad } = parsePassageGroups('13-14, Q15 and Q16; 17')
+  assert.deepEqual(groups, [[13, 14], [15, 16]])
+  assert.deepEqual(bad, ['17'])
+})
+
+test('same pattern, restart numbering → 57 slots, printed numbers restart', () => {
+  const { errors, slots } = validateAdminFacts(jeePattern)
+  assert.deepEqual(errors, [])
+  assert.equal(slots.length, 57)
+  assert.equal(slots[19].subject, 'chemistry')
+  assert.equal(slots[19].printed, 1)
+  assert.equal(slots[6].type, 'numerical')
+  assert.equal(slots[6].options, 0)
+  assert.equal(slots[6].passage, 'physics:7-8')
+  assert.equal(slots[12].passage, '')
+})
+
+test('continuous numbering shifts later subjects', () => {
+  const { errors, slots } = validateAdminFacts({ ...jeePattern, numbering: 'continuous' })
+  assert.deepEqual(errors, [])
+  assert.equal(slots[19].printed, 20)
+  assert.equal(slots[56].printed, 57)
+  assert.equal(slots[25].passage, 'chemistry:26-27')
+})
+
+test('form mistakes are reported in plain words', () => {
+  const gap = validateAdminFacts({
+    ...jeePattern,
+    pattern: { rows: [{ from: 1, to: 6, type: 'single_correct', options: 4 }, { from: 8, to: 19, type: 'integer' }] },
+  })
+  assert.ok(gap.errors.some((e) => /Q7–Q7 are in no section/.test(e)), gap.errors.join(' | '))
+  const total = validateAdminFacts({ ...jeePattern, totalQuestions: 54 })
+  assert.ok(total.errors.some((e) => /add up to 57 questions, and the total says 54/.test(e)))
+  const outside = validateAdminFacts({ ...jeePattern, pattern: { ...jeePattern.pattern, passages: '19-20' } })
+  assert.ok(outside.errors.some((e) => /outside Q1–Q19/.test(e)))
+})
+
+test('pre-fill reads the printed instructions', () => {
+  const block = (subject) => `\\section*{${subject}}
+SECTION 1 (Maximum Marks: 24)
+This section contains SIX (06) questions. Each question has FOUR options. ONE OR MORE THAN ONE of these four option(s) is(are) correct answer(s).
+SECTION 2 (Maximum Marks: 24)
+This section contains THREE (03) question stems. There are TWO (02) questions corresponding to each question stem. The answer to each question is a NUMERICAL VALUE.
+SECTION 3 (Maximum Marks: 21)
+This section contains SEVEN (07) questions. Each question has FOUR options. ONLY ONE of these four options is the correct answer.
+`
+  const ocr = [block('PHYSICS'), block('CHEMISTRY'), block('MATHEMATICS')].join('\n')
+  const draft = draftAdminFacts(ocr, [])
+  assert.equal(draft.totalQuestions, 57)
+  assert.deepEqual(draft.subjectOrder, ['physics', 'chemistry', 'mathematics'])
+  assert.equal(draft.samePattern, true)
+  assert.equal(draft.numbering, 'restart')
+  assert.deepEqual(
+    draft.pattern.rows.map((r) => [r.from, r.to, r.type]),
+    [
+      [1, 6, 'multiple_correct'],
+      [7, 12, 'numerical'],
+      [13, 19, 'single_correct'],
+    ],
+  )
+  assert.equal(draft.pattern.passages, '7-8, 9-10, 11-12')
+  assert.deepEqual(validateAdminFacts(draft).errors, [])
+})
+
+const small = {
+  totalQuestions: 4,
+  subjectOrder: ['physics'],
+  numbering: 'restart',
+  samePattern: true,
+  pattern: {
+    rows: [
+      { from: 1, to: 2, type: 'single_correct', options: 4 },
+      { from: 3, to: 4, type: 'numerical' },
+    ],
+    passages: '3-4',
+  },
+}
+const opts = ['$1$', '$2$', '$3$', '$4$']
+const cards = [
+  { id: 'a', text: 'A block of mass m slides on a smooth incline of angle theta. Find its acceleration.', options: opts, printedNumber: 1, questionType: 'single_correct' },
+  { id: 'b', text: 'A ball is thrown up with speed u from the ground. Find the maximum height reached.', options: opts, printedNumber: 2, questionType: 'single_correct' },
+  { id: 'p', text: 'Paragraph\nA uniform rod of length L is pivoted at one end and released from rest when horizontal. It swings freely in a vertical plane under gravity.', options: [], printedNumber: 16 },
+  { id: 'c', text: 'The angular speed of the rod when it becomes vertical is ____ rad/s.', options: [], printedNumber: 3, questionType: 'numerical' },
+  { id: 'd', text: 'The speed of the free end of the rod when vertical is ____ m/s.', options: [], printedNumber: 4, questionType: 'numerical' },
+  { id: 'j', text: 'Zero Marks : 0 In all other cases.', options: [], printedNumber: 22 },
+]
+
+test('applying facts drops passage and marks-text cards and shares the passage', () => {
+  const { questions, facts } = applyAdminFactsToQuestions(cards, small, '')
+  assert.ok(facts)
+  assert.deepEqual(questions.map((q) => q.id), ['a', 'b', 'c', 'd'])
+  assert.match(String(questions[2].passageText), /uniform rod of length L/)
+  assert.match(String(questions[3].passageText), /uniform rod of length L/)
+  assert.deepEqual(questions.map((q) => q.printedNumber), [1, 2, 3, 4])
+  assert.ok(questions.every((q) => q.subject === 'physics'))
+})
+
+test('facts check flags count, options and leftover passage cards', () => {
+  const { facts } = applyAdminFactsToQuestions([], small, '')
+  const wrongCount = reviewOfficialPyqCards(cards, '', facts)
+  assert.equal(wrongCount.passed, false)
+  assert.ok(wrongCount.messages.some((m) => /confirmed by you\) say 4 questions\. This paper has 6/.test(m)))
+  assert.ok(wrongCount.messages.some((m) => /Go to Q 3\. This card is a passage/.test(m)), wrongCount.messages.join(' | '))
+
+  const { questions } = applyAdminFactsToQuestions(cards, small, '')
+  const threeOptions = questions.map((q, i) => (i === 0 ? { ...q, options: opts.slice(0, 3) } : q))
+  const review = reviewOfficialPyqCards(threeOptions, '', facts)
+  assert.deepEqual(review.failedGoTo, [1])
+  assert.ok(review.messages.some((m) => /number of options does not match the paper facts \(4\)/.test(m)))
+})
+
+test('one-card check never reports the paper count (it blocked every Approve)', () => {
+  const clean = { text: cards[0].text, options: opts, questionType: 'single_correct' }
+  const lines = officialPyqContentReviewMessages([clean])
+  assert.ok(!lines.some((m) => /facts card|This section contains|Do not approve/i.test(m)), lines.join(' | '))
+  const cardsOnly = reviewOfficialPyqCards([clean], '', null, { cardsOnly: true })
+  assert.deepEqual(cardsOnly.messages, [])
+})
+
+test('a hand-edited card that moved slot keeps its edit and does not overwrite another card', () => {
+  const edited = { id: 'b', text: 'Edited by admin', options: opts, pyqSlot: 3, adminEdited: true, adminEditedAt: 5 }
+  const prev = [
+    { id: 'a', text: 'Question A', options: opts, pyqSlot: 1 },
+    { id: 'p', text: 'Paragraph only', options: [], pyqSlot: 2 },
+    edited,
+  ]
+  const next = [
+    { id: 'a', text: 'Question A', options: opts, pyqSlot: 1 },
+    { ...edited, pyqSlot: 2 },
+  ]
+  const out = keepAdminEditedOfficialPyqCards(prev, next)
+  assert.equal(out.length, 2)
+  assert.equal(out[0].text, 'Question A')
+  assert.equal(out[1].text, 'Edited by admin')
+})
+
+const twoSubject = {
+  confirmedAt: 1,
+  totalQuestions: 12,
+  subjectOrder: ['physics', 'chemistry'],
+  numbering: 'restart',
+  samePattern: true,
+  pattern: {
+    rows: [
+      { from: 1, to: 2, type: 'single_correct', options: 4 },
+      { from: 3, to: 6, type: 'numerical', options: 0 },
+    ],
+    passages: '3-4, 5-6',
+  },
+}
+const subjectOcr = (name, a, b) => `\\section*{${name}}
+Q.1 First single-correct question of ${name}.
+(A) 1 (B) 2 (C) 3 (D) 4
+Q.2 Second single-correct question of ${name}.
+(A) 1 (B) 2 (C) 3 (D) 4
+Question Stem for Question Nos. 3 and 4
+Question Stem
+${a}
+Q.3 The value of X in ${name} is ____.
+Q.4 The value of Y in ${name} is ____.
+Paragraph
+${b}
+Q.5 The value of P in ${name} is ____.
+Q.6 The value of R in ${name} is ____.
+`
+const twoOcr = [
+  subjectOcr('PHYSICS', 'A soft plastic bottle filled with water of density 1 gm/cc carries an inverted glass test-tube.', 'A pendulum of length L swings in a lift that accelerates upward with acceleration a.'),
+  subjectOcr('CHEMISTRY', 'Tin is obtained from cassiterite by reduction with coke in a blast furnace.', 'A solution of a weak acid HA is titrated against NaOH at 298 K.'),
+].join('\n')
+
+test('passage cut stops at its own first question and never takes the next passage', () => {
+  const { slots } = validateAdminFacts(twoSubject)
+  const cut = cutAdminPassagesFromOcr(twoOcr, slots)
+  assert.match(cut.get('physics:3-4'), /^A soft plastic bottle/)
+  assert.doesNotMatch(cut.get('physics:3-4'), /Q\.3|pendulum|Question Stem/)
+  assert.match(cut.get('physics:5-6'), /^A pendulum of length L/)
+  assert.doesNotMatch(cut.get('physics:5-6'), /Q\.4|Q\.5|bottle/)
+  assert.match(cut.get('chemistry:3-4'), /^Tin is obtained/)
+  assert.match(cut.get('chemistry:5-6'), /^A solution of a weak acid/)
+})
+
+const twelve = Array.from({ length: 12 }, (_, i) => ({
+  id: `q${i}`,
+  text: `Card ${i + 1} text that is long enough.`,
+  options: i % 6 < 2 ? opts : [],
+  subject: 'mathematics',
+  passageText: 'Wrong passage that belongs to Q9-10 and also holds Q.7 and Q.8 text.',
+  passageId: 'old',
+}))
+
+test('confirmed facts put subject, type and the right passage on every card', () => {
+  const out = enforceAdminFactsOnQuestions(twelve, twoSubject, twoOcr)
+  assert.deepEqual(out.map((q) => q.subject), [...Array(6).fill('physics'), ...Array(6).fill('chemistry')])
+  assert.equal(out[2].questionType, 'numerical')
+  assert.equal(out[0].passageText, undefined)
+  assert.equal(out[1].passageId, undefined)
+  assert.match(out[2].passageText, /^A soft plastic bottle/)
+  assert.equal(out[3].passageText, out[2].passageText)
+  assert.equal(out[3].passageId, out[2].passageId)
+  assert.match(out[4].passageText, /^A pendulum/)
+  assert.match(out[10].passageText, /^A solution of a weak acid/)
+  assert.equal(out[2].passageSource, 'admin_facts')
+})
+
+test('a passage typed by the admin stays; heals keep fact passages', () => {
+  const typed = twelve.map((q, i) => (i === 2 ? { ...q, passageText: 'Typed by admin, keep this.', passageSource: 'admin_edit' } : q))
+  const out = enforceAdminFactsOnQuestions(typed, twoSubject, twoOcr)
+  assert.equal(out[2].passageText, 'Typed by admin, keep this.')
+  assert.match(out[3].passageText, /^A soft plastic bottle/)
+  const healed = fillOfficialPyqPairPassages(out)
+  assert.equal(healed[2].passageText, 'Typed by admin, keep this.')
+  assert.match(healed[3].passageText, /^A soft plastic bottle/)
+  assert.equal(peelOfficialPyqCardForDisplay(out[4], twoOcr), out[4])
+  assert.equal(officialPyqCardHasMistakenPassage(out[4], twoOcr), false)
+})
+
+test('subject from facts is not re-guessed', () => {
+  const out = enforceAdminFactsOnQuestions(twelve, twoSubject, twoOcr)
+  const stamped = stampSubjectsFromPaper(out, twoOcr)
+  assert.deepEqual(stamped.map((q) => q.subject), out.map((q) => q.subject))
+})
+
+test('wrong card count leaves cards alone', () => {
+  const out = enforceAdminFactsOnQuestions(twelve.slice(0, 11), twoSubject, twoOcr)
+  assert.equal(out[0].subject, 'mathematics')
+})
+
+console.log(`official-pyq admin facts: ${passed} tests passed`)

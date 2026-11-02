@@ -7,6 +7,15 @@ import FeatureHighlightCarousel from './FeatureHighlightCarousel'
 import { useAuth } from '../context/AuthContext'
 import { PERMS } from '../utils/permissions'
 import { canAccessMainQuestionBank } from '../utils/teacherQuestionBank.js'
+import {
+  broadcastHybridSyncStatus,
+  hybridSyncUserMessage,
+  isHybridAiJobPending,
+  postgresHasNoHybridAiRows,
+  syncHybridAiIntoQuestionBank,
+} from '../utils/hybridAiSync.js'
+import { peekUploadedQuestions } from '../utils/questionBank.js'
+import { countHybridAiDrafts } from '../utils/questionBankSubBank.js'
 
 import { STUDENT_PREPARE_NAV } from '../data/studentPrepareModes'
 
@@ -18,7 +27,7 @@ const NAV_COMPETE = [
   { to: '/doubts', label: 'Ask Your Doubt', icon: '💬', title: 'Doubt on a question' },
 ]
 
-const NAV_MORE = [{ to: '/tour', label: 'TestVantage Tour', icon: '🗺️' }]
+const NAV_MORE = [{ to: '/tour', label: 'TestVantages Tour', icon: '🗺️' }]
 const NAV_MORE_ADMIN = [
   ...NAV_MORE,
   { to: '/go-live-guide', label: 'Go live guide', icon: '🚀' },
@@ -27,6 +36,7 @@ const NAV_MORE_ADMIN = [
 const ADMIN_NAV = [
   { to: '/question-bank', label: 'Question Bank', icon: '📚' },
   { to: '/question-bank/ai-generate', label: 'Hybrid AI', icon: '🤖' },
+  { to: '/question-bank/book-ingest', label: 'Book ingest', icon: '📖' },
   { to: '/question-bank/review', label: 'Review & publish', icon: '✅' },
   { to: '/question-bank/reports', label: 'Question reports', icon: '🚩' },
   { to: '/official-pyq', label: 'Approve official papers', icon: '📜' },
@@ -49,8 +59,8 @@ const PAGE_TITLES = {
   '/todays-drill': 'Today’s Drill',
   '/merit-stride': 'Merit Stride',
   '/study-circle': 'Study Circle',
-  '/tour': 'TestVantage Tour',
-  '/site-map': 'TestVantage Tour',
+  '/tour': 'TestVantages Tour',
+  '/site-map': 'TestVantages Tour',
   '/go-live-guide': 'Go Live Guide',
   '/tests': 'Mock Tests',
   '/practice': 'Syllabus Practice',
@@ -77,6 +87,7 @@ const PAGE_TITLES = {
   '/doubts': 'Ask Your Doubt',
   '/question-bank': 'Question Bank',
   '/question-bank/ai-generate': 'Hybrid AI',
+  '/question-bank/book-ingest': 'Book ingest',
   '/question-bank/review': 'Review & Publish',
   '/question-bank/reports': 'Question Reports',
   '/merge-banks': 'Merge banks',
@@ -125,6 +136,7 @@ const BREADCRUMB = {
   '/doubts': 'Community',
   '/question-bank': 'Admin',
   '/question-bank/ai-generate': 'Admin',
+  '/question-bank/book-ingest': 'Admin',
   '/question-bank/review': 'Admin',
   '/question-bank/reports': 'Admin',
   '/create-test': 'Admin',
@@ -150,7 +162,7 @@ function getPageTitle(pathname) {
       best = { path, title }
     }
   }
-  return best?.title ?? 'TestVantage'
+  return best?.title ?? 'TestVantages'
 }
 
 function getBreadcrumb(pathname) {
@@ -163,7 +175,7 @@ function getBreadcrumb(pathname) {
       best = { path, crumb }
     }
   }
-  return best?.crumb ?? 'TestVantage'
+  return best?.crumb ?? 'TestVantages'
 }
 
 function topbarRole({ isAdmin, isTeacher, isUser }) {
@@ -267,6 +279,44 @@ function ChromeDropdown({ id, label, hubTo, items, pathname, search, openId, set
 export default function Layout() {
   const { pathname, search } = useLocation()
   const { isAdmin, isUser, isTeacher, hasPermission, logout, session } = useAuth()
+
+  useEffect(() => {
+    if (!pathname.startsWith('/question-bank')) return undefined
+    let cancelled = false
+    const run = () => {
+      if (cancelled) return
+      void syncHybridAiIntoQuestionBank({ approvedOnly: false })
+        .then((result) => {
+          if (!postgresHasNoHybridAiRows(result)) return
+          if (isHybridAiJobPending()) return
+          try {
+            if (sessionStorage.getItem('tv-hybrid-empty-pool-hint')) return
+            sessionStorage.setItem('tv-hybrid-empty-pool-hint', '1')
+          } catch {
+            /* private mode */
+          }
+          const localHybrid = countHybridAiDrafts(peekUploadedQuestions())
+          const msg = hybridSyncUserMessage(result, { localHybridDraftCount: localHybrid })
+          if (msg) {
+            broadcastHybridSyncStatus({
+              type: localHybrid > 0 ? 'info' : 'error',
+              message: msg,
+            })
+          }
+        })
+        .catch((err) => {
+          const message =
+            err instanceof Error ? err.message : 'Hybrid AI sync failed — is the API running?'
+          broadcastHybridSyncStatus({ type: 'error', message })
+        })
+    }
+    run()
+    const id = window.setInterval(run, 90_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [pathname])
   const accessMainBank = isAdmin || canAccessMainQuestionBank(session)
   const [openMenu, setOpenMenu] = useState(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -299,6 +349,7 @@ export default function Layout() {
           { to: '/teacher/lecture-planner', label: 'Lecture Planner', icon: '📋' },
           { to: '/question-bank?hub=upload&owner=teacher', label: 'Upload questions', icon: '⬆️' },
           { to: '/question-bank/ai-generate', label: 'Hybrid AI', icon: '🤖' },
+  { to: '/question-bank/book-ingest', label: 'Book ingest', icon: '📖' },
         ]
       : []),
     ...(accessMainBank && hasPermission(PERMS.UPLOAD_QUESTIONS)
@@ -597,7 +648,7 @@ export default function Layout() {
         </main>
 
         <footer className="site-footer">
-          TestVantage — Professional mock tests &amp; PYQ practice for serious aspirants
+          TestVantages — Professional mock tests &amp; PYQ practice for serious aspirants
           {' · '}
           <Link to="/tour" className="site-footer-link">
             Tour

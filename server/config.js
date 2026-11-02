@@ -18,7 +18,7 @@ export const SERVER = {
   host: process.env.TESTVANTAGE_API_HOST || '127.0.0.1',
   instanceId: process.env.TESTVANTAGE_INSTANCE_ID || `api-${process.pid}`,
   dataDir: process.env.TESTVANTAGE_BANK_DATA_DIR || null,
-  /** CORS: * (default) or a single public origin, e.g. https://app.example.com */
+  /** CORS: * (default) or comma-separated origins, e.g. https://www.testvantages.com,https://testvantages.com */
   corsOrigin: String(process.env.TESTVANTAGE_CORS_ORIGIN ?? '*').trim() || '*',
 }
 

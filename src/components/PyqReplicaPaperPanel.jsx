@@ -10,11 +10,9 @@ import {
   replicaPaperLabel,
   nextReplicaIndices,
 } from '../utils/pyqReplicaPaper.js'
-import {
-  formatQuestionSourceText,
-  queueCloneScaled,
-  HYBRID_AI_ROUTE,
-} from '../utils/hybridAiClient.js'
+import { formatQuestionSourceText, queueCloneScaled, HYBRID_AI_ROUTE } from '../utils/hybridAiClient.js'
+import { syncHybridAiAfterJob } from '../utils/hybridAiSync.js'
+import CloneModal from './CloneModal.jsx'
 
 /**
  * PRIMARY staff flow: Hybrid AI clone-scaled jobs for every question in a PYQ paper.
@@ -28,6 +26,7 @@ export default function PyqReplicaPaperPanel({ paperGroup, onSaved, compact = fa
   const [replicaCount, setReplicaCount] = useState(REPLICA_PAPER_DEFAULT_COUNT)
   const [busy, setBusy] = useState(false)
   const [log, setLog] = useState([])
+  const [cloneModalOpen, setCloneModalOpen] = useState(false)
 
   const parent = useMemo(() => parentPaperFromGroup(paperGroup ?? {}), [paperGroup])
   const officialSeeds = useMemo(
@@ -46,7 +45,7 @@ export default function PyqReplicaPaperPanel({ paperGroup, onSaved, compact = fa
 
   const appendLog = (line) => setLog((prev) => [...prev.slice(-80), line])
 
-  const onCreateReplicas = async () => {
+  const runReplicaJobs = async (templatePayload) => {
     if (!canRun || busy) return
     setBusy(true)
     setLog([])
@@ -56,18 +55,21 @@ export default function PyqReplicaPaperPanel({ paperGroup, onSaved, compact = fa
 
     let queued = 0
     let failed = 0
+    const jobIds = []
     try {
       for (let i = 0; i < officialSeeds.length; i++) {
         const seed = officialSeeds[i]
         appendLog(`[${i + 1}/${officialSeeds.length}] ${seed.id} — clone-scaled ×${replicaCount}…`)
         try {
-          await queueCloneScaled({
+          const data = await queueCloneScaled({
+            ...templatePayload,
             parent_question_id: String(seed.id),
             source_question_text: formatQuestionSourceText(seed),
             count: replicaCount,
             difficulty_offset: 1,
             parent_is_pyq: true,
           })
+          if (data?.job_id || data?.batch_id) jobIds.push(data.job_id || data.batch_id)
           queued += 1
         } catch (e) {
           failed += 1
@@ -78,11 +80,13 @@ export default function PyqReplicaPaperPanel({ paperGroup, onSaved, compact = fa
         `Done. Queued ${queued} parent job(s)${failed ? `, ${failed} failed` : ''}. Replica paper names (when synced): ${previewNames.join(', ')}.`,
       )
       appendLog('Clones land in similar_pyq / AI bank via Hybrid AI — review before publish.')
+      void syncHybridAiAfterJob({ attempts: 30, intervalMs: 5000, jobIds })
       onSaved?.()
     } catch (e) {
       appendLog(e instanceof Error ? e.message : 'Replica generation failed.')
     } finally {
       setBusy(false)
+      setCloneModalOpen(false)
     }
   }
 
@@ -123,13 +127,24 @@ export default function PyqReplicaPaperPanel({ paperGroup, onSaved, compact = fa
               type="button"
               className="btn btn-primary"
               disabled={busy}
-              onClick={onCreateReplicas}
+              onClick={() => setCloneModalOpen(true)}
             >
               {busy
                 ? `Queuing clone jobs… (${officialSeeds.length} questions)`
-                : `Create ${replicaCount} replica papers (Hybrid AI)`}
+                : `Create ${replicaCount} replica papers (Hybrid AI)…`}
             </button>
           </div>
+          <CloneModal
+            open={cloneModalOpen}
+            onClose={() => !busy && setCloneModalOpen(false)}
+            seed={officialSeeds[0] ?? null}
+            count={replicaCount}
+            onCountChange={setReplicaCount}
+            countOptions={REPLICA_PAPER_COUNTS}
+            title={`Replica paper clones (×${replicaCount} per question)`}
+            submitLabel={`Queue ${officialSeeds.length} parent jobs`}
+            onSubmitPayload={(payload) => runReplicaJobs(payload)}
+          />
           <p className="form-hint">
             Names: {previewNames.join(', ')}. Each parent id gets up to {replicaCount} child ids via{' '}
             <code>clone-scaled</code>.

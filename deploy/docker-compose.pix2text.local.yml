@@ -1,0 +1,12 @@
+# Local Pix2Text only — for Cursor / F5 dev without full production stack.
+# From onlinetest folder: npm run pix2text:up
+# API uses PIX2TEXT_URL=http://127.0.0.1:8503 (default when unset).
+
+services:
+  pix2text:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.pix2text
+    ports:
+      - '8503:8503'
+    restart: unless-stopped

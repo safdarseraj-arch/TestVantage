@@ -1,0 +1,13 @@
+---
+description: Core rules for TestVantages Hybrid AI pipeline.
+globs: *
+alwaysApply: true
+---
+# Stack Definition
+- Backend: Python (FastAPI), SQLAlchemy, pgvector.
+- AI Integration: Strictly use the new `google-genai` SDK (`pip install google-genai pydantic numpy`). No local SymPy needed.
+
+# Cost Control & Code Execution Rules
+- Never use local `exec()`. Always use Google's native `ToolCodeExecution()`.
+- Apply a strict `max_output_tokens=1500` to prevent token bleeding during code execution.
+- Dynamic Routing: Draft/batch — `exam == 'JEE Advanced'` AND `difficulty == 'Hard'` → `gemini-3-pro`; else `gemini-3.7-flash`. Clone/scaled jobs — `difficulty_offset >= 1` → `gemini-3-pro`; else `gemini-3.7-flash`. Context cache & PDF ingest default → `gemini-3.7-flash`.

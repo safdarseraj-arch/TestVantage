@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Copy bank → 127.0.0.1</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 32rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      .ok {
+        color: #166534;
+      }
+      .err {
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Copy question bank</h1>
+    <p id="status">Reading questions saved in <strong>this browser tab (localhost)</strong>…</p>
+    <p id="hint" class="form-hint"></p>
+    <script>
+      const KEY = 'testvantage-uploaded-questions'
+      const BACKUP = 'testvantage-uploaded-questions-backup'
+      const TARGETS = ['http://127.0.0.1:5173', 'http://localhost:5173']
+      const el = document.getElementById('status')
+      const hint = document.getElementById('hint')
+      const port = location.port || '5173'
+      const params = new URLSearchParams(location.search)
+      const relay = params.get('relay') === '1' || params.get('relay') === 'parent'
+      const ret = params.get('return')
+      const target = ret
+        ? 'http://127.0.0.1:' + port + decodeURIComponent(ret)
+        : 'http://127.0.0.1:' + port + '/question-bank?hub=view&view=all'
+
+      function parseBank(raw) {
+        if (!raw) return { count: 0, payload: null }
+        try {
+          const data = JSON.parse(raw)
+          let list = []
+          let settings = undefined
+          if (Array.isArray(data)) {
+            list = data
+          } else if (Array.isArray(data.questions)) {
+            list = data.questions
+            settings = data.settings
+          } else if (data.questions && typeof data.questions === 'object') {
+            list = Object.values(data.questions)
+            settings = data.settings
+          }
+          return {
+            count: list.length,
+            payload: { settings: settings || {}, questions: list },
+          }
+        } catch {
+          return { count: 0, payload: null }
+        }
+      }
+
+      const raw = localStorage.getItem(KEY) || localStorage.getItem(BACKUP) || ''
+      const { count, payload } = parseBank(raw)
+
+      function postToParent() {
+        const recipients = [window.opener, window.parent !== window ? window.parent : null].filter(
+          Boolean,
+        )
+        let sent = false
+        for (const recipient of recipients) {
+          for (const origin of TARGETS) {
+            try {
+              recipient.postMessage(
+                { type: 'testvantage-bank-merge', payload },
+                origin,
+              )
+              sent = true
+            } catch {
+              /* try next */
+            }
+          }
+        }
+        return sent
+      }
+
+      if (count > 0 && payload) {
+        el.innerHTML =
+          'Found <strong class="ok">' +
+          count +
+          '</strong> question(s) on <code>' +
+          location.origin +
+          '</code>.'
+
+        if (relay) {
+          const sent = postToParent()
+          if (sent) {
+            el.textContent += ' Sent to Question Bank. This window will close…'
+            hint.textContent = 'If nothing happens, allow popups and try again from 127.0.0.1.'
+            setTimeout(function () {
+              window.close()
+            }, 1200)
+          } else {
+            el.className = 'err'
+            el.textContent =
+              'Found ' + count + ' questions but could not reach 127.0.0.1. Open Question Bank on 127 first, then click Copy again (allow popups).'
+            hint.innerHTML =
+              'Or open <a href="' +
+              target +
+              '">127.0.0.1 Question Bank</a> and use Import JSON if you have a backup.'
+          }
+        } else {
+          hint.textContent =
+            'Full-page copy cannot move data between localhost and 127.0.0.1. Use the Copy button on 127 (opens a popup).'
+          el.textContent += ' Redirecting to 127.0.0.1 (may stay empty without popup copy).'
+          setTimeout(function () {
+            location.replace(target)
+          }, 3000)
+        }
+      } else {
+        el.innerHTML =
+          '<span class="err">No questions on <code>' +
+          location.origin +
+          '</code></span> (0 in storage).'
+        hint.textContent =
+          'Your saves may already be on 127.0.0.1 only, or you need a JSON backup file.'
+        if (relay) {
+          setTimeout(function () {
+            window.close()
+          }, 2500)
+        } else {
+          setTimeout(function () {
+            location.replace(target)
+          }, 2500)
+        }
+      }
+    </script>
+  </body>
+</html>

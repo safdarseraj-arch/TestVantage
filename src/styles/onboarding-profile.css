@@ -1,0 +1,146 @@
+/* Post-register student / teacher profile forms */
+
+.onboarding-page {
+  min-height: 100vh;
+}
+
+.onboarding-shell {
+  max-width: 980px;
+  flex: 0 1 980px;
+  min-height: 32rem;
+}
+
+.onboarding-form-panel {
+  overflow: auto;
+  max-height: min(90vh, 46rem);
+}
+
+.onboarding-form select,
+.onboarding-form textarea {
+  font: inherit;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  width: 100%;
+  resize: vertical;
+}
+
+.onboarding-form select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.onboarding-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.85rem;
+}
+
+.onboarding-fieldset {
+  margin: 0 0 1rem;
+  padding: 0;
+  border: none;
+}
+
+.onboarding-fieldset legend {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: #475569;
+}
+
+.onboarding-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.onboarding-chip {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+}
+
+.onboarding-chip.is-on {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #3730a3;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+}
+
+.onboarding-optional {
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .onboarding-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-form-panel {
+    max-height: none;
+  }
+}
+
+.profile-page .profile-card {
+  padding: 1.35rem 1.5rem 1.5rem;
+}
+
+.profile-identity {
+  margin: 0 0 1.1rem;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.profile-saved {
+  margin: 0 0 0.75rem;
+  color: #166534;
+  font-weight: 650;
+}
+
+.profile-readonly {
+  padding: 1.25rem 1.4rem;
+}
+
+.profile-edit-form .auth-submit-btn {
+  margin-top: 0.35rem;
+}
+
+.chrome-profile-link {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-h, #0f172a);
+  text-decoration: none;
+  padding: 0.2rem 0.15rem;
+}
+
+.chrome-profile-link:hover {
+  color: var(--tv-blue, #2563eb);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a.topbar-avatar--link {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.topbar-avatar--link:hover,
+a.topbar-avatar--link:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 2px;
+}

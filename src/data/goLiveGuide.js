@@ -98,7 +98,7 @@ export const GO_LIVE_PARTS = [
   {
     id: 'c',
     part: 'Part C',
-    title: 'Put TestVantage on the server',
+    title: 'Put TestVantages on the server',
     intro: 'Copy your project and start the production stack.',
     steps: [
       {
@@ -116,7 +116,7 @@ export const GO_LIVE_PARTS = [
           'Change every CHANGE_ME password in .env.production before students use the live site.',
           'Copy .env.production.example → rename to .env.production (if you do not have one yet).',
           'Change POSTGRES_PASSWORD and TESTVANTAGE_ADMIN_PASSWORD to strong secrets.',
-          'Set TESTVANTAGE_CORS_ORIGIN to your public site (https://testvantages.com).',
+          'Set VITE_PUBLIC_SITE_URL=https://www.testvantages.com and TESTVANTAGE_CORS_ORIGIN=https://www.testvantages.com,https://testvantages.com',
           'Optional: add GEMINI_API_KEY for cloud OCR and AI solutions (server only).',
         ],
       },
@@ -134,7 +134,7 @@ export const GO_LIVE_PARTS = [
         title: 'Check it works on the server',
         lines: [
           'Open http://YOUR_SERVER_IP:8080 in a browser.',
-          'You should see TestVantage (not “cannot connect”).',
+          'You should see TestVantages (not “cannot connect”).',
           'Check health: http://YOUR_SERVER_IP:8080/api/health (ok should be true).',
           'Log in as admin with the email/password from .env.production.',
         ],

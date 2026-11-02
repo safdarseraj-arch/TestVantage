@@ -1,0 +1,60 @@
+JEE (Advanced) 2024 Paper 2
+FIITJEE Publications
+Page 7
+
+\section*{SECTION 1 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains THREE (03) questions.
+\item[-] Full Marks : +3 If ONLY the correct option is chosen.
+\item[-] Zero Marks : 0 If none of the options is chosen.
+\end{itemize}
+
+\item[Q.] 17 The circuit shown in the figure carries a steady current. The
+potential difference across $R_{2}$ is
+![]($ https://cdn.mathpix.com/cropped/2024_p2_circuit.jpg?height=210&width=340&top_left_y=95&top_left_x=180
+(A) $\frac{I R_{2}}{2}$
+(B) $I R_{2}$
+(C) $2 I R_{2}$
+(D) $\frac{I R_{2}}{4}$
+
+\item[Q.] 18 Match each entry in List-I with the appropriate entry in List-II.
+
+\begin{tabular}{|l|l|}
+\hline List-I & List-II \\
+\hline \item[(P)] Isothermal process & \item[(1)] $\Delta U=0$ \\
+\hline \item[(Q)] Adiabatic process & \item[(2)] $Q=0$ \\
+\hline \item[(R)] Isochoric process & \item[(3)] $W=0$ \\
+\hline \item[(S)] Isobaric process & \item[(4)] $\Delta P=0$ \\
+\hline
+\end{tabular}
+
+(A) P-1, Q-2, R-3, S-4
+(B) P-2, Q-1, R-4, S-3
+(C) P-3, Q-4, R-1, S-2
+(D) P-4, Q-3, R-2, S-1
+
+Space for rough work
+Page 8
+FIITJEE Publications
+
+Paragraph
+
+A solid sphere of mass $M$ and radius $R$ rolls without slipping down an
+incline of angle $\theta$. The moment of inertia of the sphere about its own
+centre is $2 M R^{2} / 5$, and the coefficient of friction is large enough that
+slipping never occurs anywhere along the incline.
+
+\item[Q.] 19 The acceleration of the centre of mass of the sphere is
+(A) $\frac{5 g \sin \theta}{7}$
+(B) $g \sin \theta$
+(C) $\frac{2 g \sin \theta}{5}$
+(D) $\frac{g \sin \theta}{2}$
+
+\item[Q.] 20 The total kinetic energy after the sphere descends a height $h$ is
+(A) $M g h$
+(B) $\frac{5 M g h}{7}$
+(C) $\frac{2 M g h}{7}$
+(D) $\frac{M g h}{2}$
+
+ANSWER KEY
+17. (B) 18. (A) 19. (A) 20. (A)

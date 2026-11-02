@@ -1,0 +1,17 @@
+export {
+  EXAM_ACTION_EVENT,
+  EXAM_INTEGER_ANSWER_EVENT,
+  EXAM_MATRIX_ANSWER_EVENT,
+  EXAM_MCQ_ANSWER_EVENT,
+  applyIntegerKey,
+  getIntegerDisplay,
+  publishExamIntegerAnswer,
+  publishExamMatrixGridToggle,
+  publishExamMatrixOption,
+  publishExamMcqAnswer,
+  refreshExamActionBindings,
+  registerExamClickHandler,
+  runExamAction,
+  syncIntegerDisplay,
+  ensureExamClickBridge,
+} from './examClickBridge.js'

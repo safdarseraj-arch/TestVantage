@@ -635,7 +635,10 @@ export function cleanMathpixCardText(text) {
   t = splitGluedChemDisplayEquations(t)
   t = inlineSingleSymbolDisplayMath(t)
   t = restoreDroppedMsOnGivenLine(t)
-  t = t.replace(/\$\$\s*(?=\\includegraphics\b)/g, '')
+  t = t.replace(/\$\$\s*(?=\\includegraphics\b)/g, (full, offset, whole) => {
+    const opensBefore = (String(whole).slice(0, offset).match(/\$\$/g) || []).length
+    return opensBefore % 2 === 1 ? full : ''
+  })
   t = healVisibleTableCommands(
     stripEmptyFigureShells(
       stripEmptyImageMarkdown(stripScannerNotesFromQuestionText(stripOcrJunkSymbols(t))),

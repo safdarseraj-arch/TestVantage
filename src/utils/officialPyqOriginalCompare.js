@@ -97,6 +97,24 @@ export function officialPyqPrintedNumber(q, index) {
   return Number.isFinite(n) && n > 0 ? n : index + 1
 }
 
+/**
+ * Which of the cards with this printed number this one is. With numbering that
+ * restarts per subject, chemistry Q11 is the 2nd of three Q11s.
+ * @param {string} paperId @param {number} index @param {any} q
+ */
+export function officialPyqPrintedNumberPlace(paperId, index, q) {
+  const questions = getOfficialPyqPendingPaper(paperId)?.questions
+  const n = officialPyqPrintedNumber(q, index)
+  let occurrence = 0
+  let sameNumberCount = 0
+  ;(Array.isArray(questions) ? questions : []).forEach((card, i) => {
+    if (!card || isOfficialPyqPlaceholder(card) || officialPyqPrintedNumber(card, i) !== n) return
+    sameNumberCount += 1
+    if (i < index) occurrence += 1
+  })
+  return { occurrence, sameNumberCount: Math.max(sameNumberCount, occurrence + 1) }
+}
+
 const HTML_ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'" }
 
 /**
@@ -142,6 +160,7 @@ function cardHasFigure(q) {
  * @param {string} paperId @param {number} index @param {any} q @param {{ signal?: AbortSignal }} [opts]
  */
 export async function compareOfficialPyqCardRemote(paperId, index, q, { signal } = {}) {
+  const place = officialPyqPrintedNumberPlace(paperId, index, q)
   const body = {
     paper_id: paperId,
     go_to: index + 1,
@@ -149,6 +168,8 @@ export async function compareOfficialPyqCardRemote(paperId, index, q, { signal }
     card_text: String(q?.text ?? q?.stem ?? ''),
     passage_text: String(q?.passageText ?? ''),
     subject: String(q?.subject ?? ''),
+    occurrence: place.occurrence,
+    same_number_count: place.sameNumberCount,
     options: Array.isArray(q?.options) ? q.options.map((o) => String(o ?? '')) : [],
     answer_key: formatOfficialPyqAnswerKey(q) || null,
     has_figure: cardHasFigure(q),
@@ -254,9 +275,12 @@ export function officialPyqFlaggedGoTo(paper) {
  * @returns {Promise<{ available: boolean, pageCount: number, pages: number[], kind: string, fileName?: string }>}
  */
 export async function locateOfficialPyqOriginalPage(paperId, index, q) {
+  const place = officialPyqPrintedNumberPlace(paperId, index, q)
   const params = new URLSearchParams({
     printed_number: String(officialPyqPrintedNumber(q, index)),
     card_text: `${String(q?.passageText ?? '')}\n${String(q?.text ?? q?.stem ?? '')}`.trim().slice(0, 1500),
+    occurrence: String(place.occurrence),
+    same_number_count: String(place.sameNumberCount),
   })
   const res = await fetchWithTimeout(
     `/api/official-pyq/original/${encodeURIComponent(paperId)}/locate?${params}`,

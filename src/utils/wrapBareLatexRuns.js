@@ -594,7 +594,7 @@ export function repairOrphanPiecewiseArray(text) {
 export function wrapOrDropLeftoverArray(text) {
   let s = String(text ?? '')
   if (!/\\end\{array\}/i.test(s) && !/\\begin\{array\}/i.test(s)) return s
-  s = s.replace(/\$\s*(\\begin\{array\})/gi, '$1')
+  s = s.replace(/(?<!\$)\$\s*(\\begin\{array\})/gi, '$1')
   if (/\\end\{array\}/i.test(s) && !/\\begin\{array\}/i.test(s)) {
     s = s.replace(
       /(=\s*\\?\{[\s\S]{8,700}?)\\end\{array\}/i,

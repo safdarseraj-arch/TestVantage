@@ -39,6 +39,7 @@ import { stripLeakedOptionsFromStem } from './stripLeakedOptionsFromStem.js'
 import {
   cleanMathpixCardText,
 } from './mathpixCleanPipeline.js'
+import { flattenNestedTabulars } from './latexTabularDisplay.js'
 
 /** Drop OCR of a drawing that already has \\includegraphics — never invent reagents. */
 export function stripMatchFigureCaptionLeftovers(text) {
@@ -79,7 +80,7 @@ export function stripMatchFigureCaptionLeftovers(text) {
  */
 export function sanitizeStemForDisplay(text, options = []) {
   const raw = linearizeChemReactionAligned(
-    cleanMathpixCardText(String(text ?? '').replace(/\r\n/g, '\n')),
+    cleanMathpixCardText(flattenNestedTabulars(String(text ?? '').replace(/\r\n/g, '\n'))),
   )
   try {
     let t = stripEmptyImageMarkdown(stripEmptyFigureShells(raw))
@@ -153,7 +154,10 @@ export function sanitizeStemForDisplay(text, options = []) {
     t = t.replace(/\$+(?=\$\$\\begin\{array\})/gi, '')
     t = t.replace(/(\$\$\\begin\{array\}[\s\S]*?\\end\{array\})\$+/gi, '$1$$')
     // Ensure every display-opened array has a $$ close.
-    t = t.replace(/\$\$(\\begin\{array\}[\s\S]*?\\end\{array\})(?!\$\$)/gi, '$$$$$1$$$$')
+    t = t.replace(/\$\$(\\begin\{array\}[\s\S]*?\\end\{array\})(?!\s*\$\$)/gi, '$$$$$1$$$$')
+    t = t.replace(/(\$\$\s*)?(\\begin\{tabular\}[\s\S]*?\\end\{tabular\})\s*\$\$/g, (full, open, block) =>
+      open ? full : block,
+    )
     t = stripUnlabeledListTwoDump(t)
     t = t.replace(
       /\\begin\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?\s*(?:\\hline\s*)*(?:\\end\{tabular\})?\s*$/gi,

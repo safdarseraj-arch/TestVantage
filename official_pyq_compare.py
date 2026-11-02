@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 COMPARE_MODEL = "gemini-3.7-flash"
 _MAX_OUTPUT_TOKENS = 1500
 _RENDER_DPI = 130
+_MIN_MATCH_WORDS = 6
 _MAX_INLINE_PDF_BYTES = 18 * 1024 * 1024
 _PROJECT_ROOT = Path(__file__).resolve().parent
 ORIGINALS_DIR = _PROJECT_ROOT / "data" / "official_pyq_originals"
@@ -187,26 +188,61 @@ def _prose_words(text: str) -> list[str]:
     return [w.lower() for w in plain.split() if len(w) > 3]
 
 
-def _text_layer_pages(doc: fitz.Document, number: int, card_text: str) -> list[int]:
-    """1-based pages that hold this question, from the PDF text layer. [] if unsure."""
+def _with_next_page(page: int, page_count: int) -> list[int]:
+    return [page, page + 1] if page < page_count else [page]
+
+
+def _nth_start_page(starts: list[int], occurrence: int, same_number_count: int) -> int:
+    """Page of the n-th question with this printed number (restart numbering: one per subject).
+    0 when the paper does not show exactly as many starts as there are cards with this number."""
+    if same_number_count < 1 or len(starts) != same_number_count or occurrence >= len(starts):
+        return 0
+    return starts[occurrence]
+
+
+def _text_layer_pages(
+    doc: fitz.Document, number: int, card_text: str, occurrence: int = 0, same_number_count: int = 1
+) -> list[int]:
+    """1-based pages that hold this question, from the PDF text layer. [] if unsure.
+    A short card ("The value of x is ____.") matches almost any page, so word overlap
+    only counts with enough words; otherwise the n-th printed number is used."""
     words = set(_prose_words(card_text)[:40])
+    enough_words = len(words) >= _MIN_MATCH_WORDS
     marker = re.compile(rf"(?m)^\s*(?:Q\.?\s*{number}\b|{number}\s*[.)]\s)")
+    marker_pages: list[int] = []
     best_page, best_score = 0, 0.0
     for index in range(doc.page_count):
         text = doc[index].get_text("text") or ""
         if len(text.strip()) < 40:
             continue
+        has_marker = bool(marker.search(text))
+        if has_marker:
+            marker_pages.append(index + 1)
+        if not enough_words:
+            continue
         page_words = set(_prose_words(text))
-        overlap = len(words & page_words) / max(1, len(words)) if words else 0.0
-        score = overlap * 10 + (4 if marker.search(text) else 0)
+        overlap = len(words & page_words) / len(words)
+        score = overlap * 10 + (4 if has_marker else 0)
         if score > best_score:
             best_page, best_score = index + 1, score
-    if not best_page or best_score < 5:
+    if best_page and best_score >= 5:
+        return _with_next_page(best_page, doc.page_count)
+    nth = _nth_start_page(marker_pages, occurrence, same_number_count)
+    return _with_next_page(nth, doc.page_count) if nth else []
+
+
+def _page_map_pages(
+    mapped: dict[str, Any], number: int, occurrence: int, same_number_count: int, page_count: int
+) -> list[int]:
+    starts = sorted(int(p) for p in (mapped.get("by_number") or {}).get(str(number), []))
+    if not starts:
         return []
-    pages = [best_page]
-    if best_page < doc.page_count:
-        pages.append(best_page + 1)
-    return pages
+    first = _nth_start_page(starts, occurrence, same_number_count)
+    if not first:
+        if same_number_count > 1:
+            return []
+        first = starts[0]
+    return _with_next_page(first, page_count)
 
 
 def _page_map_sync(path: Path) -> dict[str, Any]:
@@ -267,21 +303,21 @@ def _render_pages(path: Path, pages: list[int]) -> list[tuple[bytes, str]]:
     return out
 
 
-async def _pages_for_question(path: Path, paper_id: str, number: int, card_text: str) -> list[int]:
+async def _pages_for_question(
+    path: Path, paper_id: str, number: int, card_text: str, occurrence: int = 0, same_number_count: int = 1
+) -> list[int]:
     with fitz.open(str(path)) as doc:
         page_count = doc.page_count
-        pages = _text_layer_pages(doc, number, card_text)
+        pages = _text_layer_pages(doc, number, card_text, occurrence, same_number_count)
     if pages:
         return pages
     mapped = await page_map(paper_id)
-    start = sorted(mapped.get("by_number", {}).get(str(number), []))
-    if not start:
-        return []
-    first = start[0]
-    return [first, first + 1] if first < page_count else [first]
+    return _page_map_pages(mapped, number, occurrence, same_number_count, page_count)
 
 
-def locate_question_local(paper_id: str, number: int, card_text: str) -> dict[str, Any]:
+def locate_question_local(
+    paper_id: str, number: int, card_text: str, occurrence: int = 0, same_number_count: int = 1
+) -> dict[str, Any]:
     """Pages for "Show original page": PDF text layer, else a page map already saved. No Gemini."""
     path = _original_file(paper_id)
     if path is None:
@@ -290,14 +326,12 @@ def locate_question_local(paper_id: str, number: int, card_text: str) -> dict[st
         return {"available": True, "kind": "image", "pages": [1], "page_count": 1, "found_by": "image"}
     with fitz.open(str(path)) as doc:
         page_count = doc.page_count
-        pages = _text_layer_pages(doc, number, card_text) if number > 0 else []
+        pages = _text_layer_pages(doc, number, card_text, occurrence, same_number_count) if number > 0 else []
     found_by = "text_layer" if pages else ""
     if not pages:
         cached = _read_meta(paper_id).get("page_map") or {}
-        start = sorted((cached.get("by_number") or {}).get(str(number), []))
-        if start:
-            first = int(start[0])
-            pages = [first, first + 1] if first < page_count else [first]
+        pages = _page_map_pages(cached, number, occurrence, same_number_count, page_count)
+        if pages:
             found_by = "saved_page_map"
     return {
         "available": True,
@@ -401,7 +435,9 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         "- suggested_text / suggested_options: the WHOLE corrected question text / every option "
         "(not only the changed part), keeping the card's LaTeX where it was right. Only text you "
         "can read on the page. Never invent. Leave a field empty if that part matches or you are "
-        "unsure. Use $...$ for math.\n"
+        "unsure. Use $...$ for math. Inside math put ~ between a number and its unit and between "
+        "unit words, e.g. $105~\\mathrm{kcal}~\\mathrm{mol}^{-1}$. A table is one plain "
+        "\\begin{tabular} with & and \\\\ rows.\n"
         "- Do not judge the answer key unless the page prints one.\n"
         "Return JSON only."
     )
@@ -433,7 +469,14 @@ async def compare_question(body: dict[str, Any]) -> dict[str, Any]:
     number = int(body.get("printed_number") or body.get("go_to") or 0)
     if path.suffix == ".pdf":
         find_text = f"{body.get('passage_text') or ''}\n{body.get('card_text') or ''}"
-        pages = await _pages_for_question(path, paper_id, number, find_text)
+        pages = await _pages_for_question(
+            path,
+            paper_id,
+            number,
+            find_text,
+            int(body.get("occurrence") or 0),
+            int(body.get("same_number_count") or 1),
+        )
         if not pages:
             return {
                 "verdict": "not_found",

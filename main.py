@@ -1176,6 +1176,8 @@ class OfficialPyqCompareQuestionRequest(BaseModel):
     card_text: str = ""
     passage_text: str = ""
     subject: str = ""
+    occurrence: int = Field(0, ge=0)
+    same_number_count: int = Field(1, ge=1)
     options: list[str] = Field(default_factory=list)
     answer_key: str | None = None
     has_figure: bool = False
@@ -1249,6 +1251,8 @@ async def official_pyq_original_locate(
     paper_id: str,
     printed_number: int = Query(0, ge=0),
     card_text: str = Query("", max_length=4000),
+    occurrence: int = Query(0, ge=0),
+    same_number_count: int = Query(1, ge=1),
 ) -> dict[str, Any]:
     """Which original page holds this question. Local only (PDF text layer / saved page map); no Gemini."""
     import asyncio
@@ -1256,7 +1260,9 @@ async def official_pyq_original_locate(
     import official_pyq_compare as opc
 
     try:
-        result = await asyncio.to_thread(opc.locate_question_local, paper_id, printed_number, card_text)
+        result = await asyncio.to_thread(
+            opc.locate_question_local, paper_id, printed_number, card_text, occurrence, same_number_count
+        )
     except ValueError as exc:
         raise _compare_http_error(exc) from exc
     return {"ok": True, **result}

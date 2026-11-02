@@ -147,9 +147,11 @@ assert.equal(
 const ions = convertLatexTabularToArray(
   '\\begin{tabular}[t]{|l|l|} \\hline Ions & Ag^+ \\\\ \\hline $\\Lambda_0$ & 6.2 \\\\ \\hline \\end{tabular}',
 )
-assert.match(ions, /\\begin\{array\}/)
+assert.match(ions, /<table class="paper-data-table"/)
 assert.doesNotMatch(ions, /\\begin\{tabular\}/)
-assert.match(prepareTextForMathTextDisplay(ions), /\\begin\{array\}/)
+assert.match(ions, />Λ₀</, 'Greek capital in a cell is kept')
+assert.match(ions, />Ag⁺</, 'ion charge draws as a superscript')
+assert.match(prepareTextForMathTextDisplay(ions), /<table class="paper-data-table"/)
 
 const gluedStem =
   'Let $L_1$ and $L_2$ be two lines. Match each entry in List-I to the correct entry in List-II. List-I'
@@ -296,7 +298,7 @@ assert.doesNotMatch(displayPrepared, /\\begin\{tabular\}/, 'display path has no 
 assert.doesNotMatch(displayPrepared, /\\item\s*\[/, 'display path has no \\item[]')
 assert.doesNotMatch(displayPrepared, /\\caption/, 'display path has no \\caption')
 assert.match(displayPrepared, /\\mathrm\{mol\}/, 'mol is kept for KaTeX')
-assert.match(displayPrepared, /\\begin\{array\}/, 'tabular becomes array')
+assert.match(displayPrepared, /<table class="paper-data-table"/, 'tabular becomes a drawn table')
 const displayProse = displayPrepared.replace(/\$\$[\s\S]+?\$\$/g, ' ').replace(/\$[^$]+\$/g, ' ')
 assert.doesNotMatch(displayProse, /\\mathrm\{mol\}/, 'mol is inside math delimiters')
 

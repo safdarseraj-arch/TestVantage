@@ -83,13 +83,91 @@ function scriptDigits(token, map) {
   return [...String(token ?? '')].map((ch) => map[ch] || ch).join('')
 }
 
+const CELL_SYMBOLS = {
+  equiv: '≡',
+  rightarrow: '→',
+  longrightarrow: '⟶',
+  leftarrow: '←',
+  rightleftharpoons: '⇌',
+  times: '×',
+  cdot: '·',
+  circ: '°',
+  bullet: '•',
+  pm: '±',
+  leq: '≤',
+  geq: '≥',
+  neq: '≠',
+  approx: '≈',
+  infty: '∞',
+  degree: '°',
+  alpha: 'α',
+  beta: 'β',
+  gamma: 'γ',
+  delta: 'δ',
+  epsilon: 'ε',
+  varepsilon: 'ε',
+  eta: 'η',
+  theta: 'θ',
+  kappa: 'κ',
+  lambda: 'λ',
+  mu: 'μ',
+  nu: 'ν',
+  pi: 'π',
+  rho: 'ρ',
+  sigma: 'σ',
+  tau: 'τ',
+  phi: 'φ',
+  varphi: 'φ',
+  chi: 'χ',
+  psi: 'ψ',
+  omega: 'ω',
+  Gamma: 'Γ',
+  Delta: 'Δ',
+  Theta: 'Θ',
+  Lambda: 'Λ',
+  Pi: 'Π',
+  Sigma: 'Σ',
+  Phi: 'Φ',
+  Psi: 'Ψ',
+  Omega: 'Ω',
+}
+
+/**
+ * A tabular inside a tabular cell (Mathpix two-line headers: "Column J \\ Molecule")
+ * ends the outer table at the inner \end{tabular}. Fold each inner one into its cell text.
+ * @param {unknown} text
+ */
+export function flattenNestedTabulars(text) {
+  let s = String(text ?? '')
+  const innermost = /\\begin\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?((?:(?!\\begin\{tabular\})[\s\S])*?)\\end\{tabular\}/g
+  for (let guard = 0; guard < 20; guard += 1) {
+    let changed = false
+    s = s.replace(innermost, (full, body, offset, whole) => {
+      const before = whole.slice(0, offset)
+      const opens = (before.match(/\\begin\{tabular\}/g) || []).length
+      const closes = (before.match(/\\end\{tabular\}/g) || []).length
+      if (opens <= closes) return full
+      changed = true
+      return String(body)
+        .replace(/\\hline\b/g, ' ')
+        .replace(/\\\\/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    })
+    if (!changed) break
+  }
+  return s
+}
+
 /** Table cell as upright words, with the spaces and subscripts the paper shows. */
 function cellPlain(raw) {
   let s = String(raw ?? '')
   s = s.replace(/\\(?:mathrm|mathbf|text|operatorname)\s*\{([^{}]*)\}/g, '$1')
+  s = s.replace(/\\([a-zA-Z]+)/g, (m, name) => (CELL_SYMBOLS[name] ? CELL_SYMBOLS[name] : m))
+  s = s.replace(/\s*≡\s*/g, '≡')
   s = s.replace(/\\,/g, ' ').replace(/~/g, ' ')
   s = s.replace(/\^\{([^{}]+)\}/g, (_, n) => scriptDigits(n, SUPER_DIGIT))
-  s = s.replace(/\^(\d)/g, (_, n) => SUPER_DIGIT[n] || n)
+  s = s.replace(/\^([\d+-])/g, (_, n) => SUPER_DIGIT[n] || n)
   s = s.replace(/_\{([^{}]+)\}/g, (_, n) => scriptDigits(n, SUB_DIGIT))
   s = s.replace(/_(\d)/g, (_, n) => SUB_DIGIT[n] || n)
   s = s.replace(/\\[a-zA-Z]+/g, '')
@@ -451,6 +529,7 @@ function reactionLinesFromBody(body) {
     .flatMap((cell) => cell.split(/\n+/))
     .map((cell) => cell.replace(/\\hline\b/g, ' ').replace(/\\multirow\s*\{[^{}]*\}\s*\{[^{}]*\}\s*\{[^{}]*\}/g, ' ').trim())
     .filter(Boolean)
+  if (lines.filter((line) => /^\(\s*[PQRS]\s*\)/.test(line)).length >= 2) return null
   const steps = lines.filter(isReactionStepLine)
   const reactants = lines.filter((line) => !isReactionStepLine(line) && !isReactionArrow(line) && !isReactionCondition(line))
   if (steps.length < 2 || reactants.length < 1) return null
@@ -579,7 +658,7 @@ export function unwrapReactionStepTables(text) {
 }
 
 export function convertLatexTabularToArray(text) {
-  let s = renderSideBySideSheetConfigs(softenLeftRightInTables(String(text ?? '')))
+  let s = renderSideBySideSheetConfigs(softenLeftRightInTables(flattenNestedTabulars(text)))
   s = unwrapReactionStepTables(s)
   s = replacePaperDataTabulars(s)
   s = expandUnsupportedTableCommands(s)

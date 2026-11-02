@@ -227,8 +227,15 @@ export function separateInterleavedMatchColumns(text) {
       return ''
     }).trim()
     const short = value.length < 80 && !/the number of elements|the value of|passes through/i.test(value)
-    if (!displays.length || !short) continue
-    item.body = [value, ...displays].filter(Boolean).join('\n').trim()
+    if (!displays.length || !short || !value) continue
+    item.body = value
+    for (const block of displays) {
+      if (lastLetter && !/\$\$/.test(lastLetter.body)) {
+        lastLetter.body = `${lastLetter.body}\n${block}`.trim()
+      } else {
+        orphans.push(block)
+      }
+    }
   }
 
   let intro = src.slice(0, stream[0].start)
@@ -494,6 +501,10 @@ export function flattenTabularMatchLists(text) {
   }
   const body = rest.slice(0, endRel)
   const intro = s.slice(0, beginAt).trim()
+
+  // Second column labelled (i)…(iv) is not a (1)…(5) List-II: keep the paper's table.
+  const romanRight = (body.match(/&\s*\(\s*(?:i{1,3}|iv|vi{0,3}|ix|x)\s*\)/gi) || []).length
+  if (endRel < rest.length && romanRight >= 2 && !/&\s*\(\s*[1-5]\s*\)/.test(body)) return s
 
   let rows = splitTopLevelLatex(body, '\\\\')
   if (rows.length < 3) {

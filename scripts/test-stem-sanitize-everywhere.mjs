@@ -210,8 +210,9 @@ assert.doesNotMatch(q51Sanitized, /!\[\]\(\$https/)
 const q51Parsed = parseMatchingListForDisplay(q51Sanitized)
 assert.ok(q51Parsed)
 assert.equal(q51Parsed.listI.length, 4)
-assert.match(q51Parsed.listI.find((x) => x.label === '(Q)').text, /width=756/)
-assert.match(q51Parsed.listI.find((x) => x.label === '(R)').text, /width=756/)
+assert.match(q51Parsed.listI.find((x) => x.label === '(Q)').text, /width=116&top_left_y=840/)
+assert.match(q51Parsed.listI.find((x) => x.label === '(R)').text, /width=183&top_left_y=1153/)
+assert.match(q51Parsed.listI.find((x) => x.label === '(S)').text, /width=756&top_left_y=1475/)
 
 const q46Saved = persistQuestionForBank({
   text: Q46,
@@ -313,7 +314,7 @@ assert.match(q50Parsed.intro, /reaction sequences/)
 assert.doesNotMatch(q50Parsed.intro, /^\s*$/)
 const q50San = sanitizeStemForDisplay(Q50_BODY)
 assert.match(q50San, /width=767/)
-assert.doesNotMatch(q50San, /width=119/)
+assert.match(q50San, /width=119&top_left_y=411/, 'List-I (P) figure keeps its OCR crop')
 
 const Q50_LIVE =
   Q50_BODY +

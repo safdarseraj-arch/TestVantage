@@ -16,6 +16,7 @@
 import { findFirstOptionsBlockStart } from './mcqOptionMarkers.js'
 import { extractLatexItemizeMcq, extractLatexTabularMcq } from './mathpixQuestionSplit.js'
 import { restoreMissingOptionGridGraphs } from './mathpixMedia.js'
+import { repairScanStructureCodes } from './smilesDisplay.js'
 import {
   parsePaperSectionMap,
   printedQuestionNumber,
@@ -89,6 +90,8 @@ import { annotateMathpixCleanStatus } from './mathpixCleanPipeline.js'
 import { sanitizeStemForDisplay } from './sanitizeStemForDisplay.js'
 import {
   fillOfficialPyqPairPassages,
+  officialPyqCardAllowsPassage,
+  officialPyqPassageNeedsOcrRefresh,
   officialPyqPassageRanges,
   officialPyqQuestionsHaveMistakenPassages,
   stripMistakenOfficialPyqPassages,
@@ -608,6 +611,7 @@ function stripChemistryLeakFromPhysicsStem(text) {
   const t = String(text ?? '')
   if (!/<smiles>/i.test(t)) return t
   if (stemWantsChemistryProducts(t)) return t
+  if (/\(\s*[PQRS]\s*\)\s*<smiles>/i.test(t)) return t
   return t
     .replace(/\n?\(\s*[1-5]\s*\)\s*\n\s*<smiles>[\s\S]*?<\/smiles>/gi, '')
     .replace(/<smiles>[\s\S]*?<\/smiles>/gi, '')
@@ -2029,6 +2033,44 @@ function restoreTabularOptionsFromOcr(stem, options, source) {
   return next
 }
 
+function mathHasUnpairedLeftRight(text) {
+  const segments = String(text ?? '').match(/\$\$[\s\S]*?\$\$|\$[^$]*\$/g) || []
+  return segments.some((seg) => {
+    const lefts = (seg.match(/\\left(?![a-zA-Z])/g) || []).length
+    const rights = (seg.match(/\\right(?![a-zA-Z])/g) || []).length
+    return lefts !== rights
+  })
+}
+
+/**
+ * A card that draws cleanly can still need the full heal: match questions carry list,
+ * key and option fixes; other cards may be missing a figure or paragraph the scan has.
+ */
+function cardNeedsFullHeal(q, text, passage, options, source, map) {
+  if (/(?:List|Column)\s*[-–]?\s*I{1,2}\b|match\s+(?:the|each)\b/i.test(text)) return true
+  if (options.some((opt) => /^\s*[\]\)}]/.test(opt))) return true
+  if (/\\begin\{/.test(text) || mathHasUnpairedLeftRight(text)) return true
+  if (/PARAGRAPH|\\section\*?\{|\\item\[/i.test(text)) return true
+  if (options.some((opt) => opt.trim().length >= 8 && text.includes(opt.trim()))) return true
+  if (
+    options.filter((opt) => opt.trim()).length < 4 &&
+    peelGluedMcqOptions(text, options, source).text.trim() !== text.trim()
+  ) {
+    return true
+  }
+  const figures = extractMathpixImageUrls(text)
+  if ((text.match(/\\includegraphics|!\[[^\]]*\]\(/g) || []).length > figures.length) return true
+  const src = String(source ?? '')
+  if (src.length < 40) return false
+  const hasFigure = figures.length > 0
+  if (!hasFigure && stemMentionsFigure(text) && /\\includegraphics|cdn\.mathpix/i.test(src)) return true
+  if (hasFigure && dropStolenFigures(text, src, printedQuestionNumber(q), map) !== text) return true
+  if (!/PARAGRAPH/i.test(src)) return false
+  return passage.trim()
+    ? officialPyqPassageNeedsOcrRefresh(passage, q, src)
+    : officialPyqCardAllowsPassage(q, src, map)
+}
+
 /**
  * Per-card heal: wrap math, restore List-I / Mathpix figures from OCR.
  * Does not drop or merge cards — safe for bank persist of one row.
@@ -2037,7 +2079,7 @@ function restoreTabularOptionsFromOcr(stem, options, source) {
  */
 export function healUploadQuestionCard(q, source, map) {
   if (!q || typeof q !== 'object' || q.placeholder === true) return q
-  const textFixed = restoreDroppedMsOnGivenLine(String(q.text ?? ''))
+  const textFixed = repairScanStructureCodes(restoreDroppedMsOnGivenLine(String(q.text ?? '')))
   const passageFixed = restoreDroppedMsOnGivenLine(String(q.passageText ?? ''))
   if (textFixed !== String(q.text ?? '') || (q.passageText != null && passageFixed !== String(q.passageText))) {
     q = {
@@ -2054,9 +2096,13 @@ export function healUploadQuestionCard(q, source, map) {
     !storedOpts.some((opt) => visibleLatexSourceHits(opt).length > 0) &&
     !stemLooksIncompleteOnDisplay(storedText) &&
     !stemLooksIncompleteOnDisplay(storedPassage) &&
-    ![storedText, storedPassage, ...storedOpts].some((part) => visibleLatexSourceHits(part).length > 0)
+    ![storedText, storedPassage, ...storedOpts].some((part) => visibleLatexSourceHits(part).length > 0) &&
+    peelForeignComprehensionFromStem(storedText, q) === storedText &&
+    repairSmashedWeightSubscripts(storedText, source) === storedText &&
+    !cardNeedsFullHeal(q, storedText, storedPassage, storedOpts, source, map)
   if (alreadyClean) {
-    const peeled = peelPrintedAnswerFromStem(storedText)
+    const unnumbered = stripRepeatedQuestionNumberPrefix(storedText)
+    const peeled = peelPrintedAnswerFromStem(unnumbered === storedText.trim() ? storedText : unnumbered)
     return peeled === storedText ? q : { ...q, text: peeled }
   }
   const src = String(source ?? '')

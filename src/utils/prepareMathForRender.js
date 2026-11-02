@@ -754,6 +754,27 @@ function wrapBareFractionsAndRoots(text) {
   return out
 }
 
+const MATH_UNIT = String.raw`(?:kcal|cal|kJ|J|mol|K|atm|bar|M|mL|L|dm|cm|mm|nm|pm|km|kg|mg|g|s|min|h|Pa|kPa|V|mV|Hz|eV|W)`
+const NUMBER_UNIT_RE = new RegExp(String.raw`(\d|\^\{[^{}]*\})\s+\\mathrm\s*\{\s*(${MATH_UNIT})\s*\}`, 'g')
+const UNIT_UNIT_RE = new RegExp(
+  String.raw`(\\mathrm\s*\{\s*${MATH_UNIT}\s*\}(?:\^\{[^{}]*\})?)\s+\\mathrm\s*\{\s*(${MATH_UNIT})\b`,
+  'g',
+)
+
+/** KaTeX drops source spaces, so `105 \mathrm{kcal} \mathrm{mol}` would draw as "105kcalmol". */
+export function spaceMathUnits(text) {
+  let s = String(text ?? '')
+  s = s.replace(/\(\s*\\mathrm\s*\{\s*~\s*(g|l|s|aq)\s*\}\s*\)/g, '(\\mathrm{$1})')
+  s = s.replace(NUMBER_UNIT_RE, (_, lead, unit) => `${lead}~\\mathrm{${unit}}`)
+  s = s.replace(/(\d~\\mathrm\{M\})\s+\\mathrm\s*\{(?!\s*~)/g, '$1~\\mathrm{')
+  for (let i = 0; i < 3; i += 1) {
+    const next = s.replace(UNIT_UNIT_RE, (_, first, unit) => `${first}~\\mathrm{${unit}`)
+    if (next === s) break
+    s = next
+  }
+  return s
+}
+
 /**
  * Full display pipeline for MathText — sanitize OCR glitches, then KaTeX prep.
  * @param {string} text
@@ -809,6 +830,7 @@ export function prepareTextForMathTextDisplay(text, opts = {}) {
   out = sanitizeStemForDisplay(out)
   out = cleanupBrokenStemDelimiters(normalizeSmashedChemDollars(out))
   out = stripLatexDisplayChrome(out)
+  out = spaceMathUnits(out)
   out = stripMarkdownBoldOutsideMath(out)
   out = healTruncatedLatexForDisplay(out)
   if (/\\text\s*\{\s*frac\s*\}/i.test(out) || /\\frac\s*\\\{/.test(out)) {

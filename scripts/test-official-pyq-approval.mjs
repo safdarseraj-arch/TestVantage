@@ -709,16 +709,15 @@ assert.match(
   'approve failures must scroll their error into view',
 )
 
-// The sticky action row must clear the sticky app chrome (brand bar + tricolor +
-// nav, z-index 82-84 above .official-pyq-page). At top: 0 the Approve button
-// parks under the chrome and every click lands on the chrome instead.
+// The approve row stays in normal flow above the question: a sticky row covered
+// half of a tall graph. It still sits above neighbours so clicks land on it.
 const cssSrc = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
-const stickyAt = cssSrc.indexOf('.official-pyq-preview .official-pyq-actions.bank-review-status-actions')
-assert.ok(stickyAt >= 0, 'sticky approve action row rule must exist')
-const stickyRule = cssSrc.slice(stickyAt, cssSrc.indexOf('}', stickyAt) + 1)
-assert.match(stickyRule, /position:\s*sticky/)
-assert.doesNotMatch(stickyRule, /top:\s*0\s*;/, 'sticky approve row must not hide under the app chrome')
-assert.match(stickyRule, /top:\s*var\(--official-pyq-chrome-h/)
+const actionsAt = cssSrc.indexOf('.official-pyq-preview .official-pyq-actions.bank-review-status-actions')
+assert.ok(actionsAt >= 0, 'approve action row rule must exist')
+const actionsRule = cssSrc.slice(actionsAt, cssSrc.indexOf('}', actionsAt) + 1)
+assert.doesNotMatch(actionsRule, /position:\s*sticky/, 'approve row must not cover the figure below it')
+assert.match(actionsRule, /position:\s*relative/)
+assert.match(actionsRule, /z-index:\s*\d+/)
 assert.match(cssSrc, /--official-pyq-chrome-h:\s*calc\(/, 'chrome height offset must be defined')
 
 const fragPaper = importQuestionsToOfficialPyqPending({
@@ -785,7 +784,10 @@ const short50 = importQuestionsToOfficialPyqPending({
   paperLabel: 'Short 50 vs 51 reserve later',
   questions: fiftyQs,
 })
-updateOfficialPyqPendingPaper(short50.id, { expectedQuestionCount: 51 })
+updateOfficialPyqPendingPaper(short50.id, {
+  expectedQuestionCount: 51,
+  paperFacts: { known: true, expectedQuestionCount: 51 },
+})
 const short50Check = validateOfficialPyqForApprove(getOfficialPyqPendingPaper(short50.id))
 assert.equal(short50Check.ok, false, '50 filled vs 51 expected must not approve')
 assert.match(short50Check.errors.join(' '), /50|51|missing|do not approve/i)
@@ -826,7 +828,10 @@ const extra53 = importQuestionsToOfficialPyqPending({
   questions: fiftyThreeQs,
 })
 assert.equal(extra53.expectedQuestionCount, 51)
-const extra53Check = validateOfficialPyqForApprove(extra53)
+const extra53Check = validateOfficialPyqForApprove({
+  ...extra53,
+  paperFacts: { known: true, expectedQuestionCount: 51 },
+})
 assert.equal(extra53Check.ok, false, '53 cards vs 51 expected must not approve')
 assert.match(extra53Check.errors.join(' '), /53|expected|fragment|51/i)
 const incoming51 = fiftyThreeQs.slice(0, 51)
@@ -1115,17 +1120,14 @@ const reviewMsgs = officialPyqContentReviewMessages([
   },
 ])
 const reviewText = reviewMsgs.join(' ')
-assert.match(reviewText, /Question 2 \(printed 14\)/)
-assert.match(reviewText, /incomplete math/)
-assert.match(reviewText, /still shows raw code/)
-assert.match(reviewText, /The marked part is the problem/)
-assert.match(reviewText, /Do not approve/)
-assert.doesNotMatch(reviewText, /1 question\(s\)/)
+assert.match(reviewText, /Go to Q 2\b/)
+assert.match(reviewText, /TeX is still showing/)
+assert.doesNotMatch(reviewText, /Go to Q 1\b/, 'the clean card is not flagged')
 const cutOnly = officialPyqContentReviewMessages([
   { text: 'The ratio is \\frac{1}{', options: ['$1$', '$2$'], subject: 'physics', chapter: 'General' },
 ])
-assert.match(cutOnly.join(' '), /Question 1/)
-assert.match(cutOnly.join(' '), /cut-off fraction/)
+assert.match(cutOnly.join(' '), /Go to Q 1\b/)
+assert.match(cutOnly.join(' '), /did not draw/)
 const cutSpan = findReviewFlagSpans('The ratio is \\frac{1}{')
 assert.ok(cutSpan.some((span) => span.kind === 'cut-off-fraction'))
 const tableStem =

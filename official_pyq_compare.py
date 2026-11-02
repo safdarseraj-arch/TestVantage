@@ -63,7 +63,7 @@ class CompareVerdict(BaseModel):
     differences: list[CompareDifference] = Field(default_factory=list)
     suggested_text: str = Field(
         default="",
-        description="Corrected question text copied only from the page image. Empty if unsure or matches.",
+        description="Whole corrected question text copied only from the page image. Empty if unsure or matches.",
     )
     suggested_options: list[str] = Field(
         default_factory=list,
@@ -71,7 +71,7 @@ class CompareVerdict(BaseModel):
     )
     suggested_passage: str = Field(
         default="",
-        description="Corrected shared passage / question stem copied only from the page image. Empty if it matches, the card has none, or unsure.",
+        description="Whole corrected shared passage / question stem copied only from the page image. Empty if it matches or unsure.",
     )
     found_on_page: int | None = None
 
@@ -322,9 +322,17 @@ def render_original_page(paper_id: str, page: int) -> tuple[bytes, str]:
     return images[0]
 
 
+_OPTION_LABEL_RE = re.compile(r"^\s*(?:\(\s*[A-Za-z1-9]\s*\)|[A-Da-d][.)])\s*")
+
+
+def _labelled_options(raw: Any) -> str:
+    """The card hides a stored "(A) " prefix, so drop it before adding our own label."""
+    options = [_OPTION_LABEL_RE.sub("", str(o or ""), count=1) for o in raw or []]
+    return "\n".join(f"({chr(65 + i)}) {o}" for i, o in enumerate(options) if o.strip())
+
+
 def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
-    options = [str(o or "") for o in body.get("options") or []]
-    opts = "\n".join(f"({chr(65 + i)}) {o}" for i, o in enumerate(options) if o.strip()) or "(no options)"
+    opts = _labelled_options(body.get("options")) or "(no options)"
     answer = str(body.get("answer_key") or "").strip() or "(none on card)"
     figure = "yes" if body.get("has_figure") else "no"
     passage = str(body.get("passage_text") or "").strip()
@@ -335,6 +343,26 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         else "The image is the original page."
     )
     where = f" in the {subject} part" if subject else ""
+    drawn_text = str(body.get("drawn_text") or "").strip()
+    drawn_passage = str(body.get("drawn_passage") or "").strip()
+    drawn_opts = _labelled_options(body.get("drawn_options"))
+    drawn_block = (
+        "--- the same card AS DRAWN for students (math flattened to plain text) ---\n"
+        + (f"passage: {drawn_passage}\n" if drawn_passage else "")
+        + f"question: {drawn_text}\n"
+        + (f"options:\n{drawn_opts}\n" if drawn_opts else "")
+        if drawn_text or drawn_passage
+        else ""
+    )
+    drawn_rules = (
+        "- The AS DRAWN text is what students see. Superscripts/subscripts appear inline there "
+        "(Fe2+, 10−2, KMnO4) and no spaces around + − × = is normal — not a difference. But "
+        "words, numbers, units or formulas glued together there that the page separates "
+        "(e.g. drawn '0.03MKMnO4', page '0.03 M KMnO4') ARE a difference: report wrong_symbol "
+        "and fix the LaTeX with ~ between the parts, e.g. $0.03~\\mathrm{M}~\\mathrm{KMnO}_{4}$.\n"
+        if drawn_block
+        else ""
+    )
     passage_block = (
         f"--- shared passage / question stem (printed once above this question) ---\n{passage}\n"
         if passage
@@ -345,8 +373,8 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         "question), the question text, the options and the figure. Report a passage problem as "
         "wrong_passage: text missing from it, text from another passage or another question inside it, "
         "or this question's own line repeated inside it.\n"
-        "- suggested_passage: only the passage text you can read on the page, without the question lines. "
-        "Leave empty if it matches or you are unsure.\n"
+        "- suggested_passage: the WHOLE corrected passage (not only the changed part), in the card's "
+        "LaTeX style, without the question lines. Leave empty if it matches or you are unsure.\n"
         if passage
         else "- If the page prints a passage / 'Question Stem' for this question and the card has none, "
         "report wrong_passage and put the passage in suggested_passage.\n"
@@ -359,17 +387,21 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         f"--- question text ---\n{body.get('card_text') or ''}\n"
         f"--- options ---\n{opts}\n"
         f"--- answer key on card ---\n{answer}\n"
-        f"--- card has a figure --- {figure}\n\n"
+        f"--- card has a figure --- {figure}\n"
+        f"{drawn_block}\n"
         "Rules:\n"
         f"{passage_rules}"
+        f"{drawn_rules}"
         "- verdict 'matches' if the card says the same thing as the page. Ignore LaTeX vs plain "
-        "formatting that renders the same, line breaks, spacing, and the question-number prefix.\n"
+        "formatting that renders the same, line breaks, and the question-number prefix.\n"
         "- verdict 'differs' with a short list of concrete differences: missing text, wrong "
         "number/unit/symbol, wrong option, wrong alignment of reactions/tables/lists, missing "
         "figure, or extra_card if this card is not a real question on the page.\n"
         "- verdict 'not_found' if the question is not on these images.\n"
-        "- suggested_text / suggested_options: only text you can read on the page. Never invent. "
-        "Leave empty if it matches or you are unsure. Use $...$ for math.\n"
+        "- suggested_text / suggested_options: the WHOLE corrected question text / every option "
+        "(not only the changed part), keeping the card's LaTeX where it was right. Only text you "
+        "can read on the page. Never invent. Leave a field empty if that part matches or you are "
+        "unsure. Use $...$ for math.\n"
         "- Do not judge the answer key unless the page prints one.\n"
         "Return JSON only."
     )
@@ -383,6 +415,7 @@ def _compare_sync(parts: list[Any], prompt: str) -> CompareVerdict:
             max_output_tokens=_MAX_OUTPUT_TOKENS,
             response_mime_type="application/json",
             response_schema=CompareVerdict,
+            thinking_config=types.ThinkingConfig(thinking_budget=0, include_thoughts=False),
         ),
     )
     parsed = _parse_model_json(_response_text(response), CompareVerdict)

@@ -3,7 +3,7 @@
  * - Edit question (stem, options, answer key) with a live preview drawn by
  *   the same card renderer.
  * - Compare this question with the original paper page (Gemini vision).
- * - Show original page (flagged cards): the original PDF page picture beside
+ * - Show original page: the original PDF page picture beside
  *   the card, drawn locally on the server. No Gemini.
  * Never shown on published papers. Never publishes.
  */
@@ -46,17 +46,6 @@ function passageGroupGoTo(paperId, index) {
     return officialPyqPassageGroupIndexes(questions, index).map((i) => i + 1)
   } catch {
     return [index + 1]
-  }
-}
-
-/** @param {string} paperId @param {number} index */
-function readCardFlagged(paperId, index) {
-  try {
-    const paper = getOfficialPyqPendingPreviewPaper(paperId)
-    const nums = Array.isArray(paper?.localQuality?.failedGoTo) ? paper.localQuality.failedGoTo : []
-    return nums.map(Number).includes(index + 1)
-  } catch {
-    return false
   }
 }
 
@@ -249,7 +238,6 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
   const [compareBusy, setCompareBusy] = useState(false)
-  const [flagged, setFlagged] = useState(() => readCardFlagged(paperId, index))
   const [showPage, setShowPage] = useState(false)
 
   const previewCard = useMemo(
@@ -271,7 +259,6 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
         fresh = null
       }
       if (fresh && cardSyncKey(fresh) !== cardSyncKey(cardRef.current)) onSavedRef.current?.(fresh)
-      setFlagged(readCardFlagged(paperId, index))
     }
     sync()
     const onChanged = (ev) => {
@@ -299,12 +286,11 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     Boolean(String(compare?.suggestedText ?? '').trim()) ||
     Boolean(String(compare?.suggestedPassage ?? '').trim()) ||
     (compare?.suggestedOptions || []).some((o) => String(o ?? '').trim())
+  const useSuggestion = compare?.verdict === 'differs' && hasSuggestion
   const hasPassage = Boolean(
     String(card?.passageText ?? '').trim() || card?.passageId || card?.passageGroup || draft.passageText,
   )
   const passageMates = hasPassage ? passageGroupGoTo(paperId, index) : []
-  const showPageToggle = flagged || compare?.verdict === 'differs'
-
   function openEditor(nextDraft, suggested = false) {
     setDraft(nextDraft)
     setFromSuggestion(suggested)
@@ -343,6 +329,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     setCompareBusy(true)
     setError('')
     setNote(`Comparing Q${goTo} with the original paper…`)
+    let doneNote = ''
     try {
       const mod = await import('../utils/officialPyqOriginalCompare.js')
       let status = null
@@ -366,10 +353,24 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
         return
       }
       if (out.card) onSaved?.(out.card)
+      const verdict = String(out.result?.verdict ?? '')
+      const at = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      doneNote =
+        verdict === 'matches'
+          ? `Compare finished at ${at}: Q${goTo} matches the original paper.`
+          : verdict === 'error'
+            ? `Compare finished at ${at}, but Gemini could not check Q${goTo}. Try again.`
+            : `Compare finished at ${at}: Q${goTo} differs from the original — see the list above.${
+                String(out.result?.suggested_text ?? '').trim() ||
+                String(out.result?.suggested_passage ?? '').trim() ||
+                (out.result?.suggested_options || []).some((o) => String(o ?? '').trim())
+                  ? ' Click Edit question to see the corrected version.'
+                  : ''
+              }`
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Compare failed.')
     } finally {
-      setNote('')
+      setNote(doneNote)
       setCompareBusy(false)
     }
   }
@@ -392,6 +393,9 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
           {compare.verdict === 'matches' ? (
             <span>
               Matches the original paper{compare.pages?.length ? ` (page ${compare.pages[0]})` : ''}.
+              {compare.checkedAt
+                ? ` Checked ${new Date(compare.checkedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}.`
+                : ''}
             </span>
           ) : compare.verdict === 'error' ? (
             <span>
@@ -411,14 +415,9 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
                 ))}
               </ul>
               {hasSuggestion ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  data-testid="official-pyq-open-suggestion"
-                  onClick={() => openEditor(draftFromSuggestion(card, compare), true)}
-                >
-                  Open suggested correction in Edit box
-                </button>
+                <p data-testid="official-pyq-open-suggestion">
+                  Click Edit question — the corrected version is filled in for you.
+                </p>
               ) : null}
             </>
           )}
@@ -431,9 +430,11 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
             type="button"
             className="btn btn-ghost btn-sm"
             data-testid="official-pyq-edit-question"
-            onClick={() => openEditor(draftFromCard(card))}
+            onClick={() =>
+              openEditor(useSuggestion ? draftFromSuggestion(card, compare) : draftFromCard(card), useSuggestion)
+            }
           >
-            Edit question
+            {useSuggestion ? 'Edit question (corrected)' : 'Edit question'}
           </button>
           <button
             type="button"
@@ -445,17 +446,15 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
           >
             {compareBusy ? 'Comparing…' : 'Compare this question'}
           </button>
-          {showPageToggle ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              data-testid="official-pyq-show-original-page"
-              aria-pressed={showPage}
-              onClick={() => setShowPage((v) => !v)}
-            >
-              {showPage ? 'Hide original page' : 'Show original page'}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            data-testid="official-pyq-show-original-page"
+            aria-pressed={showPage}
+            onClick={() => setShowPage((v) => !v)}
+          >
+            {showPage ? 'Hide original page' : 'Show original page'}
+          </button>
         </div>
       ) : (
         <div className="official-pyq-edit-box card" style={BOX_STYLE} data-testid="official-pyq-edit-box">
@@ -563,7 +562,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
         </p>
       ) : null}
       {note ? <p className="form-hint">{note}</p> : null}
-      {showPage && showPageToggle ? (
+      {showPage ? (
         <OriginalPagePanel paperId={paperId} index={index} card={card} onClose={() => setShowPage(false)} />
       ) : null}
     </div>

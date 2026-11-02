@@ -6,6 +6,7 @@
  * question box. The "Show original page" picture is local (no Gemini).
  */
 
+import katex from 'katex'
 import {
   getOfficialPyqPendingPaper,
   updateOfficialPyqPendingPaper,
@@ -96,6 +97,38 @@ export function officialPyqPrintedNumber(q, index) {
   return Number.isFinite(n) && n > 0 ? n : index + 1
 }
 
+const HTML_ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'" }
+
+/**
+ * Card text as students see it: each $…$ drawn by KaTeX and flattened to
+ * plain text. KaTeX drops spaces inside math, so `$0.03 \mathrm{M} \mathrm{KMnO}_4$`
+ * reads "0.03MKMnO4" here — the stored LaTeX alone hides that.
+ * @param {unknown} text
+ */
+export function officialPyqDrawnText(text) {
+  const raw = String(text ?? '')
+  if (!raw.includes('$')) return raw
+  return raw.replace(/\$\$([\s\S]*?)\$\$|\$([^$\n]*)\$/g, (whole, display, inline) => {
+    const latex = String(display ?? inline ?? '').trim()
+    if (!latex) return ''
+    try {
+      const html = katex.renderToString(latex, {
+        output: 'html',
+        displayMode: display != null,
+        throwOnError: false,
+        strict: 'ignore',
+      })
+      if (html.includes('katex-error')) return whole
+      return html
+        .replace(/<[^>]+>/g, '')
+        .replace(/&[a-z#0-9]+;/gi, (m) => HTML_ENTITIES[m.toLowerCase()] ?? ' ')
+        .replace(/[\u200b\u2061]/g, '')
+    } catch {
+      return whole
+    }
+  })
+}
+
 /** @param {any} q */
 function cardHasFigure(q) {
   return Boolean(
@@ -120,6 +153,9 @@ export async function compareOfficialPyqCardRemote(paperId, index, q, { signal }
     answer_key: formatOfficialPyqAnswerKey(q) || null,
     has_figure: cardHasFigure(q),
   }
+  body.drawn_text = officialPyqDrawnText(body.card_text)
+  body.drawn_passage = officialPyqDrawnText(body.passage_text)
+  body.drawn_options = body.options.map((o) => officialPyqDrawnText(o))
   let lastError = null
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')

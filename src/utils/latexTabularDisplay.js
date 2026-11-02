@@ -182,6 +182,46 @@ function escapeCell(text) {
     .replace(/>/g, '&gt;')
 }
 
+const BOLD_OPEN = '\u0001'
+const BOLD_CLOSE = '\u0002'
+const BOND_DASH = '\u0003'
+
+/**
+ * Cell HTML: bold atoms stay bold ("C–H bonds shown in bold"), formulas stay unbroken.
+ * The bond dash is an entity: later OCR clean folds a literal en dash back to "-".
+ */
+function cellHtml(raw) {
+  let s = String(raw ?? '')
+  s = s.replace(/(\}|[A-Za-z])\s*-\s*(?=\\math(?:rm|bf)\s*\{|[A-Z])/g, `$1${BOND_DASH}`)
+  s = s.replace(/(_\{[^{}]*\}|_\d)\s+(?=\\math(?:rm|bf)\s*\{[A-Z])/g, '$1')
+  s = s.replace(/\\mathbf\s*\{([^{}]*)\}/g, `${BOLD_OPEN}$1${BOLD_CLOSE}`)
+  const plain = cellPlain(s).replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
+  return escapeCell(plain)
+    .replace(new RegExp(`${BOLD_CLOSE}(\\s*${BOND_DASH}\\s*)${BOLD_OPEN}`, 'g'), '$1')
+    .replace(new RegExp(BOLD_OPEN, 'g'), '<b>')
+    .replace(new RegExp(BOLD_CLOSE, 'g'), '</b>')
+    .replace(new RegExp(BOND_DASH, 'g'), '&ndash;')
+}
+
+/** "Column J Molecule" is two printed lines: the column name, then what it lists. */
+function headerCellHtml(raw) {
+  const html = cellHtml(raw).replace(/([A-Za-z]{2,})\((?=[a-z])/g, '$1 (')
+  const m = html.match(
+    /^((?:Column|List)\s*(?:-|–|&ndash;)?\s*(?:<b>\s*(?:I{1,3}|IV|[A-Z])\s*<\/b>|(?:I{1,3}|IV|[A-Z])\b))\s+(\S[\s\S]*)$/,
+  )
+  return m ? `${m[1]}<br>${m[2]}` : html
+}
+
+function isColumnHeaderRow(row) {
+  return row.filter((cell) => /^(?:Column|List)\b/i.test(cellPlain(cell.text))).length >= 2
+}
+
+function columnAligns(spec) {
+  return (String(spec || '').match(/[lcr]/gi) || []).map((ch) =>
+    ch.toLowerCase() === 'l' ? 'left' : ch.toLowerCase() === 'r' ? 'right' : 'center',
+  )
+}
+
 function splitRowCells(line) {
   /** @type {string[]} */
   const parts = []
@@ -310,20 +350,30 @@ function isPaperDataTabular(block) {
 function tabularToPaperTableHtml(spec, body) {
   const rows = layoutPaperDataRows(parseTabularRows(body), columnCountOf(spec, parseTabularRows(body)))
   if (rows.length < 2) return ''
+  const aligns = columnAligns(spec)
   let html =
     '<table class="paper-data-table" style="border-collapse:collapse;margin:0.75rem auto;font-style:normal;color:inherit">'
-  for (const row of rows) {
+  rows.forEach((row, rowIndex) => {
+    const header = rowIndex === 0 && isColumnHeaderRow(row)
     html += '<tr>'
+    let col = 0
     for (const cell of row) {
-      if (cell.omit) continue
-      const text = escapeCell(cellPlain(cell.text))
+      if (cell.omit) {
+        col += cell.colspan || 1
+        continue
+      }
+      const text = header ? headerCellHtml(cell.text) : cellHtml(cell.text)
+      const align = header || (cell.colspan || 1) > 1 ? 'center' : aligns[col] || 'center'
+      col += cell.colspan || 1
       const style = [
         'border:1px solid #4b5563',
         'padding:0.4rem 0.75rem',
-        'text-align:center',
+        `text-align:${align}`,
         'vertical-align:middle',
         'font-style:normal',
-        text.length > 28 ? 'max-width:11rem;white-space:normal' : 'white-space:nowrap',
+        text.replace(/<[^>]+>/g, '').length > 28 && !header
+          ? 'max-width:11rem;white-space:normal'
+          : 'white-space:nowrap',
       ].join(';')
       const span = [
         cell.colspan > 1 ? ` colspan="${cell.colspan}"` : '',
@@ -332,7 +382,7 @@ function tabularToPaperTableHtml(spec, body) {
       html += `<td${span} style="${style}">${text}</td>`
     }
     html += '</tr>'
-  }
+  })
   html += '</table>'
   return html
 }

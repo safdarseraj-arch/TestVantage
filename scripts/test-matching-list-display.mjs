@@ -153,6 +153,29 @@ assert.match(ions, />Λ₀</, 'Greek capital in a cell is kept')
 assert.match(ions, />Ag⁺</, 'ion charge draws as a superscript')
 assert.match(prepareTextForMathTextDisplay(ions), /<table class="paper-data-table"/)
 
+const bdeTable = prepareTextForMathTextDisplay(String.raw`Correct match of the C-H bonds (shown in bold) in Column J with their BDE in Column K is
+
+\begin{tabular}[t]{|l|l|}
+\hline Column J Molecule & Column K BDE ( $\mathrm{kcal} \mathrm{mol}^{-1}$ ) \\
+\hline (P) $\mathbf{H}-\mathrm{CH}\left(\mathrm{CH}_{3}\right)_{2}$ & (i) 132 \\
+\hline (Q) $\mathbf{H}-\mathrm{CH}_{2} \mathrm{Ph}$ & (ii) 110 \\
+\hline (S) $\mathbf{H}-\mathbf{C} \equiv \mathrm{CH}$ & (iv) 88 \\
+\hline
+\end{tabular}`)
+assert.match(bdeTable, /text-align:center[^"]*">Column J<br>Molecule</, 'header prints on two centred lines')
+assert.match(bdeTable, />Column K<br>BDE \(kcal mol⁻¹\)</)
+assert.match(bdeTable, /text-align:left[^"]*">\(P\) <b>H<\/b>&ndash;CH\(CH₃\)₂</, '{l} column is left aligned, bold H kept')
+assert.match(bdeTable, />\(Q\) <b>H<\/b>&ndash;CH₂Ph</, 'formula is not split by a space')
+assert.match(bdeTable, />\(S\) <b>H&ndash;C<\/b>≡CH</, 'bold H–C bond stays one bold run')
+assert.match(bdeTable, /text-align:left[^"]*">\(i\) 132</)
+assert.match(
+  convertLatexTabularToArray(
+    '\\begin{tabular}{|l|l|} \\hline Column $\\mathbf{J}$ Molecule & Column $\\mathbf{K}$ BDE \\\\ \\hline (P) a & (i) 1 \\\\ \\hline \\end{tabular}',
+  ),
+  />Column <b>J<\/b><br>Molecule</,
+  'bold column letter still splits the header',
+)
+
 const gluedStem =
   'Let $L_1$ and $L_2$ be two lines. Match each entry in List-I to the correct entry in List-II. List-I'
 const gluedOpts = [

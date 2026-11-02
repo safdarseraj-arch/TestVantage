@@ -5,48 +5,22 @@
 
 import { useMemo } from 'react'
 import { QuestionStem, OptionBody } from '../components/QuestionMediaLite.jsx'
-import { healUploadQuestionCard } from '../utils/uploadQualityGuards.js'
 import { matchOptionsFoldedIntoLists } from '../utils/parseMatchingListDisplay.js'
-import { extractMathpixImageUrls } from '../utils/mathpixMedia.js'
-import {
-  looksLikeParagraphPropertyOptions,
-  officialPyqCardAllowsPassage,
-  peelOfficialPyqCardForDisplay,
-} from '../utils/passage.js'
+import { looksLikeParagraphPropertyOptions } from '../utils/passage.js'
+import { officialPyqCardAsShown } from '../utils/officialPyqCardAsShown.js'
 
-export default function OfficialPyqPreviewMath({ q, sourceText: rawSourceText = '', sourceTick = 0 }) {
-  const sourceText = q?.adminEdited === true ? '' : rawSourceText
-  const healed = useMemo(() => {
-    try {
-      return peelOfficialPyqCardForDisplay(healUploadQuestionCard(q, sourceText), sourceText)
-    } catch (err) {
-      console.error('Official PYQ preview heal failed', err)
-      return {
-        ...(q && typeof q === 'object' ? q : {}),
-        text: String(q?.text ?? q?.stem ?? ''),
-        options: Array.isArray(q?.options) ? q.options : [],
-        _previewHealError: err instanceof Error ? err.message : String(err),
-      }
-    }
-  }, [q, sourceText, sourceTick])
-  const options = Array.isArray(healed?.options) ? healed.options : []
-  const text = String(healed?.text ?? healed?.stem ?? '')
-  const adminPassage = q?.passageSource === 'admin_facts' || q?.passageSource === 'admin_edit'
-  const storedPass = String((adminPassage ? q?.passageText : healed?.passageText) ?? '').trim()
-  const passage = adminPassage || officialPyqCardAllowsPassage(healed, sourceText)
-    ? storedPass
-    : String(sourceText ?? '').length < 40
-      ? storedPass
-      : ''
+export default function OfficialPyqPreviewMath({ q, sourceText = '', sourceTick = 0 }) {
+  const { text, options, passage, questionImage, healError } = useMemo(
+    () => officialPyqCardAsShown(q, sourceText),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [q, sourceText, sourceTick],
+  )
+  const flagProblems = q?.adminApproved !== true
   const hidePassageProps = looksLikeParagraphPropertyOptions(options, passage)
   const showOptions =
     !hidePassageProps &&
     options.some((o) => String(o ?? '').trim()) &&
     !matchOptionsFoldedIntoLists(text, options)
-  const questionImage = extractMathpixImageUrls(text).length
-    ? undefined
-    : String(healed?.questionImage ?? q?.questionImage ?? '').trim() || undefined
-  const healError = String(healed?._previewHealError ?? '').trim()
   return (
     <>
       {healError ? (
@@ -61,7 +35,7 @@ export default function OfficialPyqPreviewMath({ q, sourceText: rawSourceText = 
             text={passage}
             options={[]}
             parseMatchLists={false}
-            highlightProblems
+            highlightProblems={flagProblems}
             className="official-pyq-simple-stem"
           />
         </div>
@@ -70,7 +44,7 @@ export default function OfficialPyqPreviewMath({ q, sourceText: rawSourceText = 
         text={text}
         options={options}
         questionImage={questionImage}
-        highlightProblems
+        highlightProblems={flagProblems}
         className="official-pyq-simple-stem"
       />
       {showOptions ? (
@@ -79,7 +53,7 @@ export default function OfficialPyqPreviewMath({ q, sourceText: rawSourceText = 
             const shown = String(opt ?? '').trim()
             return shown ? (
               <li key={oi}>
-                <OptionBody text={shown} highlightProblems />
+                <OptionBody text={shown} highlightProblems={flagProblems} />
               </li>
             ) : null
           })}

@@ -776,6 +776,16 @@ export function spaceMathUnits(text) {
 }
 
 /**
+ * The paper's answer blank "____" inside math is not TeX. A blank that is the whole
+ * formula is plain text; one inside a formula becomes a drawn blank line.
+ */
+export function answerBlanksInMath(text) {
+  return String(text ?? '')
+    .replace(/(?<!\$)\$\s*(_{2,})\s*\$(?!\$)/g, (_, blank) => blank)
+    .replace(/\$[^$\n]*\$/g, (seg) => seg.replace(/(?<![\\_])_{2,}(?![_{])/g, '\\underline{\\hspace{2em}}'))
+}
+
+/**
  * Full display pipeline for MathText — sanitize OCR glitches, then KaTeX prep.
  * @param {string} text
  * @param {{ questionContext?: string, optionLetter?: string }} [opts]
@@ -830,7 +840,7 @@ export function prepareTextForMathTextDisplay(text, opts = {}) {
   out = sanitizeStemForDisplay(out)
   out = cleanupBrokenStemDelimiters(normalizeSmashedChemDollars(out))
   out = stripLatexDisplayChrome(out)
-  out = spaceMathUnits(out)
+  out = answerBlanksInMath(spaceMathUnits(out))
   out = stripMarkdownBoldOutsideMath(out)
   out = healTruncatedLatexForDisplay(out)
   if (/\\text\s*\{\s*frac\s*\}/i.test(out) || /\\frac\s*\\\{/.test(out)) {

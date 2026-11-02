@@ -7,6 +7,7 @@ import { convertLatexTabularToArray, stripDollarsInsideLatexEnvs } from '../util
 import { wrapBareLatexRuns, repairOrphanAlignedBody } from '../utils/wrapBareLatexRuns.js'
 import { hasMathpixMedia, splitMathpixMediaSegments, stripMathpixFigureChrome } from '../utils/mathpixMedia'
 import { splitSmilesDisplaySegments } from '../utils/smilesDisplay.js'
+import { displayMathStandsAlone } from '../utils/sanitizeMathDelimiters.js'
 import SmilesStructure from './SmilesStructure.jsx'
 import {
   embedInlineLatexInProse,
@@ -172,8 +173,9 @@ function renderPart(part, key, depth = 0) {
   const latex = isDisplay ? part.slice(2, -2) : part.slice(1, -1)
   const needsDisplayMatrix =
     /\\begin\{(?:bmatrix|pmatrix|matrix|vmatrix|array|cases|aligned|align\*?|eqnarray)\}/.test(latex)
+  const ownLine = isDisplay && displayMathStandsAlone(latex)
 
-  if (!needsDisplayMatrix) {
+  if (!needsDisplayMatrix && !ownLine) {
     const mixed = renderMixedProseMath(latex, key, depth)
     if (mixed) return mixed
   }
@@ -240,7 +242,7 @@ function renderPart(part, key, depth = 0) {
       <span
         key={key}
         className={
-          /\\begin\{(?:array|aligned|tabular)\}|\\hline\b|\\xrightarrow\b/.test(latex)
+          ownLine || /\\begin\{(?:array|aligned|tabular)\}|\\hline\b|\\xrightarrow\b/.test(latex)
             ? 'math-display math-display-block'
             : isDisplay || needsDisplayMatrix
               ? 'math-display'

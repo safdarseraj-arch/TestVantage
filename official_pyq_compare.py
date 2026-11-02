@@ -437,7 +437,8 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         "can read on the page. Never invent. Leave a field empty if that part matches or you are "
         "unsure. Use $...$ for math. Inside math put ~ between a number and its unit and between "
         "unit words, e.g. $105~\\mathrm{kcal}~\\mathrm{mol}^{-1}$. A table is one plain "
-        "\\begin{tabular} with & and \\\\ rows.\n"
+        "\\begin{tabular} with & and \\\\ rows. Copy every \\includegraphics{...} and ![](...) line "
+        "from the card into the suggested text or passage unchanged; never drop a picture.\n"
         "- Do not judge the answer key unless the page prints one.\n"
         "Return JSON only."
     )

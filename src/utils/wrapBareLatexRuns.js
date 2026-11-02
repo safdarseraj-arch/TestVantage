@@ -319,7 +319,9 @@ export function stripStrayMathDelimiters(text) {
       // $\mathrm{NaNH}_{2}$ (2 equivalents) and trans- $\mathrm{CH}$ are real
       // closers/openers. "(" and "-" are English here, not stray math.
       // `$...$ )` closes a unit such as (in $\mathrm{J}...$). ")" is English here.
-      const closedGroupThenParen = left === '}' && (right === '(' || right === '[' || right === ')')
+      const closedGroupThenParen =
+        (left === '}' && (right === '(' || right === '[' || right === ')')) ||
+        (right === '(' && /\s/.test(t[i + 1] || '') && /^\(\s*[A-Za-z]{3,}\b/.test(t.slice(j)))
       const hyphenBeforeCommand =
         (left === '-' || left === '\u2013' || left === '\u2014') && right === '\\'
       // [Given: $9^{1/3}=2.08$ ] and $...mol^{-1}$ ] — the bracket is English.

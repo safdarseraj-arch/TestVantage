@@ -39,7 +39,7 @@ export function validateQuestionReadiness(q) {
         message: `Stem LaTeX needs fix (${broken.slice(0, 2).join('; ')}).`,
       })
     }
-    if (stemLooksIncompleteOnDisplay(stem) || latexExtractionIncomplete(q.passageText)) {
+    if (stemLooksIncompleteOnDisplay(stem, q.options) || latexExtractionIncomplete(q.passageText)) {
       issues.push({
         id: 'extraction-incomplete',
         severity: 'error',

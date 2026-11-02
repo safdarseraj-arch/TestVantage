@@ -2094,7 +2094,7 @@ export function healUploadQuestionCard(q, source, map) {
   const alreadyClean =
     !storedMatchOptionsAreCutOff(storedOpts) &&
     !storedOpts.some((opt) => visibleLatexSourceHits(opt).length > 0) &&
-    !stemLooksIncompleteOnDisplay(storedText) &&
+    !stemLooksIncompleteOnDisplay(storedText, storedOpts) &&
     !stemLooksIncompleteOnDisplay(storedPassage) &&
     ![storedText, storedPassage, ...storedOpts].some((part) => visibleLatexSourceHits(part).length > 0) &&
     peelForeignComprehensionFromStem(storedText, q) === storedText &&

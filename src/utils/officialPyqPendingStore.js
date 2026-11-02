@@ -141,11 +141,18 @@ export const OFFICIAL_PYQ_ADMIN_EDIT_FIELDS = [
   'passageSource',
   'adminEdited',
   'adminEditedAt',
+  'adminApproved',
+  'adminApprovedAt',
 ]
 
 /** @param {unknown} q */
 export function officialPyqCardIsAdminEdited(q) {
   return Boolean(q && typeof q === 'object' && /** @type {any} */ (q).adminEdited === true)
+}
+
+/** An admin approved this one card as shown: no quality alarms, nothing may change it. @param {unknown} q */
+export function officialPyqCardIsApproved(q) {
+  return Boolean(q && typeof q === 'object' && /** @type {any} */ (q).adminApproved === true)
 }
 
 /** @param {any} q @param {number} index */

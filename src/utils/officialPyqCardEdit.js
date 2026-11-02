@@ -12,6 +12,7 @@ import {
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
 import { LOCAL_QUALITY_REVISION, localOfficialPyqQualityCheck } from './officialPyqLocalQuality.js'
+import { officialPyqCardAsShown } from './officialPyqCardAsShown.js'
 
 export const OFFICIAL_PYQ_CARD_CHANGED_EVENT = 'testvantage:official-pyq-card-changed'
 
@@ -157,6 +158,8 @@ export function saveOfficialPyqCardEdit(paperId, index, draft) {
     pyqSlot: card.pyqSlot ?? index + 1,
     adminEdited: true,
     adminEditedAt: editedAt,
+    adminApproved: undefined,
+    adminApprovedAt: undefined,
     originalCompare: undefined,
   })
   questions[index] = next
@@ -164,6 +167,8 @@ export function saveOfficialPyqCardEdit(paperId, index, draft) {
     for (const i of officialPyqPassageGroupIndexes(questions, index)) {
       if (i === index || !questions[i]) continue
       const mate = { ...questions[i], passageSource: 'admin_edit', adminEdited: true }
+      delete mate.adminApproved
+      delete mate.adminApprovedAt
       if (next.passageText) mate.passageText = next.passageText
       else delete mate.passageText
       mate.adminEditedAt = Math.max(editedAt, (Number(questions[i].adminEditedAt) || 0) + 1)
@@ -179,6 +184,89 @@ export function saveOfficialPyqCardEdit(paperId, index, draft) {
   for (const i of mates) notifyOfficialPyqCardChanged(paper.id, i)
   notifyOfficialPyqCardChanged(paper.id, index)
   return { ok: true, paper: checked, card: card2, passageShared: mates.map((i) => i + 1) }
+}
+
+/** @param {string} paperId @param {number} index */
+function pendingCardFor(paperId, index) {
+  const paper = getOfficialPyqPendingPaper(paperId)
+  if (!paper) return { error: 'Paper not found.' }
+  if (String(paper.status) !== 'pending_review') {
+    return { error: 'Only a pending paper can be changed here. Published questions stay locked.' }
+  }
+  const questions = Array.isArray(paper.questions) ? paper.questions.slice() : []
+  const card = questions[index]
+  if (!card) return { error: 'Question not found on this paper.' }
+  return { paper, questions, card }
+}
+
+/** @param {any} paper @param {any[]} questions @param {number} index */
+function saveOneCard(paper, questions, index) {
+  const saved = updateOfficialPyqPendingPaper(paper.id, { questions })
+  if (!saved) return { ok: false, error: 'Could not save — browser storage may be full.' }
+  const checked = recheckOfficialPyqCardQuality(paper.id, index) || saved
+  notifyOfficialPyqCardChanged(paper.id, index)
+  return { ok: true, paper: checked, card: (checked.questions || saved.questions || [])[index] || questions[index] }
+}
+
+/**
+ * Admin approves ONE pending card as it is drawn now. The drawn text, options,
+ * passage and figure are saved, the card is locked like a hand edit, and the
+ * quality checks skip it. Never publishes.
+ * @param {string} paperId
+ * @param {number} index 0-based card index
+ */
+export function approveOfficialPyqCard(paperId, index) {
+  const found = pendingCardFor(paperId, index)
+  if (found.error) return { ok: false, error: found.error }
+  const { paper, questions, card } = found
+  const shown = officialPyqCardAsShown(card, getOfficialPyqPendingOcrText(paper.id))
+  if (shown.healError) {
+    return { ok: false, error: 'This question could not be drawn, so it cannot be approved. Edit it first.' }
+  }
+  if (!shown.text.trim()) return { ok: false, error: 'Question text is empty. Edit it first.' }
+  const at = Math.max(Date.now(), (Number(card.adminEditedAt) || 0) + 1)
+  const next = {
+    ...card,
+    text: shown.text,
+    options: shown.options.map((opt) => String(opt ?? '')),
+    pyqSlot: card.pyqSlot ?? index + 1,
+    adminEdited: true,
+    adminEditedAt: at,
+    adminApproved: true,
+    adminApprovedAt: at,
+  }
+  if (Object.prototype.hasOwnProperty.call(card, 'stem')) next.stem = shown.text
+  if (shown.passage) next.passageText = shown.passage
+  else delete next.passageText
+  const figure = String(shown.healed?.questionImage ?? '').trim()
+  if (figure) next.questionImage = figure
+  questions[index] = next
+  return saveOneCard(paper, questions, index)
+}
+
+/**
+ * Undo a per-question approval: quality checks look at the card again.
+ * The card keeps its saved text and stays locked as edited by admin.
+ * @param {string} paperId
+ * @param {number} index 0-based card index
+ */
+export function unapproveOfficialPyqCard(paperId, index) {
+  const found = pendingCardFor(paperId, index)
+  if (found.error) return { ok: false, error: found.error }
+  const { paper, questions, card } = found
+  const next = { ...card, adminEditedAt: Math.max(Date.now(), (Number(card.adminEditedAt) || 0) + 1) }
+  delete next.adminApproved
+  delete next.adminApprovedAt
+  questions[index] = next
+  return saveOneCard(paper, questions, index)
+}
+
+/** "Go to Q 6, 19. Reason." without Q `go`; '' when no question is left on the line. */
+function dropGoToFromLine(line, go) {
+  const m = line.match(/^Go to Q ([\d,\s]+)\.\s*(.*)$/)
+  if (!m) return line
+  const nums = m[1].split(',').map((n) => Number(n.trim())).filter((n) => n && n !== go)
+  return nums.length ? `Go to Q ${nums.join(', ')}. ${m[2]}` : ''
 }
 
 /**
@@ -214,13 +302,18 @@ export function recheckOfficialPyqCardQuality(paperId, index) {
   const failed = new Set(
     (Array.isArray(prior.failedGoTo) ? prior.failedGoTo : []).filter((n) => n !== go && n <= questions.length),
   )
-  if (cardFails(index)) failed.add(go)
+  const stillFails = cardFails(index)
+  if (stillFails) failed.add(go)
   const failedGoTo = Array.from(failed).sort((a, b) => a - b)
+  const lines = (Array.isArray(prior.lines) ? prior.lines : [])
+    .map((line) => (stillFails ? line : dropGoToFromLine(String(line ?? ''), go)))
+    .filter(Boolean)
   return updateOfficialPyqPendingPaper(full.id, {
     localQuality: {
       ...prior,
       passed: failedGoTo.length === 0 && questions.length > 0,
       failedGoTo,
+      lines,
       checkedAt: Date.now(),
       questionCount: questions.length,
     },

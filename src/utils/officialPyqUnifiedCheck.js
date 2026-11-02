@@ -29,6 +29,9 @@ function cardHasFigure(q) {
   }
 }
 
+/** Where one question's scan text ends: the next Q number, a section heading, or the next stem/paragraph. */
+const QUESTION_END = /\b[Qq]\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*[Qq]|\\section\*?\{|\bQuestion Stem\b|\b(?:Paragraph|PARAGRAPH)\b/
+
 function nothingLost(q, ocr) {
   const src = String(ocr ?? '')
   const stem = String(q?.text ?? '').replace(/\s+/g, ' ').trim()
@@ -37,8 +40,8 @@ function nothingLost(q, ocr) {
   const at = src.replace(/\s+/g, ' ').indexOf(probe)
   if (at < 0) return ''
   const flat = src.replace(/\s+/g, ' ')
-  const next = flat.slice(at + probe.length).search(/\bQ\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*Q/i)
-  const span = flat.slice(at, next > 20 ? at + probe.length + next : at + 900)
+  const next = flat.slice(at + probe.length).search(QUESTION_END)
+  const span = flat.slice(at, next >= 0 ? at + probe.length + next : at + 900)
   const card = norm(cardBlob(q))
   const missing = []
   for (const num of span.match(/\d+\.\d+/g) || []) {
@@ -179,7 +182,7 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
   /** @type {{ n: number, reason: string }[]} */
   const fails = []
   list.forEach((q, index) => {
-    if (!q || q.placeholder === true) return
+    if (!q || q.placeholder === true || q.adminApproved === true) return
     const n =
       typeof checkOpts?.indexOf === 'function' ? Number(checkOpts.indexOf(q, index)) + 1 || index + 1 : index + 1
     const text = String(q.text ?? '')

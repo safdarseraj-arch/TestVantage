@@ -42,7 +42,9 @@ function mathStripped(s) {
 }
 
 const previewMath = readFileSync(join(ROOT, 'src/pages/OfficialPyqPreviewMath.jsx'), 'utf8')
-assert.match(previewMath, /healUploadQuestionCard\(q, sourceText\)/)
+assert.match(previewMath, /officialPyqCardAsShown\(q, sourceText\)/)
+const cardAsShown = readFileSync(join(ROOT, 'src/utils/officialPyqCardAsShown.js'), 'utf8')
+assert.match(cardAsShown, /healUploadQuestionCard\(q, sourceText\)/)
 
 const pendingPage = readFileSync(join(ROOT, 'src/pages/OfficialPyqPending.jsx'), 'utf8')
 assert.match(

@@ -334,6 +334,7 @@ function keepAdminEditedCards(next, prev) {
       solution: old.solution,
       adminEdited: true,
       adminEditedAt: old.adminEditedAt,
+      ...(old.adminApproved === true ? { adminApproved: true, adminApprovedAt: old.adminApprovedAt } : {}),
     }
   })
 }

@@ -108,7 +108,7 @@ function cardFailsLocalQuality(card, ocr) {
   const drawn =
     closedChemReactionDisplays(text) || closedChemReactionDisplays(passage)
   if (!drawn) {
-    if (stemLooksIncompleteOnDisplay(text) || stemLooksIncompleteOnDisplay(passage)) return true
+    if (stemLooksIncompleteOnDisplay(text, options) || stemLooksIncompleteOnDisplay(passage)) return true
     if (parts.some((part) => visibleLatexSourceHits(part).length > 0)) return true
   }
   if (ANSWER_IN_STEM.test(text) && peelPrintedAnswerFromStem(text) !== text) return true
@@ -140,7 +140,7 @@ export function localOfficialPyqQualityCheck(paper) {
   /** @type {number[]} */
   const failedGoTo = []
   questions.forEach((q, index) => {
-    if (!q || isOfficialPyqPlaceholder(q)) return
+    if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
     const rawBits = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])]
     if (rawBits.some((part) => CHECKER_NOTE.test(String(part ?? '')))) {
       failedGoTo.push(index + 1)
@@ -354,7 +354,7 @@ export function repairOfficialPyqUntilQuality(paper) {
   function prepare(index) {
     if (cleaned.has(index)) return shown[index]
     const view = cleanCard(questions[index], ocr)
-    const adopted = adoptKnownFixes(questions[index], view, ocr)
+    const adopted = questions[index]?.adminApproved === true ? questions[index] : adoptKnownFixes(questions[index], view, ocr)
     if (adopted !== questions[index]) {
       questions[index] = adopted
       questionsChanged = true
@@ -370,7 +370,7 @@ export function repairOfficialPyqUntilQuality(paper) {
     /** @type {number[]} */
     const failed = []
     questions.forEach((q, index) => {
-      if (!q || isOfficialPyqPlaceholder(q)) return
+      if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
       const rawBits = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])]
       if (rawBits.some((part) => CHECKER_NOTE.test(String(part ?? '')))) {
         failed.push(index + 1)

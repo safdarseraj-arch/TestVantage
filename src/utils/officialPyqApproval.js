@@ -79,10 +79,24 @@ import {
   officialPyqExpectedTotal,
 } from './officialPyqMissingSlots.js'
 
+/** Cards the admin approved one by one are published exactly as saved, never re-healed. */
+function keepApprovedOfficialPyqCards(paper, healed) {
+  const approved = new Map(
+    (Array.isArray(paper?.questions) ? paper.questions : [])
+      .filter((q) => q?.adminApproved === true && String(q?.id ?? '').trim())
+      .map((q) => [String(q.id), q]),
+  )
+  if (!approved.size) return healed
+  return healed.map((q) => approved.get(String(q?.id ?? '')) || q)
+}
+
 function healOfficialPyqPaperQuestionsEnriched(paper, opts) {
   const source = officialPyqPaperSourceText(paper)
-  return healOfficialPyqPaperQuestions(paper, opts).map((q) =>
-    enrichMatchListsFromOcr(healUploadQuestionCard(q, source), source),
+  return keepApprovedOfficialPyqCards(
+    paper,
+    healOfficialPyqPaperQuestions(paper, opts).map((q) =>
+      enrichMatchListsFromOcr(healUploadQuestionCard(q, source), source),
+    ),
   )
 }
 
@@ -451,7 +465,7 @@ function* officialPyqApproveStages(paperId, opts) {
       const ext = extendOfficialPyqHealCard(ctx.cards[i], source)
       extended.push(enrichMatchListsFromOcr(healUploadQuestionCard(ext, source), source))
     }
-    preHealed = finalizeOfficialPyqHealCards(extended, ctx, { skipGuards: true })
+    preHealed = keepApprovedOfficialPyqCards(ready, finalizeOfficialPyqHealCards(extended, ctx, { skipGuards: true }))
   }
   const check = officialPyqApproveCheck(ready, preHealed)
   if (!check.ok || !paper) {

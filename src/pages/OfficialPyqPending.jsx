@@ -89,6 +89,8 @@ const OcrOutputFormatPicker = lazy(() => import('../components/OcrOutputFormatPi
 
 const API_BASE = ''
 const API_FETCH_MS = 8000
+/** Red-banner lines that come from the per-card content check; replaced, never stacked, on each re-check. */
+const CARD_REVIEW_LINE = /The marked part is the problem|missing a list|^Go to Q /
 /** Local Mathpix re-parse only — no Gemini wait on this button. */
 const RE_PARSE_LOCAL_MS = 45_000
 
@@ -523,7 +525,7 @@ export default function OfficialPyqPending() {
       errors.push('Quality check by local AI has not passed.')
     }
     setApproveBlockers((prev) => {
-      const content = prev.filter((line) => /The marked part is the problem|missing a list/.test(line))
+      const content = prev.filter((line) => CARD_REVIEW_LINE.test(line))
       return [...errors, ...content]
     })
   }, [previewOpen, selected, previewMeta.filled, previewExpected])
@@ -532,7 +534,7 @@ export default function OfficialPyqPending() {
     if (!previewOpen || !selectedId || selected?.status !== 'pending_review') return undefined
     let cancelled = false
     setApproveBlockers((prev) =>
-      prev.filter((line) => !/The marked part is the problem|missing a list/.test(line)),
+      prev.filter((line) => !CARD_REVIEW_LINE.test(line)),
     )
     const cancelIdle = scheduleIdleWork(() => {
       Promise.all([
@@ -561,7 +563,7 @@ export default function OfficialPyqPending() {
             ...(missingList ? [missingList] : []),
           ]
           setApproveBlockers((prev) => {
-            const kept = prev.filter((line) => !/The marked part is the problem|missing a list/.test(line))
+            const kept = prev.filter((line) => !CARD_REVIEW_LINE.test(line))
             return content.length ? [...kept, ...content] : kept
           })
         })

@@ -176,7 +176,15 @@ export function sanitizeStemForDisplay(text, options = []) {
   }
 }
 
-/** Incomplete banner / publish block after the same clean-up students see. */
-export function stemLooksIncompleteOnDisplay(text) {
-  return latexExtractionIncomplete(sanitizeStemForDisplay(text))
+/**
+ * Incomplete banner / publish block after the same clean-up students see.
+ * A stem ending in "Then" is torn from its formula only when no options finish the sentence.
+ * @param {unknown} text
+ * @param {unknown[]} [options]
+ */
+export function stemLooksIncompleteOnDisplay(text, options) {
+  const shown = sanitizeStemForDisplay(text)
+  const filled = (Array.isArray(options) ? options : []).filter((opt) => String(opt ?? '').trim()).length
+  const checked = filled >= 2 ? shown.replace(/\s*\bThen\s*$/i, '') : shown
+  return latexExtractionIncomplete(checked)
 }

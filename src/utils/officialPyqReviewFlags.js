@@ -381,7 +381,7 @@ export function officialPyqContentReviewMessages(questions, indexOf, ocr = '') {
   /** @type {string[]} */
   const structureTags = []
   list.forEach((q, i) => {
-    if (!q || isOfficialPyqPlaceholder(q)) return
+    if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
     const index = typeof indexOf === 'function' ? indexOf(q, i) : i
     const tag = reviewQuestionTag(q, index)
     // A drawn reaction (balanced $$ and \xrightarrow) is not a cut-off fraction
@@ -390,7 +390,7 @@ export function officialPyqContentReviewMessages(questions, indexOf, ocr = '') {
       closedChemReactionDisplays(q?.text) || closedChemReactionDisplays(q?.passageText)
     const incomplete =
       !drawnReaction &&
-      (stemLooksIncompleteOnDisplay(q?.text) || stemLooksIncompleteOnDisplay(q?.passageText))
+      (stemLooksIncompleteOnDisplay(q?.text, q?.options) || stemLooksIncompleteOnDisplay(q?.passageText))
     if (incomplete) cutTags.push(tag)
     if (!drawnReaction && questionNeedsRawReview(q)) {
       rawTags.push(tag)
@@ -428,7 +428,7 @@ export function officialPyqMissingListMessage(questions, indexOf) {
   /** @type {string[]} */
   const tags = []
   list.forEach((q, i) => {
-    if (!q || isOfficialPyqPlaceholder(q)) return
+    if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
     const missing = validateMathpixQuestion(q).issues.some((issue) => issue.code === 'missing_column')
     if (!missing) return
     const index = typeof indexOf === 'function' ? indexOf(q, i) : i

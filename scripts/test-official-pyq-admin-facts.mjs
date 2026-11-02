@@ -168,6 +168,34 @@ test('one-card check never reports the paper count (it blocked every Approve)', 
   assert.deepEqual(cardsOnly.messages, [])
 })
 
+test('missing-OCR check stops at the question end (2021 P2 Q6, Q19, Q47 false alarms)', () => {
+  const q6Stem = 'Two concentric circular loops lie in the $x y$-plane. Which of the following statement(s) is(are) correct?'
+  const q6Opts = ['perpendicular', 'radial only', 'non-zero', 'outward']
+  const q19Stem = 'The work functions for metals $P, Q$ and $R$ are 4.0 eV, 4.5 eV and 5.5 eV. The photon energy, in eV, is ____.'
+  const q47Stem = 'The value of $2 m_{1}+3 n_{1}+m_{1} n_{1}$ is ____.'
+  const ocr = [
+    q6Stem,
+    '\\begin{itemize} \\item[(A)] perpendicular \\item[(B)] radial only \\item[(C)] non-zero \\item[(D)] outward \\end{itemize}',
+    '\\section*{SECTION 2} \\section*{Question Stem} The test-tube glass has density 2.5 gm/cc and the trapped air is 3.3 cc.',
+    'Q. 9',
+    q19Stem.replace('____', '\\_\\_\\_\\_'),
+    '\\end{itemize} \\section*{SECTION 1} Each question has FOUR options (A), (B), (C) and (D).',
+    'Q. 10',
+    q47Stem.replace('____', '\\_\\_\\_\\_'),
+    'Q. 11 The value is 1.25. \\section*{SECTION 3} Each question has FOUR options (A), (B), (C) and (D).',
+  ].join('\n')
+  const blank = ['', '', '', '']
+  const cardsIn = [
+    { text: q6Stem, options: q6Opts, questionType: 'multiple_correct' },
+    { text: q19Stem, options: blank, questionType: 'integer' },
+    { text: q47Stem, options: blank, questionType: 'numerical' },
+  ]
+  const clean = reviewOfficialPyqCards(cardsIn, ocr, null, { cardsOnly: true })
+  assert.deepEqual(clean.messages, [], clean.messages.join(' | '))
+  const lostOption = reviewOfficialPyqCards([{ ...cardsIn[0], options: q6Opts.slice(0, 3) }], ocr, null, { cardsOnly: true })
+  assert.ok(lostOption.messages.some((m) => /4 options in the scan/.test(m)), lostOption.messages.join(' | '))
+})
+
 test('a hand-edited card that moved slot keeps its edit and does not overwrite another card', () => {
   const edited = { id: 'b', text: 'Edited by admin', options: opts, pyqSlot: 3, adminEdited: true, adminEditedAt: 5 }
   const prev = [

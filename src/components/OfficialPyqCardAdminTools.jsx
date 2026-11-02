@@ -15,10 +15,12 @@ import { getOfficialPyqPendingPreviewPaper } from '../utils/officialPyqPendingSt
 import {
   OFFICIAL_PYQ_CARD_CHANGED_EVENT,
   applyOfficialPyqCardDraft,
+  approveOfficialPyqCard,
   formatOfficialPyqAnswerKey,
   officialPyqCardHasAnswerKey,
   officialPyqPassageGroupIndexes,
   saveOfficialPyqCardEdit,
+  unapproveOfficialPyqCard,
 } from '../utils/officialPyqCardEdit.js'
 
 const OfficialPyqPreviewMath = lazy(() => import('../pages/OfficialPyqPreviewMath.jsx'))
@@ -188,6 +190,7 @@ function cardSyncKey(q) {
     q?.passageText ?? '',
     q?.options ?? [],
     q?.adminEditedAt ?? 0,
+    q?.adminApprovedAt ?? 0,
     q?.originalCompare?.checkedAt ?? 0,
   ])
 }
@@ -204,6 +207,18 @@ function draftFromCard(card) {
   }
 }
 
+const FIGURE_MARKUP = /\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[[^\]]*\]\([^)]+\)/g
+
+/** The compare reply is text only, so a picture the card already shows must carry over. */
+function keepCardFigures(before, after) {
+  const next = String(after ?? '')
+  const lost = (String(before ?? '').match(FIGURE_MARKUP) || []).filter((fig) => {
+    const url = fig.match(/https?:\/\/[^\s)}]+/)?.[0]
+    return !next.includes(url || fig)
+  })
+  return lost.length ? `${next}\n${lost.join('\n')}` : next
+}
+
 /** @param {any} card @param {{ suggestedText?: string, suggestedOptions?: string[], suggestedPassage?: string }} compare */
 function draftFromSuggestion(card, compare) {
   const base = draftFromCard(card)
@@ -213,8 +228,8 @@ function draftFromSuggestion(card, compare) {
   const useOpts = opts.some((o) => String(o ?? '').trim())
   return {
     ...base,
-    text: text || base.text,
-    passageText: passage || base.passageText,
+    text: text ? keepCardFigures(base.text, text) : base.text,
+    passageText: passage ? keepCardFigures(base.passageText, passage) : base.passageText,
     options: useOpts
       ? base.options.length > opts.length
         ? [...opts.map((o) => String(o ?? '')), ...base.options.slice(opts.length)]
@@ -324,6 +339,31 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     onSaved?.(result.card)
   }
 
+  function onApprove() {
+    setError('')
+    const result = approveOfficialPyqCard(paperId, index)
+    if (!result.ok) {
+      setError(result.error || 'Could not approve.')
+      return
+    }
+    setNote(`Approved Q${goTo}. It is saved as shown, gets no quality alarms, and nothing will change it. Not published.`)
+    onSaved?.(result.card)
+  }
+
+  function onUnapprove() {
+    setError('')
+    const result = unapproveOfficialPyqCard(paperId, index)
+    if (!result.ok) {
+      setError(result.error || 'Could not undo the approval.')
+      return
+    }
+    const passed = !(result.paper?.localQuality?.failedGoTo || []).includes(goTo)
+    setNote(
+      `Approval removed from Q${goTo}. Quality check re-run: ${passed ? 'this card passed' : 'this card needs a look'}.`,
+    )
+    onSaved?.(result.card)
+  }
+
   async function onCompare() {
     if (compareBusy) return
     setCompareBusy(true)
@@ -377,7 +417,12 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
 
   return (
     <div className="official-pyq-card-admin" data-testid="official-pyq-card-admin">
-      {card.adminEdited ? (
+      {card.adminApproved ? (
+        <p className="form-hint official-pyq-admin-approved" data-testid="official-pyq-admin-approved">
+          <span className="bank-review-badge">Approved by admin</span> This question is saved as shown. Quality
+          alarms are off for it, and re-parse, quality fix, and auto-heal will not change it.
+        </p>
+      ) : card.adminEdited ? (
         <p className="form-hint official-pyq-admin-edited" data-testid="official-pyq-admin-edited">
           <span className="bank-review-badge">Edited by admin</span> Re-parse, quality fix, and auto-heal
           will not change this card.
@@ -426,6 +471,26 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
 
       {!editing ? (
         <div className="official-pyq-actions">
+          {card.adminApproved ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              data-testid="official-pyq-unapprove-question"
+              onClick={onUnapprove}
+            >
+              Undo approval
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              data-testid="official-pyq-approve-question"
+              title="Looks right on screen? Approve it: no more alarms for this question, and nothing will change it."
+              onClick={onApprove}
+            >
+              Approve this question
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-ghost btn-sm"

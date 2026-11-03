@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import fitz
+import httpx
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -31,11 +32,14 @@ _MAX_OUTPUT_TOKENS = 1500
 _RENDER_DPI = 130
 _MIN_MATCH_WORDS = 6
 _MAX_INLINE_PDF_BYTES = 18 * 1024 * 1024
+_GEMINI_TIMEOUT_MS = 90_000
+_PAGE_MAP_TIMEOUT_MS = 150_000
 _PROJECT_ROOT = Path(__file__).resolve().parent
 ORIGINALS_DIR = _PROJECT_ROOT / "data" / "official_pyq_originals"
 
 ORIGINAL_MISSING_MESSAGE = "Original paper not available for this paper"
 GEMINI_KEY_MISSING_MESSAGE = "Gemini key missing"
+GEMINI_TIMEOUT_MESSAGE = "Gemini did not answer in time. Click Compare this question again."
 
 _IMAGE_SUFFIXES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 
@@ -45,6 +49,10 @@ class OriginalMissingError(LookupError):
 
 
 class GeminiKeyMissingError(RuntimeError):
+    pass
+
+
+class GeminiTimeoutError(TimeoutError):
     pass
 
 
@@ -101,8 +109,28 @@ def _client() -> genai.Client:
     if not key:
         raise GeminiKeyMissingError(GEMINI_KEY_MISSING_MESSAGE)
     if _CLIENT is None:
-        _CLIENT = genai.Client(api_key=key)
+        _CLIENT = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=_GEMINI_TIMEOUT_MS))
     return _CLIENT
+
+
+def _generate(**kwargs: Any) -> Any:
+    """A pooled connection that died (e.g. after the PC slept) hangs every later call, so a failed
+    call drops the client and the next one opens a fresh connection."""
+    global _CLIENT
+    for attempt in range(2):
+        try:
+            return _client().models.generate_content(**kwargs)
+        except (GeminiKeyMissingError, OriginalMissingError):
+            raise
+        except Exception as exc:
+            _CLIENT = None
+            if isinstance(exc, httpx.TimeoutException) or "timed out" in str(exc).lower():
+                raise GeminiTimeoutError(GEMINI_TIMEOUT_MESSAGE) from exc
+            if attempt == 0 and isinstance(exc, httpx.TransportError):
+                logger.warning("Gemini connection dropped (%s); retrying on a fresh connection", exc)
+                continue
+            raise
+    raise RuntimeError("unreachable")
 
 
 def _safe_id(paper_id: str) -> str:
@@ -249,7 +277,7 @@ def _page_map_sync(path: Path) -> dict[str, Any]:
     data = path.read_bytes()
     if len(data) > _MAX_INLINE_PDF_BYTES:
         raise ValueError("The original PDF is too large to map pages (over 18 MB).")
-    response = _client().models.generate_content(
+    response = _generate(
         model=COMPARE_MODEL,
         contents=[
             types.Part.from_bytes(data=data, mime_type="application/pdf"),
@@ -264,6 +292,7 @@ def _page_map_sync(path: Path) -> dict[str, Any]:
             max_output_tokens=_MAX_OUTPUT_TOKENS,
             response_mime_type="application/json",
             response_schema=PageMap,
+            http_options=types.HttpOptions(timeout=_PAGE_MAP_TIMEOUT_MS),
         ),
     )
     parsed = _parse_model_json(_response_text(response), PageMap)
@@ -445,7 +474,7 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
 
 
 def _compare_sync(parts: list[Any], prompt: str) -> CompareVerdict:
-    response = _client().models.generate_content(
+    response = _generate(
         model=COMPARE_MODEL,
         contents=[*parts, prompt],
         config=types.GenerateContentConfig(

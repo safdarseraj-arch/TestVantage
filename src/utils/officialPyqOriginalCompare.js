@@ -16,8 +16,10 @@ import { formatOfficialPyqAnswerKey, notifyOfficialPyqCardChanged } from './offi
 
 export const ORIGINAL_MISSING_MESSAGE = 'Original paper not available for this paper'
 export const GEMINI_KEY_MISSING_MESSAGE = 'Gemini key missing'
-const MAX_RETRIES = 2
-const COMPARE_TIMEOUT_MS = 150_000
+const MAX_RETRIES = 1
+/** Above the server's own Gemini limits (90 s per call, 150 s for the one-time page map). */
+const COMPARE_TIMEOUT_MS = 170_000
+const NO_ANSWER_MESSAGE = 'Gemini did not answer in time. Click Compare this question again.'
 
 class CompareStopError extends Error {
   /** @param {string} code @param {string} message */
@@ -56,11 +58,18 @@ async function readError(res) {
 /** @param {string} url @param {RequestInit} init @param {AbortSignal | undefined} signal */
 async function fetchWithTimeout(url, init, signal) {
   const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), COMPARE_TIMEOUT_MS)
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    ctl.abort()
+  }, COMPARE_TIMEOUT_MS)
   const onAbort = () => ctl.abort()
   signal?.addEventListener('abort', onAbort)
   try {
     return await fetch(url, { ...init, signal: ctl.signal })
+  } catch (err) {
+    if (timedOut && !signal?.aborted) throw new Error(NO_ANSWER_MESSAGE)
+    throw err
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', onAbort)

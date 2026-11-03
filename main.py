@@ -1204,6 +1204,11 @@ def _compare_http_error(exc: BaseException) -> HTTPException:
             status_code=503,
             detail={"code": "gemini_key_missing", "message": opc.GEMINI_KEY_MISSING_MESSAGE},
         )
+    if isinstance(exc, opc.GeminiTimeoutError):
+        return HTTPException(
+            status_code=504,
+            detail={"code": "gemini_timeout", "message": opc.GEMINI_TIMEOUT_MESSAGE},
+        )
     low = str(exc).lower()
     if "402" in low or "resource_exhausted" in low or "prepayment credits" in low or "quota" in low:
         return HTTPException(

@@ -919,6 +919,34 @@ export function stripOfficialPyqPaperChrome(text) {
     .trim()
 }
 
+const PASSAGE_HEADING_LINE =
+  /^\s*(?:\}\s*)?(?:Question\s+Stem(?:\s+for\s+Question\s+Nos?\.?\s*\d{1,2}\s+and\s+\d{1,2})?|Paragraph(?:\s+[IVX\d]+)?|PARAGRAPH(?:\s+[IVX\d]+)?|Passage|Comprehension)?\s*\}?\s*$/
+const PASSAGE_QUESTION_START = /(?:^|\n)[ \t]*(?:\\item\s*\[\s*Q\.?\s*\]|Q\s*\.)\s*\d{1,2}\b/
+const PASSAGE_TAIL_LINE = /^\s*(?:\\begin\{(?:itemize|enumerate)\}|\\end\{(?:itemize|enumerate)\})\s*$/
+const PASSAGE_ANSWER_LINE = /\\_\s*\\_\s*\\_|_{4,}/
+
+/**
+ * Shared passage / question stem body only: no "Question Stem for Question Nos. 5 and 6"
+ * heading (or a stray `}` left from it), no question lines after it, no dangling list opener.
+ * @param {unknown} text
+ */
+export function cleanOfficialPyqPassageBody(text) {
+  let body = String(text ?? '').replace(/\r\n/g, '\n')
+  const cut = body.search(PASSAGE_QUESTION_START)
+  if (cut >= 0) body = body.slice(0, cut)
+  const lines = body.split('\n')
+  while (lines.length && PASSAGE_HEADING_LINE.test(lines[0])) lines.shift()
+  while (
+    lines.length &&
+    (PASSAGE_TAIL_LINE.test(lines[lines.length - 1]) ||
+      !lines[lines.length - 1].trim() ||
+      (PASSAGE_ANSWER_LINE.test(lines[lines.length - 1]) && lines[lines.length - 1].length < 200))
+  ) {
+    lines.pop()
+  }
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 const PHYS_COMPREHENSION_RE =
   /Young(?:['’]s)?\s+double|double\s+slit|oscil|interferenc|spring(?:-|\s*)mass|amplitud|particles?\s*[123](?:\s*[,–-]\s*[123]){1,2}|as shown in th/i
 const MATH_COMPREHENSION_RE =
@@ -1439,6 +1467,10 @@ export function peelOfficialPyqCardForDisplay(q, source = '') {
   }
   if (next.passageText && passageConflictsCard(next.text, next.passageText)) {
     next = clearMistakenPassage(next)
+  }
+  if (next.passageText) {
+    const body = cleanOfficialPyqPassageBody(next.passageText)
+    if (body !== next.passageText) next = body ? { ...next, passageText: body } : clearMistakenPassage(next)
   }
   const sameText = next.text === raw
   const samePass = String(next.passageText ?? '') === stripOfficialPyqPaperChrome(q.passageText)

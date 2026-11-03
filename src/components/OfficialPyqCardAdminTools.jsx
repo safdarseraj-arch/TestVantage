@@ -368,7 +368,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     if (compareBusy) return
     setCompareBusy(true)
     setError('')
-    setNote(`Comparing Q${goTo} with the original paper…`)
+    setNote(`Comparing Q${goTo} with the original paper… This usually takes under a minute.`)
     let doneNote = ''
     try {
       const mod = await import('../utils/officialPyqOriginalCompare.js')
@@ -444,7 +444,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
             </span>
           ) : compare.verdict === 'error' ? (
             <span>
-              Could not compare Q{goTo} after 3 tries{compare.error ? `: ${compare.error}` : '.'}
+              Could not compare Q{goTo} after 2 tries{compare.error ? `: ${compare.error}` : '.'}
             </span>
           ) : (
             <>

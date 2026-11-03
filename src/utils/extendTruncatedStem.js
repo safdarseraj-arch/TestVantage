@@ -1003,13 +1003,17 @@ function matchWindowOwnsStem(window, stem) {
 }
 
 /** Wrong-question drawings: drop URLs that are not in this card's OCR span. */
-function dropStolenFigures(stem, source, printedNumber, map) {
+function dropStolenFigures(stem, source, printedNumber, map, { passage = false } = {}) {
   const t = String(stem ?? '').trim()
   if (!t) return t
   const urls = extractMathpixImageUrls(t)
   if (!urls.length) return t
   const src = String(source ?? '')
-  const span = ocrSpanForCard(src, printedNumber, map, t)
+  // A shared passage owns the figures of its whole range (heading to last child), not one
+  // child's span, which can run into the next stem's heading and figure.
+  const n = Number(printedNumber)
+  const inRange = passage && officialPyqPassageRanges(src, map).some((r) => n >= r.from && n <= r.to)
+  const span = passage ? (inRange ? ocrSpanForCard(src, printedNumber, map) : '') : ocrSpanForCard(src, printedNumber, map, t)
   const spanUrls = span ? new Set(extractMathpixImageUrls(span)) : null
   let next = t
   for (const url of urls) {
@@ -2179,7 +2183,7 @@ export function healUploadQuestionCard(q, source, map) {
   let passageText = peeledCard.passageText
   if (passageText) {
     passageText = restoreMissingFiguresFromSource(passageText, src, printedN, map)
-    passageText = dropStolenFigures(passageText, src, printedN, map)
+    passageText = dropStolenFigures(passageText, src, printedN, map, { passage: true })
     passageText = sanitizeStemForDisplay(passageText)
   }
   const samePass = String(passageText ?? '') === String(q.passageText ?? '')

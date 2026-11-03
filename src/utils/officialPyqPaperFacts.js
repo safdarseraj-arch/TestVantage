@@ -3,6 +3,8 @@
  * junk, subjects, and types. No network and no invented questions.
  */
 
+import { cleanOfficialPyqPassageBody } from './passage.js'
+
 const WORD = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
 }
@@ -150,10 +152,12 @@ function isJunkOnlyCard(q) {
 }
 
 function passageBodyFromCard(text) {
-  return stripPyqJunkText(
-    String(text ?? '')
-      .replace(/\\section\*?\{([^}]*)\}/gi, '$1')
-      .replace(/^(?:Paragraph|PARAGRAPH|Passage|Question\s+Stem(?:\s+for\s+Question\s+Nos?\.?\s*\d{1,2}\s+and\s+\d{1,2})?)\b[:.\s-]*/i, ''),
+  return cleanOfficialPyqPassageBody(
+    stripPyqJunkText(
+      String(text ?? '')
+        .replace(/\\section\*?\{([^}]*)\}/gi, '$1')
+        .replace(/^(?:Paragraph|PARAGRAPH|Passage|Question\s+Stem(?:\s+for\s+Question\s+Nos?\.?\s*\d{1,2}\s+and\s+\d{1,2})?)\b[:.\s-]*/i, ''),
+    ),
   )
 }
 
@@ -214,9 +218,9 @@ function attachNamedStems(questions, ocr) {
   while ((m = re.exec(src))) {
     const start = m.index + m[0].length
     const rest = src.slice(start)
-    const cut = rest.search(/\\item\s*\[\s*Q[^\]]*\]\s*\d|\\section\*?\{|Question\s+Stem\s+for\s+Question/i)
+    const cut = rest.search(/\\item\s*\[\s*Q[^\]]*\]\s*\d|(?:^|\n)\s*Q\s*\.\s*\d{1,2}\b|\\section\*?\{|Question\s+Stem\s+for\s+Question/i)
     let body = (cut > 40 ? rest.slice(0, cut) : rest.slice(0, 1800)).trim()
-    body = stripPyqJunkText(body.replace(/^[\s:.-]+/, ''))
+    body = cleanOfficialPyqPassageBody(stripPyqJunkText(body.replace(/^[\s:.-]+/, '')))
     if (body.length < 20) continue
     jobs.push({ nums: [Number(m[1]), Number(m[2])], body, at: m.index })
   }
@@ -242,7 +246,10 @@ function attachNamedStems(questions, ocr) {
       return true
     })
     if (!job) return q
-    if (String(q.passageText || '').trim().length >= job.body.length) return q
+    const stored = cleanOfficialPyqPassageBody(q.passageText)
+    if (stored.length >= job.body.length) {
+      return stored === String(q.passageText ?? '') ? q : { ...q, passageText: stored }
+    }
     return {
       ...q,
       passageText: job.body,

@@ -14,10 +14,13 @@ import {
 } from '../src/utils/officialPyqAdminFacts.js'
 import { stampSubjectsFromPaper } from '../src/utils/parsePaperSectionMap.js'
 import {
+  cleanOfficialPyqPassageBody,
   fillOfficialPyqPairPassages,
   officialPyqCardHasMistakenPassage,
   peelOfficialPyqCardForDisplay,
 } from '../src/utils/passage.js'
+import { shapeOfficialPyqDrafts } from '../src/utils/officialPyqPaperFacts.js'
+import { healUploadQuestionCard } from '../src/utils/uploadQualityGuards.js'
 import { reviewOfficialPyqCards } from '../src/utils/officialPyqUnifiedCheck.js'
 import { officialPyqContentReviewMessages } from '../src/utils/officialPyqReviewFlags.js'
 import { keepAdminEditedOfficialPyqCards } from '../src/utils/officialPyqPendingStore.js'
@@ -166,6 +169,84 @@ test('one-card check never reports the paper count (it blocked every Approve)', 
   assert.ok(!lines.some((m) => /facts card|This section contains|Do not approve/i.test(m)), lines.join(' | '))
   const cardsOnly = reviewOfficialPyqCards([clean], '', null, { cardsOnly: true })
   assert.deepEqual(cardsOnly.messages, [])
+})
+
+const STEM_OCR = [
+  '\\section*{Question Stem for Question Nos. 5 and 6}',
+  '',
+  'Question Stem',
+  'A projectile is thrown from a point O on the ground at an angle 45° from the vertical. The acceleration due to gravity $g=10 \\mathrm{~m} / \\mathrm{s}^{2}$.',
+  'Q. 5 The value of $t$ is \\_\\_\\_\\_.',
+  'Q. 6 The value of $x$ is \\_\\_\\_\\_.',
+  '',
+  '\\section*{Question Stem for Question Nos. 7 and 8}',
+  '',
+  'Question Stem',
+  'In the circuit shown below, the switch S is connected to position P for a long time so that the charge on the capacitor becomes $q_{1} \\mu \\mathrm{C}$.',
+  '![](https://cdn.mathpix.com/cropped/circuit-03.jpg?height=289&width=844&top_left_y=2286&top_left_x=676)',
+  '\\begin{itemize}',
+  '\\item[Q.] 7 The magnitude of $q_{1}$ is \\_\\_\\_\\_.',
+  '\\item[Q.] 8 The magnitude of $q_{2}$ is \\_\\_\\_\\_.',
+  '\\end{itemize}',
+  '',
+  '\\section*{Question Stem for Question Nos. 9 and 10}',
+  '',
+  'Question Stem',
+  'Two point charges $-Q$ and $+Q / \\sqrt{3}$ are placed in the $x y$-plane as shown in the figure. All lengths are measured in meters.',
+  '![](https://cdn.mathpix.com/cropped/charges-04.jpg?height=327&width=621&top_left_y=1131&top_left_x=749)',
+  '\\begin{itemize}',
+  '\\item[Q.] 9 The value of $R$ is \\_\\_\\_\\_ meter.',
+  '\\item[Q.] 10 The value of $b$ is \\_\\_\\_\\_ meter.',
+  '\\end{itemize}',
+  '',
+  '\\section*{SECTION 3}',
+].join('\n')
+
+test('question-stem passage keeps only its body (2021 P1 Q5-Q10)', () => {
+  const leaked = [
+    '}',
+    '',
+    'Question Stem',
+    'A projectile is thrown from a point O on the ground.',
+    'The value of $t$ is \\_\\_\\_\\_.',
+    'The value of $x$ is \\_\\_\\_\\_.',
+  ].join('\n')
+  assert.equal(cleanOfficialPyqPassageBody(leaked), 'A projectile is thrown from a point O on the ground.')
+  const listOpener = '}\n\nQuestion Stem\nIn the circuit shown below.\n![](https://cdn.mathpix.com/cropped/c.jpg)\n\\begin{itemize}'
+  assert.equal(cleanOfficialPyqPassageBody(listOpener), 'In the circuit shown below.\n![](https://cdn.mathpix.com/cropped/c.jpg)')
+  const plain = 'A passage with no heading.\nSecond line of it.'
+  assert.equal(cleanOfficialPyqPassageBody(plain), plain)
+  const cards = [5, 6, 7, 8, 9, 10].map((n) => ({
+    id: `s${n}`,
+    text: n < 7 ? `The value of ${n === 5 ? '$t$' : '$x$'} is ____.` : `The magnitude of $q_{${n - 6}}$ is ____.`,
+    options: [],
+    printedNumber: n,
+    questionType: 'numerical',
+  }))
+  const { questions } = shapeOfficialPyqDrafts(cards, STEM_OCR)
+  for (const q of questions) {
+    assert.doesNotMatch(q.passageText, /^\s*(?:\}|Question\s+Stem)/, `Q${q.printedNumber} heading`)
+    assert.doesNotMatch(q.passageText, /The value of|The magnitude of|\\begin\{itemize\}\s*$/, `Q${q.printedNumber} tail`)
+  }
+})
+
+test('the second child of a shared stem keeps the stem figure (2021 P1 Q8)', () => {
+  const passage = 'In the circuit shown below, the switch S is connected to position P for a long time so that the charge on the capacitor becomes $q_{1} \\mu \\mathrm{C}$.\n![](https://cdn.mathpix.com/cropped/circuit-03.jpg?height=289&width=844&top_left_y=2286&top_left_x=676)'
+  for (const n of [7, 8]) {
+    const card = {
+      id: `c${n}`,
+      text: `The magnitude of $q_{${n - 6}}$ is ____.`,
+      options: [],
+      printedNumber: n,
+      questionNumber: n,
+      questionType: 'numerical',
+      passageText: passage,
+      passageSource: 'ocr-header',
+      passageId: 'admin-physics-7-8',
+    }
+    const shown = peelOfficialPyqCardForDisplay(healUploadQuestionCard(card, STEM_OCR), STEM_OCR)
+    assert.match(String(shown.passageText ?? ''), /circuit-03\.jpg/, `Q${n} lost the circuit figure`)
+  }
 })
 
 test('missing-OCR check stops at the question end (2021 P2 Q6, Q19, Q47 false alarms)', () => {

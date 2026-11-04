@@ -949,9 +949,11 @@ function keepClosedMath(raw, finished) {
   const opened = !hasUnclosedDisplayMath(raw) && hasUnclosedDisplayMath(finished)
   const leaked = !commandLeftOutsideMath(raw) && commandLeftOutsideMath(finished)
   if (!opened && !leaked) return finished
-  const safe = convertLatexTabularToArray(sanitizeStemForDisplay(raw))
+  const safe = answerBlanksInMath(convertLatexTabularToArray(sanitizeStemForDisplay(raw)))
   if (!hasUnclosedDisplayMath(safe) && !commandLeftOutsideMath(safe)) return safe
-  if (!hasUnclosedDisplayMath(raw) && !commandLeftOutsideMath(raw)) return convertLatexTabularToArray(raw)
+  if (!hasUnclosedDisplayMath(raw) && !commandLeftOutsideMath(raw)) {
+    return answerBlanksInMath(convertLatexTabularToArray(raw))
+  }
   return finished
 }
 

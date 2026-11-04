@@ -209,6 +209,30 @@ function saveOneCard(paper, questions, index) {
 }
 
 /**
+ * The card with the text, options and passage the review page draws. Edit and
+ * Compare start from this, so a stored card that the display heal repairs (e.g.
+ * option pictures left in the stem) is not edited or compared in its raw form.
+ * @param {string} paperId
+ * @param {any} card
+ */
+export function officialPyqCardForAdmin(paperId, card) {
+  if (!card || typeof card !== 'object') return card
+  let shown
+  try {
+    shown = officialPyqCardAsShown(card, getOfficialPyqPendingOcrText(paperId))
+  } catch {
+    return card
+  }
+  if (shown.healError || !shown.text.trim()) return card
+  return {
+    ...card,
+    text: shown.text,
+    options: shown.options.map((opt) => String(opt ?? '')),
+    passageText: shown.passage,
+  }
+}
+
+/**
  * Admin approves ONE pending card as it is drawn now. The drawn text, options,
  * passage and figure are saved, the card is locked like a hand edit, and the
  * quality checks skip it. Never publishes.

@@ -1,6 +1,7 @@
 """Compare Official PYQ cards with the original paper page (Gemini vision).
 
 Original files live in data/official_pyq_originals/ (not served publicly).
+Admin crops of original pages live in data/official_pyq_crops/ and are served as question pictures.
 Nothing here rewrites a question. Gemini only reports differences and may
 suggest a correction copied from the page; the admin decides.
 """
@@ -10,10 +11,12 @@ from __future__ import annotations
 import env_loader  # noqa: F401 - loads .env before genai.Client()
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -36,10 +39,23 @@ _GEMINI_TIMEOUT_MS = 90_000
 _PAGE_MAP_TIMEOUT_MS = 150_000
 _PROJECT_ROOT = Path(__file__).resolve().parent
 ORIGINALS_DIR = _PROJECT_ROOT / "data" / "official_pyq_originals"
+CROPS_DIR = _PROJECT_ROOT / "data" / "official_pyq_crops"
+CROP_URL_PREFIX = "/api/official-pyq/original/crops/"
+_CROP_DPI = 220
+_MIN_CROP_FRACTION = 0.01
+_CROP_NAME_RE = re.compile(r"[A-Za-z0-9_.-]{1,160}\.png")
+_LAYOUT_REVISION = 2
+_LAYOUT_Y_TOLERANCE = 4.0
+_LAYOUT_X_TOLERANCE = 6.0
+_QUESTION_MARKER_RE = re.compile(r"^Q\.?(\d{1,3})$")
+_OPTION_WORD_RE = re.compile(r"^\(([A-D])\)")
 
 ORIGINAL_MISSING_MESSAGE = "Original paper not available for this paper"
 GEMINI_KEY_MISSING_MESSAGE = "Gemini key missing"
 GEMINI_TIMEOUT_MESSAGE = "Gemini did not answer in time. Click Compare this question again."
+GEMINI_CONNECTION_MESSAGE = (
+    "The internet connection to Gemini kept dropping (tried 3 times). Wait a minute, then click Compare this question again."
+)
 
 _IMAGE_SUFFIXES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 
@@ -53,6 +69,10 @@ class GeminiKeyMissingError(RuntimeError):
 
 
 class GeminiTimeoutError(TimeoutError):
+    pass
+
+
+class GeminiConnectionError(ConnectionError):
     pass
 
 
@@ -99,37 +119,47 @@ def gemini_key_present() -> bool:
     return bool((os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip())
 
 
-_CLIENT: genai.Client | None = None
+_CONNECTION_TRIES = 3
+_RETRY_PAUSE_S = (1.5, 3.0)
 
 
-def _client() -> genai.Client:
-    """One long-lived client: a discarded client closes its HTTP session mid-request."""
-    global _CLIENT
+def _api_key() -> str:
     key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
     if not key:
         raise GeminiKeyMissingError(GEMINI_KEY_MISSING_MESSAGE)
-    if _CLIENT is None:
-        _CLIENT = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=_GEMINI_TIMEOUT_MS))
-    return _CLIENT
+    return key
+
+
+def _connection_dropped(exc: Exception) -> bool:
+    if isinstance(exc, (httpx.TransportError, ConnectionError)):
+        return True
+    text = str(exc).lower()
+    return any(s in text for s in ("10054", "10053", "10038", "forcibly closed", "connection reset", "connection aborted"))
 
 
 def _generate(**kwargs: Any) -> Any:
-    """A pooled connection that died (e.g. after the PC slept) hangs every later call, so a failed
-    call drops the client and the next one opens a fresh connection."""
-    global _CLIENT
-    for attempt in range(2):
+    """Each call owns its client: a shared pool lets one dropped connection break other calls
+    running at the same time ("not a socket"), and a stale pooled connection hangs later calls."""
+    key = _api_key()
+    for attempt in range(_CONNECTION_TRIES):
+        client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=_GEMINI_TIMEOUT_MS))
         try:
-            return _client().models.generate_content(**kwargs)
-        except (GeminiKeyMissingError, OriginalMissingError):
-            raise
+            return client.models.generate_content(**kwargs)
         except Exception as exc:
-            _CLIENT = None
             if isinstance(exc, httpx.TimeoutException) or "timed out" in str(exc).lower():
                 raise GeminiTimeoutError(GEMINI_TIMEOUT_MESSAGE) from exc
-            if attempt == 0 and isinstance(exc, httpx.TransportError):
-                logger.warning("Gemini connection dropped (%s); retrying on a fresh connection", exc)
+            if attempt < _CONNECTION_TRIES - 1 and _connection_dropped(exc):
+                logger.warning("Gemini connection dropped (%s); retry %d on a fresh connection", exc, attempt + 1)
+                time.sleep(_RETRY_PAUSE_S[min(attempt, len(_RETRY_PAUSE_S) - 1)])
                 continue
+            if _connection_dropped(exc):
+                raise GeminiConnectionError(GEMINI_CONNECTION_MESSAGE) from exc
             raise
+        finally:
+            try:
+                client.close()
+            except Exception:
+                pass
     raise RuntimeError("unreachable")
 
 
@@ -210,7 +240,8 @@ def original_status(paper_id: str) -> dict[str, Any]:
 
 
 def _prose_words(text: str) -> list[str]:
-    plain = re.sub(r"\$[^$]*\$", " ", str(text or ""))
+    plain = re.sub(r"\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]*\)|<smiles>.*?</smiles>|https?://\S+", " ", str(text or ""), flags=re.S)
+    plain = re.sub(r"\$[^$]*\$", " ", plain)
     plain = re.sub(r"\\[a-zA-Z]+", " ", plain)
     plain = re.sub(r"[^A-Za-z0-9 ]+", " ", plain)
     return [w.lower() for w in plain.split() if len(w) > 3]
@@ -229,7 +260,12 @@ def _nth_start_page(starts: list[int], occurrence: int, same_number_count: int) 
 
 
 def _text_layer_pages(
-    doc: fitz.Document, number: int, card_text: str, occurrence: int = 0, same_number_count: int = 1
+    doc: fitz.Document,
+    number: int,
+    card_text: str,
+    occurrence: int = 0,
+    same_number_count: int = 1,
+    loose: bool = False,
 ) -> list[int]:
     """1-based pages that hold this question, from the PDF text layer. [] if unsure.
     A short card ("The value of x is ____.") matches almost any page, so word overlap
@@ -253,7 +289,7 @@ def _text_layer_pages(
         score = overlap * 10 + (4 if has_marker else 0)
         if score > best_score:
             best_page, best_score = index + 1, score
-    if best_page and best_score >= 5:
+    if best_page and best_score >= (3 if loose else 5):
         return _with_next_page(best_page, doc.page_count)
     nth = _nth_start_page(marker_pages, occurrence, same_number_count)
     return _with_next_page(nth, doc.page_count) if nth else []
@@ -292,6 +328,7 @@ def _page_map_sync(path: Path) -> dict[str, Any]:
             max_output_tokens=_MAX_OUTPUT_TOKENS,
             response_mime_type="application/json",
             response_schema=PageMap,
+            thinking_config=types.ThinkingConfig(thinking_budget=0, include_thoughts=False),
             http_options=types.HttpOptions(timeout=_PAGE_MAP_TIMEOUT_MS),
         ),
     )
@@ -328,7 +365,7 @@ def _render_pages(path: Path, pages: list[int]) -> list[tuple[bytes, str]]:
         for page_no in pages:
             if 1 <= page_no <= doc.page_count:
                 pix = doc[page_no - 1].get_pixmap(matrix=fitz.Matrix(scale, scale))
-                out.append((pix.tobytes("png"), "image/png"))
+                out.append((pix.tobytes("jpeg", jpg_quality=88), "image/jpeg"))
     return out
 
 
@@ -340,7 +377,12 @@ async def _pages_for_question(
         pages = _text_layer_pages(doc, number, card_text, occurrence, same_number_count)
     if pages:
         return pages
-    mapped = await page_map(paper_id)
+    try:
+        mapped = await page_map(paper_id)
+    except ValueError as exc:
+        logger.warning("Page map failed (%s); using the closest text-layer page", exc)
+        with fitz.open(str(path)) as doc:
+            return _text_layer_pages(doc, number, card_text, occurrence, same_number_count, loose=True)
     return _page_map_pages(mapped, number, occurrence, same_number_count, page_count)
 
 
@@ -385,6 +427,144 @@ def render_original_page(paper_id: str, page: int) -> tuple[bytes, str]:
     return images[0]
 
 
+def _reading_order_words(doc: fitz.Document) -> list[tuple[int, float, float, str]]:
+    """(page, x0, y0, word) for every word, in reading order (two-column pages: left column first)."""
+    out: list[tuple[int, float, float, str]] = []
+    for index in range(doc.page_count):
+        page = doc[index]
+        width = page.rect.width or 1.0
+        words = page.get_text("words") or []
+        two_column = any(
+            _QUESTION_MARKER_RE.match(w[4]) and 0.5 * width <= w[0] < 0.8 * width for w in words
+        )
+        keyed = []
+        for w in words:
+            column = 1 if two_column and w[0] >= 0.5 * width else 0
+            keyed.append(((column, round(w[1], 1), w[0]), (index + 1, float(w[0]), float(w[1]), str(w[4]))))
+        keyed.sort(key=lambda item: item[0])
+        out.extend(word for _, word in keyed)
+    return out
+
+
+def _is_question_marker(word: tuple[int, float, float, str], page_width: float) -> int:
+    match = _QUESTION_MARKER_RE.match(word[3])
+    if not match:
+        return 0
+    x = word[1] / (page_width or 1.0)
+    return int(match.group(1)) if x < 0.3 or 0.5 <= x < 0.8 else 0
+
+
+def _labels_layout(labels: list[tuple[int, float, float]]) -> str:
+    """'row' (A B C D across), 'grid' (A B / C D), or 'list' (one under another), from label positions."""
+    a, b, c, d = labels
+
+    def same_line(u: tuple[int, float, float], v: tuple[int, float, float]) -> bool:
+        return u[0] == v[0] and abs(u[2] - v[2]) <= _LAYOUT_Y_TOLERANCE
+
+    def same_column(u: tuple[int, float, float], v: tuple[int, float, float]) -> bool:
+        return abs(u[1] - v[1]) <= _LAYOUT_X_TOLERANCE
+
+    if same_line(a, b) and same_line(b, c) and same_line(c, d):
+        return "row"
+    if same_line(a, b) and same_line(c, d) and same_column(a, c) and same_column(b, d) and not same_column(a, b):
+        return "grid"
+    return "list"
+
+
+def option_layouts(paper_id: str) -> dict[str, Any]:
+    """How the original paper lays out each question's options (A)-(D). Local PDF text layer only; no Gemini.
+    Questions are keyed by printed number and its n-th appearance (numbering restarts per subject)."""
+    path = _original_file(paper_id)
+    if path is None or path.suffix != ".pdf":
+        return {"available": False, "questions": [], "counts": {}}
+    meta = _read_meta(paper_id)
+    cached = meta.get("option_layout") or {}
+    if cached.get("revision") == _LAYOUT_REVISION:
+        return {"available": True, **{k: cached[k] for k in ("questions", "counts")}}
+    with fitz.open(str(path)) as doc:
+        widths = [doc[i].rect.width for i in range(doc.page_count)]
+        words = _reading_order_words(doc)
+    pages_at_spot: dict[tuple[str, int, int], set[int]] = {}
+    for page, x, y, text in words:
+        pages_at_spot.setdefault((text, round(x), round(y)), set()).add(page)
+    page_chrome = {spot for spot, pages in pages_at_spot.items() if len(pages) >= 3}
+    starts = [(i, n) for i, w in enumerate(words) if (n := _is_question_marker(w, widths[w[0] - 1]))]
+    questions: list[dict[str, Any]] = []
+    counts: dict[str, int] = {}
+    for k, (start, number) in enumerate(starts):
+        end = starts[k + 1][0] if k + 1 < len(starts) else len(words)
+        first: dict[str, tuple[int, float, float]] = {}
+        for page, x, y, text in words[start + 1 : end]:
+            label = _OPTION_WORD_RE.match(text)
+            if label and label.group(1) not in first and (text, round(x), round(y)) not in page_chrome:
+                first[label.group(1)] = (page, x, y)
+        found = [first[letter] for letter in "ABCD" if letter in first]
+        occurrence = counts.get(str(number), 0)
+        counts[str(number)] = occurrence + 1
+        questions.append(
+            {
+                "number": number,
+                "occurrence": occurrence,
+                "page": words[start][0],
+                "layout": _labels_layout(found) if len(found) == 4 else "",
+            }
+        )
+    meta["option_layout"] = {"revision": _LAYOUT_REVISION, "questions": questions, "counts": counts}
+    _write_meta(paper_id, meta)
+    return {"available": True, "questions": questions, "counts": counts}
+
+
+def _crop_box(box: dict[str, Any]) -> tuple[float, float, float, float]:
+    try:
+        x0, y0, x1, y1 = (float(box[k]) for k in ("x0", "y0", "x1", "y1"))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Crop box needs x0, y0, x1, y1 between 0 and 1.") from exc
+    x0, x1 = sorted((max(0.0, min(1.0, x0)), max(0.0, min(1.0, x1))))
+    y0, y1 = sorted((max(0.0, min(1.0, y0)), max(0.0, min(1.0, y1))))
+    if x1 - x0 < _MIN_CROP_FRACTION or y1 - y0 < _MIN_CROP_FRACTION:
+        raise ValueError("The box is too small. Drag a bigger box around the drawing.")
+    return x0, y0, x1, y1
+
+
+def crop_original_page(paper_id: str, page: int, box: dict[str, Any]) -> dict[str, Any]:
+    """Cut one box (page fractions) out of the original page as a PNG. Copies pixels only; nothing is redrawn."""
+    path = _original_file(paper_id)
+    if path is None:
+        raise OriginalMissingError(ORIGINAL_MISSING_MESSAGE)
+    x0, y0, x1, y1 = _crop_box(box)
+    with fitz.open(str(path)) as doc:
+        if not 1 <= page <= doc.page_count:
+            raise ValueError(f"Page {page} is not in the original paper (1-{doc.page_count}).")
+        pdf_page = doc[page - 1]
+        rect = pdf_page.rect
+        clip = fitz.Rect(
+            rect.x0 + x0 * rect.width,
+            rect.y0 + y0 * rect.height,
+            rect.x0 + x1 * rect.width,
+            rect.y0 + y1 * rect.height,
+        )
+        scale = (_CROP_DPI / 72.0) if path.suffix == ".pdf" else 1.0
+        pix = pdf_page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip, alpha=False)
+        data = pix.tobytes("png")
+    digest = hashlib.sha1(data).hexdigest()[:16]
+    name = f"{_safe_id(paper_id)}-p{page}-{digest}.png"
+    CROPS_DIR.mkdir(parents=True, exist_ok=True)
+    dest = CROPS_DIR / name
+    if not dest.exists():
+        dest.write_bytes(data)
+    place = f"page={page}&x0={x0:.4f}&y0={y0:.4f}&x1={x1:.4f}&y1={y1:.4f}"
+    return {"name": name, "url": f"{CROP_URL_PREFIX}{name}?{place}", "width": pix.width, "height": pix.height}
+
+
+def read_crop(name: str) -> bytes:
+    if not _CROP_NAME_RE.fullmatch(str(name or "")):
+        raise ValueError("Invalid picture name.")
+    path = CROPS_DIR / name
+    if not path.is_file():
+        raise OriginalMissingError("That cropped picture is not on this computer.")
+    return path.read_bytes()
+
+
 _OPTION_LABEL_RE = re.compile(r"^\s*(?:\(\s*[A-Za-z1-9]\s*\)|[A-Da-d][.)])\s*")
 
 
@@ -392,6 +572,13 @@ def _labelled_options(raw: Any) -> str:
     """The card hides a stored "(A) " prefix, so drop it before adding our own label."""
     options = [_OPTION_LABEL_RE.sub("", str(o or ""), count=1) for o in raw or []]
     return "\n".join(f"({chr(65 + i)}) {o}" for i, o in enumerate(options) if o.strip())
+
+
+def _real_suggested_options(raw: list[Any]) -> list[str]:
+    """A bare "(A)" is a drawing Gemini could not write; it must not blank the card's option."""
+    options = [str(o or "") for o in raw or []]
+    cleaned = [o if _OPTION_LABEL_RE.sub("", o, count=1).strip() else "" for o in options]
+    return cleaned if any(cleaned) else []
 
 
 def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
@@ -468,25 +655,42 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         "unit words, e.g. $105~\\mathrm{kcal}~\\mathrm{mol}^{-1}$. A table is one plain "
         "\\begin{tabular} with & and \\\\ rows. Copy every \\includegraphics{...} and ![](...) line "
         "from the card into the suggested text or passage unchanged; never drop a picture.\n"
+        "- If an option is a drawing (structure, graph, diagram) you cannot write as text, leave "
+        "suggested_options empty. Never return only the letters (A), (B), (C), (D).\n"
         "- Do not judge the answer key unless the page prints one.\n"
         "Return JSON only."
     )
 
 
+_SHORT_ANSWER_NOTE = (
+    "\n\nYour last answer was cut off. Answer again in under 300 words: verdict and at most 4 "
+    "short differences. Leave suggested_text, suggested_options and suggested_passage empty."
+)
+
+
 def _compare_sync(parts: list[Any], prompt: str) -> CompareVerdict:
-    response = _generate(
-        model=COMPARE_MODEL,
-        contents=[*parts, prompt],
-        config=types.GenerateContentConfig(
-            max_output_tokens=_MAX_OUTPUT_TOKENS,
-            response_mime_type="application/json",
-            response_schema=CompareVerdict,
-            thinking_config=types.ThinkingConfig(thinking_budget=0, include_thoughts=False),
-        ),
-    )
-    parsed = _parse_model_json(_response_text(response), CompareVerdict)
-    assert isinstance(parsed, CompareVerdict)
-    return parsed
+    """Long suggestions (SMILES, tables) can run past max_output_tokens; then ask once for a short answer."""
+    for attempt in range(2):
+        response = _generate(
+            model=COMPARE_MODEL,
+            contents=[*parts, prompt if attempt == 0 else prompt + _SHORT_ANSWER_NOTE],
+            config=types.GenerateContentConfig(
+                max_output_tokens=_MAX_OUTPUT_TOKENS,
+                response_mime_type="application/json",
+                response_schema=CompareVerdict,
+                thinking_config=types.ThinkingConfig(thinking_budget=0, include_thoughts=False),
+            ),
+        )
+        try:
+            parsed = _parse_model_json(_response_text(response), CompareVerdict)
+        except ValueError:
+            if attempt == 0:
+                logger.warning("Compare answer was cut off; asking again for a short answer")
+                continue
+            raise
+        assert isinstance(parsed, CompareVerdict)
+        return parsed
+    raise RuntimeError("unreachable")
 
 
 async def compare_question(body: dict[str, Any]) -> dict[str, Any]:
@@ -533,7 +737,7 @@ async def compare_question(body: dict[str, Any]) -> dict[str, Any]:
         "verdict": kind,
         "differences": [d.model_dump() for d in verdict.differences][:8],
         "suggested_text": verdict.suggested_text.strip() if kind == "differs" else "",
-        "suggested_options": [str(o) for o in verdict.suggested_options] if kind == "differs" else [],
+        "suggested_options": _real_suggested_options(verdict.suggested_options) if kind == "differs" else [],
         "suggested_passage": verdict.suggested_passage.strip() if kind == "differs" else "",
         "pages": pages,
         "model": COMPARE_MODEL,

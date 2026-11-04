@@ -10,6 +10,7 @@ import { wrapBareLatexRuns } from './wrapBareLatexRuns.js'
 import { extractMathpixImageUrls, hasMathpixMedia, restoreMissingOptionGridGraphs, stripMathpixFigureChrome } from './mathpixMedia.js'
 import { dropStemRepeatOptions, optionLooksLikeStemRepeat } from './optionStemLeak.js'
 import { mergeAdjacentOptionTails, applyUploadQualityGuards } from './extendTruncatedStem.js'
+import { mixedSmilesFigureOptions } from './labelledFigureOptions.js'
 import { looksLikeMatchingListStem, normalizeMatchAnswerKey, rewriteLatexItemLabels } from './parseMatchingListDisplay.js'
 import { detectAnswerFromPaper } from './answerProvenance.js'
 import { annotateMathpixCleanStatus, cleanMathpixCardText, preCleanMathpixOcr } from './mathpixCleanPipeline.js'
@@ -620,7 +621,14 @@ export function findGluedNextQuestionStart(raw) {
     const dEnd = tail.search(/\(\s*D\s*\)/)
     const restFrom = dEnd >= 0 ? dEnd + 3 : 0
     const rest = tail.slice(restFrom)
-    const opener = rest.search(NEXT_ITEM_OPENER_RE)
+    let opener = rest.search(NEXT_ITEM_OPENER_RE)
+    const bodyStart = rest.search(/\S/)
+    if (opener >= 0 && opener <= bodyStart) {
+      // "(D) If the surface of the bubble…" — the opener is option D's own first word.
+      const lineEnd = rest.indexOf('\n', bodyStart)
+      const later = lineEnd >= 0 ? rest.slice(lineEnd).search(NEXT_ITEM_OPENER_RE) : -1
+      opener = later >= 0 ? lineEnd + later : -1
+    }
     if (opener >= 0) {
       const abs = afterD + restFrom + opener
       const head = t.slice(0, abs)
@@ -821,6 +829,8 @@ function peelSmilesAsOptions(raw) {
   }
   const chunks = extractSmilesOptionChunks(t)
   if (chunks.length < 2) return null
+  const mixed = chunks.length < 4 ? mixedSmilesFigureOptions(t) : null
+  if (mixed) return { stem: stripVisibleItemizeCommands(mixed.stem), options: mixed.options }
   const optionChunks = chunks.length >= 5 ? chunks.slice(-4) : chunks.slice(0, 4)
   const first = chunks[0]
   const keepFirst =

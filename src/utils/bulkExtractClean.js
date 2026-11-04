@@ -507,7 +507,13 @@ export function looksLikePyqSectionInstructionStem(stem) {
     return false
   }
   if (/^\s*section\s+[a-z0-9()]/i.test(t)) return true
-  if (/\bsection\s+[a-z0-9()]/i.test(t.slice(0, 80)) && !/^\d{1,2}[\.\)]/.test(t)) return true
+  // "Area of the cross-section of a wire" is a question, not a SECTION header.
+  if (
+    /(?<![\w-])section\s*[-–]?\s*(?:\d+\b|[A-D]\b|\(\s*[A-D0-9]+\s*\)|[IVX]+\b)/i.test(t.slice(0, 80)) &&
+    !/^\d{1,2}[\.\)]/.test(t)
+  ) {
+    return true
+  }
   if (/\bmaximum marks\b/i.test(t) && !looksLikeQuestionBlock(t)) return true
   if (/\bthis section contains\b/i.test(inspect) && !looksLikeQuestionBlock(inspect)) return true
   if (/\bcontains\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)\s*(?:\(\d+\))?\s*(?:questions?|matching list)/i.test(t)) {

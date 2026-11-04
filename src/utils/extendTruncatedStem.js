@@ -14,6 +14,7 @@
  */
 
 import { findFirstOptionsBlockStart } from './mcqOptionMarkers.js'
+import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
 import { extractLatexItemizeMcq, extractLatexTabularMcq } from './mathpixQuestionSplit.js'
 import { restoreMissingOptionGridGraphs } from './mathpixMedia.js'
 import { repairScanStructureCodes } from './smilesDisplay.js'
@@ -2083,6 +2084,7 @@ function cardNeedsFullHeal(q, text, passage, options, source, map) {
  */
 export function healUploadQuestionCard(q, source, map) {
   if (!q || typeof q !== 'object' || q.placeholder === true) return q
+  q = restoreLabelledFigureOptions(q, source)
   const textFixed = repairScanStructureCodes(restoreDroppedMsOnGivenLine(String(q.text ?? '')))
   const passageFixed = restoreDroppedMsOnGivenLine(String(q.passageText ?? ''))
   if (textFixed !== String(q.text ?? '') || (q.passageText != null && passageFixed !== String(q.passageText))) {

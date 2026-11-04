@@ -21,9 +21,9 @@ import { visibleLatexSourceHits } from './visibleLatexSource.js'
 import { givenLineDroppedUnit, inlineSingleSymbolDisplayMath, restoreDroppedMsOnGivenLine } from './mathpixCleanPipeline.js'
 import { officialPyqContentReviewMessages, officialPyqMissingListMessage } from './officialPyqReviewFlags.js'
 import { reviewOfficialPyqCards } from './officialPyqUnifiedCheck.js'
-import { factsForPaper } from './officialPyqAdminFacts.js'
+import { enforceAdminFactsOnQuestions, factsForPaper } from './officialPyqAdminFacts.js'
 
-export const LOCAL_QUALITY_REVISION = 6
+export const LOCAL_QUALITY_REVISION = 7
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -345,11 +345,16 @@ function adoptKnownFixes(q, shown, ocr) {
  */
 export function repairOfficialPyqUntilQuality(paper) {
   const ocr = String(paper?.preparedText ?? '')
-  const questions = (Array.isArray(paper?.questions) ? paper.questions : []).map((q) => ({ ...q }))
+  const stored = Array.isArray(paper?.questions) ? paper.questions : []
+  /** Cards saved before a passage-cut fix still lack their shared passage; the facts put it back. */
+  const withFacts = enforceAdminFactsOnQuestions(stored, paper?.adminFacts, ocr)
+  const questions = withFacts.map((q) => ({ ...q }))
   /** @type {Array<object | null>} */
   const shown = questions.map(() => null)
   const cleaned = new Set()
-  let questionsChanged = false
+  let questionsChanged =
+    withFacts !== stored &&
+    withFacts.some((q, i) => String(q?.passageText ?? '') !== String(stored[i]?.passageText ?? ''))
 
   function prepare(index) {
     if (cleaned.has(index)) return shown[index]

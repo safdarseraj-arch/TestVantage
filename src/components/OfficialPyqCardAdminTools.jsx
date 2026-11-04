@@ -5,6 +5,8 @@
  * - Compare this question with the original paper page (Gemini vision).
  * - Show original page: the original PDF page picture beside
  *   the card, drawn locally on the server. No Gemini.
+ * - Crop a picture from that page into the question, passage, or an option
+ *   (the server copies the pixels; nothing is redrawn).
  * Never shown on published papers. Never publishes.
  */
 
@@ -17,6 +19,7 @@ import {
   applyOfficialPyqCardDraft,
   approveOfficialPyqCard,
   formatOfficialPyqAnswerKey,
+  officialPyqCardForAdmin,
   officialPyqCardHasAnswerKey,
   officialPyqPassageGroupIndexes,
   saveOfficialPyqCardEdit,
@@ -39,7 +42,21 @@ const PAGE_GRID_STYLE = {
   marginTop: '0.5rem',
 }
 const PAGE_IMG_WRAP_STYLE = { maxHeight: '80vh', overflow: 'auto', background: '#fff', border: '1px solid #ddd' }
-const PAGE_IMG_STYLE = { display: 'block', width: '100%', height: 'auto' }
+const PAGE_IMG_STYLE = { display: 'block', width: '100%', height: 'auto', userSelect: 'none' }
+const CROP_BAR_STYLE = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 2,
+  background: '#fff',
+  padding: '0.4rem 0.5rem',
+  borderBottom: '1px solid #ddd',
+}
+const CROP_BOX_STYLE = {
+  position: 'absolute',
+  border: '2px solid #d93025',
+  background: 'rgba(217, 48, 37, 0.12)',
+  pointerEvents: 'none',
+}
 
 /** Go-to numbers of the cards sharing this card's passage. @param {string} paperId @param {number} index */
 function passageGroupGoTo(paperId, index) {
@@ -51,11 +68,192 @@ function passageGroupGoTo(paperId, index) {
   }
 }
 
+/** @param {{ x0: number, y0: number, x1: number, y1: number } | null} box */
+function boxBigEnough(box) {
+  return Boolean(box && Math.abs(box.x1 - box.x0) >= 0.01 && Math.abs(box.y1 - box.y0) >= 0.01)
+}
+
+/** @param {{ x0: number, y0: number, x1: number, y1: number }} box */
+function boxStyle(box) {
+  const left = Math.min(box.x0, box.x1)
+  const top = Math.min(box.y0, box.y1)
+  return {
+    ...CROP_BOX_STYLE,
+    left: `${left * 100}%`,
+    top: `${top * 100}%`,
+    width: `${Math.abs(box.x1 - box.x0) * 100}%`,
+    height: `${Math.abs(box.y1 - box.y0) * 100}%`,
+  }
+}
+
+/**
+ * Drag a box on the page picture; the server cuts exactly that box out of the original.
+ * @param {{
+ *   paperId: string
+ *   page: number
+ *   mod: any
+ *   cropTargets: { id: string, label: string }[]
+ *   onCrop: (target: string, url: string) => void
+ *   onImgError: () => void
+ * }} props
+ */
+function CroppablePage({ paperId, page, mod, cropTargets, onCrop, onImgError }) {
+  const [cropMode, setCropMode] = useState(false)
+  const [box, setBox] = useState(/** @type {{ x0: number, y0: number, x1: number, y1: number } | null} */ (null))
+  const [busy, setBusy] = useState(false)
+  const [cropError, setCropError] = useState('')
+  const dragging = useRef(false)
+  const imgRef = useRef(/** @type {HTMLImageElement | null} */ (null))
+
+  useEffect(() => {
+    setBox(null)
+    setCropError('')
+  }, [page])
+
+  /** @param {React.PointerEvent} e */
+  function pointAt(e) {
+    const rect = imgRef.current?.getBoundingClientRect()
+    if (!rect || !rect.width || !rect.height) return null
+    return {
+      x: Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
+    }
+  }
+
+  /** @param {React.PointerEvent} e */
+  function onPointerDown(e) {
+    if (!cropMode || busy) return
+    const p = pointAt(e)
+    if (!p) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    dragging.current = true
+    setCropError('')
+    setBox({ x0: p.x, y0: p.y, x1: p.x, y1: p.y })
+  }
+
+  /** @param {React.PointerEvent} e */
+  function onPointerMove(e) {
+    if (!dragging.current) return
+    const p = pointAt(e)
+    if (p) setBox((b) => (b ? { ...b, x1: p.x, y1: p.y } : b))
+  }
+
+  function onPointerUp() {
+    dragging.current = false
+  }
+
+  async function putIn(target) {
+    if (!boxBigEnough(box) || busy) return
+    setBusy(true)
+    setCropError('')
+    try {
+      const out = await mod.cropOfficialPyqOriginalPage(paperId, page, {
+        x0: Math.min(box.x0, box.x1),
+        y0: Math.min(box.y0, box.y1),
+        x1: Math.max(box.x0, box.x1),
+        y1: Math.max(box.y0, box.y1),
+      })
+      if (!out?.url) throw new Error('The helper did not return the picture.')
+      onCrop(target, out.url)
+      setBox(null)
+      setCropMode(false)
+    } catch (err) {
+      setCropError(err instanceof Error ? err.message : 'Could not cut the picture.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const ready = boxBigEnough(box)
+  return (
+    <div>
+      <div className="official-pyq-actions" style={{ alignItems: 'center' }}>
+        <p className="form-hint" style={{ margin: 0 }}>
+          Original paper, page {page}
+        </p>
+        <button
+          type="button"
+          className={cropMode ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm'}
+          data-testid="official-pyq-crop-toggle"
+          aria-pressed={cropMode}
+          onClick={() => {
+            setCropMode((v) => !v)
+            setBox(null)
+            setCropError('')
+          }}
+        >
+          {cropMode ? 'Stop cropping' : 'Crop a picture from this page'}
+        </button>
+      </div>
+      <div style={PAGE_IMG_WRAP_STYLE}>
+        {cropMode ? (
+          <div style={CROP_BAR_STYLE}>
+            <p className="form-hint" style={{ margin: 0 }} data-testid="official-pyq-crop-help">
+              {ready
+                ? 'Box drawn. Now click where this picture should go. (Drag again to redraw the box.)'
+                : 'Hold the mouse button down and drag a box around the drawing on the page.'}
+            </p>
+            {ready ? (
+              <div className="official-pyq-actions" data-testid="official-pyq-crop-targets">
+                <span className="form-hint">Put picture in:</span>
+                {cropTargets.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={busy}
+                    data-testid={`official-pyq-crop-to-${t.id}`}
+                    onClick={() => void putIn(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+                {busy ? <span className="form-hint">Cutting the picture…</span> : null}
+              </div>
+            ) : null}
+            {cropError ? <p className="upload-error">{cropError}</p> : null}
+          </div>
+        ) : null}
+        {mod && page ? (
+          <div
+            style={{ position: 'relative', cursor: cropMode ? 'crosshair' : 'default', touchAction: cropMode ? 'none' : 'auto' }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            data-testid="official-pyq-crop-surface"
+          >
+            <img
+              ref={imgRef}
+              key={page}
+              src={mod.officialPyqOriginalPageUrl(paperId, page)}
+              alt={`Original paper page ${page}`}
+              style={PAGE_IMG_STYLE}
+              draggable={false}
+              data-testid="official-pyq-original-page-img"
+              onError={onImgError}
+            />
+            {cropMode && box ? <div style={boxStyle(box)} data-testid="official-pyq-crop-box" /> : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 /**
  * Original page picture for one card, drawn locally. No Gemini.
- * @param {{ paperId: string, index: number, card: any, onClose: () => void }} props
+ * @param {{
+ *   paperId: string
+ *   index: number
+ *   card: any
+ *   onClose: () => void
+ *   cropTargets: { id: string, label: string }[]
+ *   onCrop: (target: string, url: string) => void
+ * }} props
  */
-function OriginalPagePanel({ paperId, index, card, onClose }) {
+function OriginalPagePanel({ paperId, index, card, onClose, cropTargets, onCrop }) {
   const [info, setInfo] = useState(/** @type {any} */ (null))
   const [page, setPage] = useState(0)
   const [error, setError] = useState('')
@@ -148,21 +346,14 @@ function OriginalPagePanel({ paperId, index, card, onClose }) {
                 <OfficialPyqPreviewMath q={card} />
               </Suspense>
             </div>
-            <div>
-              <p className="form-hint">Original paper, page {page}</p>
-              <div style={PAGE_IMG_WRAP_STYLE}>
-                {mod && page ? (
-                  <img
-                    key={page}
-                    src={mod.officialPyqOriginalPageUrl(paperId, page)}
-                    alt={`Original paper page ${page}`}
-                    style={PAGE_IMG_STYLE}
-                    data-testid="official-pyq-original-page-img"
-                    onError={() => setImgError(`Could not draw page ${page}.`)}
-                  />
-                ) : null}
-              </div>
-            </div>
+            <CroppablePage
+              paperId={paperId}
+              page={page}
+              mod={mod}
+              cropTargets={cropTargets}
+              onCrop={onCrop}
+              onImgError={() => setImgError(`Could not draw page ${page}.`)}
+            />
           </div>
         </>
       ) : null}
@@ -219,22 +410,28 @@ function keepCardFigures(before, after) {
   return lost.length ? `${next}\n${lost.join('\n')}` : next
 }
 
+/** @param {unknown} option */
+function optionHasContent(option) {
+  return Boolean(String(option ?? '').replace(/^\s*(?:\(\s*[A-Da-d1-4]\s*\)|[A-Da-d][.)])\s*/, '').trim())
+}
+
 /** @param {any} card @param {{ suggestedText?: string, suggestedOptions?: string[], suggestedPassage?: string }} compare */
 function draftFromSuggestion(card, compare) {
   const base = draftFromCard(card)
   const text = String(compare?.suggestedText ?? '').trim()
   const passage = String(compare?.suggestedPassage ?? '').trim()
   const opts = Array.isArray(compare?.suggestedOptions) ? compare.suggestedOptions : []
-  const useOpts = opts.some((o) => String(o ?? '').trim())
+  const count = Math.max(base.options.length, opts.length)
+  /** Gemini sends "(A)" or "" for a drawing it cannot write; the card's own option stays then. */
+  const options = Array.from({ length: count }, (_, i) => {
+    const suggested = String(opts[i] ?? '')
+    return optionHasContent(suggested) ? keepCardFigures(base.options[i], suggested) : String(base.options[i] ?? '')
+  })
   return {
     ...base,
     text: text ? keepCardFigures(base.text, text) : base.text,
     passageText: passage ? keepCardFigures(base.passageText, passage) : base.passageText,
-    options: useOpts
-      ? base.options.length > opts.length
-        ? [...opts.map((o) => String(o ?? '')), ...base.options.slice(opts.length)]
-        : opts.map((o) => String(o ?? ''))
-      : base.options,
+    options,
   }
 }
 
@@ -300,7 +497,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
   const hasSuggestion =
     Boolean(String(compare?.suggestedText ?? '').trim()) ||
     Boolean(String(compare?.suggestedPassage ?? '').trim()) ||
-    (compare?.suggestedOptions || []).some((o) => String(o ?? '').trim())
+    (compare?.suggestedOptions || []).some(optionHasContent)
   const useSuggestion = compare?.verdict === 'differs' && hasSuggestion
   const hasPassage = Boolean(
     String(card?.passageText ?? '').trim() || card?.passageId || card?.passageGroup || draft.passageText,
@@ -312,6 +509,30 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     setError('')
     setNote('')
     setEditing(true)
+  }
+
+  const adminCard = showPage && !editing ? officialPyqCardForAdmin(paperId, card) : null
+  const optionCount = editing ? draft.options.length : (adminCard?.options || []).length
+  const cropTargets = [
+    { id: 'text', label: 'Question text' },
+    ...(hasPassage ? [{ id: 'passage', label: 'Passage' }] : []),
+    ...Array.from({ length: optionCount }, (_, i) => ({ id: String(i), label: `Option ${String.fromCharCode(65 + i)}` })),
+  ]
+
+  /** A cropped option picture replaces that option; question / passage pictures are added at the end. */
+  function onCropPicked(target, url) {
+    const fig = `\\includegraphics{${url}}`
+    const put = (d) => {
+      if (target === 'text') return { ...d, text: `${d.text.trimEnd()}\n${fig}`.trim() }
+      if (target === 'passage') return { ...d, passageText: `${d.passageText.trimEnd()}\n${fig}`.trim() }
+      const options = d.options.slice()
+      options[Number(target)] = fig
+      return { ...d, options }
+    }
+    const where = cropTargets.find((t) => t.id === target)?.label || 'the card'
+    if (editing) setDraft(put)
+    else openEditor(put(draftFromCard(adminCard || officialPyqCardForAdmin(paperId, card))))
+    setNote(`Picture from the original page put in ${where}. Check the live preview, then click Save.`)
   }
 
   function onCancel() {
@@ -368,7 +589,11 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     if (compareBusy) return
     setCompareBusy(true)
     setError('')
-    setNote(`Comparing Q${goTo} with the original paper… This usually takes under a minute.`)
+    const startedAt = Date.now()
+    const waitingNote = () =>
+      `Comparing Q${goTo} with the original paper… ${Math.round((Date.now() - startedAt) / 1000)} s so far. This usually takes under a minute.`
+    setNote(waitingNote())
+    const ticker = setInterval(() => setNote(waitingNote()), 1000)
     let doneNote = ''
     try {
       const mod = await import('../utils/officialPyqOriginalCompare.js')
@@ -399,7 +624,9 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
         verdict === 'matches'
           ? `Compare finished at ${at}: Q${goTo} matches the original paper.`
           : verdict === 'error'
-            ? `Compare finished at ${at}, but Gemini could not check Q${goTo}. Try again.`
+            ? `Compare stopped at ${at}: Gemini could not check Q${goTo}. ${
+                String(out.result?.error ?? '').trim() || 'Try again.'
+              }`
             : `Compare finished at ${at}: Q${goTo} differs from the original — see the list above.${
                 String(out.result?.suggested_text ?? '').trim() ||
                 String(out.result?.suggested_passage ?? '').trim() ||
@@ -410,6 +637,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Compare failed.')
     } finally {
+      clearInterval(ticker)
       setNote(doneNote)
       setCompareBusy(false)
     }
@@ -496,7 +724,12 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
             className="btn btn-ghost btn-sm"
             data-testid="official-pyq-edit-question"
             onClick={() =>
-              openEditor(useSuggestion ? draftFromSuggestion(card, compare) : draftFromCard(card), useSuggestion)
+              openEditor(
+                useSuggestion
+                  ? draftFromSuggestion(officialPyqCardForAdmin(paperId, card), compare)
+                  : draftFromCard(officialPyqCardForAdmin(paperId, card)),
+                useSuggestion,
+              )
             }
           >
             {useSuggestion ? 'Edit question (corrected)' : 'Edit question'}
@@ -628,7 +861,14 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
       ) : null}
       {note ? <p className="form-hint">{note}</p> : null}
       {showPage ? (
-        <OriginalPagePanel paperId={paperId} index={index} card={card} onClose={() => setShowPage(false)} />
+        <OriginalPagePanel
+          paperId={paperId}
+          index={index}
+          card={card}
+          onClose={() => setShowPage(false)}
+          cropTargets={cropTargets}
+          onCrop={onCropPicked}
+        />
       ) : null}
     </div>
   )

@@ -12,7 +12,11 @@ import {
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
-import { formatOfficialPyqAnswerKey, notifyOfficialPyqCardChanged } from './officialPyqCardEdit.js'
+import {
+  formatOfficialPyqAnswerKey,
+  notifyOfficialPyqCardChanged,
+  officialPyqCardForAdmin,
+} from './officialPyqCardEdit.js'
 
 export const ORIGINAL_MISSING_MESSAGE = 'Original paper not available for this paper'
 export const GEMINI_KEY_MISSING_MESSAGE = 'Gemini key missing'
@@ -20,6 +24,8 @@ const MAX_RETRIES = 1
 /** Above the server's own Gemini limits (90 s per call, 150 s for the one-time page map). */
 const COMPARE_TIMEOUT_MS = 170_000
 const NO_ANSWER_MESSAGE = 'Gemini did not answer in time. Click Compare this question again.'
+/** The server already retried these; another round only keeps the card on "Comparing" for minutes. */
+const SERVER_ALREADY_RETRIED = new Set(['gemini_timeout', 'gemini_connection'])
 
 class CompareStopError extends Error {
   /** @param {string} code @param {string} message */
@@ -52,7 +58,9 @@ async function readError(res) {
   if (res.status === 503 && !code) {
     return new CompareStopError('api_down', 'Hybrid AI (port 8000) is not running. Press F5, then try again.')
   }
-  return new Error(message || `Compare failed (${res.status}).`)
+  const err = new Error(message || `Compare failed (${res.status}).`)
+  if (SERVER_ALREADY_RETRIED.has(code)) err.noRetry = true
+  return err
 }
 
 /** @param {string} url @param {RequestInit} init @param {AbortSignal | undefined} signal */
@@ -168,8 +176,9 @@ function cardHasFigure(q) {
  * One card, up to 2 retries. Stops at once for a missing original / key.
  * @param {string} paperId @param {number} index @param {any} q @param {{ signal?: AbortSignal }} [opts]
  */
-export async function compareOfficialPyqCardRemote(paperId, index, q, { signal } = {}) {
-  const place = officialPyqPrintedNumberPlace(paperId, index, q)
+export async function compareOfficialPyqCardRemote(paperId, index, stored, { signal } = {}) {
+  const q = officialPyqCardForAdmin(paperId, stored)
+  const place = officialPyqPrintedNumberPlace(paperId, index, stored)
   const body = {
     paper_id: paperId,
     go_to: index + 1,
@@ -201,6 +210,7 @@ export async function compareOfficialPyqCardRemote(paperId, index, q, { signal }
       if (err instanceof CompareStopError) throw err
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
       lastError = err
+      if (err?.noRetry || err?.message === NO_ANSWER_MESSAGE) break
     }
   }
   const msg = lastError instanceof Error ? lastError.message : 'Compare failed.'
@@ -303,6 +313,27 @@ export async function locateOfficialPyqOriginalPage(paperId, index, q) {
 /** Picture of one original page, drawn locally on the server. @param {string} paperId @param {number} page 1-based */
 export function officialPyqOriginalPageUrl(paperId, page) {
   return `/api/official-pyq/original/${encodeURIComponent(paperId)}/page/${Math.max(1, Math.floor(page))}`
+}
+
+/**
+ * Cut a box out of one original page; the server copies the pixels (no Gemini).
+ * @param {string} paperId
+ * @param {number} page 1-based
+ * @param {{ x0: number, y0: number, x1: number, y1: number }} box fractions of the page (0..1)
+ * @returns {Promise<{ url: string, width: number, height: number }>}
+ */
+export async function cropOfficialPyqOriginalPage(paperId, page, box) {
+  const res = await fetchWithTimeout(
+    `/api/official-pyq/original/${encodeURIComponent(paperId)}/crop`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: Math.max(1, Math.floor(page)), ...box }),
+    },
+    undefined,
+  )
+  if (!res.ok) throw await readError(res)
+  return res.json()
 }
 
 /**

@@ -233,18 +233,30 @@ function attachNamedStems(questions, ocr) {
     }
     return name
   }
-  return questions.map((q) => {
+  /** Continuous numbering on the cards (Chemistry Q24) while the paper prints "Nos. 5 and 6" per subject. */
+  const seenInSubject = new Map()
+  const localNumber = questions.map((q) => {
+    const sub = String(q?.subject || '')
+    const n = (seenInSubject.get(sub) || 0) + 1
+    seenInSubject.set(sub, n)
+    return n
+  })
+  return questions.map((q, i) => {
     const n = Number(q?.printedNumber || q?.questionNumber)
     const sub = String(q?.subject || '')
-    const job = jobs.find((row) => {
-      if (!row.nums.includes(n)) return false
-      const jobSub = subjectAt(row.at)
-      if (sub && jobSub && jobSub !== sub) return false
-      if (!sub && jobSub && questions.some((other) => String(other?.subject || '') === jobSub && Number(other?.printedNumber) === n)) {
-        return false
-      }
-      return true
-    })
+    const job =
+      jobs.find((row) => {
+        if (!row.nums.includes(n)) return false
+        const jobSub = subjectAt(row.at)
+        if (sub && jobSub && jobSub !== sub) return false
+        if (!sub && jobSub && questions.some((other) => String(other?.subject || '') === jobSub && Number(other?.printedNumber) === n)) {
+          return false
+        }
+        return true
+      }) ||
+      (sub && localNumber[i] !== n
+        ? jobs.find((row) => row.nums.includes(localNumber[i]) && subjectAt(row.at) === sub)
+        : undefined)
     if (!job) return q
     const stored = cleanOfficialPyqPassageBody(q.passageText)
     if (stored.length >= job.body.length) {

@@ -6,6 +6,7 @@ import { keepStructuredQuestionLines } from '../utils/repairMatrixStem.js'
 import { convertLatexTabularToArray, stripDollarsInsideLatexEnvs } from '../utils/latexTabularDisplay.js'
 import { wrapBareLatexRuns, repairOrphanAlignedBody } from '../utils/wrapBareLatexRuns.js'
 import { hasMathpixMedia, splitMathpixMediaSegments, stripMathpixFigureChrome } from '../utils/mathpixMedia'
+import { figureRowShare, groupSideBySideFigureSegments } from '../utils/figureLayout.js'
 import { splitSmilesDisplaySegments } from '../utils/smilesDisplay.js'
 import { displayMathStandsAlone } from '../utils/sanitizeMathDelimiters.js'
 import SmilesStructure from './SmilesStructure.jsx'
@@ -430,8 +431,20 @@ export default function MathText({ text, questionContext, optionLetter }) {
   if (hasMathpixMedia(raw)) {
     return (
       <span className="math-text-flow math-text-with-figures">
-        {splitMathpixMediaSegments(raw).map((seg, i) =>
-          seg.kind === 'img' ? (
+        {groupSideBySideFigureSegments(splitMathpixMediaSegments(raw), stripMathpixFigureChrome).map((seg, i) =>
+          seg.kind === 'row' ? (
+            <span key={`row-${i}`} className="mathpix-figure-row" data-testid="mathpix-figure-row">
+              {seg.value.map((fig, j) => (
+                <img
+                  key={`fig-${i}-${j}`}
+                  className="mathpix-paper-figure"
+                  src={fig.url}
+                  alt=""
+                  style={{ maxWidth: `calc(${figureRowShare(seg.value, j)}% - 0.75rem)` }}
+                />
+              ))}
+            </span>
+          ) : seg.kind === 'img' ? (
             <img
               key={`fig-${i}`}
               className="mathpix-paper-figure"

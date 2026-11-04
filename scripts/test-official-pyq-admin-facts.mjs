@@ -20,10 +20,21 @@ import {
   peelOfficialPyqCardForDisplay,
 } from '../src/utils/passage.js'
 import { shapeOfficialPyqDrafts } from '../src/utils/officialPyqPaperFacts.js'
-import { healUploadQuestionCard } from '../src/utils/uploadQualityGuards.js'
+import { applyOfficialPyqQualityGuards, healUploadQuestionCard } from '../src/utils/uploadQualityGuards.js'
+import {
+  findGluedNextQuestionStart,
+  paperItemsFromMathpixOcr,
+  recoverOptionsFromStem,
+} from '../src/utils/mathpixQuestionSplit.js'
+import { mergeAdjacentOptionTails } from '../src/utils/extendTruncatedStem.js'
+import { looksLikePyqSectionInstructionStem } from '../src/utils/bulkExtractClean.js'
 import { reviewOfficialPyqCards } from '../src/utils/officialPyqUnifiedCheck.js'
 import { officialPyqContentReviewMessages } from '../src/utils/officialPyqReviewFlags.js'
 import { keepAdminEditedOfficialPyqCards } from '../src/utils/officialPyqPendingStore.js'
+import { mathDrawFailure } from '../src/utils/mathDrawCheck.js'
+import { prepareTextForMathTextDisplay } from '../src/utils/prepareMathForRender.js'
+import { restoreLabelledFigureOptions } from '../src/utils/labelledFigureOptions.js'
+import { extractMathpixImageUrls, splitMathpixMediaSegments } from '../src/utils/mathpixMedia.js'
 
 let passed = 0
 function test(name, fn) {
@@ -383,6 +394,108 @@ test('subject from facts is not re-guessed', () => {
 test('wrong card count leaves cards alone', () => {
   const out = enforceAdminFactsOnQuestions(twelve.slice(0, 11), twoSubject, twoOcr)
   assert.equal(out[0].subject, 'mathematics')
+})
+
+test('facts set as continuous still find passages the paper numbers per subject (2021 P1 Chemistry Q24)', () => {
+  const continuous = { ...twoSubject, numbering: 'continuous' }
+  const { slots } = validateAdminFacts(continuous)
+  assert.equal(slots[8].printed, 9)
+  const cut = cutAdminPassagesFromOcr(twoOcr, slots)
+  assert.match(cut.get(slots[8].passage), /^Tin is obtained/)
+  assert.match(cut.get(slots[10].passage), /^A solution of a weak acid/)
+  const out = enforceAdminFactsOnQuestions(twelve, continuous, twoOcr)
+  assert.match(out[8].passageText, /^Tin is obtained/)
+  assert.match(out[11].passageText, /^A solution of a weak acid/)
+  const approved = twelve.map((q, i) => (i === 8 ? { ...q, passageText: 'Approved as shown.', adminApproved: true } : q))
+  assert.equal(enforceAdminFactsOnQuestions(approved, continuous, twoOcr)[8].passageText, 'Approved as shown.')
+})
+
+test('an answer blank after \\left|…\\right| display math still draws (2021 P1 Q55)', () => {
+  const text =
+    'For $x \\in \\mathbb{R}$, the number of real roots of the equation\n$$3 x^{2}-4\\left|x^{2}-1\\right|+x-1=0$$\nis $____$.'
+  assert.equal(mathDrawFailure(text), '')
+  assert.doesNotMatch(prepareTextForMathTextDisplay(text), /\$____\$/)
+})
+
+test('option pictures labelled (B) and (D) leave the stem and join the bare A and C options (2021 P1 Q21)', () => {
+  const imgB = 'https://cdn.mathpix.com/cropped/x-12.jpg?height=171&width=186&top_left_y=2164&top_left_x=1210'
+  const imgD = 'https://cdn.mathpix.com/cropped/x-12.jpg?height=177&width=203&top_left_y=2445&top_left_x=1209'
+  const card = {
+    questionType: 'single_correct',
+    text: `Among the following, the conformation that corresponds to the most stable conformation of meso-butane-2,3-diol is\n\n(B)\n\n\\includegraphics{${imgB}}\n\n(D)\n\n\\includegraphics{${imgD}}`,
+    options: ['<smiles>C[C@@H](O)[C@H](C)O</smiles>', '<smiles>C[C@H](O)[C@@H](C)O</smiles>'],
+  }
+  const out = restoreLabelledFigureOptions(card)
+  assert.equal(out.text, 'Among the following, the conformation that corresponds to the most stable conformation of meso-butane-2,3-diol is')
+  assert.deepEqual(out.options, [card.options[0], `\\includegraphics{${imgB}}`, card.options[1], `\\includegraphics{${imgD}}`])
+  const three = { ...card, options: [...card.options, 'third'] }
+  assert.equal(restoreLabelledFigureOptions(three), three)
+  const healed = healUploadQuestionCard(card, '')
+  assert.equal(healed.options.filter((o) => String(o).trim()).length, 4)
+  assert.doesNotMatch(healed.text, /includegraphics/)
+  const batch = applyOfficialPyqQualityGuards([card], '')[0]
+  assert.deepEqual(batch.options, out.options)
+
+  const scan = `\\item[Q.] 2 ${out.text}\n\n${card.options[0]}\n\n\\begin{figure}\n\\captionsetup{labelformat=empty}\n\\caption{(B)}\n\\includegraphics[alt={},max width=\\textwidth]{${imgB}}\n\\end{figure}\n\n${card.options[1]}\n\n\\begin{figure}\n\\captionsetup{labelformat=empty}\n\\caption{(D)}\n\\includegraphics[alt={},max width=\\textwidth]{${imgD}}\n\\end{figure}\n\\end{itemize}\n\\begin{itemize}\n\\item[Q.] 3 Next question here.`
+  const unlabelled = { ...card, text: `${out.text}\n\n\\includegraphics{${imgB}}\n\n\\includegraphics{${imgD}}`, options: [...card.options, '', ''] }
+  assert.equal(restoreLabelledFigureOptions(unlabelled, ''), unlabelled)
+  const fromScan = restoreLabelledFigureOptions(unlabelled, scan)
+  assert.equal(fromScan.text, out.text)
+  assert.deepEqual(fromScan.options, out.options)
+  const split = recoverOptionsFromStem(scan.slice(scan.indexOf('Among'), scan.indexOf('\\item[Q.] 3')), [])
+  assert.deepEqual(split.options, out.options)
+  assert.doesNotMatch(split.stem, /includegraphics|\(B\)|\(D\)/)
+})
+
+test('a picture cropped from the original page draws and survives heal and quality fix (2021 P1 Q21 A, C)', () => {
+  const cropA = '/api/official-pyq/original/crops/opyq-1-p12-0123456789abcdef.png'
+  const cropC = '/api/official-pyq/original/crops/opyq-1-p12-fedcba9876543210.png'
+  const imgB = 'https://cdn.mathpix.com/cropped/x-12.jpg?height=171&width=186&top_left_y=2164&top_left_x=1210'
+  const imgD = 'https://cdn.mathpix.com/cropped/x-12.jpg?height=177&width=203&top_left_y=2445&top_left_x=1209'
+  const options = [`\\includegraphics{${cropA}}`, `\\includegraphics{${imgB}}`, `\\includegraphics{${cropC}}`, `\\includegraphics{${imgD}}`]
+  const card = {
+    questionType: 'single_correct',
+    text: 'Among the following, the conformation that corresponds to the most stable conformation of meso-butane-2,3-diol is',
+    options,
+    adminEdited: true,
+  }
+  assert.deepEqual(splitMathpixMediaSegments(options[0]), [{ kind: 'img', value: cropA }])
+  assert.deepEqual(extractMathpixImageUrls(`${card.text}\n${options.join('\n')}`), [cropA, imgB, cropC, imgD])
+  for (const opt of options) assert.equal(mathDrawFailure(opt), '')
+  assert.deepEqual(healUploadQuestionCard(card, '').options, options)
+  assert.deepEqual(applyOfficialPyqQualityGuards([card], '')[0].options, options)
+  const cropStem = '/api/official-pyq/original/crops/opyq-1-p12-00000000aaaaaaaa.png'
+  const inStem = { ...card, text: `${card.text}\n\\includegraphics{${cropStem}}` }
+  assert.match(healUploadQuestionCard(inStem, '').text, /opyq-1-p12-00000000aaaaaaaa\.png/)
+  assert.match(applyOfficialPyqQualityGuards([inStem], '')[0].text, /opyq-1-p12-00000000aaaaaaaa\.png/)
+})
+
+test('option D that starts with "If" stays on its question, and a cross-section question is not a SECTION header (2022 P2 Q29, Q35)', () => {
+  const bubble =
+    'Q. 11  A bubble has surface tension $S$. The ideal gas inside the bubble has ratio of specific heats $\\gamma=\\frac{5}{3}$. When the atmospheric pressure is $P_{a 2}$, the radius of the bubble and the temperature of the enclosed gas are $r_{2}$ and $T_{2}$, respectively.\nWhich of the following statement(s) is(are) correct?\n(A) If the surface of the bubble is a perfect heat insulator, then $r_{1}=r_{2}$.\n(B) If the surface of the bubble is a perfect heat insulator, then the total internal energy does not change.\n(C) If the surface of the bubble is a perfect heat conductor, then $r_{1}>r_{2}$.\n(D) If the surface of the bubble is a perfect heat insulator, then $T_{2}=T_{1}$.\n\\end{itemize}'
+  assert.equal(findGluedNextQuestionStart(bubble), -1)
+  const items = paperItemsFromMathpixOcr(`${bubble}\n\\begin{itemize}\n\\item[Q.] 12 A disk of radius R with uniform positive charge density $\\sigma$ is placed on the $x y$ plane. Which of the following statement(s) is(are) correct?\n\\begin{itemize}\n\\item[(A)] For $\\beta=1$ the particle reaches the origin.\n\\item[(B)] For $\\beta=2$ the particle reaches the origin.\n\\item[(C)] For $\\beta=3$ the particle returns.\n\\item[(D)] For $\\beta>1$ the particle always reaches the origin.\n\\end{itemize}`)
+  assert.equal(items.length, 2)
+  assert.match(items[0].options[3], /T_\{2\}=T_\{1\}/)
+
+  const screw =
+    'Area of the cross-section of a wire is measured using a screw gauge. The pitch of the main scale is 0.5 mm. The measured readings are listed below.\n\n\\begin{tabular}[t]{|l|l|l|}\n\\hline Measurement condition & Main scale reading & Circular scale reading \\\\\n\\hline Attempt-1: With wire & 4 divisions & 20 divisions \\\\\n\\hline\n\\end{tabular}\nWhat are the diameter and cross-sectional area of the wire measured using the screw gauge?'
+  assert.equal(looksLikePyqSectionInstructionStem(screw), false)
+  assert.equal(looksLikePyqSectionInstructionStem('SECTION 2 (Maximum marks: 24)\nThis section contains SIX (06) questions.'), true)
+  assert.equal(looksLikePyqSectionInstructionStem('Section-A contains FOUR questions. Each question has FOUR options.'), true)
+  const photo = {
+    text: 'When light of a given wavelength is incident on a metallic surface, the minimum potential needed to stop the emitted photoelectrons is $6.0 V$. What are the wavelength of the first source and the work function of the metal, respectively?',
+    options: ['$1.72 \\times 10^{-7} m, 1.20 eV$', '$1.72 \\times 10^{-7} m, 5.60 eV$', '$3.78 \\times 10^{-7} m, 5.60 eV$', '$3.78 \\times 10^{-7} m, 1.20 eV$'],
+    printedNumber: 16,
+  }
+  const gauge = {
+    text: screw,
+    options: ['$2.22 \\pm 0.02 mm$', '$2.22 \\pm 0.01 mm$', '$2.14 \\pm 0.02 mm$', '$2.14 \\pm 0.01 mm$'],
+    printedNumber: 17,
+  }
+  const kept = mergeAdjacentOptionTails([photo, gauge])
+  assert.equal(kept.length, 2)
+  assert.match(kept[1].text, /^Area of the cross-section/)
 })
 
 console.log(`official-pyq admin facts: ${passed} tests passed`)

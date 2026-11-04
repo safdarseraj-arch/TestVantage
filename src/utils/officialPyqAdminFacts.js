@@ -308,6 +308,23 @@ function cleanPassageBody(body) {
 }
 
 /**
+ * 1-based place of each card inside its subject. Papers set as continuous
+ * (Chemistry Q24) often print per-subject numbers ("Q. 5") on the page.
+ * @param {Array<{ subject?: string }>} list
+ * @returns {number[]}
+ */
+export function subjectLocalNumbers(list) {
+  /** @type {Map<string, number>} */
+  const seen = new Map()
+  return (Array.isArray(list) ? list : []).map((row) => {
+    const sub = String(row?.subject ?? '')
+    const n = (seen.get(sub) || 0) + 1
+    seen.set(sub, n)
+    return n
+  })
+}
+
+/**
  * Passage text for each confirmed passage group, cut from the stored OCR:
  * after the passage heading, up to the first question of the group. Only
  * text from the OCR; a group whose place on the paper is not certain is left out.
@@ -328,15 +345,23 @@ export function cutAdminPassagesFromOcr(ocr, slots) {
     if (!markerCache.has(n)) markerCache.set(n, allMatches(questionMarkerRe(n), src))
     return markerCache.get(n) || []
   }
+  const local = subjectLocalNumbers(slots)
+  /** Paper slot -> its marker: the confirmed number first, else the number inside its subject. */
+  const markerAt = (i) => {
+    for (const nums of [slots.map((s) => s.printed), local]) {
+      const n = nums[i]
+      const sameNumber = nums.filter((x) => x === n).length
+      const occurrence = nums.slice(0, i).filter((x) => x === n).length
+      const markers = markersFor(n)
+      if (markers.length === sameNumber) return markers[occurrence].index
+    }
+    return -1
+  }
   slots.forEach((slot, i) => {
     const key = slot?.passage
     if (!key || out.has(key)) return
-    const n = slot.printed
-    const sameNumber = slots.filter((s) => s.printed === n).length
-    const occurrence = slots.slice(0, i).filter((s) => s.printed === n).length
-    const markers = markersFor(n)
-    if (markers.length !== sameNumber) return
-    const at = markers[occurrence].index
+    const at = markerAt(i)
+    if (at < 0) return
     const prevQuestion = anyMarkers.filter((m) => m.index < at).pop()
     const floor = prevQuestion ? prevQuestion.end : 0
     const header = headers.filter((h) => h.index >= floor && h.index < at).shift()
@@ -374,7 +399,7 @@ export function enforceAdminFactsOnQuestions(questions, admin, ocr) {
       paperPart: slot.part,
       printedNumber: slot.printed,
     }
-    if (q.passageSource === 'admin_edit') return next
+    if (q.passageSource === 'admin_edit' || q.adminApproved === true) return next
     if (!slot.passage) {
       if (!q.passageText && !q.passageId && !q.passageGroup) return next
       const { passageText: _t, passageId: _i, passageGroup: _g, passageRole: _r, passageSource: _s, ...rest } = next

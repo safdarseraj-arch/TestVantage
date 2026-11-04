@@ -36,6 +36,7 @@ _RENDER_DPI = 130
 _MIN_MATCH_WORDS = 6
 _MAX_INLINE_PDF_BYTES = 18 * 1024 * 1024
 _GEMINI_TIMEOUT_MS = 90_000
+_COMPARE_TIMEOUT_MS = 50_000
 _PAGE_MAP_TIMEOUT_MS = 150_000
 _PROJECT_ROOT = Path(__file__).resolve().parent
 ORIGINALS_DIR = _PROJECT_ROOT / "data" / "official_pyq_originals"
@@ -137,16 +138,22 @@ def _connection_dropped(exc: Exception) -> bool:
     return any(s in text for s in ("10054", "10053", "10038", "forcibly closed", "connection reset", "connection aborted"))
 
 
-def _generate(**kwargs: Any) -> Any:
+def _generate(*, retry_timeout: bool = False, **kwargs: Any) -> Any:
     """Each call owns its client: a shared pool lets one dropped connection break other calls
-    running at the same time ("not a socket"), and a stale pooled connection hangs later calls."""
+    running at the same time ("not a socket"), and a stale pooled connection hangs later calls.
+    retry_timeout: a short call that hangs is usually one slow Gemini moment; try once more."""
     key = _api_key()
+    timed_out = False
     for attempt in range(_CONNECTION_TRIES):
         client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=_GEMINI_TIMEOUT_MS))
         try:
             return client.models.generate_content(**kwargs)
         except Exception as exc:
             if isinstance(exc, httpx.TimeoutException) or "timed out" in str(exc).lower():
+                if retry_timeout and not timed_out and attempt < _CONNECTION_TRIES - 1:
+                    timed_out = True
+                    logger.warning("Gemini did not answer in time; one retry on a fresh connection")
+                    continue
                 raise GeminiTimeoutError(GEMINI_TIMEOUT_MESSAGE) from exc
             if attempt < _CONNECTION_TRIES - 1 and _connection_dropped(exc):
                 logger.warning("Gemini connection dropped (%s); retry %d on a fresh connection", exc, attempt + 1)
@@ -631,7 +638,8 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
     )
     return (
         f"{page_note} Find printed question number {body.get('printed_number')}{where}. "
-        "If it continues onto the next image, include that part.\n\n"
+        "If no question with that number is printed there, find the question whose text matches "
+        "the card. If it continues onto the next image, include that part.\n\n"
         "Compare it with this EXTRACTED CARD (LaTeX allowed):\n"
         f"{passage_block}"
         f"--- question text ---\n{body.get('card_text') or ''}\n"
@@ -672,6 +680,7 @@ def _compare_sync(parts: list[Any], prompt: str) -> CompareVerdict:
     """Long suggestions (SMILES, tables) can run past max_output_tokens; then ask once for a short answer."""
     for attempt in range(2):
         response = _generate(
+            retry_timeout=True,
             model=COMPARE_MODEL,
             contents=[*parts, prompt if attempt == 0 else prompt + _SHORT_ANSWER_NOTE],
             config=types.GenerateContentConfig(
@@ -679,6 +688,7 @@ def _compare_sync(parts: list[Any], prompt: str) -> CompareVerdict:
                 response_mime_type="application/json",
                 response_schema=CompareVerdict,
                 thinking_config=types.ThinkingConfig(thinking_budget=0, include_thoughts=False),
+                http_options=types.HttpOptions(timeout=_COMPARE_TIMEOUT_MS),
             ),
         )
         try:

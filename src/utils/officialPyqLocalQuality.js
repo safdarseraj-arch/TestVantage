@@ -354,7 +354,11 @@ export function repairOfficialPyqUntilQuality(paper) {
   const cleaned = new Set()
   let questionsChanged =
     withFacts !== stored &&
-    withFacts.some((q, i) => String(q?.passageText ?? '') !== String(stored[i]?.passageText ?? ''))
+    withFacts.some(
+      (q, i) =>
+        String(q?.passageText ?? '') !== String(stored[i]?.passageText ?? '') ||
+        Number(q?.printedNumber) !== Number(stored[i]?.printedNumber),
+    )
 
   function prepare(index) {
     if (cleaned.has(index)) return shown[index]

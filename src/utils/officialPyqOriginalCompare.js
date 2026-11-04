@@ -7,10 +7,13 @@
  */
 
 import katex from 'katex'
+import { convertLatexTabularToArray } from './latexTabularDisplay.js'
 import {
+  getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
+import { numberingPrintedInOcr, subjectLocalNumbers } from './officialPyqAdminFacts.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
 import {
   formatOfficialPyqAnswerKey,
@@ -21,7 +24,7 @@ import {
 export const ORIGINAL_MISSING_MESSAGE = 'Original paper not available for this paper'
 export const GEMINI_KEY_MISSING_MESSAGE = 'Gemini key missing'
 const MAX_RETRIES = 1
-/** Above the server's own Gemini limits (90 s per call, 150 s for the one-time page map). */
+/** Above the server's own Gemini limits (2 × 50 s per compare call, 150 s for the one-time page map). */
 const COMPARE_TIMEOUT_MS = 170_000
 const NO_ANSWER_MESSAGE = 'Gemini did not answer in time. Click Compare this question again.'
 /** The server already retried these; another round only keeps the card on "Comparing" for minutes. */
@@ -120,19 +123,77 @@ export function officialPyqPrintedNumber(q, index) {
  * @param {string} paperId @param {number} index @param {any} q
  */
 export function officialPyqPrintedNumberPlace(paperId, index, q) {
-  const questions = getOfficialPyqPendingPaper(paperId)?.questions
-  const n = officialPyqPrintedNumber(q, index)
+  const paper = getOfficialPyqPendingPaper(paperId)
+  const questions = Array.isArray(paper?.questions) ? paper.questions : []
+  const numbers = numbersPrintedOnPage(paper, questions)
+  const n = numbers[index] ?? officialPyqPrintedNumber(q, index)
   let occurrence = 0
   let sameNumberCount = 0
-  ;(Array.isArray(questions) ? questions : []).forEach((card, i) => {
-    if (!card || isOfficialPyqPlaceholder(card) || officialPyqPrintedNumber(card, i) !== n) return
+  questions.forEach((card, i) => {
+    if (!card || isOfficialPyqPlaceholder(card) || numbers[i] !== n) return
     sameNumberCount += 1
     if (i < index) occurrence += 1
   })
-  return { occurrence, sameNumberCount: Math.max(sameNumberCount, occurrence + 1) }
+  return { number: n, occurrence, sameNumberCount: Math.max(sameNumberCount, occurrence + 1) }
+}
+
+/**
+ * The number the original page prints for each card. Cards numbered straight
+ * through (Chemistry Q39) on a paper whose scan starts again at Q.1 in each
+ * subject get their place inside the subject (Chemistry Q.3).
+ * @param {any} paper @param {any[]} questions
+ */
+function numbersPrintedOnPage(paper, questions) {
+  const stored = questions.map((card, i) => officialPyqPrintedNumber(card, i))
+  const local = subjectLocalNumbers(questions)
+  const perSubject = Math.max(0, ...local)
+  if (Math.max(0, ...stored) <= perSubject + 2) return stored
+  const ocr = getOfficialPyqPendingOcrText(paper?.id) || String(paper?.preparedText ?? '')
+  return numberingPrintedInOcr(ocr, perSubject) === 'restart' ? local : stored
 }
 
 const HTML_ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'" }
+
+function plainHtml(html) {
+  return String(html ?? '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&[a-z#0-9]+;/gi, (m) => HTML_ENTITIES[m.toLowerCase()] ?? ' ')
+}
+
+/**
+ * Tables as the student sees them (one row per line, cells split by |, raised
+ * text as ^(n+)) and pictures as [picture]. Raw \begin{tabular} hid table mistakes
+ * such as "Zn+" for Z^(n+) from the compare.
+ * @param {unknown} text
+ */
+function drawnTablesAndPictures(text) {
+  let s = String(text ?? '')
+  if (/\\begin\{tabular\}/i.test(s)) {
+    try {
+      s = convertLatexTabularToArray(s)
+    } catch {
+      /* keep the raw table */
+    }
+  }
+  s = s.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (_, body) =>
+    `\n${String(body)
+      .split(/<\/tr>/i)
+      .map((row) =>
+        row
+          .split(/<\/td>/i)
+          .map((cell) =>
+            plainHtml(cell.replace(/<sup>([\s\S]*?)<\/sup>/gi, '^($1)').replace(/<sub>([\s\S]*?)<\/sub>/gi, '_($1)')).trim(),
+          )
+          .filter(Boolean)
+          .join(' | '),
+      )
+      .filter(Boolean)
+      .join('\n')}\n`,
+  )
+  return s
+    .replace(/\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g, '[picture]')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '[picture]')
+}
 
 /**
  * Card text as students see it: each $…$ drawn by KaTeX and flattened to
@@ -141,7 +202,7 @@ const HTML_ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '
  * @param {unknown} text
  */
 export function officialPyqDrawnText(text) {
-  const raw = String(text ?? '')
+  const raw = drawnTablesAndPictures(text)
   if (!raw.includes('$')) return raw
   return raw.replace(/\$\$([\s\S]*?)\$\$|\$([^$\n]*)\$/g, (whole, display, inline) => {
     const latex = String(display ?? inline ?? '').trim()
@@ -182,7 +243,7 @@ export async function compareOfficialPyqCardRemote(paperId, index, stored, { sig
   const body = {
     paper_id: paperId,
     go_to: index + 1,
-    printed_number: officialPyqPrintedNumber(q, index),
+    printed_number: place.number,
     card_text: String(q?.text ?? q?.stem ?? ''),
     passage_text: String(q?.passageText ?? ''),
     subject: String(q?.subject ?? ''),
@@ -296,7 +357,7 @@ export function officialPyqFlaggedGoTo(paper) {
 export async function locateOfficialPyqOriginalPage(paperId, index, q) {
   const place = officialPyqPrintedNumberPlace(paperId, index, q)
   const params = new URLSearchParams({
-    printed_number: String(officialPyqPrintedNumber(q, index)),
+    printed_number: String(place.number),
     card_text: `${String(q?.passageText ?? '')}\n${String(q?.text ?? q?.stem ?? '')}`.trim().slice(0, 1500),
     occurrence: String(place.occurrence),
     same_number_count: String(place.sameNumberCount),

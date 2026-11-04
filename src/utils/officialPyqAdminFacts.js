@@ -133,7 +133,9 @@ export function draftAdminFacts(ocr, questions = []) {
     0,
     ...(Array.isArray(questions) ? questions : []).map((q) => Number(q?.printedNumber) || 0),
   )
-  const numbering = perSubject && maxPrinted > perSubject + 2 ? 'continuous' : 'restart'
+  const numbering =
+    numberingPrintedInOcr(ocr, perSubject) ||
+    (perSubject && maxPrinted > perSubject + 2 ? 'continuous' : 'restart')
 
   /** @type {Record<string, { rows: any[], passages: string }>} */
   const bySubject = {}
@@ -252,6 +254,44 @@ export function validateAdminFacts(admin) {
   return { errors: [...new Set(errors)], slots }
 }
 
+/** Questions in one subject, from the admin's section rows. */
+function questionsPerSubject(admin) {
+  const blocks = admin?.samePattern !== false ? [admin?.pattern] : Object.values(admin?.bySubject || {})
+  const ends = blocks.flatMap((b) => (Array.isArray(b?.rows) ? b.rows : []).map((r) => int(r?.to)))
+  return Math.max(0, ...ends.filter((n) => n > 0))
+}
+
+/**
+ * How the scan numbers its questions: 'restart' when Q.1 is printed again in each
+ * subject and no number goes past one subject, 'continuous' when the numbers run
+ * past one subject. '' when the scan has too few numbers to tell.
+ * @param {unknown} ocr
+ * @param {number} perSubject
+ */
+export function numberingPrintedInOcr(ocr, perSubject) {
+  const src = String(ocr ?? '')
+  if (!(perSubject > 0) || !src) return ''
+  const nums = allMatches(ANY_Q_MARKER_RE, src).map(({ index, end }) => Number(src.slice(index, end).match(/(\d{1,3})\s*\]?$/)?.[1]))
+  const seen = nums.filter((n) => n > 0)
+  if (seen.length < perSubject) return ''
+  if (Math.max(...seen) > perSubject + 2) return 'continuous'
+  return seen.filter((n) => n === 1).length >= 2 ? 'restart' : ''
+}
+
+/**
+ * The printed numbers are on the page, so the scan settles "restart" vs "continuous".
+ * A confirmed choice the scan contradicts would put Chemistry Q.3 on the card as Q39.
+ * @param {any} admin
+ * @param {unknown} ocr
+ */
+export function adminFactsMatchingScan(admin, ocr) {
+  if (!admin || typeof admin !== 'object') return admin
+  const printed = numberingPrintedInOcr(ocr, questionsPerSubject(admin))
+  const chosen = admin.numbering === 'continuous' ? 'continuous' : 'restart'
+  if (!printed || printed === chosen) return admin
+  return { ...admin, numbering: printed, numberingFromScan: true }
+}
+
 /**
  * Facts in the shape the splitter and the quality check read.
  * Returns null when the admin facts are missing or invalid.
@@ -274,7 +314,7 @@ export function adminFactsToPaperFacts(admin) {
 /** Confirmed admin facts win; otherwise the facts read from the OCR. */
 export function factsForPaper(paper) {
   if (paper?.adminFacts?.confirmedAt) {
-    const facts = adminFactsToPaperFacts(paper.adminFacts)
+    const facts = adminFactsToPaperFacts(adminFactsMatchingScan(paper.adminFacts, paper.preparedText))
     if (facts) return facts
   }
   return paper?.paperFacts || null
@@ -384,7 +424,7 @@ export function cutAdminPassagesFromOcr(ocr, slots) {
 export function enforceAdminFactsOnQuestions(questions, admin, ocr) {
   const list = Array.isArray(questions) ? questions : []
   if (!admin?.confirmedAt) return list
-  const { errors, slots } = validateAdminFacts(admin)
+  const { errors, slots } = validateAdminFacts(adminFactsMatchingScan(admin, ocr))
   if (errors.length || !slots.length || slots.length !== list.length) return list
   const passages = cutAdminPassagesFromOcr(ocr, slots)
   return list.map((q, i) => {
@@ -426,7 +466,7 @@ export function enforceAdminFactsOnQuestions(questions, admin, ocr) {
  * @param {unknown} ocr
  */
 export function applyAdminFactsToQuestions(questions, admin, ocr) {
-  const facts = adminFactsToPaperFacts(admin)
+  const facts = adminFactsToPaperFacts(adminFactsMatchingScan(admin, ocr))
   const list = Array.isArray(questions) ? questions : []
   if (!facts) return { questions: list, facts: null }
   const shaped = shapeOfficialPyqDrafts(list, ocr, { facts })

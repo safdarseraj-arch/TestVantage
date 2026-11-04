@@ -159,16 +159,28 @@ export function flattenNestedTabulars(text) {
   return s
 }
 
+const SUP_OPEN = '\u0004'
+const SUP_CLOSE = '\u0005'
+const SUB_OPEN = '\u0006'
+const SUB_CLOSE = '\u0007'
+
+/** Unicode has no raised "n", so `Z^{n+}` would read "Zn⁺" (zinc). HTML cells raise the whole script. */
+function scriptText(token, map, open, close, html) {
+  const t = String(token ?? '').trim()
+  if (!html || [...t].every((ch) => map[ch])) return scriptDigits(t, map)
+  return `${open}${t.replace(/-/g, '−')}${close}`
+}
+
 /** Table cell as upright words, with the spaces and subscripts the paper shows. */
-function cellPlain(raw) {
+function cellPlain(raw, { html = false } = {}) {
   let s = String(raw ?? '')
   s = s.replace(/\\(?:mathrm|mathbf|text|operatorname)\s*\{([^{}]*)\}/g, '$1')
   s = s.replace(/\\([a-zA-Z]+)/g, (m, name) => (CELL_SYMBOLS[name] ? CELL_SYMBOLS[name] : m))
   s = s.replace(/\s*≡\s*/g, '≡')
   s = s.replace(/\\,/g, ' ').replace(/~/g, ' ')
-  s = s.replace(/\^\{([^{}]+)\}/g, (_, n) => scriptDigits(n, SUPER_DIGIT))
+  s = s.replace(/\^\{([^{}]+)\}/g, (_, n) => scriptText(n, SUPER_DIGIT, SUP_OPEN, SUP_CLOSE, html))
   s = s.replace(/\^([\d+-])/g, (_, n) => SUPER_DIGIT[n] || n)
-  s = s.replace(/_\{([^{}]+)\}/g, (_, n) => scriptDigits(n, SUB_DIGIT))
+  s = s.replace(/_\{([^{}]+)\}/g, (_, n) => scriptText(n, SUB_DIGIT, SUB_OPEN, SUB_CLOSE, html))
   s = s.replace(/_(\d)/g, (_, n) => SUB_DIGIT[n] || n)
   s = s.replace(/\\[a-zA-Z]+/g, '')
   s = s.replace(/[{}$]/g, '')
@@ -195,12 +207,16 @@ function cellHtml(raw) {
   s = s.replace(/(\}|[A-Za-z])\s*-\s*(?=\\math(?:rm|bf)\s*\{|[A-Z])/g, `$1${BOND_DASH}`)
   s = s.replace(/(_\{[^{}]*\}|_\d)\s+(?=\\math(?:rm|bf)\s*\{[A-Z])/g, '$1')
   s = s.replace(/\\mathbf\s*\{([^{}]*)\}/g, `${BOLD_OPEN}$1${BOLD_CLOSE}`)
-  const plain = cellPlain(s).replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
+  const plain = cellPlain(s, { html: true }).replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
   return escapeCell(plain)
     .replace(new RegExp(`${BOLD_CLOSE}(\\s*${BOND_DASH}\\s*)${BOLD_OPEN}`, 'g'), '$1')
     .replace(new RegExp(BOLD_OPEN, 'g'), '<b>')
     .replace(new RegExp(BOLD_CLOSE, 'g'), '</b>')
     .replace(new RegExp(BOND_DASH, 'g'), '&ndash;')
+    .replace(new RegExp(SUP_OPEN, 'g'), '<sup>')
+    .replace(new RegExp(SUP_CLOSE, 'g'), '</sup>')
+    .replace(new RegExp(SUB_OPEN, 'g'), '<sub>')
+    .replace(new RegExp(SUB_CLOSE, 'g'), '</sub>')
 }
 
 /** "Column J Molecule" is two printed lines: the column name, then what it lists. */
@@ -387,15 +403,30 @@ function tabularToPaperTableHtml(spec, body) {
   return html
 }
 
+const TABULAR_WITH_CLOSER_RE = /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*?)\\end\{tabular\}(\s*\$+)?/gi
+
+/**
+ * Dollars after \end{tabular} close a `$…tabular…$` wrapper only when the table opened inside math.
+ * In "\end{tabular}\n$\lambda^{0}$ is …" the dollar opens the next line's math and must stay.
+ */
+function tabularCloserToKeep(full, closer, offset, whole) {
+  if (!closer) return ''
+  const src = String(whole)
+  const before = src.slice(0, offset)
+  const insideMath = /\$\s*$/.test(before) || (before.match(/(?<!\\)\$/g) || []).length % 2 === 1
+  if (insideMath) return ''
+  const after = src.slice(offset + full.length)
+  const run = closer.trim()
+  const opensMath = run === '$' ? /^[^\n$]*[^\s$][^\n$]*(?<!\\)\$/.test(after) : run === '$$' && /^[^$]*[^\s$][^$]*\$\$/.test(after)
+  return opensMath ? closer : ''
+}
+
 function replacePaperDataTabulars(text) {
-  return String(text ?? '').replace(
-    /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*?)\\end\{tabular\}(?:\s*\$+)?/gi,
-    (full, _pos, spec, body) => {
-      if (!isPaperDataTabular(full)) return full
-      const html = tabularToPaperTableHtml(spec, body)
-      return html || full
-    },
-  )
+  return String(text ?? '').replace(TABULAR_WITH_CLOSER_RE, (full, _pos, spec, body, closer, offset, whole) => {
+    if (!isPaperDataTabular(full)) return full
+    const html = tabularToPaperTableHtml(spec, body)
+    return html ? `${html}${tabularCloserToKeep(full, closer, offset, whole)}` : full
+  })
 }
 
 function escapeHtml(text) {
@@ -715,18 +746,15 @@ export function convertLatexTabularToArray(text) {
   if (!/tabular/i.test(s)) return stripDollarsInsideLatexEnvs(s)
   s = s.replace(/\\text\s*\{\s*begin\s*\}\s*\{\s*tabular\s*\}/gi, '\\begin{tabular}')
   s = s.replace(/\\text\s*\{\s*end\s*\}\s*\{\s*tabular\s*\}/gi, '\\end{tabular}')
-  s = s.replace(
-    /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*?)\\end\{tabular\}(?:\s*\$+)?/gi,
-    (full, _pos, spec, body) => {
-      const cleaned = String(body ?? '').replace(/\\\\\$+/g, '\\\\')
-      if (/\$\$\s*\\begin\{tabular\}/i.test(full)) {
-        return stripDollarsInsideLatexEnvs(
-          full.replace(body, cleaned).replace(/tabular/gi, 'array').replace(/\$+$/, ''),
-        )
-      }
-      return arrayFromTabularBody(spec, cleaned)
-    },
-  )
+  s = s.replace(TABULAR_WITH_CLOSER_RE, (full, _pos, spec, body, closer, offset, whole) => {
+    const cleaned = String(body ?? '').replace(/\\\\\$+/g, '\\\\')
+    if (/\$\$\s*\\begin\{tabular\}/i.test(full)) {
+      return stripDollarsInsideLatexEnvs(
+        full.replace(body, cleaned).replace(/tabular/gi, 'array').replace(/\$+$/, ''),
+      )
+    }
+    return `${arrayFromTabularBody(spec, cleaned)}${tabularCloserToKeep(full, closer, offset, whole)}`
+  })
   // OCR often drops \\end{tabular}. Still show a table, not raw \\begin{tabular}.
   s = s.replace(
     /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*)$/gi,

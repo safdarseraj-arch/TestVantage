@@ -35,6 +35,11 @@ import { mathDrawFailure } from '../src/utils/mathDrawCheck.js'
 import { prepareTextForMathTextDisplay } from '../src/utils/prepareMathForRender.js'
 import { restoreLabelledFigureOptions } from '../src/utils/labelledFigureOptions.js'
 import { extractMathpixImageUrls, splitMathpixMediaSegments } from '../src/utils/mathpixMedia.js'
+import { adminFactsMatchingScan, numberingPrintedInOcr } from '../src/utils/officialPyqAdminFacts.js'
+import { convertLatexTabularToArray } from '../src/utils/latexTabularDisplay.js'
+import { latexExtractionIncomplete } from '../src/utils/healTruncatedLatex.js'
+import { reviewMarkSpans } from '../src/utils/officialPyqReviewFlags.js'
+import { officialPyqDrawnText } from '../src/utils/officialPyqOriginalCompare.js'
 
 let passed = 0
 function test(name, fn) {
@@ -496,6 +501,57 @@ test('option D that starts with "If" stays on its question, and a cross-section 
   const kept = mergeAdjacentOptionTails([photo, gauge])
   assert.equal(kept.length, 2)
   assert.match(kept[1].text, /^Area of the cross-section/)
+})
+
+test('a table followed by a $…$ line keeps that dollar, raises Z^(n+), and the graph is not flagged (2022 P2 Q39)', () => {
+  const q39 =
+    'The value of (m + n + p) is ____.\nGiven:\n\n\\begin{tabular}[t]{|l|l|l|}\n\\hline Ion & \\mathrm{Z}^{\\mathrm{n}+} & \\mathrm{X}^{\\mathrm{m}-} \\\\\n\\hline \\lambda^{0}(\\mathrm{~S} \\mathrm{~cm}^{2} \\mathrm{~mol}^{-1}) & 50.0 & 80.0 \\\\\n\\hline\n\\end{tabular}\n$\\lambda^{0}$ is the limiting molar conductivity of ions\nThe plot of molar conductivity ( $\\Lambda$ ) of $\\mathrm{Z}_{\\mathrm{m}} \\mathrm{X}_{\\mathrm{n}}$ vs $\\mathrm{c}^{1 / 2}$ is given below.\n\\includegraphics{https://cdn.mathpix.com/cropped/45dff9a8-20.jpg?height=554&width=625&top_left_y=845&top_left_x=783}'
+  const drawn = convertLatexTabularToArray(q39)
+  assert.match(drawn, /<\/table>\s*\$\\lambda\^\{0\}\$ is the limiting/)
+  assert.match(drawn, /Z<sup>n\+<\/sup>/)
+  assert.match(drawn, /X<sup>m−<\/sup>/)
+  assert.match(drawn, /cm²/)
+  assert.equal(latexExtractionIncomplete(q39), false)
+  assert.deepEqual(reviewMarkSpans(q39), [])
+  assert.match(convertLatexTabularToArray('$\\begin{tabular}{|l|l|}\\hline A & 1 \\\\ \\hline\\end{tabular}$ next'), /\\end\{array\}\$\$ next/)
+
+  const forCompare = officialPyqDrawnText(q39)
+  assert.match(forCompare, /Ion \| Z\^\(n\+\) \| X\^\(m−\)/)
+  assert.match(forCompare, /\[picture\]$/)
+  assert.doesNotMatch(forCompare, /tabular|includegraphics/)
+})
+
+test('the scan settles restart vs continuous numbering, so Chemistry Q.3 is not stamped Q39', () => {
+  const subject = (name) =>
+    `\\section*{${name}}\n` +
+    Array.from({ length: 18 }, (_, i) => `\\item[Q.] ${i + 1} Question ${i + 1} of ${name} text here.`).join('\n')
+  const restartOcr = ['MATHEMATICS', 'PHYSICS', 'CHEMISTRY'].map(subject).join('\n')
+  const continuousOcr = Array.from({ length: 54 }, (_, i) => `Q. ${i + 1} Question ${i + 1} text here.`).join('\n')
+  assert.equal(numberingPrintedInOcr(restartOcr, 18), 'restart')
+  assert.equal(numberingPrintedInOcr(continuousOcr, 18), 'continuous')
+  assert.equal(numberingPrintedInOcr('Q. 1 only', 18), '')
+
+  const rows = [
+    { from: 1, to: 8, type: 'integer', options: 0, listI: '', listII: '' },
+    { from: 9, to: 14, type: 'multiple_correct', options: 4, listI: '', listII: '' },
+    { from: 15, to: 18, type: 'single_correct', options: 4, listI: '', listII: '' },
+  ]
+  const admin = {
+    totalQuestions: 54,
+    subjectOrder: ['mathematics', 'physics', 'chemistry'],
+    numbering: 'continuous',
+    samePattern: true,
+    pattern: { rows, passages: '' },
+    confirmedAt: 1,
+  }
+  assert.equal(adminFactsMatchingScan(admin, restartOcr).numbering, 'restart')
+  assert.equal(adminFactsMatchingScan(admin, continuousOcr), admin)
+  const cards = Array.from({ length: 54 }, (_, i) => ({ text: `Question ${i + 1}`, options: [], printedNumber: i + 1 }))
+  const stamped = enforceAdminFactsOnQuestions(cards, admin, restartOcr)
+  assert.equal(stamped[38].printedNumber, 3)
+  assert.equal(stamped[38].subject, 'chemistry')
+  assert.equal(enforceAdminFactsOnQuestions(cards, admin, continuousOcr)[38].printedNumber, 39)
+  assert.equal(draftAdminFacts(restartOcr, cards).numbering, 'restart')
 })
 
 console.log(`official-pyq admin facts: ${passed} tests passed`)

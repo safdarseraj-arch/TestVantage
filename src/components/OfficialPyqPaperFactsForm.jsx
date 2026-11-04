@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   FACT_SUBJECTS,
   FACT_TYPES,
+  adminFactsMatchingScan,
   defaultOptionsFor,
   draftAdminFacts,
   emptyFactRow,
@@ -21,8 +22,8 @@ function clone(value) {
 function loadDraft(paperId, fresh = false) {
   const paper = getOfficialPyqPendingPaper(paperId)
   if (!paper) return null
-  if (!fresh && paper.adminFacts) return clone(paper.adminFacts)
   const ocr = getOfficialPyqPendingOcrText(paperId) || String(paper.preparedText ?? '')
+  if (!fresh && paper.adminFacts) return clone(adminFactsMatchingScan(paper.adminFacts, ocr))
   return draftAdminFacts(ocr, paper.questions)
 }
 
@@ -332,7 +333,7 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
                   type="radio"
                   name={`facts-numbering-${paperId}`}
                   checked={draft.numbering !== 'continuous'}
-                  onChange={() => patch({ numbering: 'restart' })}
+                  onChange={() => patch({ numbering: 'restart', numberingFromScan: false })}
                 />{' '}
                 restart at Q1 in each subject
               </label>{' '}
@@ -341,10 +342,18 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
                   type="radio"
                   name={`facts-numbering-${paperId}`}
                   checked={draft.numbering === 'continuous'}
-                  onChange={() => patch({ numbering: 'continuous' })}
+                  onChange={() => patch({ numbering: 'continuous', numberingFromScan: false })}
                 />{' '}
                 run straight through all subjects
               </label>
+              {draft.numberingFromScan ? (
+                <p className="form-hint" data-testid="official-pyq-facts-numbering-from-scan">
+                  Set from the scan: the paper prints{' '}
+                  {draft.numbering === 'continuous'
+                    ? 'numbers that run on past one subject.'
+                    : 'Q.1 again at the start of each subject.'}
+                </p>
+              ) : null}
             </div>
 
             <label>

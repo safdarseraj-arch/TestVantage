@@ -241,18 +241,21 @@ export function findReviewFlagSpans(text) {
  * Spans to mark, only when this text is one of the reasons the red banner blocks Approve.
  * @param {unknown} text
  */
-export function reviewMarkSpans(text) {
+export function reviewMarkSpans(text, options) {
   const raw = String(text ?? '')
   if (!raw.trim()) return []
   if (closedChemReactionDisplays(raw)) return []
-  const spans = findReviewFlagSpans(raw)
+  const finishedByChoices =
+    (Array.isArray(options) ? options : []).filter((opt) => String(opt ?? '').trim()).length >= 2
+  const thenAt = finishedByChoices ? raw.search(/\bThen\s*$/i) : -1
+  const spans = findReviewFlagSpans(raw).filter((span) => !(thenAt >= 0 && span.start === thenAt))
   if (!spans.length) return []
   const tables = drawableTableRanges(raw)
   const kept = spans.filter(
     (span) => !tables.some((table) => span.start < table.end && span.end > table.start),
   )
   if (!kept.length) return []
-  if (partNeedsReviewFlag(raw) || stemLooksIncompleteOnDisplay(raw)) return kept
+  if (partNeedsReviewFlag(raw) || stemLooksIncompleteOnDisplay(raw, options)) return kept
   return kept.filter((span) => span.kind === 'table-command')
 }
 

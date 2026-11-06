@@ -36,6 +36,8 @@ const { stripMistakenOfficialPyqPassages } = await import('../src/utils/passage.
 const { buildPaperFacts } = await import('../src/utils/officialPyqPaperFacts.js')
 const { splitGluedChemDisplayEquations } = await import('../src/utils/healTruncatedLatex.js')
 const { extendOfficialPyqHealCard } = await import('../src/utils/extendTruncatedStem.js')
+const { sanitizeStemForDisplay, shownStemLooksIncomplete } = await import('../src/utils/sanitizeStemForDisplay.js')
+const { reviewMarkSpans } = await import('../src/utils/officialPyqReviewFlags.js')
 
 let failed = 0
 function test(name, fn) {
@@ -780,6 +782,15 @@ test('a radioactive decay chain stays one line; the $$ closer before the next "$
   const healed = extendOfficialPyqHealCard(card, `\\item[Q.] 10 ${text}`)
   assert.equal((healed.text.match(/\$\$/g) || []).length, 2, healed.text)
   assert.ok(healed.text.includes('\\mathrm{Th}$$\n$\\mathrm{x}_{1}'), healed.text)
+})
+
+test('"…, then" followed by four choices shows no "Extraction incomplete" banner or red "Then" (2020 P2 Q10–12)', () => {
+  const stem = 'Starting at time $t=0$ from the origin with speed $1 \\mathrm{~ms}^{-1}$, a particle follows a two-dimensional trajectory in the $x-y$ plane so that its coordinates are related by the equation $y=\\frac{x^{2}}{2}$. The $x$ and $y$ components of its acceleration are denoted by $a_{x}$ and $a_{\\mathrm{y}}$, respectively. Then'
+  const options = ['$a_{x}=1 \\mathrm{~ms}^{-2}$ implies $a_{y}=1 \\mathrm{~ms}^{-2}$', '$a_{x}=0$ implies $a_{y}=1 \\mathrm{~ms}^{-2}$ at all times', "at $t=0$, the particle's velocity points in the $x$-direction", '$a_{x}=0$ implies the angle is 45°']
+  const shown = sanitizeStemForDisplay(stem, options)
+  assert.equal(shownStemLooksIncomplete(shown, options), false)
+  assert.deepEqual(reviewMarkSpans(shown, options), [])
+  assert.equal(shownStemLooksIncomplete(shown, []), true, 'a lone "Then" with no choices is still torn')
 })
 
 test('the next part\'s page heading glued onto option D is cut off (2019 P2 phys Q18)', () => {

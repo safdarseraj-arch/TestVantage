@@ -14,7 +14,7 @@ import { findOptionsBlockStart } from '../utils/mcqOptionMarkers.js'
 import { stripTrailingPyqSectionHeader } from '../utils/bulkExtractClean.js'
 import { convertLatexTabularToArray } from '../utils/latexTabularDisplay.js'
 import { reviewMarkSpans, sliceTextByFlagSpans } from '../utils/officialPyqReviewFlags.js'
-import { sanitizeStemForDisplay } from '../utils/sanitizeStemForDisplay.js'
+import { sanitizeStemForDisplay, shownStemLooksIncomplete } from '../utils/sanitizeStemForDisplay.js'
 import { stripLeakedOptionsFromStem } from '../utils/stripLeakedOptionsFromStem.js'
 import { stripTrailingOptionMarkerFromStem } from '../utils/optionStemLeak.js'
 
@@ -40,9 +40,9 @@ function tableDraws(text) {
   }
 }
 
-function ProblemMarkedText({ text }) {
+function ProblemMarkedText({ text, options }) {
   const raw = String(text ?? '')
-  const spans = reviewMarkSpans(raw)
+  const spans = reviewMarkSpans(raw, options)
   if (!spans.length) return <MathText text={raw} />
   const parts = sliceTextByFlagSpans(raw, spans)
   return (
@@ -89,7 +89,7 @@ export function QuestionStem({
   const sanitized = sanitizeStemForDisplay(text ?? '', options)
   const parsedLists = parseMatchingListForDisplay(sanitized, options)
   const showMatchLayout = Boolean(parseMatchLists && parsedLists?.listI?.length)
-  const extractionIncomplete = latexExtractionIncomplete(sanitized)
+  const extractionIncomplete = shownStemLooksIncomplete(sanitized, options)
   const previewText = showMatchLayout ? parsedLists.intro : stemTextForPreview(sanitized, options)
   const displayText =
     !showMatchLayout &&
@@ -125,8 +125,8 @@ export function QuestionStem({
           Extraction incomplete — do not approve
         </p>
       ) : null}
-      {highlightProblems && reviewMarkSpans(sanitized).length ? (
-        <ProblemMarkedText text={sanitized} />
+      {highlightProblems && reviewMarkSpans(sanitized, options).length ? (
+        <ProblemMarkedText text={sanitized} options={options} />
       ) : showMatchLayout ? (
         <MatchListDisplay parsed={parsedLists} />
       ) : (

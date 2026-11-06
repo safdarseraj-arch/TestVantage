@@ -12,7 +12,7 @@ import {
   countRealMcqOptions,
   stemLikelyNeedsDiagramImage,
 } from '../utils/stemDiagramDetect.js'
-import { sanitizeStemForDisplay } from '../utils/sanitizeStemForDisplay.js'
+import { sanitizeStemForDisplay, shownStemLooksIncomplete } from '../utils/sanitizeStemForDisplay.js'
 
 /** Stem preview only — hide (A)–(D) block. Keep List-I / Column I markers. */
 function stemTextForPreview(text, options = []) {
@@ -65,7 +65,7 @@ export function QuestionStem({
   const sanitized = sanitizeStemForDisplay(text ?? '', options)
   const parsedLists = parseMatchingListForDisplay(sanitized, options)
   const showMatchLayout = Boolean(parseMatchLists && parsedLists?.listI?.length)
-  const extractionIncomplete = latexExtractionIncomplete(sanitized)
+  const extractionIncomplete = shownStemLooksIncomplete(sanitized, options)
   const previewText = showMatchLayout
     ? parsedLists.intro
     : parsedLists && !parseMatchLists

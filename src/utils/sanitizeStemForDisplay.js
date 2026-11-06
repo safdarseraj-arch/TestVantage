@@ -185,8 +185,12 @@ export function sanitizeStemForDisplay(text, options = []) {
  * @param {unknown[]} [options]
  */
 export function stemLooksIncompleteOnDisplay(text, options) {
-  const shown = sanitizeStemForDisplay(text)
+  return shownStemLooksIncomplete(sanitizeStemForDisplay(text), options)
+}
+
+/** Already-sanitized stem: "…, then" followed by two or more choices is a finished question. */
+export function shownStemLooksIncomplete(shown, options) {
   const filled = (Array.isArray(options) ? options : []).filter((opt) => String(opt ?? '').trim()).length
-  const checked = filled >= 2 ? shown.replace(/\s*\bThen\s*$/i, '') : shown
+  const checked = filled >= 2 ? String(shown ?? '').replace(/\s*\bThen\s*$/i, '') : String(shown ?? '')
   return latexExtractionIncomplete(checked)
 }

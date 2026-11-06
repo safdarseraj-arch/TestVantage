@@ -66,7 +66,7 @@ const paper = addOfficialPyqPendingPaper({
   session: 'Paper 1',
   paperLabel: 'Published lock fixture',
   sourceLabel: 'test',
-  status: 'approved',
+  status: 'published',
   preparedText: ocr,
   questions: originalQs,
 })
@@ -94,8 +94,34 @@ const sneaky = updateOfficialPyqPendingPaper(paper.id, {
   questions: [{ text: 'MUTATED', options: ['a', 'b', 'c', 'd'], pyqSlot: 1 }],
 })
 assert.ok(sneaky)
-assert.equal(JSON.stringify(sneaky.questions), before, 'store must ignore question writes while approved')
+assert.equal(JSON.stringify(sneaky.questions), before, 'store must ignore question writes while published')
 assert.notEqual(String(sneaky.questions[0]?.text || ''), 'MUTATED')
+
+const tagWhilePublished = updateOfficialPyqPendingPaper(paper.id, {
+  questions: [{ ...originalQs[0], chapter: 'Magnetism' }, originalQs[1]],
+  allowPublishedQuestionWrite: true,
+})
+assert.equal(JSON.stringify(tagWhilePublished.questions), before, 'a published paper takes no tag writes either')
+
+// Approved: wording stays locked, but the tag / answer / solution path may write.
+const approvedPaper = updateOfficialPyqPendingPaper(paper.id, { status: 'approved' })
+assert.equal(approvedPaper.status, 'approved')
+assert.equal(officialPyqQuestionsArePublishedLocked(approvedPaper), true)
+assert.equal(JSON.stringify(approvedPaper.questions), before)
+const healApproved = healAndPersistOfficialPyqPaper(getOfficialPyqPendingPaper(paper.id))
+assert.equal(healApproved.ok, false, 'heal must refuse approved papers')
+assert.match(String(healApproved.error || ''), /send it back for review/i)
+const sneakyApproved = updateOfficialPyqPendingPaper(paper.id, {
+  questions: [{ text: 'MUTATED', options: ['a', 'b', 'c', 'd'], pyqSlot: 1 }],
+})
+assert.equal(JSON.stringify(sneakyApproved.questions), before, 'store must ignore plain question writes while approved')
+const tagged = updateOfficialPyqPendingPaper(paper.id, {
+  questions: [{ ...originalQs[0], chapter: 'Magnetism' }, originalQs[1]],
+  allowPublishedQuestionWrite: true,
+})
+assert.equal(tagged.status, 'approved')
+assert.equal(tagged.questions[0].chapter, 'Magnetism')
+assert.equal(tagged.questions[0].text, originalQs[0].text)
 
 const unlocked = updateOfficialPyqPendingPaper(paper.id, {
   status: 'pending_review',

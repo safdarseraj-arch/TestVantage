@@ -344,8 +344,8 @@ assert.equal(mergedPyq.questions[0].pyqYear, 2024)
 assert.equal(mergedPyq.questions[0].pyqDate, '2024-01-27')
 assert.equal(mergedPyq.questions[0].pyqShift, 2)
 assert.equal(mergedPyq.questions[1].pyqYear, 2024)
-assert.equal(mergedPyq.questions[0].toughnessLevel, 7, 'actual toughness, not 40/30/30')
-assert.equal(mergedPyq.questions[1].toughnessLevel, 2)
+assert.equal(mergedPyq.questions[0].toughnessLevel, undefined, 'toughness is a Hybrid AI tag, filled after approval')
+assert.equal(mergedPyq.questions[1].chapter, 'General', 'chapter is a Hybrid AI tag, filled after approval')
 
 const repairedRow = repairGeminiPyqBankItem({
   text: garbledCases,

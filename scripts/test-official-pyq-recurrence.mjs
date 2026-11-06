@@ -21,7 +21,7 @@ if (typeof globalThis.localStorage === 'undefined') {
   }
 }
 
-const { paperItemsFromMathpixOcr, restoreGluedQuestionNumbers } = await import('../src/utils/mathpixQuestionSplit.js')
+const { paperItemsFromMathpixOcr, restoreGluedQuestionNumbers, sanitizeMathpixOcrText } = await import('../src/utils/mathpixQuestionSplit.js')
 const { mathDrawFailure } = await import('../src/utils/mathDrawCheck.js')
 const { prepareTextForMathTextDisplay } = await import('../src/utils/prepareMathForRender.js')
 const { stripImageWatermarkOcr } = await import('../src/utils/stripImageWatermarkOcr.js')
@@ -36,9 +36,14 @@ const { stripMistakenOfficialPyqPassages } = await import('../src/utils/passage.
 const { buildPaperFacts } = await import('../src/utils/officialPyqPaperFacts.js')
 const { splitGluedChemDisplayEquations } = await import('../src/utils/healTruncatedLatex.js')
 const { extendOfficialPyqHealCard, restoreMissingListIIFromSource, matchQuestionMissingListI } = await import('../src/utils/extendTruncatedStem.js')
-const { keepApprovedOfficialPyqCards } = await import('../src/utils/officialPyqApproval.js')
+const { keepApprovedOfficialPyqCards, importQuestionsToOfficialPyqPending } = await import('../src/utils/officialPyqApproval.js')
 const { keepAdminEditedCards, copyAnswersOntoCanonical } = await import('../src/utils/officialPyqLocalReparse.js')
+const { questionsFromOfficialPyqExtract, formatOfficialPyqUploadError, inferOcrQuestionCount } = await import('../src/utils/pyqGeminiExtract.js')
+const { readPrintedAnswerKey } = await import('../src/utils/printedAnswerKey.js')
+const { parsedBulkToPyqItems } = await import('../src/utils/pyqImport.js')
+const { enrichParsedWithAnswerProvenance } = await import('../src/utils/answerProvenance.js')
 const { sanitizeStemForDisplay, shownStemLooksIncomplete } = await import('../src/utils/sanitizeStemForDisplay.js')
+const { matchColumnTableLayout, splitMatchColumnTables } = await import('../src/utils/latexTabularDisplay.js')
 const { reviewMarkSpans } = await import('../src/utils/officialPyqReviewFlags.js')
 
 let failed = 0
@@ -1057,6 +1062,334 @@ test('Compare\'s original-page picture of both lists is not "missing List-I"; ba
   assert.equal(kept[1], other)
 })
 
+test('2017 answer-key layout: printed answer boxes never reach a card; the key, facts, subjects, three-column tables and a nine-molecule integer question come through (JEE Adv 2017 P1)', () => {
+  const raw = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), 'fixtures', 'jee-advanced-2017-p1-mathpix.txt'), 'utf8')
+  const meta = { exam: 'jee-advanced', year: 2017, session: 'Paper 1', paperLabel: 'JEE Advanced 2017', sourceLabel: 'Official JEE Advanced archive' }
+
+  const facts = buildPaperFacts(raw)
+  assert.equal(facts.known, true, facts.notes.join(' | '))
+  assert.equal(facts.expectedQuestionCount, 54)
+  assert.deepEqual(facts.sections.slice(0, 3).map((s) => `${s.count}:${s.type}`), ['7:multiple_correct', '5:integer', '6:single_correct'])
+
+  const built = questionsFromOfficialPyqExtract({ engine: 'mathpix', text: raw, questions: [] }, meta)
+  const qs = built.questions
+  assert.equal(qs.length, 54)
+  for (const q of qs) {
+    const blob = JSON.stringify([q.text, q.options, q.passageText])
+    assert.ok(!/Ans\s+for\s+Q|Answers?\s+for\s+the\s+above/i.test(blob), `Q${q.pyqSlot} carries a printed answer box`)
+    assert.ok(!/\\(?:begin|end)\{table\}|rough work/i.test(String(q.passageText ?? '')), `Q${q.pyqSlot} table keeps its wrapper`)
+    assert.ok(!/\\(?:begin|end)\{table\}/.test(JSON.stringify([q.text, q.options])), `Q${q.pyqSlot} card carries a table wrapper`)
+  }
+  const at = (n) => qs.find((q) => Number(q.printedNumber ?? q.pyqSlot) === n)
+  assert.deepEqual(at(1).correctIndices, [0, 1, 3])
+  assert.deepEqual(at(4).correctIndices, [2], 'a one-letter answer on a multi-correct card is still a correctIndices list')
+  assert.equal(at(8).correctInteger, 6)
+  assert.equal(at(13).correctIndex, 3)
+  for (const bonus of [29, 39]) {
+    const q = at(bonus)
+    assert.equal(q.answerSource, 'unknown', `Q${bonus} has no printed answer (marks to all)`)
+    assert.ok(q.correctIndex == null && !q.correctIndices?.length && q.correctInteger == null, `Q${bonus} got a guessed answer`)
+  }
+  const q30 = at(30)
+  assert.equal(q30.questionType, 'integer')
+  assert.equal((q30.text.match(/<smiles>/g) || []).length, 9, 'all nine structures stay in the question')
+  assert.equal(q30.correctInteger, 5)
+  qs.forEach((q, i) => assert.equal(q.subject, i < 18 ? 'physics' : i < 36 ? 'chemistry' : 'mathematics', `Q${i + 1} subject`))
+  for (const n of [13, 14, 15, 16, 17, 18, 31, 32, 33, 34, 35, 36, 49, 50, 51, 52, 53, 54]) {
+    assert.match(String(at(n).passageText ?? ''), /Column 1/, `Q${n} lost its three-column table`)
+  }
+
+  const stored = built.preparedText
+  assert.ok(!/Ans\s+for\s+Q/i.test(sanitizeMathpixOcrText(stored)), 'the cleaner removes the stored key before any split reads it')
+  const again = questionsFromOfficialPyqExtract({ engine: 'builtin', text: sanitizeMathpixOcrText(stored), questions: [] }, meta, {
+    printedAnswerKey: readPrintedAnswerKey(stored),
+  })
+  assert.deepEqual(
+    again.questions.map((q) => [q.correctIndex, q.correctIndices, q.correctInteger]),
+    qs.map((q) => [q.correctIndex, q.correctIndices, q.correctInteger]),
+    're-parse of the stored text keeps the printed answers',
+  )
+})
+
+test('2017 "[A] text" choices keep one letter, and the three-column match tables draw one aligned row per (I)/(i)/(P) (JEE Adv 2017 P1)', () => {
+  const raw = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), 'fixtures', 'jee-advanced-2017-p1-mathpix.txt'), 'utf8')
+  const meta = { exam: 'jee-advanced', year: 2017, session: 'Paper 1', paperLabel: 'JEE Advanced 2017', sourceLabel: 'Official JEE Advanced archive' }
+  const qs = questionsFromOfficialPyqExtract({ engine: 'mathpix', text: raw, questions: [] }, meta).questions
+  assert.equal(qs.length, 54)
+  for (const q of qs) {
+    ;(q.options || []).forEach((opt, i) => {
+      const letter = 'ABCD'[i]
+      assert.ok(
+        !new RegExp(`^\\s*(?:\\[\\s*${letter}\\s*\\]|\\(\\s*${letter}\\s*\\)|${letter}\\s*[.:)])`).test(String(opt ?? '')),
+        `Q${q.pyqSlot} option ${letter} still starts with its own label: ${String(opt).slice(0, 40)}`,
+      )
+    })
+  }
+  assert.match(qs[0].options[0], /^The pressure difference/)
+
+  const tableOf = (passage) => {
+    const s = String(passage ?? '')
+    const at = s.indexOf('\\begin{tabular}')
+    const end = s.lastIndexOf('\\end{tabular}')
+    assert.ok(at >= 0 && end > at, 'passage keeps its table')
+    return matchColumnTableLayout(s.slice(at, end).replace(/^\\begin\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?/, ''))
+  }
+  for (const n of [13, 16, 31, 34, 49, 52]) {
+    const q = qs[n - 1]
+    const layout = tableOf(q.passageText)
+    assert.ok(layout, `Q${n} table is not read as a three-column match table`)
+    assert.deepEqual(layout.header, ['Column 1', 'Column 2', 'Column 3'], `Q${n} header`)
+    assert.equal(layout.rows.length, 4, `Q${n} rows`)
+    layout.rows.forEach((cells, r) => {
+      assert.equal(cells.length, 3, `Q${n} row ${r + 1} has ${cells.length} cells`)
+      assert.match(cells[0], new RegExp(`^\\(${['I', 'II', 'III', 'IV'][r]}\\)`), `Q${n} row ${r + 1} column 1`)
+      assert.match(cells[1], new RegExp(`^\\(${['i', 'ii', 'iii', 'iv'][r]}\\)`), `Q${n} row ${r + 1} column 2`)
+      assert.match(cells[2], new RegExp(`^\\(${'PQRS'[r]}\\)`), `Q${n} row ${r + 1} column 3`)
+    })
+    const parts = splitMatchColumnTables(q.passageText)
+    const html = parts?.find((p) => p.kind === 'html')?.value ?? ''
+    assert.ok(html, `Q${n} table is not drawn`)
+    assert.ok(!/\\(?:begin|end|hline|frac|vec)\b|\$/.test(html), `Q${n} drawn table shows TeX source`)
+  }
+  assert.match(tableOf(qs[12].passageText).rows[0][0], /\$\\vec\{v\}=2 \\frac\{E_\{0\}\}\{B_\{0\}\}/, 'Column 1 math keeps its dollars')
+  assert.equal(tableOf(qs[12].passageText).intro.length, 1, 'the spanning lead-in row stays above the header')
+  assert.ok(tableOf(qs[15].passageText).rows.every((cells) => /!\[\]\(https:\/\/cdn\.mathpix\.com/.test(cells[2])), 'P-V pictures stay in column 3')
+
+  const split = matchColumnTableLayout(String.raw`\hline
+\multicolumn{2}{|c|}{\textbf{Column 1}} & \multicolumn{2}{c|}{\textbf{Column 2}} & \multicolumn{2}{c|}{\textbf{Column 3}} \\
+\hline
+(I) & Electron with $\vec{v} = 2\frac{E_0}{B_0} \hat{x}$ & (i) & $\vec{E} = E_0\hat{z}$ & (P) & $\vec{B} = -B_0\hat{x}$ \\
+(II) & Electron with $\vec{v} = \frac{E_0}{B_0} \hat{y}$ & (ii) & $\vec{E} = -E_0\hat{y}$ & (Q) & $\vec{B} = B_0\hat{x}$ \\
+\hline`)
+  assert.deepEqual(split.rows.map((cells) => cells.length), [3, 3], 'a label in its own cell joins its item')
+  assert.match(split.rows[0][1], /^\(i\) \$\\vec\{E\}/)
+})
+
+test('a card with no read answer gets none (no default "A" marked as from the paper)', () => {
+  const [q] = parsedBulkToPyqItems([{ text: 'A question whose answer the scan does not print.', options: ['1', '2', '3', '4'] }], { pyqYear: 2017, examPatternId: 'jee-advanced' }, 0)
+  assert.equal(q.correctIndex, undefined)
+  assert.notEqual(enrichParsedWithAnswerProvenance(q, q.text).answerSource, 'from_paper')
+})
+
+test('upload stops at the split: no AI tags, answers, or solutions; printed answers stay', () => {
+  const stemA = 'If $3 x+2=11$, then the value of $x$ is equal to which one of the following numbers?'
+  const stemB = 'The number of real roots of the equation $x^{2}+4 x+5=0$ is equal to which value below?'
+  const stemC = 'The derivative of $\\sin x$ with respect to $x$ at $x=0$ is equal to which value below?'
+  const built = questionsFromOfficialPyqExtract(
+    {
+      engine: 'cloud-vision',
+      text: '',
+      questions: [
+        { number: 1, text: stemA, options: ['$1$', '$2$', '$3$', '$4$'], correctIndex: 2, answerKeyVisible: true, chapter: 'Algebra', topic: 'Linear equations', toughness: 3, solution: 'Subtract 2 and divide by 3, so $x=3$.' },
+        { number: 2, text: stemB, options: ['$0$', '$1$', '$2$', '$3$'], correctIndex: 0, chapter: 'Quadratic Equations', toughness: 6, solution: 'The discriminant is negative.' },
+        { number: 3, text: stemC, options: ['$0$', '$1$', '$-1$', '$2$'], correctIndex: 1, answerSource: 'from_paper', solution: 'Printed: $\\cos 0=1$.', solutionSource: 'from_paper', chapter: 'Differentiation' },
+      ],
+    },
+    { exam: 'jee-main', year: 2024, session: 'January', paperLabel: 'JEE Main 2024 split-only check', sourceLabel: 'test' },
+  )
+  const [a, b, c] = built.questions
+  assert.equal(built.questions.length, 3, built.rejected.join('; '))
+  for (const q of built.questions) {
+    assert.equal(q.chapter, 'General', `Q${q.pyqSlot} chapter is a Hybrid AI job after approval`)
+    assert.equal(q.topic, undefined)
+    assert.equal(q.toughnessLevel, undefined)
+  }
+  assert.equal(a.correctIndex, 2, 'an answer key printed on the paper stays')
+  assert.equal(a.solution, undefined)
+  assert.equal(b.correctIndex, undefined, 'a guessed answer is not kept at upload')
+  assert.equal(b.solution, undefined)
+  assert.equal(c.correctIndex, 1)
+  assert.match(String(c.solution), /Printed/)
+
+  const plain = { text: 'What is 2+3?', options: ['4', '5', '6', '7'] }
+  const plainBlock = 'What is 2+3?\n(A) 4\n(B) 5\n(C) 6\n(D) 7'
+  assert.equal(enrichParsedWithAnswerProvenance({ ...plain }, plainBlock).answerSource, 'ai_generated', 'the local solver would answer this one')
+  const paperOnly = enrichParsedWithAnswerProvenance({ ...plain }, plainBlock, { paperOnly: true })
+  assert.equal(paperOnly.correctIndex, undefined, 'upload does not solve')
+  assert.equal(paperOnly.solution, undefined, 'upload does not draft a solution')
+  assert.equal(paperOnly.answerSource, 'unknown')
+  const printed = enrichParsedWithAnswerProvenance({ ...plain }, `${plainBlock}\nAnswer: B`, { paperOnly: true })
+  assert.equal(printed.correctIndex, 1)
+  assert.equal(printed.answerSource, 'from_paper')
+
+  const importSrc = fs.readFileSync(path.join(process.cwd(), 'src/utils/officialPyqImportFile.js'), 'utf8')
+  assert.match(importSrc, /enrichParsedWithAnswerProvenance\(q, q\.text, \{ paperOnly: true \}\)/)
+  assert.doesNotMatch(importSrc, /fillOfficialPyq|enrichQuestionsLightClient/)
+  const extractSrc = fs.readFileSync(path.join(process.cwd(), 'src/utils/pyqGeminiExtract.js'), 'utf8')
+  assert.doesNotMatch(extractSrc, /tags, answers, solutions…/)
+  const pageSrc = fs.readFileSync(path.join(process.cwd(), 'src/pages/OfficialPyqPending.jsx'), 'utf8')
+  assert.doesNotMatch(pageSrc, /fillOfficialPyq(?:Approved|Pending)PaperPartByPart|fillOfficialPyqTags/, 'the page never starts Hybrid AI on its own')
+})
+
+test('2017 P2 layout: a number glued inside the formula ("Q. $51|…"), clause options, either-or keys, review notes and a picture option split right (JEE Adv 2017 P2)', () => {
+  const raw = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), 'fixtures', 'jee-advanced-2017-p2-mathpix.txt'), 'utf8')
+  const meta = { exam: 'jee-advanced', year: 2017, session: 'Paper 2', paperLabel: 'JEE Advanced 2017', sourceLabel: 'Official JEE Advanced archive' }
+
+  const facts = buildPaperFacts(raw)
+  assert.equal(facts.known, true, facts.notes.join(' | '))
+  assert.equal(facts.expectedQuestionCount, 54, '"Based on each paragraph, there are TWO questions" is read')
+  assert.equal(inferOcrQuestionCount(raw), 54, '"Q.44: Due to internal review…" notes are not counted as questions')
+
+  const built = questionsFromOfficialPyqExtract({ engine: 'mathpix', text: raw, questions: [] }, meta)
+  const qs = built.questions
+  assert.equal(qs.length, 54)
+  assert.equal(built.summary?.expected, 54)
+  qs.forEach((q, i) => assert.equal(q.subject, i < 18 ? 'physics' : i < 36 ? 'chemistry' : 'mathematics', `Q${i + 1} subject`))
+  const at = (n) => qs.find((q) => Number(q.printedNumber ?? q.pyqSlot) === n)
+
+  const q51 = at(51)
+  assert.match(q51.text, /\\overrightarrow\{O X\} \\times \\overrightarrow\{O Y\}/, 'Q51 is its own card')
+  assert.deepEqual(q51.options, ['$\\sin (P+Q)$', '$\\sin 2 R$', '$\\sin (P+R)$', '$\\sin (Q+R)$'])
+  assert.equal(q51.correctIndex, 0)
+  assert.match(at(52).text, /minimum value of/)
+  assert.deepEqual(at(52).options.map((o) => o.trim()), ['$-\\frac{5}{3}$', '$-\\frac{3}{2}$', '$\\frac{3}{2}$', '$\\frac{5}{3}$'])
+  assert.match(at(50).text, /\\sum_\{k=1\}\^\{98\}/)
+  assert.match(at(50).options[3], /49\}\{50\}/, 'Q50 does not swallow Q51')
+
+  assert.deepEqual(at(46).options, [
+    '$f(x)$ is increasing in $(0, \\infty)$',
+    '$f(x)$ is decreasing in $(0, \\infty)$',
+    '$f(x)>e^{2 x}$ in $(0, \\infty)$',
+    "$f'(x)<e^{2 x}$ in $(0, \\infty)$",
+  ])
+  assert.deepEqual(at(46).correctIndices, [0, 2])
+
+  const q24 = at(24)
+  assert.match(q24.options[1], /^(?:\\includegraphics\{|!\[\]\()https:\/\/cdn\.mathpix\.com\/[^\s]*top_left_y=1075/, 'Q24 option B is its picture')
+  assert.match(q24.options[2], /Oc1ccc2nnc3ccccc3c2c1/)
+  assert.equal(q24.correctIndex, 2)
+
+  assert.deepEqual(at(3).correctIndex, 3, 'two answer boxes on one line both read')
+  assert.deepEqual(at(4).correctIndex, 0)
+  assert.deepEqual(at(31).correctIndices, [0, 3])
+  assert.match(at(31).options[3], /ZnO/)
+  for (const n of [14, 29, 17, 44, 45]) {
+    const q = at(n)
+    assert.equal(q.answerSource, 'unknown', `Q${n} has no single printed answer`)
+    assert.ok(q.correctIndex == null && !q.correctIndices?.length, `Q${n} got a guessed answer`)
+  }
+  assert.equal(qs.filter((q) => q.answerSource === 'from_paper').length, 49)
+  for (const q of qs) {
+    const opts = (q.options || []).map((o) => String(o).trim())
+    assert.equal(opts.filter(Boolean).length, 4, `Q${q.pyqSlot} is missing an option`)
+    assert.equal(new Set(opts).size, 4, `Q${q.pyqSlot} has two options the same`)
+    const blob = JSON.stringify([q.text, q.options, q.passageText])
+    assert.ok(!/Ans\s+for\s+Q|internal\s+review|awarded|\}\$?\s+or\s+\$?\\\\\{/i.test(blob), `Q${q.pyqSlot} carries answer-box text`)
+  }
+
+  const stored = built.preparedText
+  assert.equal(inferOcrQuestionCount(stored), 54)
+  const again = questionsFromOfficialPyqExtract({ engine: 'builtin', text: sanitizeMathpixOcrText(stored), questions: [] }, meta, {
+    printedAnswerKey: readPrintedAnswerKey(stored),
+  })
+  assert.equal(again.questions.length, 54, 're-parse of the stored text keeps Q51')
+  assert.deepEqual(
+    again.questions.map((q) => [q.correctIndex, q.correctIndices]),
+    qs.map((q) => [q.correctIndex, q.correctIndices]),
+    're-parse of the stored text keeps the printed answers',
+  )
+
+  // Text stored by the older cleaner: "Ans for Q.14:" gone, the "\{…\} or \{…\}" half left behind.
+  const oldStored = raw.replace(/Ans for Q\.(?:14|29):\s*/g, '')
+  const fromOld = paperItemsFromMathpixOcr(sanitizeMathpixOcrText(oldStored), { paperMeta: meta })
+  assert.equal(fromOld.length, 54)
+  for (const q of fromOld) {
+    const blob = JSON.stringify([q.text, q.options])
+    assert.ok(!/\}\$?\s+or\s+\$?\\\\\{/.test(blob), `Q${q.pyqSlot ?? q.printedNumber} carries an old either-or box`)
+  }
+  assert.match(String(fromOld[30].options?.[3] ?? ''), /ZnO/, 'Q31 keeps its own options')
+})
+
+test('an upload lost to a dropped internet connection says so in plain words, never a bare "fetch failed" (2017 P2)', () => {
+  for (const raw of ['fetch failed', 'Fetch failed.', 'socket hang up', 'connect ETIMEDOUT 104.18.1.1:443', 'getaddrinfo ENOTFOUND api.mathpix.com']) {
+    const shown = formatOfficialPyqUploadError(new Error(raw))
+    assert.notEqual(shown, raw, raw)
+    assert.match(shown, /nothing was saved/i, raw)
+    assert.match(shown, /not in Pending approval/, raw)
+    assert.match(shown, /upload the file again/, raw)
+  }
+  const server = Object.assign(new Error('The internet connection to Mathpix dropped. Nothing was saved.'), { code: 'MATHPIX_NETWORK' })
+  assert.equal(formatOfficialPyqUploadError(server), server.message)
+  assert.match(formatOfficialPyqUploadError(new TypeError('Failed to fetch')), /port 3001/, 'the browser losing our own API keeps its own advice')
+
+  const mathpixSrc = fs.readFileSync(path.join(process.cwd(), 'server/mathpix.js'), 'utf8')
+  assert.match(mathpixSrc, /pollPdfUntilReady[\s\S]*withNetworkRetry/, 'waiting on Mathpix survives a short drop')
+  assert.match(mathpixSrc, /reusableMathpixPdfJob\(fileHash/, 'the same PDF uploaded again reuses the finished Mathpix read')
+})
+
+const p2Upload = await (async () => {
+  const raw = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), 'fixtures', 'jee-advanced-2017-p2-mathpix.txt'), 'utf8')
+  const realFetch = globalThis.fetch
+  const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+  globalThis.fetch = async (url) => {
+    const u = String(url)
+    if (u.endsWith('/mathpix/status')) return json({ configured: true, ready: true })
+    if (u.endsWith('/mathpix/extract')) return json({ text: raw, format: 'word' })
+    return json({ error: 'No cloud calls in this test.' }, 503)
+  }
+  try {
+    const { runMathpixThenGemini } = await import('../src/utils/mathpixGeminiPipeline.js')
+    const meta = { exam: 'jee-advanced', year: 2017, session: 'Paper 2', paperLabel: 'JEE Advanced 2017' }
+    const file = new File([new Uint8Array([37, 80, 68, 70])], '2017_2.pdf', { type: 'application/pdf' })
+    const result = await runMathpixThenGemini(file, { officialPyq: true, saveToBank: false, format: 'word', paperMeta: meta })
+    return { raw, result }
+  } catch (err) {
+    return err
+  } finally {
+    globalThis.fetch = realFetch
+  }
+})()
+
+test('an upload keeps the answers printed on the paper: the key is read from the raw OCR before cleaning cuts it out (JEE Adv 2017 P2)', () => {
+  if (p2Upload instanceof Error) throw p2Upload
+  const { raw, result } = p2Upload
+  assert.match(raw, /Ans for Q\.3:/, 'the raw OCR has the printed boxes')
+  assert.doesNotMatch(String(result.text), /Ans\s+for\s+Q/i, 'the cleaned text has none')
+  assert.ok(result.printedAnswerKey instanceof Map, 'the upload result carries the key read before cleaning')
+  assert.equal(result.printedAnswerKey.size, 49)
+
+  // extractMcqFromImage → extractPyqFileWithGemini → importFileToPending hand the key on unchanged.
+  const docSrc = fs.readFileSync(path.join(process.cwd(), 'src/utils/extractDocument.js'), 'utf8')
+  assert.match(docSrc, /printedAnswerKey: result\.printedAnswerKey/)
+  const extractSrc = fs.readFileSync(path.join(process.cwd(), 'src/utils/pyqGeminiExtract.js'), 'utf8')
+  assert.match(extractSrc, /printedAnswerKey: extracted\.printedAnswerKey/)
+  const extracted = {
+    engine: 'mathpix',
+    text: result.text,
+    questions: result.questions,
+    printedAnswerKey: result.printedAnswerKey,
+    localOcrText: result.text,
+    pdfText: result.text,
+    visionText: result.text,
+  }
+  const meta = { exam: 'jee-advanced', year: 2017, session: 'Paper 2', paperLabel: 'JEE Advanced 2017', sourceLabel: 'Official JEE Advanced archive' }
+  const built = questionsFromOfficialPyqExtract(extracted, meta)
+  const questions = built.questions.map((q) => {
+    const enriched = enrichParsedWithAnswerProvenance(q, q.text, { paperOnly: true })
+    return { ...enriched, answerSource: enriched.answerSource || 'unknown' }
+  })
+  localStorage.clear()
+  const paper = importQuestionsToOfficialPyqPending({ ...meta, preparedText: built.preparedText, questions })
+  const cards = paper.questions
+  assert.equal(cards.length, 54)
+  assert.equal(paper.status, 'pending_review')
+  const fromPaper = cards.filter((q) => q.answerSource === 'from_paper')
+  assert.equal(fromPaper.length, 49, 'every printed answer sits in its card')
+  assert.equal(cards[2].correctIndex, 3, 'Q3 (D)')
+  assert.equal(cards[3].correctIndex, 0, 'Q4 (A)')
+  assert.deepEqual(cards[30].correctIndices, [0, 3], 'Q31 (A) and (D)')
+  assert.equal(cards[50].correctIndex, 0, 'Q51 (A)')
+  for (const n of [14, 17, 29, 44, 45]) {
+    const q = cards[n - 1]
+    assert.equal(q.answerSource, 'unknown', `Q${n} has no single printed answer`)
+    assert.ok(q.correctIndex == null && !q.correctIndices?.length && q.correctInteger == null, `Q${n} stays empty`)
+  }
+  for (const q of cards) {
+    assert.doesNotMatch(JSON.stringify([q.text, q.options, q.passageText]), /Ans\s+for\s+Q/i, `Q${q.pyqSlot} shows no answer box`)
+  }
+  assert.match(String(paper.preparedText), /Ans for Q\.3: \(D\)/, 'the key is stored with the paper so a re-parse keeps it')
+  localStorage.clear()
+})
 if (failed) {
   console.error(`\n${failed} recurrence test(s) failed`)
   process.exit(1)

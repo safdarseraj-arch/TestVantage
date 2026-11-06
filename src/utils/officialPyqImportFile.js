@@ -94,7 +94,7 @@ export async function importFileToPending(file, meta, io = {}) {
     summary = built.summary ?? null
     extractSummaryLine = built.summary ? formatOfficialPyqExtractSummary(built.summary) : ''
     questions = built.questions.map((q) => {
-      const enriched = enrichParsedWithAnswerProvenance(q, q.text)
+      const enriched = enrichParsedWithAnswerProvenance(q, q.text, { paperOnly: true })
       return {
         ...enriched,
         answerSource: enriched.answerSource || 'unknown',

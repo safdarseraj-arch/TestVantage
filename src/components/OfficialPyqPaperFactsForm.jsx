@@ -194,7 +194,7 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
     light = null
   }
   const confirmedAt = Number(light?.adminFacts?.confirmedAt) || 0
-  const published = String(light?.status ?? '') === 'approved'
+  const published = String(light?.status ?? '') === 'approved' || String(light?.status ?? '') === 'published'
   if (published && !confirmedAt) return null
 
   function onToggle(e) {
@@ -280,7 +280,7 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
             Confirmed {new Date(confirmedAt).toLocaleString()}
           </span>
         ) : (
-          <span className="upload-error">Not confirmed — needed before Approve &amp; publish</span>
+          <span className="upload-error">Not confirmed — needed before Approve</span>
         )}
       </summary>
 

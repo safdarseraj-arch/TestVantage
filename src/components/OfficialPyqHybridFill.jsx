@@ -1,15 +1,16 @@
 /**
- * Pending Official PYQ: Hybrid AI fills metatags, answers, and solutions two questions at a time.
- * Each finished part is saved at once, so Stop or a timeout keeps the work already done.
+ * Approved Official PYQ: Hybrid AI fills metatags, answers, and solutions two questions at a time.
+ * Optional step between Approve and Publish. Each finished part is saved at once, so Stop or a
+ * timeout keeps the work already done. Answers printed on the paper stay.
  */
 import { useRef, useState } from 'react'
-import { fillOfficialPyqPendingPaperPartByPart } from '../utils/officialPyqPendingFill.js'
+import { fillOfficialPyqApprovedPaperPartByPart } from '../utils/officialPyqPendingFill.js'
 
 function keyIsMissing(err) {
   return /GEMINI_API_KEY|API key|api key is missing/i.test(String(err?.message || err || ''))
 }
 
-export default function OfficialPyqPendingFill({ paperId, onChanged }) {
+export default function OfficialPyqHybridFill({ paperId, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [redoAll, setRedoAll] = useState(false)
   const [note, setNote] = useState('')
@@ -24,7 +25,7 @@ export default function OfficialPyqPendingFill({ paperId, onChanged }) {
     setError('')
     setNote('Starting…')
     try {
-      const result = await fillOfficialPyqPendingPaperPartByPart(paperId, {
+      const result = await fillOfficialPyqApprovedPaperPartByPart(paperId, {
         redoAll,
         signal: ctl.signal,
         isFatal: keyIsMissing,
@@ -41,7 +42,7 @@ export default function OfficialPyqPendingFill({ paperId, onChanged }) {
         setNote('Every question already has its chapter, answer, and solution. Tick "Redo all" to fill again.')
       } else {
         setNote(
-          `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} question(s).${look}`,
+          `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} question(s). The paper is still Approved — press Publish when it looks right.${look}`,
         )
       }
     } catch (err) {
@@ -58,11 +59,15 @@ export default function OfficialPyqPendingFill({ paperId, onChanged }) {
   }
 
   return (
-    <div className="official-pyq-pending-fill" data-testid="official-pyq-pending-fill">
+    <div className="official-pyq-pending-fill" data-testid="official-pyq-hybrid-fill">
+      <p className="form-hint">
+        Optional: Hybrid AI fills the tags, answer, and solution, two questions at a time. Answers
+        printed on the paper and your own edits stay. Question wording does not change.
+      </p>
       <button
         type="button"
-        className="btn btn-secondary btn-sm"
-        data-testid="official-pyq-pending-fill-button"
+        className="btn btn-primary btn-sm"
+        data-testid="official-pyq-hybrid-fill-button"
         disabled={busy}
         aria-busy={busy}
         onClick={() => void onFill()}
@@ -73,7 +78,7 @@ export default function OfficialPyqPendingFill({ paperId, onChanged }) {
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          data-testid="official-pyq-pending-fill-stop"
+          data-testid="official-pyq-hybrid-fill-stop"
           onClick={() => {
             stopRef.current?.abort()
             setNote('Stopping after the two questions already sent…')
@@ -88,7 +93,7 @@ export default function OfficialPyqPendingFill({ paperId, onChanged }) {
         </label>
       )}
       {note ? (
-        <p className="official-pyq-progress" role="status" data-testid="official-pyq-pending-fill-note">
+        <p className="official-pyq-progress" role="status" data-testid="official-pyq-hybrid-fill-note">
           {note}
         </p>
       ) : null}

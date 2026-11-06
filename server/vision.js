@@ -1085,7 +1085,7 @@ export async function structureOcrWithGemini(body = {}) {
   for (let i = 0; i < chunks.length; i++) {
     if (Date.now() > deadline) break
     const extra = official
-      ? 'Official PYQ paper: split EVERY \\item[Q.] / Q.n into its own question. Instructions stay instructions, not extra questions. Returning 1 blob for a multi-question paper is wrong. Keep paper identity from context.'
+      ? 'Official PYQ paper: split EVERY \\item[Q.] / Q.n into its own question. Instructions stay instructions, not extra questions. Returning 1 blob for a multi-question paper is wrong. Keep paper identity from context. Split only: set chapter, topic, toughness, and solution to null, and give an answer only when the answer key is printed on the paper (answerKeyVisible true). Tags, answers, and solutions are filled later, after the paper is approved.'
       : deferSolutions
         ? 'Question-bank verify step: split every question with stem + options + questionType. Do NOT write solutions — set solution to null on every row. User will approve split first, then ask for solutions later.'
         : 'Question-bank upload: fill every field you can.'

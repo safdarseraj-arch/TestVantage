@@ -324,9 +324,9 @@ const paperUi = fs.readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/components/OfficialPyqReplicaControls.jsx'),
   'utf8',
 )
-const fillBtn = paperUi.indexOf('Ask Hybrid AI to fill')
-const similarBtn = paperUi.indexOf('Create four similar papers')
-assert.ok(fillBtn > 0 && similarBtn > fillBtn)
+assert.equal(paperUi.includes('Ask Hybrid AI to fill'), false, 'one fill button only: the post-approval Hybrid AI fill')
+assert.equal(paperUi.includes('applyOfficialPyqPublishedMeta'), false)
+assert.ok(paperUi.indexOf('Create four similar papers') > 0)
 assert.ok(paperUi.includes('−1, Same, +1, and +2'))
 assert.ok(paperUi.includes('Needs a look'))
 assert.ok(paperUi.includes('avoid_texts'))
@@ -393,7 +393,7 @@ const approveUi = fs.readFileSync(
 assert.ok(approveUi.includes("sub_bank_type = 'similar_pyq'"))
 
 const { officialPyqSolutionProblem, HYBRID_FILL_PART_SIZE } = await import('../src/utils/officialPyqReplica.js')
-const { applyHybridPatchToPendingCard, fillOfficialPyqPendingPaperPartByPart } = await import(
+const { applyHybridPatchToCard, fillOfficialPyqApprovedPaperPartByPart, HYBRID_FILL_NEEDS_APPROVAL } = await import(
   '../src/utils/officialPyqPendingFill.js'
 )
 const GOOD_SOLUTION = 'Use $\\det(kA)=k^3\\det A$.\n$\\det(2A)=8\\times 2=16$.\nAnswer: (B)'
@@ -455,7 +455,7 @@ assert.equal(stopCalls, 1)
 assert.equal(stopRows.length, 2)
 assert.equal(stopRows[1].skipped, true)
 
-const keptCard = applyHybridPatchToPendingCard(
+const keptCard = applyHybridPatchToCard(
   { text: 'Q', subject: 'physics', questionType: 'integer', correctInteger: 4, answerSource: 'from_paper' },
   { subject: 'chemistry', questionType: 'mcq', chapter: 'Kinematics', correctInteger: 7, solution: GOOD_SOLUTION },
 )
@@ -465,14 +465,51 @@ assert.equal(keptCard.correctInteger, 4)
 assert.equal(keptCard.chapter, 'Kinematics')
 assert.equal(keptCard.solution, GOOD_SOLUTION)
 assert.equal(keptCard.solutionSource, 'hybrid_ai')
-const handCard = applyHybridPatchToPendingCard(
+const handCard = applyHybridPatchToCard(
   { text: 'Q', adminEdited: true, solution: 'Mine.', correctIndex: 0 },
   { chapter: 'Optics', correctIndex: 2, solution: GOOD_SOLUTION },
 )
 assert.equal(handCard.solution, 'Mine.')
 assert.equal(handCard.correctIndex, 0)
 assert.equal(handCard.chapter, 'Optics')
+const sameAnswerCard = applyHybridPatchToCard(
+  { text: 'Q', correctIndex: 1, answerSource: 'unknown' },
+  { correctIndex: 1, correctIndices: [], correctInteger: '', correctNumerical: '' },
+)
+assert.equal(sameAnswerCard.answerSource, 'unknown', 'an answer Hybrid AI only repeats is not relabelled')
 
+function loginAs(role) {
+  sessionStorage.setItem('testvantage-session', JSON.stringify({ role, email: role + '@test', name: role, loggedInAt: 1 }))
+}
+const fillQuestions = [
+  { text: 'Fill stem one.', options: ['1', '2', '3', '4'], subject: 'mathematics', pyqSlot: 1 },
+  { text: 'Fill stem two.', options: ['1', '2', '3', '4'], subject: 'mathematics', pyqSlot: 2 },
+  {
+    text: 'Printed answer stem.',
+    options: ['1', '2', '3', '4'],
+    subject: 'mathematics',
+    pyqSlot: 3,
+    correctIndex: 3,
+    answerSource: 'from_paper',
+  },
+  {
+    text: 'Already done.',
+    options: ['1', '2', '3', '4'],
+    pyqSlot: 4,
+    chapter: 'Matrices & Determinants',
+    correctIndex: 1,
+    solution: GOOD_SOLUTION,
+  },
+]
+const pendingFillPaper = addOfficialPyqPendingPaper({
+  exam: 'jee-advanced',
+  year: 2022,
+  session: 'Paper 1',
+  paperLabel: 'JEE Advanced 2022 Paper 1',
+  paperId: 'jee-advanced-2022-pending-fill',
+  sourceLabel: 'test',
+  questions: fillQuestions,
+})
 const fillPaper = addOfficialPyqPendingPaper({
   exam: 'jee-advanced',
   year: 2022,
@@ -480,17 +517,8 @@ const fillPaper = addOfficialPyqPendingPaper({
   paperLabel: 'JEE Advanced 2022 Paper 2',
   paperId: 'jee-advanced-2022-part-fill',
   sourceLabel: 'test',
-  questions: [
-    { text: 'Fill stem one.', options: ['1', '2', '3', '4'], subject: 'mathematics' },
-    { text: 'Fill stem two.', options: ['1', '2', '3', '4'], subject: 'mathematics' },
-    {
-      text: 'Already done.',
-      options: ['1', '2', '3', '4'],
-      chapter: 'Matrices & Determinants',
-      correctIndex: 1,
-      solution: GOOD_SOLUTION,
-    },
-  ],
+  status: 'approved',
+  questions: fillQuestions,
 })
 const realFetch = globalThis.fetch
 const sentStems = []
@@ -504,30 +532,51 @@ globalThis.fetch = async (_url, init) => {
 }
 const progress = []
 try {
-  const filledRun = await fillOfficialPyqPendingPaperPartByPart(fillPaper.id, {
+  loginAs('admin')
+  await assert.rejects(fillOfficialPyqApprovedPaperPartByPart(pendingFillPaper.id), (err) => err.message === HYBRID_FILL_NEEDS_APPROVAL)
+  assert.equal(sentStems.length, 0, 'no Hybrid AI call before approval')
+  const filledRun = await fillOfficialPyqApprovedPaperPartByPart(fillPaper.id, {
     onProgress: (info) => progress.push(`${info.from}-${info.to}/${info.total}`),
   })
-  assert.equal(filledRun.asked, 2)
-  assert.equal(filledRun.filled, 2)
+  assert.equal(filledRun.asked, 3)
+  assert.equal(filledRun.filled, 3)
   assert.deepEqual(filledRun.needsLook, [])
 } finally {
   globalThis.fetch = realFetch
+  sessionStorage.removeItem('testvantage-session')
 }
-assert.deepEqual(sentStems.sort(), ['Fill stem one.', 'Fill stem two.'])
-assert.ok(progress.includes('1-2/3'))
+assert.deepEqual(sentStems.sort(), ['Fill stem one.', 'Fill stem two.', 'Printed answer stem.'])
+assert.ok(progress.includes('1-2/4'))
 const savedFill = getOfficialPyqPendingPaper(fillPaper.id)
+assert.equal(savedFill.status, 'approved', 'the fill keeps the paper approved, not published')
 assert.equal(savedFill.questions[0].correctIndex, 1)
 assert.equal(savedFill.questions[0].answerSource, 'hybrid_ai')
+assert.equal(savedFill.questions[0].solutionSource, 'hybrid_ai')
 assert.equal(savedFill.questions[1].solution, GOOD_SOLUTION)
 assert.equal(savedFill.questions[1].chapter, 'Matrices & Determinants')
 assert.equal(savedFill.questions[1].text, 'Fill stem two.')
+assert.equal(savedFill.questions[2].correctIndex, 3, 'the printed answer is never replaced')
+assert.equal(savedFill.questions[2].answerSource, 'from_paper')
+assert.equal(savedFill.questions[2].chapter, 'Matrices & Determinants')
+assert.equal(savedFill.questions[2].solution, GOOD_SOLUTION)
+assert.equal(savedFill.questions[3].correctIndex, 1)
+assert.equal(getOfficialPyqPendingPaper(pendingFillPaper.id).questions[0].chapter, undefined)
 
 const pendingPage = fs.readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/pages/OfficialPyqPending.jsx'),
   'utf8',
 )
 assert.equal(pendingPage.includes('enrichQuestionsLightClient'), false)
-assert.ok(pendingPage.includes('<OfficialPyqPendingFill'))
+const approvedBlock = pendingPage.indexOf("selected.status === 'approved' ? (")
+const hybridFillAt = pendingPage.indexOf('<OfficialPyqHybridFill')
+const publishedBlock = pendingPage.indexOf("selected.status === 'published' ? (")
+const rejectedBlock = pendingPage.indexOf("selected.status === 'rejected' ? (")
+assert.ok(
+  approvedBlock > 0 && hybridFillAt > approvedBlock && publishedBlock > hybridFillAt && rejectedBlock > publishedBlock,
+  'Hybrid AI fill sits on approved papers only',
+)
+assert.equal(pendingPage.split('<OfficialPyqHybridFill').length, 2, 'no Hybrid AI fill on pending papers')
+assert.equal(pendingPage.includes('OfficialPyqPendingFill'), false)
 assert.equal(approveUi.includes('enrichQuestionsLightClient'), false)
 
 console.log('official pyq replica ok')

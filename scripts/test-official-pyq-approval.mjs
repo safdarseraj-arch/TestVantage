@@ -73,7 +73,9 @@ const {
 
 const {
   approveOfficialPyqPaper,
+  publishOfficialPyqPaper,
   unpublishOfficialPyqPaper,
+  unapproveOfficialPyqPaper,
   rejectOfficialPyqPaper,
   dismissOfficialPyqPaper,
   dismissOfficialPyqSitting,
@@ -107,7 +109,8 @@ assert.ok(OFFICIAL_PYQ_SOURCE_SLOTS.length >= 6)
 assert.ok(listOfficialPyqSourceSlots('jee-advanced').every((s) => s.exam === 'jee-advanced'))
 assert.ok(getOfficialPyqSourceSlot('jee-adv-2024-p1')?.sourceUrl.includes('jeeadv.ac.in'))
 assert.equal(officialPyqStatusLabel('pending_review'), 'Pending approval')
-assert.equal(officialPyqStatusLabel('approved'), 'Published PYQ')
+assert.equal(officialPyqStatusLabel('approved'), 'Approved')
+assert.equal(officialPyqStatusLabel('published'), 'Published')
 assert.equal(
   assignOfficialPyqSaveId(
     {
@@ -238,12 +241,22 @@ const lockedNoFacts = validateOfficialPyqForApprove(getOfficialPyqPendingPaper(p
 assert.equal(lockedNoFacts.ok, false)
 assert.match(lockedNoFacts.errors.join(' '), /Paper facts are not confirmed/)
 
-// --- Approve → PYQ + published Question Bank ---
+// --- Reviewed — Approve: Approved, nothing for students yet ---
 const beforePyq = loadImportedPyqs().length
-const result = approveOfficialPyqPaper(withFacts(pending.id))
+const beforeBank = (loadQuestionBank().questions ?? []).length
+const approvedOnly = approveOfficialPyqPaper(withFacts(pending.id))
+assert.equal(approvedOnly.ok, true, approvedOnly.errors?.join(' '))
+assert.equal(approvedOnly.questionCount, 2)
+assert.equal(getOfficialPyqPendingPaper(pending.id).status, 'approved')
+assert.equal(loadImportedPyqs().length, beforePyq, 'approve alone must not reach student PYQ')
+assert.equal((loadQuestionBank().questions ?? []).length, beforeBank, 'approve alone must not reach the bank')
+
+// --- Publish → PYQ + published Question Bank ---
+const result = publishOfficialPyqPaper(pending.id)
 assert.equal(result.ok, true, result.errors?.join(' '))
 assert.equal(result.pyqCount, 2)
 assert.equal(result.bankCount, 2)
+assert.equal(getOfficialPyqPendingPaper(pending.id).status, 'published')
 
 const pyqs = loadImportedPyqs()
 assert.equal(pyqs.length, beforePyq + 2)
@@ -283,41 +296,51 @@ assert.equal(pyqAfterTag.subject, 'chemistry')
 assert.equal(pyqAfterTag.chapter, 'Thermodynamics')
 assert.equal(pyqAfterTag.topic, 'Enthalpy')
 
-const approvedRow = listOfficialPyqPendingPapers('approved').find((p) => p.id === pending.id)
-assert.equal(approvedRow?.status, 'approved')
+const publishedRow = listOfficialPyqPendingPapers('published').find((p) => p.id === pending.id)
+assert.equal(publishedRow?.status, 'published')
 
 const double = approveOfficialPyqPaper(withFacts(pending.id))
 assert.equal(double.ok, false)
+assert.match((double.errors || []).join(' '), /already published/i)
+assert.match((double.errors || []).join(' '), /unpublish/i)
+const doublePublish = publishOfficialPyqPaper(pending.id)
+assert.equal(doublePublish.ok, false)
+assert.match((doublePublish.errors || []).join(' '), /already published/i)
 
 const publishedCount = loadImportedPyqs().filter((q) => q.paperId === pending.paperId).length
-updateOfficialPyqPendingPaper(pending.id, { status: 'pending_review' })
-const againWhileLive = approveOfficialPyqPaper(withFacts(pending.id))
-assert.equal(againWhileLive.ok, false)
-assert.match((againWhileLive.errors || []).join(' '), /already published/i)
-assert.match((againWhileLive.errors || []).join(' '), /unapprove/i)
-assert.equal(
-  loadImportedPyqs().filter((q) => q.paperId === pending.paperId).length,
-  publishedCount,
-  'a second publish must not add another copy',
-)
-updateOfficialPyqPendingPaper(pending.id, { status: 'approved' })
+const publishedIds = getOfficialPyqPendingPaper(pending.id).questions.map((q) => q.id)
 
 sessionStorage.setItem(
   'testvantage-session',
   JSON.stringify({ role: 'admin', email: 'admin@test', name: 'Admin', loggedInAt: 1 }),
 )
+// Unpublish: Published → Approved, gone from students, ids stay on the cards
 const unpub = unpublishOfficialPyqPaper(pending.id)
 assert.equal(unpub.ok, true, unpub.error)
-assert.equal(unpub.paper?.status, 'pending_review')
+assert.equal(unpub.paper?.status, 'approved')
 assert.ok(unpub.pyqRemoved >= 2)
-assert.equal(listOfficialPyqPendingPapers('approved').find((p) => p.id === pending.id), undefined)
-assert.equal(listOfficialPyqPendingPapers('pending_review').find((p) => p.id === pending.id)?.status, 'pending_review')
+assert.equal(listOfficialPyqPendingPapers('published').find((p) => p.id === pending.id), undefined)
+assert.equal(listOfficialPyqPendingPapers('approved').find((p) => p.id === pending.id)?.status, 'approved')
 assert.equal(loadImportedPyqs().filter((q) => q.paperId === pending.paperId).length, 0)
+assert.deepEqual(getOfficialPyqPendingPaper(pending.id).questions.map((q) => q.id), publishedIds)
 
-// Re-approve after unpublish must work again
+// Send back for review: Approved → Pending
+const back = unapproveOfficialPyqPaper(pending.id)
+assert.equal(back.ok, true, back.error)
+assert.equal(getOfficialPyqPendingPaper(pending.id).status, 'pending_review')
+
+// Re-approve and publish again: same final ids, one copy only
 const reap = approveOfficialPyqPaper(withFacts(pending.id))
 assert.equal(reap.ok, true, reap.errors?.join(' '))
 assert.equal(listOfficialPyqPendingPapers('approved').find((p) => p.id === pending.id)?.status, 'approved')
+const repub = publishOfficialPyqPaper(pending.id)
+assert.equal(repub.ok, true, repub.errors?.join(' '))
+assert.deepEqual(repub.questionIds, publishedIds, 'publishing again keeps the final ids')
+assert.equal(
+  loadImportedPyqs().filter((q) => q.paperId === pending.paperId).length,
+  publishedCount,
+  'a second publish must not add another copy',
+)
 
 // --- Direct add path ---
 const direct = addOfficialPyqPendingPaper({

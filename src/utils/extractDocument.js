@@ -31,6 +31,7 @@ import {
 import { repairWordSymbolFontText } from './wordSymbolFont.js'
 import { ocrEngineBadgeLabel } from './cloudVisionClient.js'
 import { extractTextFromPptx, isPptxFile } from './pptExtract.js'
+import { readPrintedAnswerKey } from './printedAnswerKey.js'
 
 export { wordExtractLooksBroken } from './wordOmmlExtract.js'
 export { repairWordSymbolFontText } from './wordSymbolFont.js'
@@ -381,9 +382,11 @@ export async function extractMcqFromImage(file, onProgress, opts = {}) {
         paperMeta,
         engine: 'word',
       })
+      const printedAnswerKey = readPrintedAnswerKey(text)
       return {
         text: structured.text || text,
         questions: structured.questions,
+        ...(printedAnswerKey.size ? { printedAnswerKey } : {}),
         engine: /** @type {McqExtractEngine} */ ('word'),
         cloudNote: structured.cloudNote,
         ocrWeakness: structured.ocrWeakness,
@@ -416,6 +419,7 @@ export async function extractMcqFromImage(file, onProgress, opts = {}) {
     return {
       text: result.text,
       questions: result.questions,
+      ...(result.printedAnswerKey ? { printedAnswerKey: result.printedAnswerKey } : {}),
       engine: /** @type {McqExtractEngine} */ ('mathpix'),
       cloudNote: result.cloudNote,
       ocrWeakness: result.ocrWeakness,

@@ -33,6 +33,7 @@ import {
 } from './parsePaperSectionMap.js'
 import { stripTrailingPyqSectionHeader } from './bulkExtractClean.js'
 import { shapeOfficialPyqDrafts } from './officialPyqPaperFacts.js'
+import { stripAwardedToAllNotes, stripPrintedAnswerBoxes } from './printedAnswerKey.js'
 
 function guessQuestionType(text, optionsFound) {
   if ((optionsFound ?? 0) >= 2) return 'single_correct'
@@ -58,7 +59,7 @@ function sectionStartRe() {
 }
 
 function paragraphStartRe() {
-  return /(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/gi
+  return /(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}(?:\s*,\s*Q\.?\s*\d{1,3})*\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/gi
 }
 
 const SECTION_CUT_RE =
@@ -107,7 +108,9 @@ const NEXT_FULL_STEM_RE =
 export function sanitizeMathpixOcrText(raw) {
   return restoreGluedQuestionNumbers(
     preCleanMathpixOcr(
-      String(raw ?? '')
+      stripPrintedAnswerBoxes(String(raw ?? ''))
+        // A \begin{table} left before the next group's caption sticks to the last option.
+        .replace(/\\(?:begin|end)\{table\}|\\captionsetup\{[^{}]*\}/g, '')
         .replace(/^\uFEFF/, '')
         .replace(/\uFFFD+/g, '')
         .replace(/\u0000/g, '')
@@ -135,12 +138,14 @@ export function restoreGluedQuestionNumbers(text) {
         prev = Number(inside)
         return whole
       }
-      if (!digits || (dollar && !/^\\item/.test(marker))) return whole
+      if (!digits) return whole
       const want = String(prev + 1)
       const next = String(str)
         .slice(offset + whole.length)
         .match(/\\item\s*\[\s*Q\s*\.?\s*(\d{1,3})?\s*\]\s*\$?(\d{1,3})?\b|\n[ \t]*Q\s*\.\s*(\d{1,3})\b/)
       const nextN = Number(next?.[1] ?? next?.[2] ?? next?.[3])
+      // A bare "Q. $51|…" line (2017 P2) only counts when the next marker is 52.
+      if (dollar && !/^\\item/.test(marker) && !(Number(digits) === prev + 1 && nextN === prev + 2)) return whole
       if (Number(digits) === prev + 1 && !(dollar && nextN === prev + 1)) {
         prev += 1
         return dollar ? `${marker}${digits} $` : whole
@@ -239,7 +244,19 @@ function collectParagraphStarts(text) {
 
 /** @param {unknown} raw */
 export function countMathpixQuestionMarkers(raw) {
-  return collectMarkerStarts(String(raw ?? '')).length
+  return collectMarkerStarts(restoreGluedQuestionNumbers(stripAwardedToAllNotes(raw))).length
+}
+
+/** "[A] text" in the A slot: the card already draws the letter. "(A) only" is the option's own words. */
+export function stripOwnOptionLabel(opt, index) {
+  const s = String(opt ?? '')
+  const letter = 'ABCD'[index]
+  if (!letter) return s
+  const m = s.match(/^\s*(?:\[\s*([A-D])\s*\]|\(\s*([A-D])\s*\)(?=\s)|([A-D])\s*[.:)](?=\s))\s*/)
+  if (!m || (m[1] || m[2] || m[3]) !== letter) return s
+  const rest = s.slice(m[0].length)
+  if (!rest.trim() || /^(?:only|and|or|both|,|&|→|-|\\rightarrow)/i.test(rest)) return s
+  return rest
 }
 
 function stripKeyLeak(opt) {
@@ -503,7 +520,10 @@ export function extractLatexItemizeMcq(raw) {
   const cut = stripSectionAndItemizeFromStem(head)
   const stem = stripVisibleItemizeCommands(cut.stem)
   if (stem.length < 12) return null
-  return { stem, options: parts.slice(0, 4).map(inlineOptionTabulars).map(stripVisibleItemizeCommands) }
+  return {
+    stem,
+    options: parts.slice(0, 4).map(inlineOptionTabulars).map(stripVisibleItemizeCommands).map(stripOwnOptionLabel),
+  }
 }
 
 function startOfSecondStem(text, letIndex) {
@@ -686,7 +706,7 @@ export function findGluedNextQuestionStart(raw) {
   const t = String(raw ?? '')
   if (t.length < 48) return -1
 
-  const midPara = t.slice(40).search(/\n\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/i)
+  const midPara = t.slice(40).search(/\n\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}(?:\s*,\s*Q\.?\s*\d{1,3})*\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/i)
   if (midPara >= 0) {
     const abs = 40 + midPara
     const head = t.slice(0, abs)
@@ -977,6 +997,9 @@ function peelSmilesAsOptions(raw) {
   if (labelled) return labelled
   const chunks = extractSmilesOptionChunks(t)
   if (chunks.length < 2) return null
+  // One stem structure + four choices is five. Six or more unlabelled structures are a
+  // list the question counts ("the number of aromatic compounds is"); peeling would drop the middle ones.
+  if (chunks.length >= 6) return null
   const mixed = chunks.length < 4 ? mixedSmilesFigureOptions(t) : null
   if (mixed) return { stem: stripVisibleItemizeCommands(mixed.stem), options: mixed.options }
   const optionChunks = chunks.length >= 5 ? chunks.slice(-4) : chunks.slice(0, 4)
@@ -1068,7 +1091,7 @@ export function recoverOptionsFromStem(stem, options) {
     }
   }
   const finish = (stemText, optionList, instructionText = '') => ({
-    options: (optionList || []).map(stripKeyLeak).slice(0, 4),
+    options: (optionList || []).map(stripKeyLeak).slice(0, 4).map(stripOwnOptionLabel),
     stem: stripTrailingPyqSectionHeader(stripVisibleItemizeCommands(stemText)),
     instructionText,
   })
@@ -1457,9 +1480,9 @@ function blockToMathpixDraft(block, i, attached, paper) {
 }
 
 const MATCH_PARAGRAPH_RE =
-  /(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*(\d{1,3})\s+and\s+Q\.?\s*(\d{1,3})\s+by\s+appropriately\s+matching[^\n]*/gi
+  /(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*(\d{1,3})(?:\s*,\s*Q\.?\s*\d{1,3})*\s+and\s+Q\.?\s*(\d{1,3})\s+by\s+appropriately\s+matching[^\n]*/gi
 const MATCH_INSTRUCTION_CARD_RE =
-  /^\s*Answer\s+Q\.?\s*(\d{1,3})\s+and\s+Q\.?\s*(\d{1,3})\s+by\s+appropriately\s+matching/i
+  /^\s*Answer\s+Q\.?\s*(\d{1,3})(?:\s*,\s*Q\.?\s*\d{1,3})*\s+and\s+Q\.?\s*(\d{1,3})\s+by\s+appropriately\s+matching/i
 
 /**
  * "Answer Q. 15 and Q. 16 by appropriately matching the lists based on the
@@ -1480,7 +1503,13 @@ export function matchListParagraphsFromOcr(raw) {
       new RegExp(`(?:^|\\n)\\s*(?:\\\\item\\s*\\[\\s*Q[^\\]]*\\]\\s*|Q\\s*\\.?\\s*)${from}\\b`),
     )
     if (end < 20) continue
-    const body = cleanMathpixCardText(stripVisibleItemizeCommands(after.slice(0, end)))
+    // 2017 prints the table inside \begin{table} with a caption; only the tabular is the passage.
+    const unwrapped = after
+      .slice(0, end)
+      .replace(/^\s*\}/, '')
+      .replace(/\\(?:begin|end)\{table\}|\\captionsetup\{[^{}]*\}|\\caption\{\s*Space for rough work\s*\}/g, '')
+      .replace(/(?:\\section\*?\{\s*)?Space for rough work\s*\}?/gi, '')
+    const body = cleanMathpixCardText(stripVisibleItemizeCommands(unwrapped))
     if (body.length < 40) continue
     const instruction = m[0].replace(/^\\section\*?\{\s*/, '').replace(/\}\s*$/, '').trim()
     out.push({ from, to, passageText: `${instruction}\n\n${body}` })

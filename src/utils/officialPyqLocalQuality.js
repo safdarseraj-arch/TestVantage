@@ -13,6 +13,7 @@ import {
   getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
   listOfficialPyqPendingSummaries,
+  officialPyqQuestionsArePublishedLocked,
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
 import { peelOfficialPyqCardForDisplay } from './passage.js'
@@ -447,7 +448,7 @@ export function repairOfficialPyqUntilQuality(paper) {
 export function persistOfficialPyqQualityRun(paper) {
   if (!paper?.id) return null
   const full = getOfficialPyqPendingPaper(paper.id) || paper
-  if (String(full?.status ?? '') === 'approved') return full
+  if (officialPyqQuestionsArePublishedLocked(full)) return full
   const ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
   let repaired
   try {

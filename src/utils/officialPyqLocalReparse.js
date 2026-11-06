@@ -52,6 +52,7 @@ import {
   getOfficialPyqPendingPaper,
   updateOfficialPyqPendingPaper,
   officialPyqQuestionsArePublishedLocked,
+  officialPyqWordingLockedMessage,
 } from './officialPyqPendingStore.js'
 import { splitOcrInWorker, rememberOfficialPyqSplitKeep } from './officialPyqSplitWorker.js'
 import {
@@ -159,9 +160,6 @@ function healOfficialPyqPaperQuestionsEnriched(paper, opts) {
   )
 }
 
-const PUBLISHED_LOCK_ERROR =
-  'This paper is published. Unpublish it before re-parse or heal can change its questions.'
-
 /**
  * Heal fragment cards (53 → ~51) and persist when safe.
  * @param {import('./officialPyqPendingStore.js').OfficialPyqPendingPaper | null | undefined} paper
@@ -176,7 +174,7 @@ export function healAndPersistOfficialPyqPaper(paper, opts = {}) {
       count: n,
       previousCount: n,
       questions: paper?.questions ?? [],
-      error: officialPyqQuestionsArePublishedLocked(paper) ? PUBLISHED_LOCK_ERROR : '',
+      error: officialPyqQuestionsArePublishedLocked(paper) ? officialPyqWordingLockedMessage(paper) : '',
     }
   }
   if (!paper?.id || !['pending_review', 'rejected'].includes(status)) {
@@ -501,7 +499,7 @@ export function reExtractOfficialPyqPendingPaperLocal(paper) {
     const n = paper.questions?.length ?? 0
     return {
       ok: false,
-      error: PUBLISHED_LOCK_ERROR,
+      error: officialPyqWordingLockedMessage(paper),
       questions: paper.questions ?? [],
       count: n,
       previousCount: n,
@@ -693,7 +691,7 @@ export async function reExtractOfficialPyqPendingPaperLocalAsync(paper, { yieldF
     const n = paper.questions?.length ?? 0
     return {
       ok: false,
-      error: PUBLISHED_LOCK_ERROR,
+      error: officialPyqWordingLockedMessage(paper),
       questions: paper.questions ?? [],
       count: n,
       previousCount: n,

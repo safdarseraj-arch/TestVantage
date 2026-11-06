@@ -623,10 +623,12 @@ export function enrichPassageSubQuestion(sq, chunk = '') {
  * Enrich a parsed question (single or bulk item) with answer/solution provenance.
  * Paper answers win over AI; never overwrite an existing explicit correctIndex from caller
  * unless it came from the same enrich pass.
+ * `paperOnly` keeps what the paper prints and stops there: no solving, no drafted solution.
  * @param {Record<string, unknown>} parsed
  * @param {string} [rawBlock]
+ * @param {{ paperOnly?: boolean }} [opts]
  */
-export function enrichParsedWithAnswerProvenance(parsed, rawBlock = '') {
+export function enrichParsedWithAnswerProvenance(parsed, rawBlock = '', opts = {}) {
   const block = String(rawBlock || parsed?.text || '')
   const paperAns = detectAnswerFromPaper(block)
   const paperSol = detectSolutionFromPaper(block)
@@ -683,6 +685,11 @@ export function enrichParsedWithAnswerProvenance(parsed, rawBlock = '') {
   } else if (out.solution && !out.solutionSource) {
     out.solutionSource = paperSol.solutionSource === 'from_paper' ? 'from_paper' : 'from_paper'
     out.solutionConfidence = paperSol.solutionConfidence || 80
+  }
+
+  if (opts.paperOnly === true) {
+    if (!out.answerSource) out.answerSource = 'unknown'
+    return out
   }
 
   const stillNoAnswer =

@@ -57,7 +57,7 @@ export function buildPaperFacts(raw) {
   const sections = []
   const notes = []
   const re =
-    /This section contains\s+([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)/gi
+    /This section contains\s+([A-Za-z]+|\d+)\s*(?:\(\s*0*(\d+)\s*\)\s*)?(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)/gi
   let m
   let subject = ''
   let sawHeading = false
@@ -84,7 +84,12 @@ export function buildPaperFacts(raw) {
     const kind = String(m[3] || '').toLowerCase()
     const n = wordNumber(m[1], m[2])
     const ahead = text.slice(at, at + 500)
-    const stop = ahead.slice(20).search(/This section contains|\bSECTION\s*[-–]?\s*\d/i)
+    // "This section contains TWO tables" (2017) describes the same section, so it does not end the window.
+    const stop = ahead
+      .slice(20)
+      .search(
+        /This section contains\s+(?:[A-Za-z]+|\d+)\s*(?:\(\s*0*\d+\s*\)\s*)?(?:question|paragraph|matching list|list[-\s]match)|\bSECTION\s*[-–]?\s*\d/i,
+      )
     const window = stop >= 0 ? ahead.slice(0, stop + 20) : ahead
     let count = 0
     let stems = 0
@@ -97,6 +102,10 @@ export function buildPaperFacts(raw) {
         ) ||
         window.match(
           /\beach\b[^.\n]{0,120}?([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*(?:multiple\s+choice\s+)?questions?/i,
+        ) ||
+        // 2017: "Based on each paragraph, there are TWO questions" (no "(02)").
+        window.match(
+          /\beach\s+(?:paragraph|passage|question\s+stem|stem)\b[^.\n]{0,40}?\bthere\s+(?:are|is)\s+([A-Za-z]+|\d+)()\s+(?:multiple\s+choice\s+)?questions?/i,
         )
       const k = each ? wordNumber(each[1], each[2]) : 0
       count = k ? n * k : 0
@@ -146,9 +155,14 @@ function filledOptions(options) {
   return (Array.isArray(options) ? options : []).map((o) => String(o ?? '').trim()).filter(Boolean)
 }
 
+/** "Answer Q.13, Q. 14 and Q. 15 by appropriately matching …" (2017 tables, 2019 paragraphs). */
+const MATCH_GROUP_HEAD_RE =
+  /^(?:\\(?:section\*?|caption)\{)?\s*Answer\s+Q\.?\s*\d{1,3}(?:\s*,\s*Q\.?\s*\d{1,3})*\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/i
+
 export function isPassageOnlyCard(q) {
   const t = String(q?.text ?? '').trim()
   if (!t) return false
+  if (MATCH_GROUP_HEAD_RE.test(t) && !/\\item\s*\[\s*Q|(?:^|\n)\s*\[\s*A\s*\]/.test(t)) return true
   const opts = filledOptions(q?.options)
   if (opts.length >= 2) return false
   return /^(?:\\section\*?\{[^}]*\})?\s*(?:Paragraph|PARAGRAPH|Passage|Question\s+Stem)\b/i.test(t)
@@ -175,7 +189,10 @@ function passageBodyFromCard(text) {
 }
 
 function namedStemNums(text) {
-  const m = String(text ?? '').match(/Question\s+Nos?\.?\s*(\d{1,2})\s+and\s+(\d{1,2})/i)
+  const t = String(text ?? '')
+  const head = t.match(MATCH_GROUP_HEAD_RE)
+  if (head) return [...head[0].matchAll(/Q\.?\s*(\d{1,3})/gi)].map((m) => Number(m[1])).filter((n) => n > 0)
+  const m = t.match(/Question\s+Nos?\.?\s*(\d{1,2})\s+and\s+(\d{1,2})/i)
   if (!m) return []
   return [Number(m[1]), Number(m[2])].filter((n) => n > 0)
 }

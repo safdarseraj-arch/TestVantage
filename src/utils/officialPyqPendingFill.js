@@ -1,5 +1,6 @@
 /**
  * Hybrid AI fill for Official PYQ cards: metatags, answer, and solution.
+ * Its own step on an Approved paper, before Publish — upload stops at the local split.
  * Part by part — two questions at a time, one Gemini request per question —
  * and each finished part is saved before the next starts, so a timeout loses nothing.
  * The stem, options, and figures are never changed.
@@ -7,8 +8,15 @@
 import { fillOfficialPyqTags } from './hybridAiClient.js'
 import { mapExamSlugToHybridLabel, mapSubjectSlugToHybridLabel } from './hybridMetadata.js'
 import { HYBRID_FILL_PART_SIZE, fillPaperQuestionByQuestion } from './officialPyqReplica.js'
-import { getOfficialPyqPendingPaper, updateOfficialPyqPendingPaper } from './officialPyqPendingStore.js'
+import { getOfficialPyqPendingPaper, officialPyqCardIsAdminEdited } from './officialPyqPendingStore.js'
+import { applyOfficialPyqPublishedMeta } from './officialPyqPublishedMeta.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
+
+export const HYBRID_FILL_NEEDS_APPROVAL =
+  'Hybrid AI fills tags, answers, and solutions only on an Approved paper. Approve it first; if it is published, Unpublish it first.'
+
+/** Answers and solutions Hybrid AI must leave alone: printed on the paper or typed by an admin. */
+const KEPT_SOURCES = new Set(['from_paper', 'manual'])
 
 /** Stored answer as Hybrid AI reads it: letter(s) or the number. */
 export function currentAnswerText(question) {
@@ -46,9 +54,10 @@ export function hybridFillRequestForQuestion(question, paperExam = '') {
   }
 }
 
-/** True when the card already has its chapter, an answer, and a solution. */
+/** True when the card already has a real chapter (not "General"), an answer, and a solution. */
 export function officialPyqCardIsFilled(q) {
-  return Boolean(String(q?.chapter || '').trim() && currentAnswerText(q) && String(q?.solution || '').trim())
+  const chapter = String(q?.chapter || '').trim()
+  return Boolean(chapter && !/^general$/i.test(chapter) && currentAnswerText(q) && String(q?.solution || '').trim())
 }
 
 function has(value) {
@@ -56,12 +65,12 @@ function has(value) {
 }
 
 /**
- * Put one Hybrid AI patch on a pending card. The answer printed with the paper
+ * Put one Hybrid AI patch on a card. The answer printed with the paper
  * and a hand-edited answer or solution win; subject and type set by the paper
  * facts stay. Only fills — never touches the stem, options, or figures.
  * @param {any} card @param {any} patch
  */
-export function applyHybridPatchToPendingCard(card, patch) {
+export function applyHybridPatchToCard(card, patch) {
   if (!card || !patch) return card
   const next = { ...card }
   if (!has(card.subject) && has(patch.subject)) next.subject = patch.subject
@@ -70,39 +79,63 @@ export function applyHybridPatchToPendingCard(card, patch) {
     if (has(patch[key])) next[key] = patch[key]
   }
   if (Array.isArray(patch.examIds) && patch.examIds.length) next.examIds = patch.examIds
-  const handEdited = card.adminEdited === true
-  if (!handEdited && card.answerSource !== 'from_paper') {
-    const answer = currentAnswerText(patch)
-    if (answer) {
-      next.correctIndex = patch.correctIndex
-      next.correctIndices = patch.correctIndices
-      next.correctInteger = patch.correctInteger
-      next.correctNumerical = patch.correctNumerical
-      next.answerSource = 'hybrid_ai'
-    }
+  const handEdited = officialPyqCardIsAdminEdited(card)
+  const answer = currentAnswerText(patch)
+  if (!handEdited && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
+    next.correctIndex = patch.correctIndex
+    next.correctIndices = patch.correctIndices
+    next.correctInteger = patch.correctInteger
+    next.correctNumerical = patch.correctNumerical
+    next.answerSource = 'hybrid_ai'
   }
-  if (!handEdited && card.solutionSource !== 'from_paper' && has(patch.solution) && patch.solution !== card.solution) {
+  if (!handEdited && !KEPT_SOURCES.has(card.solutionSource) && has(patch.solution) && patch.solution !== card.solution) {
     next.solution = patch.solution
     next.solutionSource = 'hybrid_ai'
   }
   return next
 }
 
+/** Tags, answer, and solution of a card, shaped for the Approved-paper save. */
+function publishedPatchFromCard(card) {
+  return {
+    questionId: card.id,
+    expectText: String(card.text ?? card.stem ?? ''),
+    subject: card.subject,
+    section: card.section || card.unit,
+    chapter: card.chapter,
+    topic: card.topic,
+    questionType: card.questionType,
+    examIds: card.examIds,
+    toughnessLevel: card.toughnessLevel,
+    source: card.source,
+    solution: card.solution,
+    correctIndex: card.correctIndex,
+    correctIndices: card.correctIndices,
+    correctInteger: card.correctInteger,
+    correctNumerical: card.correctNumerical,
+    answerSource: card.answerSource,
+    solutionSource: card.solutionSource,
+  }
+}
+
 /**
- * Fill a pending paper part by part and save after every part.
+ * Fill an Approved paper part by part and save after every part. The paper stays
+ * Approved (students do not see it until Publish); the save goes through the
+ * Approved-paper tag path, so the question wording cannot change.
  * @param {string} paperId
  * @param {{ redoAll?: boolean, signal?: AbortSignal, onProgress?: (info: { from: number, to: number, total: number, filled: number, needsLook: number[] }) => void, isFatal?: (err: Error) => boolean }} [opts]
  */
-export async function fillOfficialPyqPendingPaperPartByPart(paperId, opts = {}) {
+export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {}) {
   const paper = getOfficialPyqPendingPaper(paperId)
-  const questions = Array.isArray(paper?.questions) ? paper.questions : []
+  if (!paper || paper.status !== 'approved') throw new Error(HYBRID_FILL_NEEDS_APPROVAL)
+  const questions = Array.isArray(paper.questions) ? paper.questions : []
   const total = questions.length
   let filled = 0
   /** @type {number[]} */
   const needsLook = []
   const rows = await fillPaperQuestionByQuestion(
     questions,
-    (question) => fillOfficialPyqTags(hybridFillRequestForQuestion(question, paper?.exam)),
+    (question) => fillOfficialPyqTags(hybridFillRequestForQuestion(question, paper.exam)),
     {
       concurrency: HYBRID_FILL_PART_SIZE,
       signal: opts.signal,
@@ -117,11 +150,14 @@ export async function fillOfficialPyqPendingPaperPartByPart(paperId, opts = {}) 
         if (row.needsLook) needsLook.push(row.index + 1)
         if (!row.patch) return
         const latest = getOfficialPyqPendingPaper(paperId)
-        const list = Array.isArray(latest?.questions) ? latest.questions.slice() : []
-        const card = list[row.index]
+        if (latest?.status !== 'approved') throw new Error(HYBRID_FILL_NEEDS_APPROVAL)
+        const card = latest.questions?.[row.index]
         if (!card || String(card.text ?? card.stem ?? '') !== row.patch.expectText) return
-        list[row.index] = applyHybridPatchToPendingCard(card, row.patch)
-        if (updateOfficialPyqPendingPaper(paperId, { questions: list })) filled += 1
+        // A solution that still reads like a hint or an essay is not saved.
+        const patch = row.problem ? { ...row.patch, solution: card.solution } : row.patch
+        const result = applyOfficialPyqPublishedMeta(paperId, row.index, publishedPatchFromCard(applyHybridPatchToCard(card, patch)))
+        if (!result.ok) throw new Error(result.error || `Could not save question ${row.index + 1}.`)
+        filled += 1
       },
     },
   )

@@ -1,8 +1,10 @@
 /**
  * Official PYQ approval state machine:
- *   pending_review → approved  (publish to student PYQ + Question Bank)
- *   pending_review → rejected  (stay out of PYQ / bank)
- *   approved → pending_review  (unpublish: pull from student PYQ + bank)
+ *   pending_review → approved   (Reviewed — Approve: not shown to students yet)
+ *   approved → published        (Publish: final question ids, student PYQ + Question Bank)
+ *   published → approved        (Unpublish: pull from student PYQ + bank)
+ *   approved → pending_review   (send back for review)
+ *   pending_review → rejected   (stay out of PYQ / bank)
  *
  * Never invents official papers. AI solutions stay labelled separately.
  */
@@ -31,19 +33,23 @@ import {
   prepareOfficialPyqHealContext,
 } from './extendTruncatedStem.js'
 import { enrichMatchListsFromOcr } from './restoreMatchListsOcr.js'
-import { addImportedPyqs, loadImportedPyqs, saveImportedPyqs } from './pyqStore.js'
+import { addImportedPyqs } from './pyqStore.js'
 import {
-  ALREADY_PUBLISHED_MESSAGE,
-  officialPyqPublishSittingKey,
-  officialPyqPublishSittingKeyFromPaper,
-  officialPyqSittingHasPublishedQuestions,
+  OFFICIAL_PYQ_ALREADY_PUBLISHED_MESSAGE,
   removeOlderDuplicateOfficialPyqPublishes,
-  writeQuestionBankSnapshot,
 } from './officialPyqPublishOnce.js'
+import {
+  officialPyqFinalIdContext,
+  officialPyqKeptIdsWithCards,
+  officialPyqRowBelongsToPaper,
+  pickOfficialPyqFinalId,
+  removeOfficialPyqStudentRows,
+} from './officialPyqPublishFlow.js'
 import {
   addBulkUploadedQuestions,
   loadQuestionBank,
   publishUploadedQuestions,
+  saveQuestionBank,
 } from './questionBank.js'
 import { assignClassifiedQuestionId } from './classifiedQuestionId.js'
 import { officialPyqReplicaChildId } from './officialPyqReplica.js'
@@ -52,12 +58,17 @@ import {
   addOfficialPyqPendingPaper,
   getOfficialPyqPendingPaper,
   getOfficialPyqPendingOcrText,
+  loadOfficialPyqPendingPapers,
+  officialPyqQuestionsArePublishedLocked,
+  officialPyqSittingKey,
+  officialPyqWordingLockedMessage,
   removeOfficialPyqPendingPaper,
   removeOfficialPyqPendingSitting,
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
 import {
   expectedPyqPaperQuestionTarget,
+  extractPreparedTextFromPaperNotes,
   formatOfficialPyqExtractSummary,
   formatOfficialPyqStoredNotes,
   officialPyqStoredOcrText,
@@ -65,6 +76,7 @@ import {
   questionsFromOfficialPyqExtract,
 } from './pyqGeminiExtract.js'
 import { sanitizeMathpixOcrText } from './mathpixQuestionSplit.js'
+import { formatStoredPrintedAnswerKey, readPrintedAnswerKey } from './printedAnswerKey.js'
 import { raceStepTimeout } from './ocrTimeout.js'
 import { getOfficialPyqExamLabel } from '../data/officialPyqSources.js'
 import {
@@ -304,9 +316,11 @@ function officialPyqApproveCheck(paper, preHealed) {
   let healedOut = Array.isArray(paper.questions) ? paper.questions : []
   if (paper.status !== 'pending_review') {
     errors.push(
-      paper.status === 'approved'
-        ? ALREADY_PUBLISHED_MESSAGE
-        : 'This paper was rejected. Import again if you still want it.',
+      paper.status === 'published'
+        ? OFFICIAL_PYQ_ALREADY_PUBLISHED_MESSAGE
+        : paper.status === 'approved'
+          ? 'This paper is already approved. Fill tags, answers, and solutions, then press Publish.'
+          : 'This paper was rejected. Import again if you still want it.',
     )
   }
   if (paper.aiReplicaPaper !== true && !paper.replicaParentPaperId && !paper.adminFacts?.confirmedAt) {
@@ -419,31 +433,18 @@ export function officialPyqHealProgressPercent(done, total) {
 }
 
 /**
- * Approve & publish, one stage at a time.
+ * Reviewed — Approve, one stage at a time. Saves the checked cards and marks the
+ * paper Approved. Nothing goes to students and no final ids are made here.
  *
- * A 90-card paper needs a second or two of heal + id minting + bank writes.
- * Splitting it into stages lets the async caller repaint between them, so the
- * page shows real progress instead of going white. Both the sync and async
- * entry points drive this same generator — there is only one implementation.
+ * A 90-card paper needs a second or two of heal. Splitting it into stages lets
+ * the async caller repaint between them, so the page shows real progress
+ * instead of going white. Both the sync and async entry points drive this same
+ * generator — there is only one implementation.
  *
  * @param {string} paperId
- * @param {{ skipBank?: boolean }} opts
  */
-function* officialPyqApproveStages(paperId, opts) {
+function* officialPyqApproveStages(paperId) {
   const paper = getOfficialPyqPendingPaper(paperId)
-  try {
-    removeOlderDuplicateOfficialPyqPublishes()
-  } catch {
-    /* a second publish is still refused below */
-  }
-  if (paper && (paper.status === 'approved' || officialPyqSittingHasPublishedQuestions(paper))) {
-    return {
-      ok: false,
-      errors: [ALREADY_PUBLISHED_MESSAGE],
-      pyqCount: 0,
-      bankCount: 0,
-    }
-  }
   yield { pct: 2, label: 'Checking and healing the paper…' }
   const ocr = paper ? getOfficialPyqPendingOcrText(paper.id) : ''
   const ready =
@@ -472,32 +473,191 @@ function* officialPyqApproveStages(paperId, opts) {
   }
   const check = officialPyqApproveCheck(ready, preHealed)
   if (!check.ok || !paper) {
-    return {
-      ok: false,
-      errors: check.errors,
-      pyqCount: 0,
-      bankCount: 0,
+    return { ok: false, errors: check.errors, questionCount: 0 }
+  }
+
+  yield { pct: 95, label: 'Saving the approved paper…' }
+  // Already healed and enriched by the gate above — these exact cards are what Publish sends later.
+  const saved = updateOfficialPyqPendingPaper(paperId, {
+    questions: check.healed,
+    status: 'approved',
+    reviewedAt: Date.now(),
+    rejectReason: undefined,
+    returnedFromPublished: false,
+  })
+  if (!saved) {
+    return { ok: false, errors: ['Could not save the approved paper. Try again.'], questionCount: 0 }
+  }
+  return {
+    ok: true,
+    errors: [],
+    questionCount: Array.isArray(saved.questions) ? saved.questions.length : 0,
+    paperId,
+  }
+}
+
+/** @template T @param {Generator<{ pct: number, label: string }, T>} stages */
+function runStagesSync(stages) {
+  let step = stages.next()
+  while (!step.done) step = stages.next()
+  return step.value
+}
+
+/**
+ * @template T
+ * @param {Generator<{ pct: number, label: string }, T>} stages
+ * @param {{ onProgress?: (pct: number, label: string) => void, yieldFn?: () => Promise<void> }} opts
+ */
+async function runStagesAsync(stages, opts) {
+  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : () => {}
+  const yieldFn = typeof opts.yieldFn === 'function' ? opts.yieldFn : () => Promise.resolve()
+  let step = stages.next()
+  while (!step.done) {
+    onProgress(step.value.pct, step.value.label)
+    await yieldFn()
+    step = stages.next()
+  }
+  onProgress(100, 'Done')
+  return step.value
+}
+
+/**
+ * Reviewed — Approve. The paper becomes Approved; students do not see it yet.
+ * @param {string} paperId
+ */
+export function approveOfficialPyqPaper(paperId) {
+  return runStagesSync(officialPyqApproveStages(paperId))
+}
+
+/**
+ * Same approve, with a repaint between stages so the button reports what it is
+ * doing instead of freezing the page on a big paper.
+ * @param {string} paperId
+ * @param {{
+ *   onProgress?: (pct: number, label: string) => void
+ *   yieldFn?: () => Promise<void>
+ * }} [opts]
+ */
+export async function approveOfficialPyqPaperAsync(paperId, opts = {}) {
+  return runStagesAsync(officialPyqApproveStages(paperId), opts)
+}
+
+/**
+ * Can this Approved paper be published? Cards are not healed again here:
+ * Publish sends exactly what the Approved paper shows.
+ * @param {OfficialPyqPendingPaper | null | undefined} paper
+ */
+export function validateOfficialPyqForPublish(paper) {
+  /** @type {string[]} */
+  const errors = []
+  if (!paper) return { ok: false, errors: ['Paper not found.'] }
+  if (paper.status === 'published') errors.push(OFFICIAL_PYQ_ALREADY_PUBLISHED_MESSAGE)
+  else if (paper.status !== 'approved') {
+    errors.push('Approve this paper first (Reviewed — Approve). Then press Publish.')
+  }
+  const sitting = officialPyqSittingKey(paper)
+  const twin = loadOfficialPyqPendingPapers().find(
+    (p) => p?.id !== paper.id && p?.status === 'published' && officialPyqSittingKey(p) === sitting,
+  )
+  if (twin) errors.push(`“${twin.paperLabel}” is already published for this sitting. Unpublish it first.`)
+  const cards = Array.isArray(paper.questions) ? paper.questions : []
+  if (!cards.length) errors.push('This paper has no questions.')
+  const reserved = cards.filter((q) => isOfficialPyqPlaceholder(q)).length
+  if (reserved) {
+    errors.push(`${reserved} reserved slot(s) are still empty. Send the paper back to Pending to fill them.`)
+  }
+  const blank = cards.filter((q) => !isOfficialPyqPlaceholder(q) && !String(q?.text ?? '').trim()).length
+  if (blank) errors.push(`${blank} question(s) have no text.`)
+  if (!paper.year || !paper.exam) errors.push('Exam and year must be set.')
+  return { ok: errors.length === 0, errors }
+}
+
+/**
+ * The bank renumbers a row whose kept id no longer fits its tags. Put the
+ * paper's final id back so the bank, student PYQ, and the paper agree.
+ * @param {OfficialPyqPendingPaper} paper
+ * @param {OfficialPyqPendingQuestion[]} finalCards
+ */
+function keepOfficialPyqBankIds(paper, finalCards) {
+  const bank = loadQuestionBank()
+  const rows = Array.isArray(bank.questions) ? bank.questions : []
+  const ids = new Set(rows.map((row) => String(row?.id ?? '')))
+  const wantBySlot = new Map(
+    finalCards.map((q, i) => [q?.pyqSlot != null ? Number(q.pyqSlot) : i + 1, String(q.id)]),
+  )
+  /** @type {Map<string, string>} */
+  const renames = new Map()
+  for (const row of rows) {
+    if (!officialPyqRowBelongsToPaper(paper, row)) continue
+    const want = wantBySlot.get(Number(row.pyqSlot))
+    if (!want || want === String(row.id) || ids.has(want)) continue
+    renames.set(String(row.id), want)
+    ids.add(want)
+  }
+  if (!renames.size) return 0
+  const next = rows.map((row) => {
+    let out = row
+    const renamed = renames.get(String(row?.id ?? ''))
+    if (renamed) out = { ...out, id: renamed }
+    for (const field of ['passageId', 'parentQuestionId', 'similarToId', 'seedPyqId']) {
+      const ref = renames.get(String(out?.[field] ?? ''))
+      if (ref) out = { ...out, [field]: ref }
     }
+    return out
+  })
+  saveQuestionBank({ ...bank, questions: next })
+  return renames.size
+}
+
+/**
+ * Publish, one stage at a time: final question ids, then student PYQ and the
+ * Question Bank. A question that already has a final id keeps it.
+ * @param {string} paperId
+ * @param {{ skipBank?: boolean }} opts
+ */
+function* officialPyqPublishStages(paperId, opts) {
+  const paper = getOfficialPyqPendingPaper(paperId)
+  const check = validateOfficialPyqForPublish(paper)
+  if (!check.ok || !paper) return { ok: false, errors: check.errors, pyqCount: 0, bankCount: 0 }
+
+  yield { pct: 5, label: 'Clearing any old student copy…' }
+  try {
+    removeOlderDuplicateOfficialPyqPublishes()
+  } catch {
+    /* this paper's own old rows are removed next */
   }
+  removeOfficialPyqStudentRows(paper)
 
-  yield { pct: 92, label: 'Preparing question cards…' }
-  // Already healed and enriched by the gate above — publish those exact cards.
-  const healedQs = check.healed
-  const pyqItems = healedQs
-    .map((q, i) => pendingQuestionToPyqItem(paper, q, i))
-    .filter((q) => q.text)
+  const cards = paper.questions
+  yield { pct: 20, label: `Giving ${cards.length} question(s) their final Question ID…` }
+  const ctx = officialPyqFinalIdContext(paper)
+  const finalCards = cards.map((card, i) => {
+    const parentId = String(card?.parentQuestionId || '').trim()
+    if (paper.aiReplicaPaper !== true && !parentId) {
+      return { ...card, id: pickOfficialPyqFinalId(paper, card, i, ctx) }
+    }
+    const offset = card?.replicaDifficultyOffset ?? paper.replicaDifficultyOffset
+    const probe = {
+      ...card,
+      parentQuestionId: parentId,
+      ...(offset != null && offset !== '' && Number.isFinite(Number(offset))
+        ? { replicaDifficultyOffset: Number(offset) }
+        : {}),
+    }
+    const id = officialPyqReplicaChildId(probe, ctx.peers)
+    ctx.taken.add(id)
+    ctx.peers.push({ ...probe, id })
+    return { ...probe, id }
+  })
 
-  if (!pyqItems.length) {
-    return { ok: false, errors: ['No usable questions to publish.'], pyqCount: 0, bankCount: 0 }
-  }
-
-  yield { pct: 94, label: `Numbering ${pyqItems.length} question(s)…` }
-  const peers = [...(loadQuestionBank().questions ?? [])]
+  yield { pct: 50, label: 'Preparing question cards…' }
+  const pyqItems = finalCards.map((q, i) => pendingQuestionToPyqItem(paper, q, i))
   const bankRows = linkOfficialPyqBankPassages(
     pyqItems.map((q, i) => {
       const row = pyqItemToBankQuestion(paper, q, i)
-      const source = healedQs[i] || q
-      const parentId = String(q.parentQuestionId || source.parentQuestionId || '').trim()
+      row.id = q.id
+      const source = finalCards[i]
+      const parentId = String(source?.parentQuestionId || '').trim()
       if (paper.aiReplicaPaper === true || parentId) {
         row.parentQuestionId = parentId
         row.similarToId = parentId
@@ -512,82 +672,58 @@ function* officialPyqApproveStages(paperId, opts) {
         q.officialPyq = false
         q.sub_bank_type = 'similar_pyq'
         q.source = String(paper.paperLabel || q.source || '')
-        const offset = source.replicaDifficultyOffset ?? paper.replicaDifficultyOffset
-        if (offset != null && offset !== '' && Number.isFinite(Number(offset))) {
-          row.replicaDifficultyOffset = Number(offset)
-          q.replicaDifficultyOffset = Number(offset)
+        if (source.replicaDifficultyOffset != null) {
+          row.replicaDifficultyOffset = Number(source.replicaDifficultyOffset)
+          q.replicaDifficultyOffset = Number(source.replicaDifficultyOffset)
         }
-        row.id = officialPyqReplicaChildId(row, peers)
-      } else {
-        row.id = assignOfficialPyqSaveId(row, paper, peers)
+        if (parentId) q.parentQuestionId = parentId
       }
-      q.id = row.id
-      if (parentId) q.parentQuestionId = parentId
-      peers.push(row)
       return row
     }),
   )
 
-  yield { pct: 96, label: 'Publishing to student PYQ…' }
+  yield { pct: 70, label: 'Publishing to student PYQ…' }
   addImportedPyqs(pyqItems)
 
   let bankCount = 0
-  /** @type {string[]} */
-  const bankIds = []
   if (!opts.skipBank) {
-    yield { pct: 98, label: 'Saving to the Question Bank…' }
+    yield { pct: 85, label: 'Saving to the Question Bank…' }
     const added = addBulkUploadedQuestions(bankRows)
-    bankIds.push(...added.map((r) => r.id))
-    publishUploadedQuestions(bankIds)
-    bankCount = bankIds.length
+    bankCount = publishUploadedQuestions(added.map((row) => row.id)).length
+    keepOfficialPyqBankIds(paper, finalCards)
   }
 
-  const replicaQuestions =
-    paper.aiReplicaPaper === true
-      ? (Array.isArray(paper.questions) ? paper.questions : []).map((q, i) => {
-          const slot = q?.pyqSlot != null ? Number(q.pyqSlot) : i + 1
-          const minted =
-            pyqItems.find((item) => Number(item.pyqSlot) === slot) || pyqItems[i]
-          if (!minted?.id) return q
-          const next = { ...q, id: String(minted.id) }
-          if (minted.parentQuestionId) next.parentQuestionId = String(minted.parentQuestionId)
-          return next
-        })
-      : null
-
-  updateOfficialPyqPendingPaper(paperId, {
-    status: 'approved',
-    reviewedAt: Date.now(),
-    rejectReason: undefined,
-    returnedFromPublished: false,
-    ...(replicaQuestions ? { questions: replicaQuestions } : {}),
+  yield { pct: 96, label: 'Saving the published paper…' }
+  const saved = updateOfficialPyqPendingPaper(paperId, {
+    questions: finalCards,
+    allowPublishedQuestionWrite: true,
+    status: 'published',
+    publishedAt: Date.now(),
   })
-
+  if (!saved || saved.status !== 'published') {
+    removeOfficialPyqStudentRows(paper)
+    return { ok: false, errors: ['Could not save the published paper. Nothing was published.'], pyqCount: 0, bankCount: 0 }
+  }
   return {
     ok: true,
     errors: [],
     pyqCount: pyqItems.length,
     bankCount,
-    bankIds,
+    questionIds: finalCards.map((q) => String(q.id)),
     paperId,
   }
 }
 
 /**
- * Approve & publish: student PYQ store + main Question Bank (published).
+ * Publish an Approved paper: final question ids, student PYQ, Question Bank.
  * @param {string} paperId
  * @param {{ skipBank?: boolean }} [opts]
  */
-export function approveOfficialPyqPaper(paperId, opts = {}) {
-  const stages = officialPyqApproveStages(paperId, opts)
-  let step = stages.next()
-  while (!step.done) step = stages.next()
-  return step.value
+export function publishOfficialPyqPaper(paperId, opts = {}) {
+  return runStagesSync(officialPyqPublishStages(paperId, opts))
 }
 
 /**
- * Same publish, with a repaint between stages so Approve & Publish reports what
- * it is doing instead of freezing the page on a big paper.
  * @param {string} paperId
  * @param {{
  *   skipBank?: boolean
@@ -595,18 +731,8 @@ export function approveOfficialPyqPaper(paperId, opts = {}) {
  *   yieldFn?: () => Promise<void>
  * }} [opts]
  */
-export async function approveOfficialPyqPaperAsync(paperId, opts = {}) {
-  const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : () => {}
-  const yieldFn = typeof opts.yieldFn === 'function' ? opts.yieldFn : () => Promise.resolve()
-  const stages = officialPyqApproveStages(paperId, opts)
-  let step = stages.next()
-  while (!step.done) {
-    onProgress(step.value.pct, step.value.label)
-    await yieldFn()
-    step = stages.next()
-  }
-  onProgress(100, 'Done')
-  return step.value
+export async function publishOfficialPyqPaperAsync(paperId, opts = {}) {
+  return runStagesAsync(officialPyqPublishStages(paperId, opts), opts)
 }
 
 /**
@@ -623,9 +749,11 @@ export function rejectOfficialPyqPaper(paperId, reason = '') {
     return {
       ok: false,
       error:
-        paper.status === 'approved'
+        paper.status === 'published'
           ? 'Already published — cannot reject from here.'
-          : 'Already rejected.',
+          : paper.status === 'approved'
+            ? 'Already approved — send it back for review first.'
+            : 'Already rejected.',
     }
   }
   const updated = updateOfficialPyqPendingPaper(paperId, {
@@ -641,7 +769,8 @@ export function rejectOfficialPyqPaper(paperId, reason = '') {
 
 /**
  * Put a rejected paper back in Pending approval. Does not invent questions.
- * Published papers use {@link unpublishOfficialPyqPaper} instead.
+ * Approved papers use {@link unapproveOfficialPyqPaper}; published papers
+ * use {@link unpublishOfficialPyqPaper} first.
  * @param {string} paperId
  */
 export function returnOfficialPyqPaperToPending(paperId) {
@@ -649,10 +778,16 @@ export function returnOfficialPyqPaperToPending(paperId) {
   if (!paper) {
     return { ok: false, error: 'Paper not found.' }
   }
+  if (paper.status === 'published') {
+    return {
+      ok: false,
+      error: 'Already published — press Unpublish first, then send it back to Pending.',
+    }
+  }
   if (paper.status === 'approved') {
     return {
       ok: false,
-      error: 'Already published — use Unpublish to move it back to Pending.',
+      error: 'Already approved — use Send back for review to move it to Pending.',
     }
   }
   if (paper.status === 'pending_review') {
@@ -669,31 +804,6 @@ export function returnOfficialPyqPaperToPending(paperId) {
   return { ok: true, paper: updated }
 }
 
-/**
- * Match student-PYQ / bank rows that came from this Official PYQ paper.
- * @param {OfficialPyqPendingPaper} paper
- * @param {{ id?: string, paperId?: string, officialPyq?: boolean, bankSource?: string }} q
- */
-function rowBelongsToOfficialPyqPaper(paper, q) {
-  if (!q || !paper) return false
-  if (q.officialPyq !== true && q.bankSource !== 'official_pyq') return false
-  const paperKey = String(paper.paperId || '').trim()
-  const rowKey = String(q.paperId || '').trim()
-  if (paperKey && rowKey && paperKey === rowKey) return true
-  const pendingId = String(paper.id || '').trim()
-  const rowId = String(q.id || '')
-  if (pendingId && rowId.includes(pendingId)) return true
-  const sitting = officialPyqPublishSittingKeyFromPaper(paper)
-  return Boolean(sitting && officialPyqPublishSittingKey(q) === sitting)
-}
-
-/**
- * Unpublish: approved → pending_review. Removes this sitting from student PYQ
- * and deletes matching Official PYQ rows from the Question Bank (same reverse of
- * Approve & Publish). Does not invent questions. Does not Approve/Publish.
- * @param {string} paperId
- * @param {{ preparedText?: string, notes?: string, questions?: OfficialPyqPendingQuestion[] }} [restore]
- */
 function browserMaySendPublishedPaperBack() {
   if (typeof window === 'undefined') return true
   try {
@@ -705,37 +815,69 @@ function browserMaySendPublishedPaperBack() {
   }
 }
 
-export function unpublishOfficialPyqPaper(paperId, restore = {}) {
+/**
+ * Unpublish: published → approved. Removes this paper from student PYQ and the
+ * Question Bank. The cards keep their final ids, so the next Publish reuses them.
+ * @param {string} paperId
+ */
+export function unpublishOfficialPyqPaper(paperId) {
   const paper = getOfficialPyqPendingPaper(paperId)
   if (!paper) {
     return { ok: false, error: 'Paper not found.' }
   }
-  if (paper.status === 'approved' && !browserMaySendPublishedPaperBack()) {
+  if (paper.status === 'approved') {
+    return { ok: true, paper, alreadyApproved: true, pyqRemoved: 0, bankRemoved: 0 }
+  }
+  if (paper.status !== 'published') {
+    return { ok: false, error: 'Only a published paper can be unpublished.' }
+  }
+  if (!browserMaySendPublishedPaperBack()) {
+    return { ok: false, error: 'Only an admin can unpublish a paper.' }
+  }
+  const { pyqRemoved, bankRemoved } = removeOfficialPyqStudentRows(paper)
+  const updated = updateOfficialPyqPendingPaper(paperId, {
+    status: 'approved',
+    publishedAt: undefined,
+    unpublishedAt: Date.now(),
+    keptPublishedIds: officialPyqKeptIdsWithCards(paper),
+  })
+  if (!updated) {
     return {
       ok: false,
-      error: 'Only an admin can send a published paper back for review.',
+      error: 'Removed from student stores but could not move the paper to Approved.',
+      pyqRemoved,
+      bankRemoved,
     }
   }
+  return { ok: true, paper: updated, pyqRemoved, bankRemoved }
+}
+
+/**
+ * Send back for review: approved → pending_review. Students never had this paper,
+ * so nothing is removed from them. Does not invent questions. Does not re-extract.
+ * @param {string} paperId
+ * @param {{ preparedText?: string, notes?: string, questions?: OfficialPyqPendingQuestion[] }} [restore]
+ */
+export function unapproveOfficialPyqPaper(paperId, restore = {}) {
+  const paper = getOfficialPyqPendingPaper(paperId)
+  if (!paper) {
+    return { ok: false, error: 'Paper not found.' }
+  }
   if (paper.status === 'pending_review') {
-    return { ok: true, paper, alreadyPending: true, pyqRemoved: 0, bankRemoved: 0 }
+    return { ok: true, paper, alreadyPending: true }
   }
   if (paper.status === 'rejected') {
     return returnOfficialPyqPaperToPending(paperId)
   }
-  if (paper.status !== 'approved') {
-    return { ok: false, error: `Cannot unpublish status "${paper.status}".` }
+  if (paper.status === 'published') {
+    return { ok: false, error: 'This paper is published. Press Unpublish first.' }
   }
-
-  const beforePyq = loadImportedPyqs()
-  const keepPyq = beforePyq.filter((q) => !rowBelongsToOfficialPyqPaper(paper, q))
-  const pyqRemoved = beforePyq.length - keepPyq.length
-  if (pyqRemoved > 0) saveImportedPyqs(keepPyq)
-
-  const bank = loadQuestionBank()
-  const bankBefore = bank.questions ?? []
-  const bankNext = bankBefore.filter((q) => !rowBelongsToOfficialPyqPaper(paper, q))
-  const bankRemoved = bankBefore.length - bankNext.length
-  if (bankRemoved > 0) writeQuestionBankSnapshot(bank, bankNext)
+  if (paper.status !== 'approved') {
+    return { ok: false, error: `Cannot send back status "${paper.status}".` }
+  }
+  if (!browserMaySendPublishedPaperBack()) {
+    return { ok: false, error: 'Only an admin can send an approved paper back for review.' }
+  }
 
   /** @type {Partial<OfficialPyqPendingPaper>} */
   const patch = {
@@ -756,19 +898,14 @@ export function unpublishOfficialPyqPaper(paperId, restore = {}) {
 
   const updated = updateOfficialPyqPendingPaper(paperId, patch)
   if (!updated) {
-    return {
-      ok: false,
-      error: 'Removed from student stores but could not move the paper to Pending.',
-      pyqRemoved,
-      bankRemoved,
-    }
+    return { ok: false, error: 'Could not move the paper to Pending.' }
   }
-  return { ok: true, paper: updated, pyqRemoved, bankRemoved }
+  return { ok: true, paper: updated }
 }
 
 /**
  * Remove a pending or rejected paper from the approval queue (not student PYQ / bank).
- * Published papers cannot be removed here.
+ * Approved and published papers cannot be removed here.
  * @param {string} paperId
  */
 export function dismissOfficialPyqPaper(paperId) {
@@ -776,11 +913,14 @@ export function dismissOfficialPyqPaper(paperId) {
   if (!paper) {
     return { ok: false, error: 'Paper not found.' }
   }
-  if (paper.status === 'approved') {
+  if (paper.status === 'published') {
     return {
       ok: false,
       error: 'Already published — it stays in student PYQ. Remove from PYQ Bank if needed.',
     }
+  }
+  if (paper.status === 'approved') {
+    return { ok: false, error: 'Already approved — send it back for review before removing it.' }
   }
   const removed = removeOfficialPyqPendingPaper(paperId)
   if (!removed) {
@@ -810,7 +950,9 @@ export function officialPyqStatusLabel(status) {
     case 'pending_review':
       return 'Pending approval'
     case 'approved':
-      return 'Published PYQ'
+      return 'Approved'
+    case 'published':
+      return 'Published'
     case 'rejected':
       return 'Rejected'
     default:
@@ -923,19 +1065,22 @@ export function reExtractOfficialPyqPendingPaper(paper, extractOverride) {
   if (!paper) {
     return { ok: false, error: 'Paper not found.', questions: [], count: 0 }
   }
-  if (String(paper.status ?? '') === 'approved') {
+  if (officialPyqQuestionsArePublishedLocked(paper)) {
     return {
       ok: false,
-      error:
-        'This paper is published. Unpublish it before re-parse or heal can change its questions.',
+      error: officialPyqWordingLockedMessage(paper),
       questions: paper.questions ?? [],
       count: paper.questions?.length ?? 0,
       previousCount: paper.questions?.length ?? 0,
     }
   }
-  const preparedText = sanitizeMathpixOcrText(
-    extractOverride?.text || officialPyqStoredOcrText(paper),
+  // The Gemini re-parse passes text already cleaned of its answer boxes; the stored copy still has them.
+  const printedAnswerKey = readPrintedAnswerKey(
+    [extractOverride?.text, paper.preparedText, extractPreparedTextFromPaperNotes(paper.notes)].join('\n'),
   )
+  const preparedText =
+    sanitizeMathpixOcrText(extractOverride?.text || officialPyqStoredOcrText(paper)) +
+    formatStoredPrintedAnswerKey(printedAnswerKey)
   if (!preparedText || preparedText.length < 80) {
     return {
       ok: false,
@@ -960,7 +1105,7 @@ export function reExtractOfficialPyqPendingPaper(paper, extractOverride) {
       paperLabel: paper.paperLabel,
       sourceLabel: paper.sourceLabel,
     },
-    { existingQuestionCount },
+    { existingQuestionCount, printedAnswerKey },
   )
   let questions = (built.questions ?? []).map((q, i) => ({
     ...q,
@@ -1091,7 +1236,7 @@ export async function reExtractOfficialPyqPendingPaperWithGemini(paper, io = {})
       ...result,
       count: finalCount,
       questions: finalPaper?.questions ?? result.questions,
-      geminiNote: `Local Mathpix split found ${result.count} clean question(s). Press Fill tags, answers & solutions (Hybrid AI) to fill them two at a time.`,
+      geminiNote: `Local Mathpix split found ${result.count} clean question(s). Tags, answers, and solutions are filled after you approve.`,
       usedGemini: false,
       apiDown: false,
     }

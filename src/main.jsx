@@ -47,6 +47,18 @@ async function boot() {
 
   if (redirectLocalhostTo127()) return
 
+  // Must finish before any student page reads PYQ: papers published before Approve
+  // and Publish were split become Approved (OFFICIAL_PYQ_PUBLISH_SPLIT_KEY).
+  try {
+    if (localStorage.getItem('testvantage-official-pyq-publish-split') !== '1') {
+      const { runOfficialPyqPublishSplitMigrationOnce } = await import('./utils/officialPyqPublishFlow.js')
+      const moved = runOfficialPyqPublishSplitMigrationOnce()
+      console.info('[official PYQ] published papers moved to Approved', moved)
+    }
+  } catch (err) {
+    console.warn('[official PYQ] could not move published papers to Approved yet', err)
+  }
+
   try {
     const { default: App } = await import('./App.jsx')
     createRoot(rootEl).render(

@@ -1,6 +1,7 @@
 /**
- * Question Bank metatag fields on one published Official PYQ question.
+ * Question Bank metatag fields on one Approved Official PYQ question.
  * Same form as Saved questions, Metatags, plus Answer and Solution.
+ * On a Published paper the fields are shown read-only.
  */
 
 import { useEffect, useMemo, useState } from 'react'
@@ -21,6 +22,7 @@ import {
   applyOfficialPyqPublishedMeta,
   normalizeBankSubjectId,
 } from '../utils/officialPyqPublishedMeta.js'
+import { isOfficialPyqFinalQuestionId } from '../utils/officialPyqPublishFlow.js'
 import { loadQuestionBank } from '../utils/questionBank.js'
 
 function optionLabel(opt, index) {
@@ -63,8 +65,12 @@ function readMeta(question) {
   }
 }
 
-export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, question, onSaved }) {
-  const canEdit = isAdminLoggedIn()
+function answerKey(meta) {
+  return JSON.stringify([String(meta.index ?? meta.answerIndex ?? ''), meta.indices ?? meta.answerIndices ?? [], String(meta.number ?? meta.answerNumber ?? '')])
+}
+
+export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, question, published = false, keptId = '', onSaved }) {
+  const canEdit = isAdminLoggedIn() && !published
   const initial = readMeta(question)
   const [subject, setSubject] = useState(initial.subject)
   const [section, setSection] = useState(initial.section)
@@ -83,6 +89,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
   const [saving, setSaving] = useState(false)
   const [filling, setFilling] = useState(false)
   const [previous, setPrevious] = useState(null)
+  const [hybridValues, setHybridValues] = useState(null)
   const [questionId, setQuestionId] = useState(String(question?.id ?? ''))
 
   const resetKey = paperId + ':' + questionIndex + ':' + String(question?.id ?? '')
@@ -102,6 +109,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
     setSolution(next.solution)
     setQuestionId(String(question?.id ?? ''))
     setPrevious(null)
+    setHybridValues(null)
   }, [resetKey, question])
 
   const bankQuestions = useMemo(() => {
@@ -129,7 +137,23 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
     return text ? text : current
   }
 
-  function savePayload(meta) {
+  /** Who wrote a changed answer or solution: Hybrid AI if it is still exactly what Hybrid AI gave, else the admin. */
+  function changedSources(meta, solutionFromAi = false) {
+    const stored = readMeta(question)
+    const out = {}
+    if (answerKey(meta) !== answerKey(stored)) {
+      out.answerSource = hybridValues && answerKey(meta) === answerKey(hybridValues) ? 'hybrid_ai' : 'manual'
+    }
+    if (String(meta.solution ?? '').trim() !== stored.solution.trim()) {
+      out.solutionSource =
+        solutionFromAi || (hybridValues && String(meta.solution ?? '') === String(hybridValues.solution ?? ''))
+          ? 'hybrid_ai'
+          : 'manual'
+    }
+    return out
+  }
+
+  function savePayload(meta, solutionFromAi = false) {
     const answerKindNow = answerKind(meta.questionType)
     const answer =
       answerKindNow === 'multi'
@@ -152,6 +176,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
       source: meta.source,
       solution: meta.solution,
       ...answer,
+      ...changedSources(meta, solutionFromAi),
     })
   }
 
@@ -189,7 +214,9 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
         return
       }
       setPrevious(currentValues())
-      showValues(valuesFromSuggestion(filled))
+      const suggested = valuesFromSuggestion(filled)
+      setHybridValues(suggested)
+      showValues(suggested)
       const answered = String(filled.correct_answer || '').trim()
       const solved = String(filled.step_by_step_solution || '').trim()
       setNote(
@@ -240,6 +267,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
     if (!previous) return
     showValues(previous)
     setPrevious(null)
+    setHybridValues(null)
     setNote('Put back what was there before Hybrid AI. Nothing was saved.')
   }
 
@@ -308,16 +336,10 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
         setError(result.error || 'Could not save.')
         return
       }
-      const id = String(result.question?.id ?? '')
-      setQuestionId(id)
-      const ready = Boolean(String(subject).trim() && String(section).trim() && String(chapter).trim())
-      setNote(
-        result.status === 'approved'
-          ? id && ready
-            ? 'Saved. Question Id ' + id + '. This paper is still published.'
-            : 'Saved. This paper is still published. Question Id is created when Subject, Unit, and Chapter are filled.'
-          : 'Saved.',
-      )
+      setQuestionId(String(result.question?.id ?? ''))
+      setHybridValues(null)
+      setPrevious(null)
+      setNote('Saved. The paper is still Approved — students see it after you press Publish.')
       if (typeof onSaved === 'function') onSaved(result.question)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save.')
@@ -335,12 +357,18 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
       <legend>Metatags, answer, and solution</legend>
       <p className="form-hint">
         Same fields as Question Bank metatags. Stored values are shown, including blanks.
-        {canEdit
-          ? ' Saving stays on this published paper and does not change the question wording or options.'
-          : ' Only an admin can change them.'}
+        {published
+          ? ' This paper is published, so these are read-only. Unpublish it to change them.'
+          : canEdit
+            ? ' Saving keeps the paper Approved and does not change the question wording or options.'
+            : ' Only an admin can change them.'}
       </p>
       <p className="form-hint" data-testid="official-pyq-question-id">
-        Question Id: {questionId || 'Not created yet'}
+        {published || isOfficialPyqFinalQuestionId(questionId)
+          ? 'Question Id: ' + (questionId || 'Not created yet') + (published ? '' : ' (kept on Publish)')
+          : keptId
+            ? 'Question Id: ' + keptId + ' (given back on Publish)'
+            : 'Question Id: given on Publish'}
       </p>
       <QuestionMetadataForm
         showBlankChoices
@@ -459,18 +487,13 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
               answerIndex,
               answerIndices,
               answerNumber,
-            })
+            }, true)
             if (!result.ok) {
               setError(result.error || 'Could not save the solution.')
               return
             }
-            if (result.status !== 'approved') {
-              setError('Save refused because the paper would leave Published.')
-              return
-            }
-            const id = String(result.question?.id ?? '')
-            setQuestionId(id)
-            setNote('Saved the solution. This paper is still published. The question wording was not changed.')
+            setQuestionId(String(result.question?.id ?? ''))
+            setNote('Saved the solution. The paper is still Approved. The question wording was not changed.')
             if (typeof onSaved === 'function') onSaved(result.question)
           } catch (err) {
             setError(err instanceof Error ? err.message : 'Could not save the solution.')

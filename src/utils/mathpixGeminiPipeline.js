@@ -20,6 +20,7 @@ import {
 import { healOfficialPyqPaperQuestions } from './extendTruncatedStem.js'
 import { applyUploadQualityGuards } from './uploadQualityGuards.js'
 import { localMathpixSplitGoodEnough } from './pyqGeminiExtract.js'
+import { readPrintedAnswerKey } from './printedAnswerKey.js'
 import {
   localBankSplitGoodEnough,
   mergeLightEnrichOntoDrafts,
@@ -483,6 +484,8 @@ export async function runMathpixThenGemini(file, opts = {}) {
       signal: opts.signal,
       onProgress: (p) => progress(Math.max(6, Math.round(6 + Number(p) * 0.56))),
     })
+    // Cleaning cuts the printed "Ans for Q.N" boxes out, so read the key from the raw text first.
+    const printedAnswerKey = readPrintedAnswerKey(ocr.text)
     const text = sanitizeMathpixOcrText(ocr.text)
     if (!text) {
       progress(100)
@@ -494,7 +497,7 @@ export async function runMathpixThenGemini(file, opts = {}) {
       })
     }
 
-    return await structureTextThenMaybeSave(text, {
+    const structured = await structureTextThenMaybeSave(text, {
       signal: opts.signal,
       progress,
       format,
@@ -505,6 +508,7 @@ export async function runMathpixThenGemini(file, opts = {}) {
       engine: 'mathpix',
       docxBase64: ocr.docxBase64,
     })
+    return printedAnswerKey.size ? { ...structured, printedAnswerKey } : structured
   } catch (err) {
     progress(100)
     throw err

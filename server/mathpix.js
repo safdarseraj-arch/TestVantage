@@ -3,6 +3,10 @@
  * Keys stay on the API server. Gemini is never used here.
  */
 import './loadEnv.js'
+import { createHash } from 'crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
 import { MATHPIX } from './config.js'
 
 const MATHPIX_TEXT_URL = 'https://api.mathpix.com/v3/text'
@@ -12,11 +16,107 @@ const MATHPIX_CONVERTER_URL = 'https://api.mathpix.com/v3/converter'
 export const MATHPIX_MISSING_MESSAGE =
   'Mathpix keys were not loaded from onlinetest/.env. Keep the bottom panel open (Ctrl+J then Ctrl+`), then press F5 so port 3001 re-reads the file. Gemini generate still works.'
 
+const SERVER_DIR = dirname(fileURLToPath(import.meta.url))
+const MAX_REMEMBERED_PDF_JOBS = 300
+
 let mathpixFetch = fetch
+let retryDelaysMs = [1000, 3000, 6000]
 
 /** Test hook - mock HTTP without hitting Mathpix. */
 export function setMathpixFetch(fn) {
   mathpixFetch = typeof fn === 'function' ? fn : fetch
+}
+
+/** Test hook - wait between retries of a dropped Mathpix connection. */
+export function setMathpixRetryDelays(delays) {
+  retryDelaysMs = Array.isArray(delays) ? delays.map((n) => Math.max(0, Number(n) || 0)) : [1000, 3000, 6000]
+}
+
+/** Node's fetch throws "fetch failed" when the internet drops mid-request. */
+export function isMathpixNetworkError(err) {
+  if (!err || err.name === 'AbortError' || /^MATHPIX_/.test(String(err.code || ''))) return false
+  const code = String(err.cause?.code || err.code || '')
+  return (
+    /fetch failed|socket hang up/i.test(String(err.message || '')) ||
+    /^(ECONNRESET|ECONNREFUSED|ECONNABORTED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|EPIPE|ENETUNREACH|EHOSTUNREACH|UND_ERR_)/.test(code)
+  )
+}
+
+/** The request never reached Mathpix, so sending the PDF again cannot bill twice. */
+function isMathpixConnectError(err) {
+  const code = String(err?.cause?.code || err?.code || '')
+  return /^(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|UND_ERR_CONNECT_TIMEOUT)$/.test(code)
+}
+
+async function withNetworkRetry(run, signal, retryable = isMathpixNetworkError) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await run()
+    } catch (e) {
+      if (!retryable(e) || attempt >= retryDelaysMs.length) throw e
+      await sleep(retryDelaysMs[attempt], signal)
+    }
+  }
+}
+
+function mathpixNetworkError(cause, pdfId) {
+  const err = new Error(
+    pdfId
+      ? 'The internet connection to Mathpix (the PDF reader) dropped before the paper came back, so nothing was saved and it is not in Pending approval. Check your internet, then upload the same file again — Mathpix already read it, so the second try is not charged again.'
+      : 'Could not reach Mathpix (the PDF reader) — the internet connection dropped. Nothing was saved and the paper is not in Pending approval. Check your internet, then upload the file again.',
+  )
+  err.code = 'MATHPIX_NETWORK'
+  err.cause = cause
+  if (pdfId) err.pdfId = pdfId
+  return err
+}
+
+function pdfJobsFile() {
+  return join(process.env.TESTVANTAGE_BANK_DATA_DIR || join(SERVER_DIR, 'data'), 'mathpix-pdf-jobs.json')
+}
+
+/** @returns {Record<string, { pdfId: string, docx: boolean, at: number }>} */
+function readPdfJobs() {
+  try {
+    const file = pdfJobsFile()
+    if (!existsSync(file)) return {}
+    const data = JSON.parse(readFileSync(file, 'utf8'))
+    return data && typeof data === 'object' ? data : {}
+  } catch {
+    return {}
+  }
+}
+
+function writePdfJobs(jobs) {
+  try {
+    const file = pdfJobsFile()
+    mkdirSync(dirname(file), { recursive: true })
+    const kept = Object.entries(jobs)
+      .sort((a, b) => (b[1]?.at ?? 0) - (a[1]?.at ?? 0))
+      .slice(0, MAX_REMEMBERED_PDF_JOBS)
+    writeFileSync(file, JSON.stringify(Object.fromEntries(kept), null, 1), 'utf8')
+  } catch {
+    /* re-upload just costs a fresh Mathpix read */
+  }
+}
+
+/** Same PDF bytes read again reuse the finished Mathpix job instead of a second bill. */
+export function rememberMathpixPdfJob(fileHash, pdfId, docx) {
+  if (!fileHash || !pdfId) return
+  const jobs = readPdfJobs()
+  jobs[fileHash] = { pdfId: String(pdfId), docx: docx === true, at: Date.now() }
+  writePdfJobs(jobs)
+}
+
+function forgetMathpixPdfJob(fileHash) {
+  const jobs = readPdfJobs()
+  if (!jobs[fileHash]) return
+  delete jobs[fileHash]
+  writePdfJobs(jobs)
+}
+
+export function mathpixPdfFileHash(bytes) {
+  return createHash('sha256').update(bytes).digest('hex')
 }
 
 function firstEnv(...names) {
@@ -248,11 +348,13 @@ async function pollPdfUntilReady(pdfId, appId, appKey, signal, wantDocx) {
   const started = Date.now()
   let delay = 1500
   while (Date.now() - started < MATHPIX.pollTimeoutMs) {
-    const res = await mathpixFetch(`${MATHPIX_PDF_URL}/${encodeURIComponent(pdfId)}`, {
-      headers: authHeaders(appId, appKey),
-      signal,
-    })
-    const body = await readJsonSafe(res)
+    const { res, body } = await withNetworkRetry(async () => {
+      const r = await mathpixFetch(`${MATHPIX_PDF_URL}/${encodeURIComponent(pdfId)}`, {
+        headers: authHeaders(appId, appKey),
+        signal,
+      })
+      return { res: r, body: await readJsonSafe(r) }
+    }, signal)
     if (!res.ok) {
       const err = new Error(body?.error || `Mathpix PDF status failed (${res.status})`)
       err.code = 'MATHPIX_EXTRACT_FAILED'
@@ -281,50 +383,67 @@ async function pollPdfUntilReady(pdfId, appId, appKey, signal, wantDocx) {
 }
 
 async function downloadPdfFormat(pdfId, ext, appId, appKey, signal) {
-  const res = await mathpixFetch(`${MATHPIX_PDF_URL}/${encodeURIComponent(pdfId)}.${ext}`, {
-    headers: authHeaders(appId, appKey),
-    signal,
-  })
-  if (!res.ok) {
-    const body = await readJsonSafe(res).catch(() => ({}))
-    const err = new Error(body?.error || `Mathpix could not download .${ext} (${res.status})`)
-    err.code = 'MATHPIX_EXTRACT_FAILED'
-    throw err
-  }
-  if (ext === 'mmd' || ext === 'md' || ext === 'tex') {
-    return { text: await res.text(), bytes: null }
-  }
-  const buf = Buffer.from(await res.arrayBuffer())
-  return { text: '', bytes: buf }
+  return withNetworkRetry(async () => {
+    const res = await mathpixFetch(`${MATHPIX_PDF_URL}/${encodeURIComponent(pdfId)}.${ext}`, {
+      headers: authHeaders(appId, appKey),
+      signal,
+    })
+    if (!res.ok) {
+      const body = await readJsonSafe(res).catch(() => ({}))
+      const err = new Error(body?.error || `Mathpix could not download .${ext} (${res.status})`)
+      err.code = 'MATHPIX_EXTRACT_FAILED'
+      throw err
+    }
+    if (ext === 'mmd' || ext === 'md' || ext === 'tex') {
+      return { text: await res.text(), bytes: null }
+    }
+    const buf = Buffer.from(await res.arrayBuffer())
+    return { text: '', bytes: buf }
+  }, signal)
 }
 
-async function extractPdf(input, format, appId, appKey, signal) {
-  const b64 = stripDataUrl(input.pdfBase64 || input.imageBase64)
-  if (!b64 || b64.length < 40) {
-    const err = new Error('pdfBase64 is required for Mathpix PDF OCR.')
-    err.code = 'MATHPIX_BAD_INPUT'
-    throw err
+/** pdf_id of an earlier Mathpix read of these exact bytes that Mathpix still has, else ''. */
+async function reusableMathpixPdfJob(fileHash, wantDocx, appId, appKey, signal) {
+  const job = readPdfJobs()[fileHash]
+  if (!job?.pdfId || (wantDocx && !job.docx)) return ''
+  const { res, body } = await withNetworkRetry(async () => {
+    const r = await mathpixFetch(`${MATHPIX_PDF_URL}/${encodeURIComponent(job.pdfId)}`, {
+      headers: authHeaders(appId, appKey),
+      signal,
+    })
+    return { res: r, body: await readJsonSafe(r) }
+  }, signal)
+  if (!res.ok || String(body?.status ?? '') === 'error') {
+    forgetMathpixPdfJob(fileHash)
+    return ''
   }
-  const bytes = Buffer.from(b64, 'base64')
-  const blob = new Blob([bytes], { type: 'application/pdf' })
-  const form = new FormData()
-  form.append('file', blob, input.fileName || 'upload.pdf')
-  const conversion_formats = format === 'word' ? { docx: true } : {}
-  form.append(
-    'options_json',
-    JSON.stringify({
-      conversion_formats,
-      math_inline_delimiters: ['$', '$'],
-      math_display_delimiters: ['$$', '$$'],
-      rm_spaces: true,
-    }),
-  )
-  const submit = await mathpixFetch(MATHPIX_PDF_URL, {
-    method: 'POST',
-    headers: authHeaders(appId, appKey),
-    body: form,
+  return job.pdfId
+}
+
+async function submitPdf(bytes, fileName, wantDocx, appId, appKey, signal) {
+  const submit = await withNetworkRetry(
+    () => {
+      const form = new FormData()
+      form.append('file', new Blob([bytes], { type: 'application/pdf' }), fileName || 'upload.pdf')
+      form.append(
+        'options_json',
+        JSON.stringify({
+          conversion_formats: wantDocx ? { docx: true } : {},
+          math_inline_delimiters: ['$', '$'],
+          math_display_delimiters: ['$$', '$$'],
+          rm_spaces: true,
+        }),
+      )
+      return mathpixFetch(MATHPIX_PDF_URL, {
+        method: 'POST',
+        headers: authHeaders(appId, appKey),
+        body: form,
+        signal,
+      })
+    },
     signal,
-  })
+    isMathpixConnectError,
+  )
   const submitted = await readJsonSafe(submit)
   if (!submit.ok) {
     const msg =
@@ -341,8 +460,36 @@ async function extractPdf(input, format, appId, appKey, signal) {
     err.code = 'MATHPIX_EXTRACT_FAILED'
     throw err
   }
-  await pollPdfUntilReady(pdfId, appId, appKey, signal, format === 'word')
-  const mmd = await downloadPdfFormat(pdfId, 'mmd', appId, appKey, signal)
+  return String(pdfId)
+}
+
+async function extractPdf(input, format, appId, appKey, signal) {
+  const b64 = stripDataUrl(input.pdfBase64 || input.imageBase64)
+  if (!b64 || b64.length < 40) {
+    const err = new Error('pdfBase64 is required for Mathpix PDF OCR.')
+    err.code = 'MATHPIX_BAD_INPUT'
+    throw err
+  }
+  const bytes = Buffer.from(b64, 'base64')
+  const fileHash = mathpixPdfFileHash(bytes)
+  const wantDocx = format === 'word'
+  let pdfId = ''
+  try {
+    pdfId = await reusableMathpixPdfJob(fileHash, wantDocx, appId, appKey, signal)
+    if (!pdfId) pdfId = await submitPdf(bytes, input.fileName, wantDocx, appId, appKey, signal)
+    rememberMathpixPdfJob(fileHash, pdfId, wantDocx)
+    await pollPdfUntilReady(pdfId, appId, appKey, signal, wantDocx)
+  } catch (e) {
+    if (isMathpixNetworkError(e)) throw mathpixNetworkError(e, pdfId)
+    if (pdfId && e?.code === 'MATHPIX_EXTRACT_FAILED') forgetMathpixPdfJob(fileHash)
+    throw e
+  }
+  let mmd
+  try {
+    mmd = await downloadPdfFormat(pdfId, 'mmd', appId, appKey, signal)
+  } catch (e) {
+    throw isMathpixNetworkError(e) ? mathpixNetworkError(e, pdfId) : e
+  }
   if (!String(mmd.text ?? '').trim()) {
     const err = new Error('Mathpix PDF OCR returned empty text.')
     err.code = 'MATHPIX_EMPTY'
@@ -386,9 +533,14 @@ export async function extractWithMathpix(body = {}, opts = {}) {
     mimeType: body.mimeType || '',
     fileName: body.fileName || '',
   }
-  const result = looksLikePdf(input)
-    ? await extractPdf(input, format, appId, appKey, opts.signal)
-    : await extractImage(input, format, appId, appKey, opts.signal)
+  let result
+  try {
+    result = looksLikePdf(input)
+      ? await extractPdf(input, format, appId, appKey, opts.signal)
+      : await extractImage(input, format, appId, appKey, opts.signal)
+  } catch (e) {
+    throw isMathpixNetworkError(e) ? mathpixNetworkError(e) : e
+  }
   return {
     ok: true,
     engine: 'mathpix',

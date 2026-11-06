@@ -90,7 +90,7 @@ export function mergeOfficialPyqSnapshotIntoPapers(existingPapers, incomingPaper
     const idx = papers.findIndex(
       (p) => officialPyqSittingKey(p) === key || (src.id && p.id === src.id),
     )
-    if (idx >= 0 && String(papers[idx]?.status ?? '') === 'approved') {
+    if (idx >= 0 && ['approved', 'published'].includes(String(papers[idx]?.status ?? ''))) {
       skippedPublished += 1
       continue
     }

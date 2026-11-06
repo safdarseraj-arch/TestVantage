@@ -25,6 +25,9 @@ export function writeQuestionBankSnapshot(bank, questions) {
 export const ALREADY_PUBLISHED_MESSAGE =
   'This paper is already published. To publish again, an admin must first unapprove it.'
 
+export const OFFICIAL_PYQ_ALREADY_PUBLISHED_MESSAGE =
+  'This paper is already published. To change it, an admin must first unpublish it.'
+
 function isOfficialRow(q) {
   if (!q) return false
   if (q.officialPyq === true) return true

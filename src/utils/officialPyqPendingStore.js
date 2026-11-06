@@ -13,7 +13,17 @@ export const OFFICIAL_PYQ_PENDING_LIST_KEY = 'testvantage-official-pyq-pending-l
 /** One paper’s questions (no OCR blob) so Open does not JSON.parse the fat store. */
 export const OFFICIAL_PYQ_PENDING_PAPER_KEY_PREFIX = 'testvantage-official-pyq-pending-item:'
 
-/** @typedef {'pending_review' | 'approved' | 'rejected'} OfficialPyqPaperStatus */
+/**
+ * pending_review → approved (reviewed, not shown to students) → published (final ids, served).
+ * @typedef {'pending_review' | 'approved' | 'published' | 'rejected'} OfficialPyqPaperStatus
+ */
+
+const OFFICIAL_PYQ_STATUSES = new Set(['pending_review', 'approved', 'published', 'rejected'])
+
+/** @param {unknown} status @returns {OfficialPyqPaperStatus} */
+function knownOfficialPyqStatus(status) {
+  return OFFICIAL_PYQ_STATUSES.has(String(status)) ? /** @type {OfficialPyqPaperStatus} */ (status) : 'pending_review'
+}
 
 /**
  * @typedef {{
@@ -334,6 +344,8 @@ function paperToLightRecord(paper) {
       .join('\n'),
     importedAt: paper.importedAt,
     reviewedAt: paper.reviewedAt,
+    ...(paper.publishedAt ? { publishedAt: paper.publishedAt } : {}),
+    ...(paper.keptPublishedIds ? { keptPublishedIds: paper.keptPublishedIds } : {}),
     rejectReason: paper.rejectReason,
     expectedQuestionCount: paper.expectedQuestionCount,
     hasOcr: paper.hasOcr === true || String(paper.preparedText ?? '').trim().length >= 80,
@@ -429,10 +441,7 @@ function paperToSummary(paper) {
     id: String(paper.id ?? ''),
     paperId: paper.paperId,
     paperLabel: String(paper.paperLabel || ''),
-    status:
-      paper.status === 'approved' || paper.status === 'rejected' || paper.status === 'pending_review'
-        ? paper.status
-        : 'pending_review',
+    status: knownOfficialPyqStatus(paper.status),
     year: Number(paper.year) || 0,
     exam: paper.exam,
     session: paper.session,
@@ -481,7 +490,7 @@ function rebuildSummariesFromPapers(papers, updatedAt) {
   return memorySummaries ?? []
 }
 
-const STATUS_RANK = { approved: 3, pending_review: 2, rejected: 1 }
+const STATUS_RANK = { published: 4, approved: 3, pending_review: 2, rejected: 1 }
 
 /**
  * One row per exam sitting (exam + year + paper/session/shift).
@@ -530,10 +539,7 @@ function pickPreferredPaper(a, b) {
 export function normalizeOfficialPyqPendingPapers(papers) {
   const list = (Array.isArray(papers) ? papers : []).map((p) => ({
     ...p,
-    status:
-      p.status === 'approved' || p.status === 'rejected' || p.status === 'pending_review'
-        ? p.status
-        : 'pending_review',
+    status: knownOfficialPyqStatus(p.status),
   }))
   /** @type {Map<string, OfficialPyqPendingPaper>} */
   const byKey = new Map()
@@ -738,9 +744,10 @@ export function listOfficialPyqPendingSummaries(status = 'pending_review') {
 /** One pass over the light cache — used by tab badges. */
 export function countOfficialPyqPendingByStatus() {
   const all = listOfficialPyqPendingSummaries('all')
-  const out = { pending_review: 0, approved: 0, rejected: 0, all: all.length }
+  const out = { pending_review: 0, approved: 0, published: 0, rejected: 0, all: all.length }
   for (const p of all) {
     if (p.status === 'approved') out.approved += 1
+    else if (p.status === 'published') out.published += 1
     else if (p.status === 'rejected') out.rejected += 1
     else out.pending_review += 1
   }
@@ -875,8 +882,11 @@ export function addOfficialPyqPendingPaper(input) {
 
   const existing = findOfficialPyqPendingBySittingKey(draft)
   if (existing) {
-    if (existing.status === 'approved') {
+    if (existing.status === 'published') {
       throw new Error(`“${existing.paperLabel}” is already published.`)
+    }
+    if (existing.status === 'approved') {
+      throw new Error(`“${existing.paperLabel}” is already approved. Send it back to Pending first to upload it again.`)
     }
     const updated = updateOfficialPyqPendingPaper(existing.id, {
       ...draft,
@@ -942,9 +952,26 @@ export function addOfficialPyqReplicaPendingPaper(input) {
   return paper
 }
 
-/** True when Approve & Publish has locked this paper’s question bodies. */
+/**
+ * True once Approve has locked this paper’s question wording (Approved or Published).
+ * Approved papers still take tag, answer, and solution saves through
+ * allowPublishedQuestionWrite; Published papers take none.
+ */
 export function officialPyqQuestionsArePublishedLocked(paper) {
-  return String(paper?.status ?? '') === 'approved'
+  const status = String(paper?.status ?? '')
+  return status === 'approved' || status === 'published'
+}
+
+/** True when students are served this paper. */
+export function officialPyqPaperIsPublished(paper) {
+  return String(paper?.status ?? '') === 'published'
+}
+
+/** Why re-parse, heal, or a card edit cannot change this paper’s questions. */
+export function officialPyqWordingLockedMessage(paper) {
+  return officialPyqPaperIsPublished(paper)
+    ? 'This paper is published. Unpublish it and send it back for review before re-parse or heal can change its questions.'
+    : 'This paper is approved. Send it back for review before re-parse or heal can change its questions.'
 }
 
 /**
@@ -969,14 +996,14 @@ export function updateOfficialPyqPendingPaper(id, updates) {
   const unlocking =
     updates &&
     Object.prototype.hasOwnProperty.call(updates, 'status') &&
-    updates.status !== 'approved'
+    !officialPyqQuestionsArePublishedLocked({ status: updates.status })
   const wantsQuestions =
     updates && Object.prototype.hasOwnProperty.call(updates, 'questions')
   const publishedLocked =
     officialPyqQuestionsArePublishedLocked(prev) &&
     wantsQuestions &&
     !unlocking &&
-    updates.allowPublishedQuestionWrite !== true
+    !(updates.allowPublishedQuestionWrite === true && String(prev.status) === 'approved')
   let nextQuestions = publishedLocked
     ? prev.questions
     : wantsQuestions
@@ -1013,6 +1040,26 @@ export function updateOfficialPyqPendingPaper(id, updates) {
   const saved = memoryRoot?.papers?.find((paper) => paper.id === prev.id) || root.papers[idx]
   writeLightPaper(saved)
   return saved
+}
+
+/**
+ * Paper-level fields for many papers in one save. Never touches questions, status, or id.
+ * @param {Record<string, Partial<OfficialPyqPendingPaper>>} patchById
+ * @returns {number} papers changed
+ */
+export function updateOfficialPyqPendingPapersMeta(patchById) {
+  const root = loadRoot()
+  let changed = 0
+  const papers = root.papers.map((paper) => {
+    const patch = patchById?.[paper.id]
+    if (!patch || typeof patch !== 'object') return paper
+    const { questions: _questions, status: _status, id: _id, ...safe } = patch
+    changed += 1
+    return { ...paper, ...safe }
+  })
+  if (!changed) return 0
+  saveRoot({ papers, updatedAt: Date.now() })
+  return changed
 }
 
 /** @param {string} id */

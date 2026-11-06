@@ -44,11 +44,12 @@ export function mixedSmilesFigureOptions(raw) {
     .slice(at)
     .replace(OPTION_TOKEN_RE, '')
     .replace(/\\(?:begin|end)\{figure\*?\}|\\captionsetup\{[^}]*\}|\\caption\{\s*(?:\(\s*[A-D]\s*\))?\s*\}/gi, '')
-    .replace(/\(\s*[A-D]\s*\)|\\(?:begin|end)\{itemize\}|\\item\b/gi, '')
+    // 2017 papers print "[A]" where later ones print "(A)".
+    .replace(/\(\s*[A-D]\s*\)|\[\s*[A-D]\s*\]|\\(?:begin|end)\{itemize\}|\\item\b/gi, '')
   if (between.trim()) return null
   const stem = t
     .slice(0, at)
-    .replace(/(?:^|\n)\s*\(\s*A\s*\)\s*$/i, '')
+    .replace(/(?:^|\n)\s*(?:\(\s*A\s*\)|\[\s*A\s*\])\s*$/i, '')
     .trim()
   return { stem, options: tail.map((m) => asOptionFigure(m[0])) }
 }

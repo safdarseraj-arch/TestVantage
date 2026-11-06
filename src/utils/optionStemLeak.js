@@ -378,11 +378,26 @@ export function trimTrailingProseAfterMath(opt) {
   if (
     /^and\s+\$/.test(tail) ||
     hasOptionEqualityAnswer(tail) ||
-    hasMeaningfulOptionAnswerTail(tail)
+    hasMeaningfulOptionAnswerTail(tail) ||
+    isOptionClauseTail(tail)
   ) {
     return o
   }
   return m[1].trim()
+}
+
+/**
+ * "is increasing in $(0, \infty)$" or "in $(0, \infty)$" after the first formula is the
+ * option itself (2017 P2 Q46). A run-on ("is equal to"), a new sentence, or page chrome is not.
+ * @param {string} tail
+ */
+function isOptionClauseTail(tail) {
+  const t = String(tail ?? '').trim()
+  if (!t || t.length > 120 || !/^[a-z]/.test(t)) return false
+  if (/[.?!:]\s+[A-Z]|\bthen\b|rough\s+work|\bQ\s*\.\s*\d/i.test(t)) return false
+  const prose = t.replace(/\$[^$]*\$/g, ' $ ').trim()
+  if (/\b(?:to|of|is|are|the|a|an|and|or|that|by|for|with|in|on|at|from|as|than|where|which)\s*[.,]?$/i.test(prose)) return false
+  return prose.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length <= 10
 }
 
 /**

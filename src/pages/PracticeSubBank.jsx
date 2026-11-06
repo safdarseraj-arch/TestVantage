@@ -85,7 +85,7 @@ export function PracticeSubBankPage({ subBankType }) {
           <p className="form-hint official-pyq-admin-hint">
             Official NTA / Advanced / NEET papers:{' '}
             <Link to="/official-pyq">Approve official papers</Link> — import stays pending until you
-            Approve &amp; publish to PYQ and Question Bank. Gemini PYQ-style is labelled separately
+            approve it and then Publish it to PYQ and Question Bank. Gemini PYQ-style is labelled separately
             and is not an official NTA dump.
           </p>
           <PyqGeminiGeneratePanel onImported={bumpRefresh} />

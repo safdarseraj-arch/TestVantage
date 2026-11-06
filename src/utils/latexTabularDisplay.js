@@ -89,7 +89,7 @@ export function stripDollarsInsideLatexEnvs(text, { keepMatchListTabular = false
       // A List-I / List-II table holds prose cells; its $...$ are later flattened into rows, not typeset as one array.
       keepMatchListTabular &&
       /^\\begin\{tabular\}/i.test(block) &&
-      /(?:List|Column)\s*[-–]*\s*I\b/i.test(block)
+      /(?:List|Column)\s*[-–]*\s*(?:I|1)\b/i.test(block)
         ? block
         : block.replace(/\$+/g, ''),
   )
@@ -426,6 +426,227 @@ function tabularToPaperTableHtml(spec, body) {
   })
   html += '</table>'
   return html
+}
+
+/** Split at `\\` (rows) or `&` (cells) that sit outside $…$ math and braces. */
+function splitOutsideMath(text, sep) {
+  const s = String(text ?? '')
+  const out = []
+  let buf = ''
+  let depth = 0
+  let math = ''
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i]
+    if (ch === '\\' && s[i + 1] === '$') {
+      buf += '\\$'
+      i += 1
+      continue
+    }
+    const image = !math && ch === '!' ? s.slice(i).match(/^!\[[^\]]*\]\([^)\s]*\)/) : null
+    if (image) {
+      buf += image[0]
+      i += image[0].length - 1
+      continue
+    }
+    if (ch === '$') {
+      const run = s[i + 1] === '$' ? '$$' : '$'
+      if (!math) math = run
+      else if (math === run) math = ''
+      buf += run
+      i += run.length - 1
+      continue
+    }
+    if (!math) {
+      if (ch === '{') depth += 1
+      else if (ch === '}') depth = Math.max(0, depth - 1)
+      else if (depth === 0 && sep === 'row' && ch === '\\' && s[i + 1] === '\\') {
+        out.push(buf)
+        buf = ''
+        i += 1
+        continue
+      } else if (depth === 0 && sep === 'cell' && ch === '&' && s[i - 1] !== '\\') {
+        out.push(buf)
+        buf = ''
+        continue
+      }
+    }
+    buf += ch
+  }
+  out.push(buf)
+  return out
+}
+
+const MATCH_LABEL_ONLY_RE = /^\(\s*(?:[IVX]{1,4}|[ivx]{1,4}|[A-Z]|\d{1,2})\s*\)$/
+const MATCH_ROW_LABEL_RE = /^\(\s*(?:[IVX]{1,4}|[ivx]{1,4}|[A-Z]|\d{1,2})\s*\)/
+
+function isMatchHeaderRow(row) {
+  return row.filter((cell) => /^(?:Column|List)\b/i.test(cellPlain(cell.text))).length >= 2
+}
+
+/** Some OCR puts "(I)" in its own cell; the paper prints it at the start of the item's cell. */
+function mergeLabelOnlyCells(row) {
+  const out = []
+  for (let i = 0; i < row.length; i += 1) {
+    const label = row[i].text.trim()
+    const next = row[i + 1]
+    if (MATCH_LABEL_ONLY_RE.test(label) && next && !MATCH_ROW_LABEL_RE.test(next.text.trim())) {
+      out.push({ ...next, text: `${label} ${next.text.trim()}`.trim(), colspan: 1 })
+      i += 1
+      continue
+    }
+    out.push(row[i])
+  }
+  return out
+}
+
+/**
+ * "Column 1 | Column 2 | Column 3" with (I)/(i)/(P) rows, laid out as the paper prints it:
+ * any lead-in row spans the table, then one row per (I)/(i)/(P) with one cell per column.
+ * @returns {{ intro: string[], header: string[], rows: string[][] } | null}
+ */
+export function matchColumnTableLayout(body) {
+  const flat = String(body ?? '').replace(
+    /\\begin\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?([\s\S]*?)\\end\{tabular\}/g,
+    (_, inner) => inner.replace(/\\hline\b/g, ' ').replace(/\\\\/g, ' ').replace(/\s+/g, ' ').trim(),
+  )
+  const rows = splitOutsideMath(flat, 'row')
+    .map((line) => line.replace(/\\hline\b/g, ' ').trim())
+    .filter(Boolean)
+    .map((line) => splitOutsideMath(line, 'cell').map(parseTableCell))
+  const headerAt = rows.findIndex(isMatchHeaderRow)
+  if (headerAt < 0) return null
+  const header = rows[headerAt]
+    .map((cell) => cellPlain(cell.text))
+    .filter(Boolean)
+  const cols = header.length
+  const data = rows.slice(headerAt + 1).map((row) => {
+    const cells = mergeLabelOnlyCells(row).map((cell) => cell.text.trim())
+    while (cells.length > cols && !cells[cells.length - 1]) cells.pop()
+    while (cells.length < cols) cells.push('')
+    return cells
+  })
+  if (data.filter((cells) => MATCH_ROW_LABEL_RE.test(cells[0])).length < 2) return null
+  if (data.some((cells) => cells.length !== cols)) return null
+  const intro = rows
+    .slice(0, headerAt)
+    .map((row) => row.map((cell) => cell.text.trim()).filter(Boolean).join(' '))
+    .filter(Boolean)
+  return { intro, header, rows: data }
+}
+
+function matchCellMathHtml(tex) {
+  try {
+    const html = katex.renderToString(String(tex).trim(), { throwOnError: false, output: 'html' })
+    if (html && !/katex-error/.test(html)) return html
+  } catch {
+    /* plain cell text below */
+  }
+  return cellHtml(tex)
+}
+
+/** Prose around math. If the OCR lost a cell's dollars, the run from the first command to the last is math. */
+function matchCellProseHtml(text) {
+  const s = String(text ?? '')
+  if (!/\\[a-zA-Z]|[_^]\{/.test(s)) return escapeCell(s)
+  const words = s.split(/(\s+)/)
+  const mathy = (w) => /\\[a-zA-Z]|[_^{}=]/.test(w)
+  const first = words.findIndex(mathy)
+  let last = words.length - 1
+  while (last > first && !mathy(words[last])) last -= 1
+  return (
+    escapeCell(words.slice(0, first).join('')) +
+    matchCellMathHtml(words.slice(first, last + 1).join('')) +
+    escapeCell(words.slice(last + 1).join(''))
+  )
+}
+
+function matchCellHtml(raw) {
+  const src = String(raw ?? '').replace(/\\(?:begin|end)\{itemize\}/g, ' ')
+  if (/\\item\b/.test(src)) {
+    const [lead, ...items] = src.split(/\\item\s*(?:\[[^\]]*\])?/)
+    return [matchCellHtml(lead), ...items.map((item) => `• ${matchCellHtml(item)}`)].filter((h) => h.trim()).join('<br>')
+  }
+  const s = src.replace(/\s+/g, ' ').trim()
+  const re = /!\[[^\]]*\]\(([^)\s]+)\)|\\includegraphics(?:\[[^\]]*\])?\{([^}]*)\}|\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g
+  let html = ''
+  let last = 0
+  for (const m of s.matchAll(re)) {
+    html += matchCellProseHtml(s.slice(last, m.index))
+    const src = m[1] || m[2]
+    html += src
+      ? `<img src="${escapeHtml(src)}" alt="" style="display:block;max-width:10rem;height:auto;margin:0.3rem 0">`
+      : matchCellMathHtml(m[3] ?? m[4])
+    last = m.index + m[0].length
+  }
+  return html + matchCellProseHtml(s.slice(last))
+}
+
+const MATCH_CELL_STYLE = 'border:1px solid #4b5563;padding:0.45rem 0.6rem;vertical-align:top;font-style:normal'
+
+function matchColumnTableHtml(layout) {
+  const cols = layout.header.length
+  const width = `${(100 / cols).toFixed(2)}%`
+  let html =
+    '<table class="paper-data-table match-columns-table" style="border-collapse:collapse;width:100%;margin:0.75rem 0;font-style:normal;color:inherit">'
+  for (const line of layout.intro) {
+    html += `<tr><td colspan="${cols}" style="${MATCH_CELL_STYLE};text-align:left">${matchCellHtml(line)}</td></tr>`
+  }
+  html += '<tr>'
+  for (const name of layout.header) {
+    html += `<th style="${MATCH_CELL_STYLE};text-align:center;font-weight:600;width:${width}">${escapeCell(name)}</th>`
+  }
+  html += '</tr>'
+  for (const cells of layout.rows) {
+    html += '<tr>'
+    for (const cell of cells) html += `<td style="${MATCH_CELL_STYLE};text-align:left">${matchCellHtml(cell)}</td>`
+    html += '</tr>'
+  }
+  return `${html}</table>`
+}
+
+/** Outermost tabulars with their bodies; an inner tabular stays inside its cell. */
+function outerTabulars(src) {
+  const blocks = []
+  const re = /\\(begin|end)\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?/g
+  let depth = 0
+  let start = -1
+  let bodyStart = -1
+  for (const m of src.matchAll(re)) {
+    if (m[1] === 'begin') {
+      if (depth === 0) {
+        start = m.index
+        bodyStart = m.index + m[0].length
+      }
+      depth += 1
+    } else if (depth > 0) {
+      depth -= 1
+      if (depth === 0) blocks.push({ start, end: m.index + '\\end{tabular}'.length, body: src.slice(bodyStart, m.index) })
+    }
+  }
+  return blocks
+}
+
+/**
+ * Pull "Column 1 / Column 2 / Column 3" match tables out of text as drawn HTML, so pictures
+ * and formulas stay inside their cells. Returns null when the text has no such table.
+ * @param {unknown} text
+ * @returns {Array<{ kind: 'text' | 'html', value: string }> | null}
+ */
+export function splitMatchColumnTables(text) {
+  const src = String(text ?? '')
+  if (!/\\begin\{tabular\}/.test(src) || !/(?:Column|List)/i.test(src)) return null
+  const parts = []
+  let last = 0
+  for (const block of outerTabulars(src)) {
+    const layout = matchColumnTableLayout(block.body)
+    if (!layout) continue
+    if (block.start > last) parts.push({ kind: 'text', value: src.slice(last, block.start) })
+    parts.push({ kind: 'html', value: matchColumnTableHtml(layout) })
+    last = block.end
+  }
+  if (!parts.length) return null
+  if (last < src.length) parts.push({ kind: 'text', value: src.slice(last) })
+  return parts
 }
 
 const TABULAR_WITH_CLOSER_RE = /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*?)\\end\{tabular\}(\s*\$+)?/gi

@@ -1,6 +1,7 @@
 /**
  * Official previous-year papers — pending approval bank.
- * Import official PDFs/JSON → review → Approve & publish (PYQ + Question Bank)
+ * Import official PDFs/JSON → review → Reviewed — Approve (not shown to students)
+ * → fill tags, answers, solutions → Publish (final ids, PYQ + Question Bank)
  * or Reject (stays out of student PYQ).
  */
 
@@ -32,7 +33,7 @@ import {
 } from '../utils/officialPyqPendingStore'
 import ErrorBoundary from '../components/ErrorBoundary.jsx'
 import OfficialPyqReplicaControls from '../components/OfficialPyqReplicaControls.jsx'
-import OfficialPyqPendingFill from '../components/OfficialPyqPendingFill.jsx'
+import OfficialPyqHybridFill from '../components/OfficialPyqHybridFill.jsx'
 import OfficialPyqTabList from './OfficialPyqTabList.jsx'
 import OfficialPyqPreviewPager from './OfficialPyqPreviewPager.jsx'
 import { resetOfficialPyqSplitWorker, peekOfficialPyqSplitKeep } from '../utils/officialPyqSplitWorker.js'
@@ -43,6 +44,7 @@ import {
 } from '../utils/officialPyqMissingSlots.js'
 import { buildLiteExtractionSummary } from '../utils/pyqOcrCountLite.js'
 import { applyOfficialPyqPublicSnapshotOnce } from '../utils/applyOfficialPyqPublicSnapshot.js'
+import { officialPyqPublishGaps } from '../utils/officialPyqPublishFlow.js'
 
 const ExtractionSummaryTable = lazy(() => import('../components/ExtractionSummaryTable.jsx'))
 const OfficialPyqOriginalComparePanel = lazy(() => import('../components/OfficialPyqOriginalComparePanel.jsx'))
@@ -115,6 +117,10 @@ function expectedMinOfficialPyqCount(exam) {
   if (exam === 'jee-main') return 20
   if (exam === 'neet') return 30
   return 8
+}
+
+function paperIsApprovedOrPublished(paper) {
+  return paper?.status === 'approved' || paper?.status === 'published'
 }
 
 function paperHasStoredOcr(paper) {
@@ -619,6 +625,14 @@ export default function OfficialPyqPending() {
       return null
     }
   }, [selected, filledPreviewCount, tick])
+  const publishGaps = useMemo(() => {
+    if (!selected || selected.status !== 'approved') return null
+    try {
+      return officialPyqPublishGaps(getOfficialPyqPendingPreviewPaper(selected.id))
+    } catch {
+      return null
+    }
+  }, [selected, tick, previewReload])
 
   useEffect(() => {
     if (!previewOpen || !selectedId) return undefined
@@ -655,7 +669,7 @@ export default function OfficialPyqPending() {
                 const paper = getOfficialPyqPendingPaper(selectedId)
                 const ocr = officialPyqStoredOcrTextLocal(paper)
                 if (!paper || ocr.length < 80) return
-                if (paper.status === 'approved' || paper.returnedFromPublished === true) return
+                if (paperIsApprovedOrPublished(paper) || paper.returnedFromPublished === true) return
                 const result = await reExtractOfficialPyqPendingPaperLocalAsync(paper, {
                   yieldFn: yieldToUi,
                 })
@@ -703,7 +717,7 @@ export default function OfficialPyqPending() {
               if (cancelled) return
               const paper = getOfficialPyqPendingPaper(selectedId)
               if (!paper) return
-              if (paper.status === 'approved' || paper.returnedFromPublished === true) return
+              if (paperIsApprovedOrPublished(paper) || paper.returnedFromPublished === true) return
               if (
                 paper.localQuality?.passed === true &&
                 (paper.localQuality?.sameCheck === 'banner-v1' ||
@@ -796,8 +810,8 @@ export default function OfficialPyqPending() {
     if (existing) {
       if (existing.status === 'rejected') {
         writeOfficialPyqUi({ filter: 'rejected' })
-      } else if (existing.status === 'approved') {
-        writeOfficialPyqUi({ filter: 'approved' })
+      } else if (existing.status === 'approved' || existing.status === 'published') {
+        writeOfficialPyqUi({ filter: existing.status })
       } else {
         writeOfficialPyqUi({ filter: 'pending_review' })
       }
@@ -808,6 +822,8 @@ export default function OfficialPyqPending() {
         setMessage(
           `“${existing.paperLabel}” is in Rejected. Use Remove from list below to clear it, or import a new file to start over.`,
         )
+      } else if (existing.status === 'approved') {
+        setMessage(`“${existing.paperLabel}” is already approved. Fill tags, answers, and solutions, then Publish.`)
       } else {
         setMessage(`“${existing.paperLabel}” is already published.`)
       }
@@ -925,7 +941,7 @@ export default function OfficialPyqPending() {
         return
       }
       setMessage(
-        `Published ${result.pyqCount} question(s) to PYQ and ${result.bankCount} to Question Bank. Students can use them under Prepare → PYQ.`,
+        `Approved ${result.questionCount} question(s). Students do not see them yet. Next: fill tags, answers, and solutions (by hand or with Hybrid AI), then press Publish.`,
       )
       bump()
     } catch (e) {
@@ -1000,7 +1016,7 @@ export default function OfficialPyqPending() {
         const acceptable = localOfficialPyqReparseAcceptable(count, target, paperNow.exam, previousCount)
         setMessage(
           acceptable
-            ? `Re-parsed ${count} question(s) from stored OCR (was ${previousCount}). Local split done — press Fill tags, answers & solutions (Hybrid AI) to fill them two at a time.`
+            ? `Re-parsed ${count} question(s) from stored OCR (was ${previousCount}). Local split done. Tags, answers, and solutions are filled after you approve.`
             : `Re-parsed ${count} question(s) from stored OCR (was ${previousCount}). Review the count before approving.`,
         )
         if (count < expectedMinOfficialPyqCount(paperNow.exam)) {
@@ -1155,14 +1171,56 @@ export default function OfficialPyqPending() {
     }
   }
 
-  async function onUnpublishToPending() {
-    if (!selected || selected.status !== 'approved') return
+  async function onPublish() {
+    if (!selected || selected.status !== 'approved' || approveBusy) return
     if (!isAdminLoggedIn()) {
-      setError('Only an admin can send a published paper back for review.')
+      setError('Only an admin can publish a paper.')
+      return
+    }
+    const warn = `Publish “${selected.paperLabel}”? Every question gets its final Question ID and students can use the paper.`
+    if (typeof window !== 'undefined' && !window.confirm(warn)) return
+    setError('')
+    setMessage('')
+    setApproveBusy(true)
+    setApproveLabel('Starting…')
+    setApprovePct(2)
+    await yieldToUi()
+    try {
+      const { publishOfficialPyqPaperAsync } = await loadOfficialPyqApproval()
+      const result = await publishOfficialPyqPaperAsync(selected.id, {
+        onProgress: (pct, label) => {
+          setApprovePct(pct)
+          setApproveLabel(label)
+        },
+        yieldFn: yieldToUi,
+      })
+      if (!result.ok) {
+        setError(result.errors.join(' ') || 'Could not publish.')
+        return
+      }
+      writeOfficialPyqUi({ filter: 'published', openId: selected.id })
+      setOpenedPaper(officialPyqPaperToSummary({ ...selected, status: 'published' }))
+      setMessage(
+        `Published ${result.pyqCount} question(s) to PYQ and ${result.bankCount} to Question Bank, each with its final Question ID. Students can use them under Prepare → PYQ.`,
+      )
+      bump()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not publish.')
+    } finally {
+      setApproveBusy(false)
+      setApproveLabel('')
+      setApprovePct(0)
+    }
+  }
+
+  async function onUnpublishToApproved() {
+    if (!selected || selected.status !== 'published') return
+    if (!isAdminLoggedIn()) {
+      setError('Only an admin can unpublish a paper.')
       return
     }
     const warn =
-      `Send “${selected.paperLabel}” back for review? It leaves the student test and the published bank, and returns to Pending with the same questions. This does not re-extract or change List rows. It does not approve the paper again.`
+      `Unpublish “${selected.paperLabel}”? Students stop seeing it. It goes back to Approved with the same questions, answers, and Question IDs, so you can fix tags and Publish again.`
     if (typeof window !== 'undefined' && !window.confirm(warn)) return
     setError('')
     setMessage('')
@@ -1173,12 +1231,12 @@ export default function OfficialPyqPending() {
         setError(result.error || 'Could not unpublish.')
         return
       }
-      const next = result.paper || { ...selected, status: 'pending_review' }
-      writeOfficialPyqUi({ filter: 'pending_review', openId: selected.id })
+      const next = result.paper || { ...selected, status: 'approved' }
+      writeOfficialPyqUi({ filter: 'approved', openId: selected.id })
       setOpenedPaper(officialPyqPaperToSummary(next))
       setPreviewOpen(true)
       setMessage(
-        `Sent “${next.paperLabel}” back for review. It is in Pending with the same questions` +
+        `Unpublished “${next.paperLabel}”. It is Approved again` +
           (result.pyqRemoved || result.bankRemoved
             ? ` (removed ${result.pyqRemoved || 0} from the student test and ${result.bankRemoved || 0} from the bank).`
             : '.'),
@@ -1186,6 +1244,35 @@ export default function OfficialPyqPending() {
       bump()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not unpublish.')
+    }
+  }
+
+  async function onSendApprovedToPending() {
+    if (!selected || selected.status !== 'approved') return
+    if (!isAdminLoggedIn()) {
+      setError('Only an admin can send an approved paper back for review.')
+      return
+    }
+    const warn =
+      `Send “${selected.paperLabel}” back for review? It returns to Pending with the same questions. This does not re-extract or change List rows.`
+    if (typeof window !== 'undefined' && !window.confirm(warn)) return
+    setError('')
+    setMessage('')
+    try {
+      const { unapproveOfficialPyqPaper } = await loadOfficialPyqApproval()
+      const result = unapproveOfficialPyqPaper(selected.id)
+      if (!result.ok) {
+        setError(result.error || 'Could not send it back.')
+        return
+      }
+      const next = result.paper || { ...selected, status: 'pending_review' }
+      writeOfficialPyqUi({ filter: 'pending_review', openId: selected.id })
+      setOpenedPaper(officialPyqPaperToSummary(next))
+      setPreviewOpen(true)
+      setMessage(`Sent “${next.paperLabel}” back for review. It is in Pending with the same questions.`)
+      bump()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not send it back.')
     }
   }
 
@@ -1259,7 +1346,8 @@ export default function OfficialPyqPending() {
         <h1>Approve official papers</h1>
         <p className="form-hint">
           Pull or upload <strong>official</strong> previous-year papers (NTA / JEE Advanced archive). They stay in
-          this separate bank until you <strong>Approve &amp; publish</strong> — then they go to student{' '}
+          this separate bank. <strong>Reviewed — Approve</strong> checks a paper; then fill tags, answers, and
+          solutions; then <strong>Publish</strong> gives final Question IDs and sends it to student{' '}
           <Link to="/pyq">PYQ Bank</Link> and Question Bank. Coaching-site scrapes are not allowed.
         </p>
         <p className="form-hint">
@@ -1373,7 +1461,9 @@ export default function OfficialPyqPending() {
         <p className="form-hint">
           Download the official PDF from NTA / Advanced archive, then upload it here (or JSON/CSV).
           Stored OCR is split on this computer (Re-parse does not wait for Gemini).
-          Papers stay <strong>Pending approval</strong> until you publish. AI-filled solutions are
+          Papers stay <strong>Pending approval</strong> until you approve, and students see them only
+          after you publish. Upload only splits the paper into questions and keeps answers printed on
+          it. Hybrid AI can fill tags, answers, and solutions after you approve, and its answers are
           labelled separately from official keys.
           {' '}
           <strong>Do not approve a JEE Advanced paper if it has under 40 questions</strong>
@@ -1460,7 +1550,7 @@ export default function OfficialPyqPending() {
             const id = String(summary?.id || '')
             if (!id || qualityBusyId) return
             const paper = getOfficialPyqPendingPaper(id)
-            if (!paper || paper.status === 'approved') return
+            if (!paper || paperIsApprovedOrPublished(paper)) return
             setQualityBusyId(id)
             void import('../utils/officialPyqLocalQuality.js')
               .then(({ persistOfficialPyqQualityRun }) => {
@@ -1506,15 +1596,66 @@ export default function OfficialPyqPending() {
                       {extractSummary ? ` · ${extractSummary}` : ''}
                     </p>
                     {selected.status === 'approved' ? (
-                      <div className="official-pyq-actions">
+                      <div className="official-pyq-actions" data-testid="official-pyq-approved-actions">
                         <p className="form-hint" data-testid="official-pyq-fix-tags-hint">
-                          This paper is published. Each question below uses the Question Bank metatag
-                          fields: Subject, Unit, Chapter, Topic, Type of question, Exam assigned,
-                          Toughness, and Source, plus Answer and Solution. Gemini&apos;s values are shown,
-                          including blanks.
+                          Approved — students do not see this paper yet. Each question below uses the
+                          Question Bank metatag fields: Subject, Unit, Chapter, Topic, Type of question,
+                          Exam assigned, Toughness, and Source, plus Answer and Solution.
                           {isAdminLoggedIn()
-                            ? ' Save them here, or ask Hybrid AI to fill them. The paper stays published, and the question wording is not changed.'
+                            ? ' Fill them by hand, or ask Hybrid AI to fill them (optional). The question wording is not changed. Then press Publish.'
                             : ' Only an admin can change them.'}
+                        </p>
+                        {publishGaps && publishGaps.total > 0 ? (
+                          <p className="form-hint" data-testid="official-pyq-publish-gaps">
+                            {publishGaps.noChapter || publishGaps.noAnswer || publishGaps.noSolution
+                              ? `Still blank: ${publishGaps.noChapter} without a chapter, ${publishGaps.noAnswer} without an answer, ${publishGaps.noSolution} without a solution (of ${publishGaps.total}). You can still Publish.`
+                              : `All ${publishGaps.total} questions have a chapter, answer, and solution.`}
+                          </p>
+                        ) : null}
+                        {isAdminLoggedIn() ? (
+                          <OfficialPyqHybridFill
+                            paperId={selected.id}
+                            onChanged={() => {
+                              bump()
+                              setPreviewReload((n) => n + 1)
+                            }}
+                          />
+                        ) : null}
+                        {isAdminLoggedIn() ? (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            data-testid="official-pyq-publish"
+                            disabled={approveBusy}
+                            aria-busy={approveBusy}
+                            onClick={() => void onPublish()}
+                          >
+                            {approveBusy ? 'Publishing…' : 'Publish'}
+                          </button>
+                        ) : null}
+                        {approveBusy ? (
+                          <p className="official-pyq-progress" role="status" data-testid="official-pyq-publish-progress">
+                            {approvePct}% · {approveLabel}
+                          </p>
+                        ) : null}
+                        {isAdminLoggedIn() ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            data-testid="official-pyq-send-back"
+                            disabled={approveBusy}
+                            onClick={() => void onSendApprovedToPending()}
+                          >
+                            Unapprove — send back for review
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {selected.status === 'published' ? (
+                      <div className="official-pyq-actions" data-testid="official-pyq-published-actions">
+                        <p className="form-hint">
+                          Published — students can use this paper and every question has its final
+                          Question ID. To change tags, answers, or solutions, press Unpublish first.
                         </p>
                         {isAdminLoggedIn() ? (
                         <OfficialPyqReplicaControls
@@ -1531,23 +1672,16 @@ export default function OfficialPyqPending() {
                             )
                             bump()
                           }}
-                          onFilled={() => {
-                            setPreviewReload((n) => n + 1)
-                            setMessage(
-                              'Saved Hybrid AI tags, answers, and solutions for this paper. It is still published. Question wording was not changed.',
-                            )
-                            bump()
-                          }}
                         />
                         ) : null}
                         {isAdminLoggedIn() ? (
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
-                          data-testid="official-pyq-send-back"
-                          onClick={() => void onUnpublishToPending()}
+                          data-testid="official-pyq-unpublish"
+                          onClick={() => void onUnpublishToApproved()}
                         >
-                          Unapprove — send back for review
+                          Unpublish — back to Approved
                         </button>
                         ) : null}
                       </div>
@@ -1575,7 +1709,11 @@ export default function OfficialPyqPending() {
                           and no stored OCR. Your reviewed paper is still stored as{' '}
                           <strong>{siblingWithQuestions.paperLabel}</strong> (
                           {officialPyqPaperQuestionCount(siblingWithQuestions)} questions
-                          {siblingWithQuestions.status === 'approved' ? ', under Published PYQ' : ''}).
+                          {siblingWithQuestions.status === 'approved'
+                            ? ', under Approved'
+                            : siblingWithQuestions.status === 'published'
+                              ? ', under Published'
+                              : ''}).
                           Re-parse cannot restore this empty Paper 2 row.
                         </p>
                         <button
@@ -1585,7 +1723,9 @@ export default function OfficialPyqPending() {
                             const status = siblingWithQuestions.status
                             writeOfficialPyqUi({
                               filter:
-                                status === 'approved' || status === 'rejected' ? status : 'pending_review',
+                                status === 'approved' || status === 'published' || status === 'rejected'
+                                  ? status
+                                  : 'pending_review',
                               openId: siblingWithQuestions.id,
                             })
                             openOfficialPaper(siblingWithQuestions)
@@ -1687,13 +1827,12 @@ export default function OfficialPyqPending() {
                             {reParseBusy ? 'Re-parsing…' : 'Re-parse stored OCR'}
                           </button>
                         )}
-                        <OfficialPyqPendingFill
-                          paperId={selected.id}
-                          onChanged={() => {
-                            bump()
-                            setPreviewReload((n) => n + 1)
-                          }}
-                        />
+                        <p className="form-hint" data-testid="official-pyq-fill-after-approve">
+                          Tags, answers, and solutions are not filled yet. After you approve, open the
+                          paper under Approved and fill them by hand or press Fill tags, answers &amp;
+                          solutions (Hybrid AI). Then press Publish. Answers printed on the paper are
+                          already here.
+                        </p>
                         <ErrorBoundary compact title="Compare with original paper hit an error">
                           <Suspense fallback={null}>
                             <OfficialPyqOriginalComparePanel
@@ -1726,7 +1865,7 @@ export default function OfficialPyqPending() {
                             data-testid="official-pyq-approve-progress"
                             role="status"
                           >
-                            {approveLabel || 'Publishing…'}{' '}
+                            {approveLabel || 'Approving…'}{' '}
                             {approvePct > 0 ? `${Math.round(approvePct)}%` : ''}
                           </p>
                         ) : null}
@@ -1749,7 +1888,7 @@ export default function OfficialPyqPending() {
                             if (approveBlockers.length === 0 && !approveBusy) void onApprove()
                           }}
                         >
-                          {approveBusy ? 'Publishing…' : 'Approve & publish'}
+                          {approveBusy ? 'Approving…' : 'Reviewed — Approve'}
                         </button>
                         <input
                           type="text"

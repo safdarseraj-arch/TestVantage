@@ -456,8 +456,8 @@ export default function PyqImportPanel({ onImported }) {
         <p>
           <strong>Official papers with approval:</strong> for NTA / Advanced / NEET that must stay{' '}
           <em>pending</em> until a teacher approves, use{' '}
-          <Link to="/official-pyq">Approve official papers</Link> instead — Approve &amp; publish sends them
-          to student PYQ and Question Bank.
+          <Link to="/official-pyq">Approve official papers</Link> instead — approve, fill, then Publish sends
+          them to student PYQ and Question Bank.
         </p>
       </div>
 

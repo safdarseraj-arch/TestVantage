@@ -3,7 +3,11 @@ import 'katex/dist/katex.min.css'
 import 'katex/contrib/mhchem/mhchem.js'
 import { prepareTextForMathTextDisplay, stripLatexDisplayChrome, normalizeSplitMathDollars } from '../utils/prepareMathForRender'
 import { keepStructuredQuestionLines } from '../utils/repairMatrixStem.js'
-import { convertLatexTabularToArray, stripDollarsInsideLatexEnvs } from '../utils/latexTabularDisplay.js'
+import {
+  convertLatexTabularToArray,
+  splitMatchColumnTables,
+  stripDollarsInsideLatexEnvs,
+} from '../utils/latexTabularDisplay.js'
 import { wrapBareLatexRuns, repairOrphanAlignedBody } from '../utils/wrapBareLatexRuns.js'
 import { hasMathpixMedia, splitMathpixMediaSegments, stripMathpixFigureChrome } from '../utils/mathpixMedia'
 import { figureRowShare, groupSideBySideFigureSegments } from '../utils/figureLayout.js'
@@ -397,6 +401,25 @@ function renderSegmentBody(part, key) {
 
 export default function MathText({ text, questionContext, optionLetter }) {
   const raw = String(text ?? '')
+  const matchTables = splitMatchColumnTables(raw)
+  if (matchTables) {
+    return (
+      <span className="math-text-flow">
+        {matchTables.map((part, i) =>
+          part.kind === 'html' ? (
+            <span
+              key={`mt-${i}`}
+              className="match-columns-table-wrap"
+              style={{ display: 'block', overflowX: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: part.value }}
+            />
+          ) : (
+            <MathText key={`tx-${i}`} text={part.value} questionContext={questionContext} optionLetter={optionLetter} />
+          ),
+        )}
+      </span>
+    )
+  }
   if (/<smiles>/i.test(raw)) {
     const segs = splitSmilesDisplaySegments(raw)
     const looping =

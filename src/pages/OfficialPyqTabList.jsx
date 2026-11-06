@@ -14,12 +14,15 @@ import {
 
 const TABS = [
   ['pending_review', 'Pending approval'],
-  ['approved', 'Published PYQ'],
+  ['approved', 'Approved'],
+  ['published', 'Published'],
   ['rejected', 'Rejected'],
   ['all', 'All'],
 ]
 
 const UI_KEY = 'testvantage-official-pyq-ui'
+
+const VALID_FILTERS = new Set(TABS.map(([id]) => id))
 
 function readUi() {
   try {
@@ -40,7 +43,8 @@ function writeUi(patch) {
 
 function statusLabel(status) {
   if (status === 'pending_review') return 'Pending approval'
-  if (status === 'approved') return 'Published PYQ'
+  if (status === 'approved') return 'Approved'
+  if (status === 'published') return 'Published'
   if (status === 'rejected') return 'Rejected'
   return String(status || 'Unknown')
 }
@@ -71,14 +75,14 @@ function OfficialPyqTabList({
 }) {
   const [filter, setFilter] = useState(() => {
     const saved = readUi().filter
-    return saved === 'all' || saved === 'approved' || saved === 'rejected' || saved === 'pending_review'
+    return VALID_FILTERS.has(saved)
       ? saved
       : 'pending_review'
   })
 
   useEffect(() => {
     const saved = readUi().filter
-    if (saved === 'all' || saved === 'approved' || saved === 'rejected' || saved === 'pending_review') {
+    if (VALID_FILTERS.has(saved)) {
       setFilter((cur) => (cur === saved ? cur : saved))
     }
   }, [listTick])
@@ -140,8 +144,8 @@ function OfficialPyqTabList({
       {papers.length === 0 ? (
         <p className="form-hint">
           {filter === 'pending_review' &&
-          (Number(tabCounts.approved) > 0 || Number(tabCounts.rejected) > 0)
-            ? 'No papers waiting here. Click Published PYQ or Rejected above — your papers moved there.'
+          (Number(tabCounts.approved) > 0 || Number(tabCounts.published) > 0 || Number(tabCounts.rejected) > 0)
+            ? 'No papers waiting here. Click Approved, Published, or Rejected above — your papers moved there.'
             : 'No papers in this list yet.'}
         </p>
       ) : (

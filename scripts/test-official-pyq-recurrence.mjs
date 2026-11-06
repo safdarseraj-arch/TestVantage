@@ -34,6 +34,8 @@ const { stripTrailingPyqSectionHeader } = await import('../src/utils/bulkExtract
 const { officialPyqDrawnRawCode, officialPyqDrawnText } = await import('../src/utils/officialPyqOriginalCompare.js')
 const { stripMistakenOfficialPyqPassages } = await import('../src/utils/passage.js')
 const { buildPaperFacts } = await import('../src/utils/officialPyqPaperFacts.js')
+const { splitGluedChemDisplayEquations } = await import('../src/utils/healTruncatedLatex.js')
+const { extendOfficialPyqHealCard } = await import('../src/utils/extendTruncatedStem.js')
 
 let failed = 0
 function test(name, fn) {
@@ -763,6 +765,21 @@ List-II
   const healed = healUploadQuestionCard(card, `${ocr}\n\n${ocr}`)
   for (const y of [652, 1007, 1362, 1700]) assert.ok(String(healed.passageText).includes(url(y)), healed.passageText)
   assert.ok(!String(healed.passageText).includes(physUrl), healed.passageText)
+})
+
+test('a radioactive decay chain stays one line; the $$ closer before the next "$x_1$" line is kept (2019 P1 chem Q10)', () => {
+  const chain =
+    '$${ }_{92}^{238} \\mathrm{U} \\xrightarrow{-\\mathrm{x}_{1}}{ }_{90}^{234} \\mathrm{Th} \\xrightarrow{-\\mathrm{x}_{2}}{ }_{91}^{234} \\mathrm{~Pa} \\xrightarrow{-\\mathrm{x}_{3}}{ }^{234} \\mathbf{Z} \\xrightarrow{-\\mathrm{x}_{4}}{ }_{90}^{230} \\mathrm{Th}$$'
+  const text = `In the decay sequence,\n${chain}\n$\\mathrm{x}_{1}, \\mathrm{x}_{2}, \\mathrm{x}_{3}$ and $\\mathrm{x}_{4}$ are particles/radiation emitted by the respective isotopes. The correct option(s) is(are)`
+  assert.equal(splitGluedChemDisplayEquations(text), text)
+  const card = {
+    text,
+    options: ['$\\mathrm{x}_{1}$ will deflect towards negatively charged plate', '$\\mathrm{x}_{2}$ is $\\beta^{-}$', '$\\mathrm{x}_{3}$ is $\\gamma$-ray', 'Z is an isotope of uranium'],
+    questionType: 'multiple_correct',
+  }
+  const healed = extendOfficialPyqHealCard(card, `\\item[Q.] 10 ${text}`)
+  assert.equal((healed.text.match(/\$\$/g) || []).length, 2, healed.text)
+  assert.ok(healed.text.includes('\\mathrm{Th}$$\n$\\mathrm{x}_{1}'), healed.text)
 })
 
 test('the next part\'s page heading glued onto option D is cut off (2019 P2 phys Q18)', () => {

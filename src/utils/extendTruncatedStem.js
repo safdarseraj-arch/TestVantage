@@ -1998,7 +1998,8 @@ function ensureStemMathDelimiters(text) {
   s = normalizeSmashedChemDollars(s)
   s = stripBareNumericListTwoDump(s)
   s = stripTrailingPyqSectionHeader(s)
-  return stripAnswerDotTail(s.replace(/\$\s+\$/g, ' '))
+  // Empty "$ $" only; a display closer "$$" then "\n$x$" on the next line is not empty math.
+  return stripAnswerDotTail(s.replace(/(?<!\$)\$\s+\$(?!\$)/g, ' '))
 }
 
 /** Duplicate unlabeled 0 / 2 / 4 dump before a real labeled List-II. */

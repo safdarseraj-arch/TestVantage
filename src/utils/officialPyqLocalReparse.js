@@ -34,7 +34,7 @@ function shapeWithPaperFacts(paper, questions, preparedText) {
     paperFacts: facts,
   }
 }
-import { officialPyqContentReviewMessages } from './officialPyqReviewFlags.js'
+import { officialPyqContentReviewMessages, officialPyqMissingListMessage } from './officialPyqReviewFlags.js'
 import { healUploadQuestionCard as healPreviewCard, applyStoredOcrCardFixes } from './uploadQualityGuards.js'
 import { enrichMatchListsFromOcr } from './restoreMatchListsOcr.js'
 import {
@@ -390,6 +390,30 @@ function uniqueAdminCards(admins) {
   return [...best.values()]
 }
 
+/**
+ * An unapproved auto-compare card (a machine fix, not the admin's) that still misses a
+ * match list gives way when the fresh parse of the same slot has both lists.
+ */
+function autoFixLostToFreshParse(old, fresh) {
+  if (old?.editSource !== 'auto_compare' || old?.adminApproved === true || !fresh) return false
+  return Boolean(officialPyqMissingListMessage([old])) && !officialPyqMissingListMessage([fresh])
+}
+
+/** Old card indexes the store may replace because the fresh parse fixed the same slot. */
+function releasedAutoFixIndexes(prev, next) {
+  const fresh = Array.isArray(next) ? next : []
+  const out = []
+  ;(Array.isArray(prev) ? prev : []).forEach((old, i) => {
+    if (old?.editSource !== 'auto_compare') return
+    const slot = Number(old?.pyqSlot ?? old?.questionNumber)
+    const now =
+      fresh.find((q) => old?.id && q?.id === old.id) ||
+      fresh.find((q) => Number(q?.pyqSlot ?? q?.questionNumber) === slot)
+    if (now && now.adminEdited !== true && autoFixLostToFreshParse(old, now)) out.push(i)
+  })
+  return out
+}
+
 export function keepAdminEditedCards(next, prev) {
   const prior = Array.isArray(prev) ? prev : []
   const cards = Array.isArray(next) ? next : []
@@ -398,7 +422,7 @@ export function keepAdminEditedCards(next, prev) {
   const byNext = placeAdminEditedCards(cards, prior, admins)
   return cards.map((q, i) => {
     const old = byNext.get(i)
-    if (!old?.adminEdited) return q
+    if (!old?.adminEdited || autoFixLostToFreshParse(old, q)) return q
     return {
       ...q,
       id: old.id || q.id,
@@ -434,7 +458,7 @@ export function copyAnswersOntoCanonical(canonical, prev) {
     let old = placed || byNum.get(Number(q.questionNumber)) || prev[i]
     if (!placed && old?.adminEdited === true) old = null
     if (!old) return q
-    if (old.adminEdited === true) {
+    if (old.adminEdited === true && !autoFixLostToFreshParse(old, q)) {
       return {
         ...old,
         questionNumber: q.questionNumber,
@@ -814,6 +838,7 @@ export async function reExtractOfficialPyqPendingPaperLocalAsync(paper, { yieldF
     ...shaped,
     preparedText,
     localQuality: undefined,
+    releaseAdminEditIndexes: releasedAutoFixIndexes(paper.questions, questions),
   })
   if (!updated) {
     return {

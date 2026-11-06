@@ -455,7 +455,9 @@ function cleanTabularCell(cell) {
       .replace(/\\hline\b/gi, '')
       .replace(/^\s*\\(?:centering|raggedright|raggedleft)\b/i, '')
       .replace(/\s+/g, ' ')
-      .trim(),
+      .trim()
+      // "\textbf{P.} In process I" / "\textbf{1.} $8$" cells: the bold "P." is the row label.
+      .replace(/^([PQRSTU]|[1-6])\s*[.:]\s+/, '($1) '),
   )
 }
 
@@ -481,6 +483,8 @@ function classifyTabularMatchCell(cell, side, leftCell) {
 export function flattenTabularMatchLists(text) {
   let s = String(text ?? '').replace(/\r\n/g, '\n')
   if (!s.trim()) return s
+  // TeX en dash: "LIST--I" is the heading "LIST-I".
+  s = s.replace(/\b(List|Column)\s*--\s*(?=I)/gi, '$1-')
   s = s.replace(/\\text\s*\{\s*begin\s*\}\s*\{\s*tabular\s*\}/gi, '\\begin{tabular}')
   s = s.replace(/\\text\s*\{\s*end\s*\}\s*\{\s*tabular\s*\}/gi, '\\end{tabular}')
   const beginAt = s.search(TABULAR_BEGIN)
@@ -1184,7 +1188,16 @@ export function parseMediaMatchLists(text) {
   const seenLabelsI = new Set()
   let side = 'I'
   let introEnd = tokens[0]?.index ?? 0
-  for (const m of tokens) {
+  // "<smiles>…</smiles>\n$+\mathrm{HNO}_{2}$": the reagent after a drawing belongs to that row.
+  const reagentAfter = (at) => {
+    const m = tokens[at]
+    const end = (m.index ?? 0) + m[0].length
+    const stop = tokens[at + 1]?.index ?? raw.length
+    const gap = raw.slice(end, stop).split(/\n[ \t]*\n/)[0].trim()
+    if (!gap || gap.length > 120) return ''
+    return /^(?:\$\s*)?\+|^\$?\s*\\(?:longrightarrow|xrightarrow|rightarrow)\b/.test(gap) ? gap : ''
+  }
+  for (const [at, m] of tokens.entries()) {
     const tok = m[0]
     const kind = mediaTokenKind(tok, roman, alpha)
     if (kind === 'i') {
@@ -1211,8 +1224,9 @@ export function parseMediaMatchLists(text) {
       continue
     }
     if (kind !== 'media') continue
-    const body = tokenToMediaText(tok)
-    if (!body) continue
+    const drawn = tokenToMediaText(tok)
+    if (!drawn) continue
+    const body = [drawn, reagentAfter(at)].filter(Boolean).join('\n')
     if (side === 'II' && pendingQueueII.length) {
       const L = pendingQueueII.pop()
       rowsII[L] = [rowsII[L], body].filter(Boolean).join('\n')
@@ -1381,7 +1395,15 @@ export function parseMatchingListForDisplay(text, options) {
       : String(options)
   const key = `${optKey}\u0000${t}`
   if (matchParseCache.has(key)) return matchParseCache.get(key) ?? null
-  const parsed = parseMatchingListForDisplayNoCache(t, options)
+  let parsed = parseMatchingListForDisplayNoCache(t, options)
+  // One original-page picture of both lists is the whole table, not row (P) of List-I.
+  if (
+    parsed?.listI?.length === 1 &&
+    !parsed.listII?.length &&
+    /^\s*\\includegraphics(?:\[[^\]]*\])?\{\s*\/api\/official-pyq\/original\/crops\/[^}]*\}\s*$/.test(String(parsed.listI[0]?.text ?? ''))
+  ) {
+    parsed = null
+  }
   if (matchParseCache.size >= MATCH_PARSE_CACHE_MAX) {
     matchParseCache.delete(matchParseCache.keys().next().value)
   }

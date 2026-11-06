@@ -630,11 +630,15 @@ function stripForeignListTwo(text) {
 /** True leftover List-II dump vs a real match card that still needs List-I. */
 function listTwoHasOwnStem(q) {
   const t = String(q?.text ?? '').trim()
+  // "Q. 17 LIST-I contains reactions and LIST-II contains major products." opens a new item
+  // even when OCR lost every (P)/(1) label of its lists.
+  if (/^(?:(?:Q\.?\s*)?\d{1,3}[.)]?\s+)?(?:List|Column)\s*[-–]?\s*I\s+(?:contains|gives|lists|shows)\b/i.test(t)) return true
   const ii = t.search(/(?:List|Column)\s*[-–]?\s*II\b/i)
   const before = (ii >= 0 ? t.slice(0, ii) : t).trim()
   if (before.length < 40) return false
   if (looksLikeMatchInstructionOnly(before)) return false
   return (
+    /\b(?:in|from)\s+(?:the\s+)?(?:List|Column)\s*[-–]?\s*I\b(?!\s*I)/i.test(before) ||
     looksLikeMatchingListStem(before) ||
     looksLikeFullPaperItem(before) ||
     /Match each|Match the|A thin uniform|A light ray|One mole|The circuit shown|Four identical/i.test(
@@ -1109,8 +1113,10 @@ function uniqueStemProbes(text) {
       .trim()
     if (s.length >= 12 && !probes.includes(s)) probes.push(s)
   }
-  const rowP = t.match(/\(\s*P\s*\)\s+[^\n]{8,70}/)
+  const rowP = t.match(/\(\s*P\s*\)\s+([^\n]{8,70})/)
   if (rowP) push(rowP[0])
+  // OCR writes the label as \item[P.], so also look for the row wording alone.
+  if (rowP && rowP[1].replace(/\$+/g, '').trim().length >= 24) push(rowP[1])
   const distinctive = t.match(
     /(?:Let\s+\$\\alpha|Let\s+\$f\s*:\s*\\mathbb\{R\}|One mole of a|Four identical thin|A light ray is incident|The circuit shown in the figure|Based on VSEPR|List-I contains various|Among the following phenolic|In a conductometric|A particle of charge|The option\(s\) with correct sequence|conversion of P to Q|Work done in the complete)[^\n]{0,48}/i,
   )
@@ -1241,7 +1247,8 @@ export function restoreMissingListIIFromSource(stem, options, source) {
       const idx = findProbeInSource(src.slice(from), short)
       if (idx < 0) break
       const abs = from + idx
-      const winStart = Math.max(0, abs - 200)
+      // A List-I row probe sits after the whole stem; look back far enough to keep the stem.
+      const winStart = Math.max(0, abs - Math.max(200, Math.min(text.length + 200, 2400)))
       const window = clipOcrWindowToQuestion(src.slice(winStart, abs + 2800), abs - winStart)
       // A later question can have a longer List-II. Keep only the window that
       // still contains this card. Do not delete rows that window already has,
@@ -2695,7 +2702,12 @@ function mergeOrphanStemContinuationsOnce(list) {
 }
 
 function matchTwinKey(q) {
-  const t = foldStem(q?.text)
+  // Figure URLs share one long CDN prefix per paper, so they cannot tell two questions apart.
+  const t = foldStem(
+    String(q?.text ?? '')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g, ' '),
+  )
   const p = t.match(/\(p\)\s*(.{16,80})/)
   if (p) return `p:${p[1].slice(0, 64)}`
   return ''
@@ -2773,6 +2785,7 @@ function attachStrayListTwoToPrevious(list) {
     const prev = out[out.length - 1]
     const prevNeedsTail =
       prev &&
+      !listTwoHasOwnStem(q) &&
       prevAcceptsMatchContinuation(prev) &&
       (matchingListMissingListTwo(prev) || optionCount(prev) < 2)
     if (prevNeedsTail) {

@@ -82,10 +82,16 @@ function softenLeftRightInTables(text) {
 }
 
 /** Cells are already in math once wrapped in $$ — leftover $…$ breaks KaTeX. */
-export function stripDollarsInsideLatexEnvs(text) {
+export function stripDollarsInsideLatexEnvs(text, { keepMatchListTabular = false } = {}) {
   return String(text ?? '').replace(
     /(\\begin\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix|aligned|align\*?|gathered|split)\}[\s\S]*?\\end\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix|aligned|align\*?|gathered|split)\})/gi,
-    (block) => block.replace(/\$+/g, ''),
+    (block) =>
+      // A List-I / List-II table holds prose cells; its $...$ are later flattened into rows, not typeset as one array.
+      keepMatchListTabular &&
+      /^\\begin\{tabular\}/i.test(block) &&
+      /(?:List|Column)\s*[-–]*\s*I\b/i.test(block)
+        ? block
+        : block.replace(/\$+/g, ''),
   )
 }
 

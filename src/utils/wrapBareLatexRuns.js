@@ -840,7 +840,7 @@ export function rejoinSplitMathEnvironments(text) {
     s = s.replace(/(\$[^$\n]{1,180})\s*\]\s*$/, (_, inner) => `${inner}$ ]`)
   }
   s = guardDollarsAroundFigures(s)
-  return stripDollarsInsideLatexEnvs(s)
+  return stripDollarsInsideLatexEnvs(s, { keepMatchListTabular: true })
 }
 
 /** @param {string} text */

@@ -526,7 +526,7 @@ export function stripMathpixFigureChrome(raw) {
     .replace(/\\caption\{[^}]*\}/gi, ' ')
     // Keep match-list / MCQ labels; drop other \\item[…] chrome.
     .replace(/\\item\s*\[\s*\(\s*(I{1,3}|IV|V)\s*\)\s*\]/g, '\n($1)\n')
-    .replace(/\\item\s*\[\s*\(?\s*([PQRST1-5A-D])\s*\)?\s*\]/gi, '\n($1)\n')
+    .replace(/\\item\s*\[\s*\(?\s*([PQRST1-5A-D])\s*[.:]?\s*\)?\s*\]/gi, '\n($1)\n')
     .replace(/\\item\s*\[[^\]]*\]/gi, ' ')
     .replace(/\\begin\{itemize\}/gi, '\n')
     .replace(/\\end\{itemize\}/gi, '\n')

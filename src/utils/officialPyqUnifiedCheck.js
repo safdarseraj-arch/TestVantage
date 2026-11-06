@@ -38,17 +38,33 @@ function cardHasFigure(q) {
   }
 }
 
-/** Where one question's scan text ends: the next Q number, a section heading, or the next stem/paragraph. */
-const QUESTION_END = /\b[Qq]\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*[Qq]|\\section\*?\{|\bQuestion Stem\b|\b(?:Paragraph|PARAGRAPH)\b/
+/** Where one question's scan text ends: the next Q number, a section heading, the next stem/paragraph, or the printed "Answer: [0.7 to 0.8]" key. */
+const QUESTION_END =
+  /\b[Qq]\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*[Qq]|\\section\*?\{|\bQuestion Stem\b|\b(?:Paragraph|PARAGRAPH)\b|\b(?:Answer|Ans)\s*[:.]\s*(?:\[|\(|\$|-?\d|[A-D]\b)/
+
+/**
+ * Two questions can open with the same words ("One mole of a monatomic ideal gas undergoes…"),
+ * so pick the occurrence whose next words still match this card.
+ */
+function probeOccurrence(flat, stem, probe) {
+  const first = flat.indexOf(probe)
+  if (first < 0 || flat.indexOf(probe, first + 1) < 0) return first
+  for (const len of [160, 120, 80, 56]) {
+    if (stem.length < len) continue
+    const at = flat.indexOf(stem.slice(0, len))
+    if (at >= 0) return at
+  }
+  return first
+}
 
 function nothingLost(q, ocr) {
   const src = String(ocr ?? '')
   const stem = String(q?.text ?? '').replace(/\s+/g, ' ').trim()
   if (src.length < 80 || stem.length < 24) return ''
   const probe = stem.slice(0, 40)
-  const at = src.replace(/\s+/g, ' ').indexOf(probe)
-  if (at < 0) return ''
   const flat = src.replace(/\s+/g, ' ')
+  const at = probeOccurrence(flat, stem, probe)
+  if (at < 0) return ''
   const next = flat.slice(at + probe.length).search(QUESTION_END)
   const span = flat.slice(at, next >= 0 ? at + probe.length + next : at + 900)
   const card = norm(cardBlob(q))

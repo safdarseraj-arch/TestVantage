@@ -649,7 +649,7 @@ export function cleanMathpixCardText(text) {
   t = unescapeAccidentalDoubleBackslash(t)
   t = canonicalizeBeginMatrixEnv(t)
   t = normalizeMatrixEnvironments(t)
-  t = stripDollarsInsideLatexEnvs(t)
+  t = stripDollarsInsideLatexEnvs(t, { keepMatchListTabular: true })
   t = ensureMatrixStemDelimiters(t)
   t = wrapBareMatrixEnvs(t)
   t = rejoinSplitMathEnvironments(t)
@@ -683,7 +683,16 @@ export function validateMathpixQuestion(q) {
     break
   }
 
-  if (looksLikeMatchingListStem(text)) {
+  // "LIST-I contains reactions…" with P → 1 choices is a match card even when the scan
+  // dropped every (P)/(1) label, so the lists cannot be told apart.
+  const mappedChoices =
+    (text.match(/(?:^|\n|&)[ \t]*(?:\\item\s*\[\s*|\\textbf\{\s*)?\(?\s*[PQRS]\s*[.):\]}]/g) || []).length < 2 &&
+    /(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*I[ \t]*(?:\n|$)/i.test(text) &&
+    /(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*II[ \t]*(?:\n|$)/i.test(text) &&
+    (Array.isArray(q?.options) ? q.options : []).filter((o) =>
+      /\bP\b[^;]{0,24}?(?:→|\\rightarrow|\\to\b)/.test(String(o ?? '')),
+    ).length >= 2
+  if (looksLikeMatchingListStem(text) || mappedChoices) {
     const parsed = parseMatchingListForDisplay(text, q.options)
     if ((parsed?.listI?.length ?? 0) < 2) {
       issues.push({

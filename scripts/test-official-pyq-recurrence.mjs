@@ -35,7 +35,8 @@ const { officialPyqDrawnRawCode, officialPyqDrawnText } = await import('../src/u
 const { stripMistakenOfficialPyqPassages } = await import('../src/utils/passage.js')
 const { buildPaperFacts } = await import('../src/utils/officialPyqPaperFacts.js')
 const { splitGluedChemDisplayEquations } = await import('../src/utils/healTruncatedLatex.js')
-const { extendOfficialPyqHealCard } = await import('../src/utils/extendTruncatedStem.js')
+const { extendOfficialPyqHealCard, restoreMissingListIIFromSource } = await import('../src/utils/extendTruncatedStem.js')
+const { keepAdminEditedCards, copyAnswersOntoCanonical } = await import('../src/utils/officialPyqLocalReparse.js')
 const { sanitizeStemForDisplay, shownStemLooksIncomplete } = await import('../src/utils/sanitizeStemForDisplay.js')
 const { reviewMarkSpans } = await import('../src/utils/officialPyqReviewFlags.js')
 
@@ -796,6 +797,226 @@ test('"…, then" followed by four choices shows no "Extraction incomplete" bann
 test('the next part\'s page heading glued onto option D is cut off (2019 P2 phys Q18)', () => {
   assert.equal(stripTrailingPyqSectionHeader('$\\frac{5}{6} R T_{0}$ JEE (ADVANCED) 2019 PAPER 2 PART-II CHEMISTRY'), '$\\frac{5}{6} R T_{0}$')
   assert.equal(stripTrailingPyqSectionHeader('(IV), (Q)\n\\section*{JEE (ADVANCED) 2019 PAPER 2 PART-III MATHEMATICS}'), '(IV), (Q)')
+})
+
+const IMG18 = (y, h, w) =>
+  `![](https://cdn.mathpix.com/cropped/8d7e95c4-a2b9-4a3b-9b5f-0e4cf6710a68-20.jpg?height=${h}&width=${w}&top_left_y=${y}&top_left_x=543)`
+const CHEM18_Q16 = [
+  'Q. 16  The desired product X can be prepared by reacting the major product of the reactions in LIST-I with one or more appropriate reagents in LIST-II.',
+  '(given, order of migratory aptitude: aryl > alkyl > hydrogen)',
+  '<smiles>CC(C(=O)O)(c1ccccc1)c1ccccc1</smiles>',
+  '',
+  'LIST-I',
+  'LIST-II',
+  '\\item[P.]',
+  IMG18(775, 156, 459),
+  '\\item[Q.]',
+  '<smiles>COC(c1ccccc1)C(N)(c1ccccc1)c1ccccc1</smiles>',
+  '$+\\mathrm{HNO}_{2}$',
+  '\\item[1.] $\\mathbf{I}_{\\mathbf{2}}, \\mathrm{NaOH}$',
+  '\\item[2.] $\\left[\\mathrm{Ag}\\left(\\mathrm{NH}_{3}\\right)_{2}\\right] \\mathrm{OH}$',
+  '\\item[3.] Fehling solution',
+  '\\item[R.]',
+  IMG18(1202, 157, 442),
+  '\\item[S.]',
+  IMG18(1415, 158, 455),
+  '\\item[4.] HCHO, NaOH',
+  '\\item[5.] NaOBr',
+  '\\end{itemize}',
+  '',
+  'The correct option is',
+  '\\begin{itemize}',
+  '\\item[(A)] P → 1; Q → 2,3; R → 1,4; S → 2,4',
+  '\\item[(B)] P → 1,5; Q → 3,4; R → 4,5; S → 3',
+  '\\item[(C)] P → 1,5; Q → 3,4; R → 5; S → 2,4',
+  '\\item[(D)] P → 1,5; Q → 2,3; R → 1,5; S → 2,3',
+  '\\end{itemize}',
+].join('\n')
+const CHEM18_Q17 = [
+  'Q. 17 LIST-I contains reactions and LIST-II contains major products.',
+  '',
+  'LIST-I',
+  'LIST-II',
+  '<smiles>CC(C)(C)[O][Na]</smiles>',
+  '<smiles>CC(C)(C)Br</smiles>',
+  '$+\\mathrm{HBr} \\longrightarrow$',
+  '<smiles>CC(C)(C)O</smiles>',
+  '$+\\mathrm{NaOMe} \\longrightarrow$',
+  '<smiles>COC(C)(C)C</smiles>',
+  '$+\\mathrm{MeBr} \\longrightarrow$',
+  '<smiles>C=C(C)C</smiles>',
+  '',
+  'Match each reaction in LIST-I with one or more products in LIST-II and choose the correct option.',
+  '\\begin{itemize}',
+  '\\item[(A)] P → 1,5; Q → 2; R → 3; S → 4',
+  '\\item[(B)] P → 1,4; Q → 2; R → 4; S → 3',
+  '\\item[(C)] P → 1,4; Q → 1,2; R → 3,4; S → 4',
+  '\\item[(D)] P → 4,5; Q → 4; R → 4; S → 3,4',
+  '\\end{itemize}',
+].join('\n')
+const CHEM18_Q18 = [
+  'Q. 18 Dilution processes of different aqueous solutions, with water, are given in LIST-I. The effects of dilution of the solutions on $\\left[\\mathrm{H}^{+}\\right]$are given in LIST-II.',
+  '',
+  '\\section*{LIST-I}',
+  '\\begin{itemize}',
+  '\\item[P.] ( 10 mL of $0.1 \\mathrm{M} \\mathrm{NaOH}+20 \\mathrm{~mL}$ of 0.1 M acetic acid) diluted to 60 mL',
+  '\\item[Q.] (20 mL of 0.1 M NaOH + 20 mL of 0.1 M acetic acid) diluted to 80 mL',
+  '\\item[R.] (20 mL of 0.1 M HCl + 20 mL of 0.1 M ammonia solution) diluted to 80 mL',
+  '\\item[S.] 10 mL saturated solution of $\\mathrm{Ni}(\\mathrm{OH})_{2}$ is diluted to 20 mL',
+  '\\end{itemize}',
+  '',
+  '\\section*{LIST-II}',
+  '\\begin{itemize}',
+  '\\item[1.] the value of $\\left[\\mathrm{H}^{+}\\right]$does not change on dilution',
+  '\\item[2.] the value of [ $\\mathrm{H}^{+}$] changes to half of its initial value on dilution',
+  '\\item[3.] the value of $\\left[\\mathrm{H}^{+}\\right]$changes to two times of its initial value on dilution',
+  '\\item[4.] the value of $\\left[\\mathrm{H}^{+}\\right]$changes to $\\frac{1}{\\sqrt{2}}$ times of its initial value on dilution',
+  '\\item[5.] the value of $\\left[\\mathrm{H}^{+}\\right]$changes to $\\sqrt{2}$ times of its initial value on dilution',
+  '\\end{itemize}',
+  '',
+  'Match each process given in LIST-I with one or more effect(s) in LIST-II. The correct option is',
+  '\\begin{itemize}',
+  '\\item[(A)] P → 4; Q → 2; R → 3; S → 1',
+  '\\item[(B)] P → 4; Q → 3; R → 2; S → 3',
+  '\\item[(C)] P → 1; Q → 4; R → 5; S → 3',
+  '\\item[(D)] P → 1; Q → 5; R → 4; S → 1',
+  '\\end{itemize}',
+].join('\n')
+
+test('"\\item[P.]" / "\\item[1.]" labels survive, and a match card whose scan lost its labels is not glued onto the one before (2018 P2 chem Q16–18)', () => {
+  const ocr = ['\\section*{JEE (ADVANCED) 2018 PAPER 2 PART-II CHEMISTRY}', CHEM18_Q16, CHEM18_Q17, CHEM18_Q18].join('\n\n')
+  const items = paperItemsFromMathpixOcr(ocr)
+  const byN = (n) => items.filter((q) => Number(q.printedNumber) === n)
+  for (const n of [16, 17, 18]) assert.equal(byN(n).length, 1, `printed ${n}: ${items.map((q) => q.printedNumber).join(',')}`)
+  const q16 = byN(16)[0]
+  const q18 = byN(18)[0]
+  assert.ok(/\(P\)/.test(q16.text) && /\(5\)\s*NaOBr/.test(q16.text), q16.text)
+  assert.ok(!/LIST-I contains reactions/.test(q16.text), 'Q17 merged into Q16')
+  assert.ok(/\(P\)/.test(q18.text) && /\(1\)/.test(q18.text), q18.text)
+  assert.ok(/LIST-I contains reactions/.test(byN(17)[0].text))
+  assert.equal(validateMathpixQuestion(q18).issues.some((x) => x.code === 'missing_column'), false)
+})
+
+test('a match card whose scan has no (P)/(1) labels at all is flagged; "P." lines and \\textbf{P.} table cells are not (2018 P2 chem Q17, Q18, maths Q18)', () => {
+  const choices = ['P → 1,5; Q → 2; R → 3; S → 4', 'P → 1,4; Q → 2; R → 4; S → 3', 'P → 1,4; Q → 1,2; R → 3,4; S → 4', 'P → 4,5; Q → 4; R → 4; S → 3,4']
+  const missing = (text) => validateMathpixQuestion({ text, options: choices }).issues.some((x) => x.code === 'missing_column')
+  assert.equal(missing('LIST-I contains reactions and LIST-II contains major products.\n\nLIST-I\nLIST-II\n<smiles>CC(C)(C)Br</smiles>\n<smiles>CC(C)(C)O</smiles>\n\nMatch each reaction in LIST-I with one or more products in LIST-II.'), true)
+  assert.equal(missing('Let f be given.\n\nLIST-I\nP. The function $f_{1}$ is\nQ. The function $f_{2}$ is\nR. The function $f_{3}$ is\nS. The function $f_{4}$ is\n\nLIST-II\n1. NOT continuous\n(2)\ncontinuous'), false)
+  assert.equal(missing('Dilution processes are given in LIST-I.\n\\begin{tabular}{ll}\n\\textbf{LIST--I} & \\textbf{LIST--II} \\\\\n\\textbf{P.} (10 mL) & \\textbf{1.} no change \\\\\n\\textbf{Q.} (20 mL) & \\textbf{2.} half \\\\\n\\textbf{R.} (30 mL) & \\textbf{3.} two times \\\\\n\\textbf{S.} (40 mL) & \\textbf{4.} root two \\\\\n & \\textbf{5.} root half \\\\\n\\end{tabular}'), false)
+})
+
+test('List-II printed after the answer choices is found again late in a long paper, for a stem longer than 200 characters (2018 P2 maths Q17)', () => {
+  const stem = 'Let $H: \\frac{x^{2}}{a^{2}}-\\frac{y^{2}}{b^{2}}=1$, where $a>b>0$, be a hyperbola in the $x y$-plane whose conjugate axis $L M$ subtends an angle of $60^{0}$ at one of its vertices $N$. Let the area of the triangle $L M N$ be $4 \\sqrt{3}$.'
+  const earlierPages = 'The earlier questions of this paper take up this space.\n'.repeat(900)
+  const ocr = [
+    earlierPages,
+    `Q. 17  ${stem}`,
+    '\\end{itemize}',
+    '',
+    '\\section*{LIST-I}',
+    '\\begin{itemize}',
+    '\\item[P.] The length of the conjugate axis of $H$ is',
+    '\\item[Q.] The eccentricity of $H$ is',
+    '\\item[R.] The distance between the foci of $H$ is',
+    '\\item[S.] The length of the latus rectum of $H$ is',
+    '\\end{itemize}',
+    '',
+    'The correct option is:',
+    '\\begin{itemize}',
+    '\\item[(A)] P → 4; Q → 2; R → 1; S → 3',
+    '\\item[(B)] P → 4; Q → 3; R → 1; S → 2',
+    '\\item[(C)] P → 4; Q → 1; R → 3; S → 2',
+    '\\item[(D)] P → 3; Q → 4; R → 2; S → 1',
+    '\\end{itemize}',
+    '',
+    '\\section*{LIST-II}',
+    '\\begin{itemize}',
+    '\\item[1.] 8',
+    '\\item[2.] $\\frac{4}{\\sqrt{3}}$',
+    '\\item[3.] $\\frac{2}{\\sqrt{3}}$',
+    '\\item[4.] 4',
+    '\\end{itemize}',
+  ].join('\n')
+  const text = `${stem}\n\nLIST-I\n\n(P) The length of the conjugate axis of $H$ is\n\n(Q) The eccentricity of $H$ is\n\n(R) The distance between the foci of $H$ is\n\n(S) The length of the latus rectum of $H$ is`
+  const options = ['P → 4; Q → 2; R → 1; S → 3', 'P → 4; Q → 3; R → 1; S → 2', 'P → 4; Q → 1; R → 3; S → 2', 'P → 3; Q → 4; R → 2; S → 1']
+  const out = restoreMissingListIIFromSource(text, options, ocr)
+  assert.ok(/List-II/i.test(out) && out.includes('\\frac{4}{\\sqrt{3}}'), out)
+})
+
+test('two questions opening with the same words are each checked against their own scan text (2018 P2 phys Q7 and Q17)', () => {
+  const ocr = [
+    '\\item[Q.] 7 One mole of a monatomic ideal gas undergoes an adiabatic expansion in which its volume becomes eight times its initial value. If the universal gas constant $R=8.0 ~ J mol^{-1} K^{-1}$, the decrease in its internal energy, in Joule, is ____.',
+    '\\item[Q.] 17 One mole of a monatomic ideal gas undergoes four thermodynamic processes as shown schematically in the $P V$-diagram below. Match the processes mentioned in List-I with the corresponding statements in List-II.',
+    'LIST-I',
+    '\\item[P.] In process I',
+    '\\item[Q.] In process II',
+  ].join('\n')
+  const card = {
+    printedNumber: 17,
+    questionType: 'single_correct',
+    text: 'One mole of a monatomic ideal gas undergoes four thermodynamic processes as shown schematically in the $P V$-diagram below. Match the processes mentioned in List-I with the corresponding statements in List-II.\n(P) In process I\n(Q) In process II',
+    options: ['P → 4; Q → 3', 'P → 1; Q → 3', 'P → 3; Q → 4', 'P → 3; Q → 1'],
+  }
+  const messages = reviewOfficialPyqCards([card], ocr, null, { cardsOnly: true }).messages.join(' ')
+  assert.ok(!/8\.0/.test(messages), messages)
+})
+
+test('an automatic auto-fix card that still misses a list gives way to a fresh parse that has both lists; a hand edit stays (2018 P2 chem Q16)', () => {
+  const crop = 'The desired product X can be prepared by reacting the major product of the reactions in LIST-I with one or more appropriate reagents in LIST-II.\n\\includegraphics{/api/official-pyq/original/crops/x-p20.png}\nThe correct option is'
+  const fresh = {
+    id: 'c16', pyqSlot: 34, questionNumber: 34, printedNumber: 16, questionType: 'single_correct',
+    text: 'The desired product X can be prepared by reacting the major product of the reactions in LIST-I with one or more appropriate reagents in LIST-II.\n\nList-I\n(P) aldehyde\n(Q) amine\n(R) ketone\n(S) ester\n\nList-II\n(1) $\\mathrm{I}_{2}, \\mathrm{NaOH}$\n(2) Tollens\n(3) Fehling solution\n(4) HCHO, NaOH\n(5) NaOBr',
+    options: ['P → 1; Q → 2,3', 'P → 1,5; Q → 3,4', 'P → 1,5; Q → 3,4; R → 5', 'P → 1,5; Q → 2,3'],
+  }
+  const auto = { ...fresh, text: crop, adminEdited: true, adminEditedAt: 1, editSource: 'auto_compare' }
+  assert.ok(validateMathpixQuestion(auto).issues.some((x) => x.code === 'missing_column'), 'crop card should read as missing a list')
+  assert.equal(keepAdminEditedCards([fresh], [auto])[0].text, fresh.text)
+  assert.equal(copyAnswersOntoCanonical([fresh], [auto])[0].text, fresh.text)
+  const byHand = { ...auto, editSource: undefined }
+  assert.equal(keepAdminEditedCards([fresh], [byHand])[0].text, crop)
+})
+
+test('"+ HNO2" after a drawn List-I row stays in that row; one original-page picture of both lists is not row (P) (2018 P2 chem Q16, Q17)', () => {
+  const rows = parseMatchingListForDisplay(
+    'The desired product X can be prepared from LIST-I with reagents in LIST-II.\n\nList-I\n(P) \\includegraphics{https://cdn.mathpix.com/cropped/a-20.jpg?height=156&width=459&top_left_y=775&top_left_x=543}\n(Q) <smiles>COC(c1ccccc1)C(N)(c1ccccc1)c1ccccc1</smiles>\n$+\\mathrm{HNO}_{2}$\n(R) \\includegraphics{https://cdn.mathpix.com/cropped/a-20.jpg?height=157&width=442&top_left_y=1202&top_left_x=541}\n(S) \\includegraphics{https://cdn.mathpix.com/cropped/a-20.jpg?height=158&width=455&top_left_y=1415&top_left_x=541}\n\nList-II\n(1) $\\mathrm{I}_{2}, \\mathrm{NaOH}$\n(2) Tollens reagent\n(3) Fehling solution\n(4) HCHO, NaOH\n(5) NaOBr',
+    ['P → 1; Q → 2,3', 'P → 1,5; Q → 3,4', 'P → 1,5; Q → 3,4; R → 5', 'P → 1,5; Q → 2,3'],
+  )
+  const q = rows?.listI?.find((r) => r.label === '(Q)')
+  assert.ok(q && q.text.includes('\\mathrm{HNO}_{2}'), JSON.stringify(rows?.listI))
+  assert.equal(rows.listII.length, 5)
+  const whole = parseMatchingListForDisplay(
+    'LIST-I contains reactions and LIST-II contains major products.\n\\includegraphics{/api/official-pyq/original/crops/x-p21.png?page=21&x0=0.18&y0=0.11&x1=0.76&y1=0.42}\nMatch each reaction in LIST-I with one or more products in LIST-II and choose the correct option.',
+    ['P → 1,5; Q → 2', 'P → 1,4; Q → 2', 'P → 1,4; Q → 1,2', 'P → 4,5; Q → 4'],
+  )
+  assert.equal(whole, null, JSON.stringify(whole))
+})
+
+test('a "LIST--I / LIST--II" table with bold "P." / "1." cells shows both lists and keeps every $ in its own row (2018 P2 maths Q17)', () => {
+  const stem =
+    'Let $H$ be a hyperbola.\n\n\\begin{tabular}{ll}\n\\textbf{LIST--I} & \\textbf{LIST--II} \\\\\n\\textbf{P.} The length of the conjugate axis of $H$ is & \\textbf{1.} $8$ \\\\\n\\textbf{Q.} The eccentricity of $H$ is & \\textbf{2.} $\\frac{4}{\\sqrt{3}}$ \\\\\n\\textbf{R.} The distance between the foci of $H$ is & \\textbf{3.} $\\frac{2}{\\sqrt{3}}$ \\\\\n\\textbf{S.} The length of the latus rectum of $H$ is & \\textbf{4.} $4$\n\\end{tabular}\n\nThe correct option is:'
+  const rows = parseMatchingListForDisplay(sanitizeStemForDisplay(stem), [
+    'P → 4; Q → 2; R → 1; S → 3',
+    'P → 4; Q → 3; R → 1; S → 2',
+    'P → 4; Q → 1; R → 3; S → 2',
+    'P → 3; Q → 4; R → 2; S → 1',
+  ])
+  assert.deepEqual(rows?.listI?.map((r) => r.label), ['(P)', '(Q)', '(R)', '(S)'], JSON.stringify(rows))
+  assert.ok(rows.listI[1].text.includes('$H$'), rows.listI[1].text)
+  assert.deepEqual(rows.listII.map((r) => r.text), ['$8$', '$\\frac{4}{\\sqrt{3}}$', '$\\frac{2}{\\sqrt{3}}$', '$4$'])
+})
+
+test('false alarms on published papers: printed "Answer: [0.7 to 0.8]", "2<P<8" in math and the drawn reaction block (2025 P2 Q9, 2026 P1 Q33, 2025 P1 Q47)', () => {
+  const stem = 'Let $y(x)$ be the solution of the differential equation with $y(1)=0$. Then the value of $2 y(e)$ is $____$.'
+  const ocr = `\\item[Q.] 9 ${stem.replace('$____$', '\\_\\_\\_\\_')}. Answer: [0.7 to 0.8]\n\\item[Q.] 10 Let $a_{0}, a_{1}$ be real numbers. Then the value of $r$ is \\_\\_\\_\\_. Answer: 6\n${'Filler line for the scan length.\n'.repeat(4)}`
+  const card = { text: stem, options: ['', '', '', ''], questionType: 'numerical', subject: 'mathematics' }
+  const messages = reviewOfficialPyqCards([card], ocr, null, { cardsOnly: true }).messages.join(' ')
+  assert.ok(!/0\.7|0\.8/.test(messages), messages)
+  assert.equal(mathDrawFailure('the gas is compressed against $P$ bar $(2<P<8)$ and then 8 bar'), '')
+  assert.equal(
+    mathDrawFailure('Toluene <div class="reaction-align" style="display:flex"><span style="white-space:nowrap">A</span><span>B<br>C</span></div> gives (2)'),
+    '',
+  )
+  assert.equal(mathDrawFailure('a stray <div class="x">table</div> left by the scan'), 'raw HTML')
 })
 
 if (failed) {

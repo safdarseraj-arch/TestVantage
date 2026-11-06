@@ -143,6 +143,7 @@ export const OFFICIAL_PYQ_ADMIN_EDIT_FIELDS = [
   'adminEditedAt',
   'adminApproved',
   'adminApprovedAt',
+  'editHistory',
 ]
 
 /** @param {unknown} q */
@@ -165,12 +166,16 @@ function officialPyqCardSlotKey(q, index) {
  * Re-parse, auto-heal, quality fix, snapshot restore and Gemini fill must never
  * overwrite a card an admin edited by hand. Matches cards by slot number.
  * A newer admin save (larger adminEditedAt) is the only thing that replaces one.
+ * `release` lists old card indexes the admin chose to undo (Undo last edit /
+ * Go back to the scanned version); those may be replaced.
  * @param {unknown[] | null | undefined} prevQuestions
  * @param {unknown[] | null | undefined} nextQuestions
+ * @param {{ release?: Iterable<number> }} [opts]
  * @returns {unknown[]}
  */
-export function keepAdminEditedOfficialPyqCards(prevQuestions, nextQuestions) {
-  const prev = Array.isArray(prevQuestions) ? prevQuestions : []
+export function keepAdminEditedOfficialPyqCards(prevQuestions, nextQuestions, opts = {}) {
+  const released = new Set(Array.from(opts?.release ?? [], Number))
+  const prev = (Array.isArray(prevQuestions) ? prevQuestions : []).map((q, i) => (released.has(i) ? null : q))
   const next = Array.isArray(nextQuestions) ? nextQuestions : []
   if (!next.length) return next
   /** @type {Map<string, number>} */
@@ -946,7 +951,7 @@ export function officialPyqAutoRewriteBlocked(paper) {
 
 /**
  * @param {string} id
- * @param {Partial<OfficialPyqPendingPaper> & { allowPublishedQuestionWrite?: boolean }} updates
+ * @param {Partial<OfficialPyqPendingPaper> & { allowPublishedQuestionWrite?: boolean, releaseAdminEditIndexes?: number[] }} updates
  */
 export function updateOfficialPyqPendingPaper(id, updates) {
   const root = loadRoot()
@@ -972,11 +977,13 @@ export function updateOfficialPyqPendingPaper(id, updates) {
           keepOfficialPyqQuestionsIfEmptied(prev, updates.questions, {
             allowEmpty: updates.allowEmptyQuestions === true,
           }),
+          { release: Array.isArray(updates.releaseAdminEditIndexes) ? updates.releaseAdminEditIndexes : [] },
         )
       : prev.questions
   const {
     allowEmptyQuestions: _allowEmptyQuestions,
     allowPublishedQuestionWrite: _allowPublishedQuestionWrite,
+    releaseAdminEditIndexes: _releaseAdminEditIndexes,
     ...safeUpdates
   } = updates || {}
   const adminFacts = Object.prototype.hasOwnProperty.call(safeUpdates, 'adminFacts')

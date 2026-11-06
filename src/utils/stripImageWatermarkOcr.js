@@ -209,7 +209,8 @@ export function stripImageWatermarkOcr(text) {
     .filter((line) => {
       const t = line.trim()
       if (!t) return true
-      if (t.length <= 2) return false
+      // `$$`, `\[`, `\]` and `}` on their own line open/close display math.
+      if (t.length <= 2 && !/[$\\{}&]/.test(t)) return false
       if (looksLikeWatermarkPhrase(t)) return false
       if (/^═+$/.test(t)) return false
       if (/^#{3,}\s*\d*\s*$/.test(t)) return false

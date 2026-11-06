@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import MathText from './MathText.jsx'
 import MissingSolutionFill from './MissingSolutionFill.jsx'
 import QuestionMetadataForm from './QuestionMetadataForm.jsx'
 import { isAdminLoggedIn } from '../utils/auth.js'
@@ -81,7 +82,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [filling, setFilling] = useState(false)
-  const [suggestion, setSuggestion] = useState(null)
+  const [previous, setPrevious] = useState(null)
   const [questionId, setQuestionId] = useState(String(question?.id ?? ''))
 
   const resetKey = paperId + ':' + questionIndex + ':' + String(question?.id ?? '')
@@ -100,7 +101,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
     setAnswerNumber(next.number)
     setSolution(next.solution)
     setQuestionId(String(question?.id ?? ''))
-    setSuggestion(null)
+    setPrevious(null)
   }, [resetKey, question])
 
   const bankQuestions = useMemo(() => {
@@ -183,18 +184,66 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
                 : String.fromCharCode(65 + Number(answerIndex)),
         solution,
       })
-      setSuggestion(filled && typeof filled === 'object' ? filled : null)
-      setNote('Hybrid AI returned tags, the answer, and a solution. Review them, then use them if they look right.')
+      if (!filled || typeof filled !== 'object') {
+        setError('Hybrid AI returned nothing for this question.')
+        return
+      }
+      setPrevious(currentValues())
+      showValues(valuesFromSuggestion(filled))
+      const answered = String(filled.correct_answer || '').trim()
+      const solved = String(filled.step_by_step_solution || '').trim()
+      setNote(
+        answered && solved
+          ? 'Hybrid AI filled the boxes above. Check them, then press Save tags, answer, and solution.'
+          : 'Hybrid AI filled the tags but could not work out the answer or solution from this question (a picture or text may be missing). Fill them by hand, then press Save.',
+      )
     } catch (err) {
-      setSuggestion(null)
       setError(err instanceof Error ? err.message : 'Hybrid AI could not fill this question.')
     } finally {
       setFilling(false)
     }
   }
 
-  const onUseSuggestion = () => {
-    if (!canEdit || !suggestion || saving) return
+  function currentValues() {
+    return {
+      subject,
+      section,
+      chapter,
+      topic,
+      questionType,
+      examIds,
+      toughness,
+      source,
+      solution,
+      answerIndex,
+      answerIndices,
+      answerNumber,
+    }
+  }
+
+  function showValues(v) {
+    setSubject(v.subject)
+    setSection(v.section)
+    setChapter(v.chapter)
+    setTopic(v.topic)
+    setQuestionType(v.questionType)
+    setExamIds(v.examIds)
+    setToughness(v.toughness)
+    setSource(v.source)
+    setSolution(v.solution)
+    setAnswerIndex(v.answerIndex)
+    setAnswerIndices(v.answerIndices)
+    setAnswerNumber(v.answerNumber)
+  }
+
+  const onPutBack = () => {
+    if (!previous) return
+    showValues(previous)
+    setPrevious(null)
+    setNote('Put back what was there before Hybrid AI. Nothing was saved.')
+  }
+
+  function valuesFromSuggestion(suggestion) {
     const nextSubject = filledOrKept(
       suggestion.subject ? mapHybridSubjectLabelToSlug(suggestion.subject) : '',
       subject,
@@ -219,48 +268,19 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
         : mapped && mapped.correctInteger != null
           ? String(mapped.correctInteger)
           : answerNumber
-    setSubject(nextSubject)
-    setSection(nextSection)
-    setChapter(nextChapter)
-    setTopic(nextTopic)
-    setQuestionType(nextType)
-    setExamIds(nextExamIds)
-    setToughness(nextToughness)
-    setSource(nextSource)
-    setSolution(nextSolution)
-    setAnswerIndex(nextIndex)
-    setAnswerIndices(nextIndices)
-    setAnswerNumber(nextNumber)
-    setSaving(true)
-    setError('')
-    try {
-      const result = savePayload({
-        subject: nextSubject,
-        section: nextSection,
-        chapter: nextChapter,
-        topic: nextTopic,
-        questionType: nextType,
-        examIds: nextExamIds,
-        toughness: nextToughness,
-        source: nextSource,
-        solution: nextSolution,
-        answerIndex: nextIndex,
-        answerIndices: nextIndices,
-        answerNumber: nextNumber,
-      })
-      if (!result.ok) {
-        setError(result.error || 'Could not save.')
-        return
-      }
-      const id = String(result.question?.id ?? '')
-      setQuestionId(id)
-      setSuggestion(null)
-      setNote('Saved the Hybrid AI tags, answer, and solution. This paper is still published. The question wording was not changed.')
-      if (typeof onSaved === 'function') onSaved(result.question)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save.')
-    } finally {
-      setSaving(false)
+    return {
+      subject: nextSubject,
+      section: nextSection,
+      chapter: nextChapter,
+      topic: nextTopic,
+      questionType: nextType,
+      examIds: nextExamIds,
+      toughness: nextToughness,
+      source: nextSource,
+      solution: nextSolution,
+      answerIndex: nextIndex,
+      answerIndices: nextIndices,
+      answerNumber: nextNumber,
     }
   }
 
@@ -391,6 +411,12 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
           placeholder="Blank if no solution was stored"
         />
       </label>
+      {String(solution || '').trim() ? (
+        <div className="official-pyq-solution-preview" data-testid="official-pyq-meta-solution-preview">
+          <span className="metadata-label">How students will see the solution</span>
+          <MathText text={solution} />
+        </div>
+      ) : null}
       <MissingSolutionFill
         hasSolution={Boolean(String(solution || '').trim())}
         questionText={String(question?.text ?? question?.stem ?? '')}
@@ -469,26 +495,16 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
           </button>
         </div>
       ) : null}
-      {suggestion ? (
-        <div className="form-hint" data-testid="official-pyq-hybrid-suggestion">
-          <p>
-            Subject {suggestion.subject || '(blank)'}, Unit {suggestion.unit || '(blank)'}, Chapter{' '}
-            {suggestion.chapter || '(blank)'}, Topic {suggestion.topic || '(blank)'}, Type{' '}
-            {suggestion.question_type || '(blank)'}, Exam {suggestion.exam || '(blank)'}, Toughness{' '}
-            {suggestion.toughness_level || '(blank)'}, Source {suggestion.source || '(blank)'}.
-          </p>
-          <p>Answer: {suggestion.correct_answer || '(blank, current answer stays)'}</p>
-          <p>Solution: {suggestion.step_by_step_solution || '(blank, current solution stays)'}</p>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            data-testid="official-pyq-use-hybrid"
-            onClick={onUseSuggestion}
-            disabled={saving || filling}
-          >
-            Use these tags, answer, and solution
-          </button>
-        </div>
+      {previous ? (
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          data-testid="official-pyq-hybrid-put-back"
+          onClick={onPutBack}
+          disabled={saving || filling}
+        >
+          Put back what was there before Hybrid AI
+        </button>
       ) : null}
       {error ? (
         <p className="upload-error" role="alert">

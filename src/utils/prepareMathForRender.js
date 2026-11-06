@@ -26,6 +26,7 @@ import {
   repairOrphanPiecewiseArray,
 } from './wrapBareLatexRuns.js'
 import {
+  LATEX_FENCE,
   convertLatexTabularToArray,
   restoreSheetConfigHtml,
   stashSheetConfigHtml,
@@ -125,6 +126,28 @@ function convertMathpixDelimiters(text) {
  * Multi-row \begin{array} must sit in balanced $$…$$ for MathText / KaTeX.
  * @param {string} text
  */
+/** Inside $…$ or $$…$$ at `offset`; $$ toggles display math as one delimiter. */
+function insideMathBefore(before) {
+  let inline = false
+  let display = false
+  for (let i = 0; i < before.length; i += 1) {
+    if (before[i] === '\\') {
+      i += 1
+      continue
+    }
+    if (before[i] !== '$') continue
+    if (before[i + 1] === '$') {
+      display = !display
+      i += 1
+    } else {
+      inline = !inline
+    }
+  }
+  return inline || display
+}
+
+const LEFT_FENCE_TAIL = new RegExp(String.raw`\\left\s*${LATEX_FENCE}?\s*$`)
+
 export function wrapDisplayArrayBlocks(text) {
   if (!text?.includes('\\begin{array}')) return text
 
@@ -160,7 +183,7 @@ export function wrapDisplayArrayBlocks(text) {
     (full, block, offset, str) => {
       const before = String(str ?? '').slice(0, offset)
       if (((before.match(/(?<!\\)\$/g) || []).length % 2) === 1) return full
-      if (/\\left\s*[(\[{.]?\s*$/.test(before.slice(-16))) return full
+      if (LEFT_FENCE_TAIL.test(before.slice(-24))) return full
       return /\\\\/.test(block) ? `$$${block}$$` : `$${block}$`
     },
   )
@@ -168,8 +191,8 @@ export function wrapDisplayArrayBlocks(text) {
     /(?<!\$)\s*(\\begin\{array\}\{[^}]*\}[\s\S]*?\\end\{array\})\s*(?!\$)/g,
     (full, block, offset, str) => {
       const before = String(str ?? '').slice(0, offset)
-      if (((before.match(/(?<!\\)\$/g) || []).length % 2) === 1) return full
-      if (/\\left\s*[(\[{.]?\s*$/.test(before.slice(-16))) return full
+      if (insideMathBefore(before)) return full
+      if (LEFT_FENCE_TAIL.test(before.slice(-24))) return full
       if (/\$\$/.test(full)) return full
       return /\\\\/.test(block) ? `$$${String(block).trim()}$$` : full
     },

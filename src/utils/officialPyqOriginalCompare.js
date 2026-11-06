@@ -19,6 +19,8 @@ import {
   formatOfficialPyqAnswerKey,
   notifyOfficialPyqCardChanged,
   officialPyqCardForAdmin,
+  officialPyqCompareHasSuggestion,
+  officialPyqSuggestedFigures,
 } from './officialPyqCardEdit.js'
 
 export const ORIGINAL_MISSING_MESSAGE = 'Original paper not available for this paper'
@@ -204,13 +206,12 @@ function drawnTablesAndPictures(text) {
 export function officialPyqDrawnText(text) {
   const raw = drawnTablesAndPictures(text)
   if (!raw.includes('$')) return raw
-  return raw.replace(/\$\$([\s\S]*?)\$\$|\$([^$\n]*)\$/g, (whole, display, inline) => {
-    const latex = String(display ?? inline ?? '').trim()
-    if (!latex) return ''
+  /** @param {string} latex @param {boolean} displayMode @param {string} whole */
+  const draw = (latex, displayMode, whole) => {
     try {
       const html = katex.renderToString(latex, {
         output: 'html',
-        displayMode: display != null,
+        displayMode,
         throwOnError: false,
         strict: 'ignore',
       })
@@ -222,7 +223,98 @@ export function officialPyqDrawnText(text) {
     } catch {
       return whole
     }
+  }
+  return raw.replace(/\$\$([\s\S]*?)\$\$|\$([^$\n]*)\$/g, (whole, display, inline) => {
+    const latex = String(display ?? inline ?? '').trim()
+    if (!latex) return ''
+    // The card draws an answer blank `$____ \mathrm{cm}$` as a line; KaTeX alone rejects the bare underscores.
+    const blank = latex.match(/^(?:\\?_\s*){2,}/)
+    if (blank) {
+      const rest = latex.slice(blank[0].length).trim()
+      return rest ? `____ ${draw(rest, false, `$${rest}$`)}` : '____'
+    }
+    return draw(latex, display != null, whole)
   })
+}
+
+/**
+ * Raw code a student would see in drawn card text: a broken picture line,
+ * a $ formula KaTeX could not draw (e.g. a cut-off \frac), or bare TeX.
+ * Complete pictures were already turned into [picture]; molecules draw from <smiles>.
+ * @param {unknown} drawn
+ * @returns {string[]}
+ */
+export function officialPyqDrawnRawCode(drawn) {
+  const t = String(drawn ?? '').replace(/<smiles>[\s\S]*?<\/smiles>/gi, ' ')
+  const out = []
+  if (/\\includegraphics|!\[[^\]]*\]\(|\/api\/official-pyq\/original\/crops\//i.test(t)) {
+    out.push('a picture line is broken, so the card shows \\includegraphics code instead of the picture')
+  }
+  const rest = t.replace(/\\includegraphics[^\n]*/gi, ' ')
+  if (/\$/.test(rest)) out.push('a formula does not draw (a $ sign or cut-off math shows on the card)')
+  else if (/\\[a-zA-Z]{2,}/.test(rest)) out.push(`raw code shows on the card (${rest.match(/\\[a-zA-Z]{2,}/)[0]})`)
+  return out
+}
+
+/** "Go to Q 6, 44. Reason." lines from the local check that name this question. */
+function qualityReasonsFor(paper, goTo) {
+  const lines = Array.isArray(paper?.localQuality?.lines) ? paper.localQuality.lines : []
+  const out = []
+  for (const line of lines) {
+    const m = String(line ?? '').match(/^Go to Q ([\d,\s]+)\.\s*(.*)$/)
+    if (!m) continue
+    if (!m[1].split(',').map((n) => Number(n.trim())).includes(goTo)) continue
+    if (m[2].trim()) out.push(m[2].trim().replace(/\.$/, ''))
+  }
+  return out
+}
+
+/**
+ * Problems a student would see on this card right now, from the local quality
+ * check and from the drawn text. A Compare "matches" must not hide them.
+ * @param {any} paper @param {number} index
+ * @param {{ text?: string, passage?: string, options?: string[] }} drawn
+ * @returns {string[]}
+ */
+export function officialPyqCardScreenProblems(paper, index, drawn) {
+  const goTo = index + 1
+  const out = []
+  const flagged = (Array.isArray(paper?.localQuality?.failedGoTo) ? paper.localQuality.failedGoTo : [])
+    .map(Number)
+    .includes(goTo)
+  if (flagged) {
+    const reasons = qualityReasonsFor(paper, goTo)
+    out.push(
+      reasons.length
+        ? `the quality check flags Q${goTo}: ${reasons.slice(0, 2).join('; ')}`
+        : `the quality check flags Q${goTo} (see the red banner)`,
+    )
+  }
+  const parts = [drawn?.passage, drawn?.text, ...(Array.isArray(drawn?.options) ? drawn.options : [])]
+  for (const hit of officialPyqDrawnRawCode(parts.map((p) => String(p ?? '')).join('\n'))) out.push(hit)
+  return out
+}
+
+/**
+ * Gemini compares words with the page. When the words match but the card still
+ * shows a problem, the result says so instead of "matches".
+ * @param {any} result @param {string[]} problems
+ */
+export function honestOfficialPyqCompareResult(result, problems) {
+  if (String(result?.verdict ?? '') !== 'matches' || !problems?.length) return result
+  return {
+    ...result,
+    verdict: 'differs',
+    textMatches: true,
+    differences: problems.slice(0, 4).map((p) => ({
+      kind: 'card_problem',
+      detail: `The words match the original, but ${p}. Fix: Edit question (or Undo last edit), then compare again.`,
+    })),
+    suggested_text: '',
+    suggested_options: [],
+    suggested_passage: '',
+    suggested_figures: undefined,
+  }
 }
 
 /** @param {any} q */
@@ -256,6 +348,12 @@ export async function compareOfficialPyqCardRemote(paperId, index, stored, { sig
   body.drawn_text = officialPyqDrawnText(body.card_text)
   body.drawn_passage = officialPyqDrawnText(body.passage_text)
   body.drawn_options = body.options.map((o) => officialPyqDrawnText(o))
+  const problems = officialPyqCardScreenProblems(getOfficialPyqPendingPaper(paperId), index, {
+    text: body.drawn_text,
+    passage: body.drawn_passage,
+    options: body.drawn_options,
+  })
+  body.screen_problems = problems
   let lastError = null
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -266,7 +364,7 @@ export async function compareOfficialPyqCardRemote(paperId, index, stored, { sig
         signal,
       )
       if (!res.ok) throw await readError(res)
-      return await res.json()
+      return honestOfficialPyqCompareResult(await res.json(), problems)
     } catch (err) {
       if (err instanceof CompareStopError) throw err
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -292,11 +390,13 @@ export function saveOfficialPyqCompareResult(paperId, index, result) {
   const verdict = ['matches', 'differs', 'not_found', 'error'].includes(String(result?.verdict))
     ? String(result.verdict)
     : 'error'
+  const figures = officialPyqSuggestedFigures(result?.suggested_figures)
   questions[index] = {
     ...card,
     originalCompare: {
       verdict: verdict === 'not_found' ? 'differs' : verdict,
       notFound: verdict === 'not_found' || undefined,
+      textMatches: result?.textMatches === true || result?.text_matches === true || undefined,
       differences: (Array.isArray(result?.differences) ? result.differences : [])
         .slice(0, 8)
         .map((d) => ({ kind: String(d?.kind ?? 'other'), detail: String(d?.detail ?? '') })),
@@ -305,6 +405,7 @@ export function saveOfficialPyqCompareResult(paperId, index, result) {
       suggestedOptions: Array.isArray(result?.suggested_options)
         ? result.suggested_options.map((o) => String(o ?? ''))
         : [],
+      suggestedFigures: officialPyqCompareHasSuggestion({ suggestedFigures: figures }) ? figures : undefined,
       pages: Array.isArray(result?.pages) ? result.pages : [],
       error: result?.error ? String(result.error) : undefined,
       checkedAt: Date.now(),

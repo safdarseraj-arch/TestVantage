@@ -17,6 +17,7 @@ import {
 } from './officialPyqPublishOnce.js'
 import {
   getOfficialPyqPendingPaper,
+  officialPyqCardIsAdminEdited,
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
 import { loadQuestionBank, saveQuestionBank } from './questionBank.js'
@@ -280,6 +281,10 @@ export function applyOfficialPyqPublishedMeta(paperId, index, patch) {
   if (id) tagged.id = id
   else if (prev.id) tagged.id = prev.id
   restoreBody(tagged, prev)
+  // keepAdminEditedOfficialPyqCards puts back an edited card's old answer unless this save is newer.
+  if (officialPyqCardIsAdminEdited(prev)) {
+    tagged.adminEditedAt = Math.max(Date.now(), (Number(prev.adminEditedAt) || 0) + 1)
+  }
 
   const beforeText = String(prev.text ?? '')
   const beforeOptions = JSON.stringify(prev.options ?? [])

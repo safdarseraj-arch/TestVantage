@@ -39,7 +39,9 @@ import { stripLeakedOptionsFromStem } from './stripLeakedOptionsFromStem.js'
 import {
   cleanMathpixCardText,
 } from './mathpixCleanPipeline.js'
-import { flattenNestedTabulars } from './latexTabularDisplay.js'
+import { LATEX_FENCE, flattenNestedTabulars } from './latexTabularDisplay.js'
+
+const LEFT_FENCE_AT_END = new RegExp(String.raw`\\left\s*${LATEX_FENCE}\s*$`)
 
 /** Drop OCR of a drawing that already has \\includegraphics — never invent reagents. */
 export function stripMatchFigureCaptionLeftovers(text) {
@@ -120,7 +122,7 @@ export function sanitizeStemForDisplay(text, options = []) {
     t = t.replace(/(\\begin\{(?:array|cases)\}[\s\S]*?\\end\{(?:array|cases)\})/g, (block, _, offset, str) => {
       const before = String(str).slice(0, offset)
       // Already inside \left\{ / \left[ / \left( … \right. — do not insert $$ between delimiter and begin.
-      if (/\\left(?:\\\{|\[|\()\s*$/.test(before)) return block
+      if (LEFT_FENCE_AT_END.test(before)) return block
       // Open $ or $$ must keep the environment. A $$ that only closed the
       // previous display is not a reason to wrap a cases block that still
       // belongs to that formula (\right comes after the cases).

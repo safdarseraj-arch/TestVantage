@@ -1194,6 +1194,7 @@ class OfficialPyqCompareQuestionRequest(BaseModel):
     drawn_text: str = ""
     drawn_passage: str = ""
     drawn_options: list[str] = Field(default_factory=list)
+    screen_problems: list[str] = Field(default_factory=list)
 
 
 class OfficialPyqCompareCountRequest(BaseModel):

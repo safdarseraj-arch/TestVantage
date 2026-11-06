@@ -11,10 +11,12 @@ import {
 } from '../utils/hybridAiClient.js'
 import { mapExamSlugToHybridLabel, mapSubjectSlugToHybridLabel } from '../utils/hybridMetadata.js'
 import { applyOfficialPyqPublishedMeta } from '../utils/officialPyqPublishedMeta.js'
+import { hybridFillRequestForQuestion } from '../utils/officialPyqPendingFill.js'
 import { loadQuestionBank } from '../utils/questionBank.js'
 import {
   answerFieldsFromHybrid,
   fillPaperQuestionByQuestion,
+  HYBRID_FILL_PART_SIZE,
   REPLICA_DIFFICULTY_ORDER,
   replicaAlreadyStored,
   replicaPaperName,
@@ -56,18 +58,6 @@ function keyIsMissing(err) {
   return /GEMINI_API_KEY|API key|api key is missing/i.test(msg)
 }
 
-function currentAnswerText(question) {
-  if (Array.isArray(question?.correctIndices) && question.correctIndices.length) {
-    return question.correctIndices.map((n) => String.fromCharCode(65 + Number(n))).join(',')
-  }
-  if (question?.correctNumerical != null && question.correctNumerical !== '') return String(question.correctNumerical)
-  if (question?.correctInteger != null && question.correctInteger !== '') return String(question.correctInteger)
-  if (question?.correctIndex != null && question.correctIndex !== '') {
-    return String.fromCharCode(65 + Number(question.correctIndex))
-  }
-  return ''
-}
-
 export default function OfficialPyqReplicaControls({ paper, onCreated, onFilled }) {
   const [offset, setOffset] = useState('0')
   const [busy, setBusy] = useState(false)
@@ -95,29 +85,13 @@ export default function OfficialPyqReplicaControls({ paper, onCreated, onFilled 
       const total = questions.length
       const rows = await fillPaperQuestionByQuestion(
         questions,
-        async (question) => {
-          const examId = Array.isArray(question.examIds) && question.examIds.length ? question.examIds[0] : full.exam
-          return fillOfficialPyqTags({
-            question_text: String(question.text ?? question.stem ?? ''),
-            options: (Array.isArray(question.options) ? question.options : []).map((opt) => String(opt ?? '')),
-            subject: question.subject
-              ? mapSubjectSlugToHybridLabel(question.subject, question.chapter || question.section)
-              : '',
-            unit: String(question.section || question.unit || ''),
-            section: String(question.section || question.unit || ''),
-            chapter: String(question.chapter || ''),
-            topic: question.topic ? String(question.topic) : '',
-            question_type: question.questionType ? String(question.questionType) : '',
-            exam: examId ? mapExamSlugToHybridLabel(examId) : '',
-            toughness_level: question.toughnessLevel != null ? String(question.toughnessLevel) : '',
-            source: question.source ? String(question.source) : '',
-            answer: currentAnswerText(question),
-            solution: String(question.solution || ''),
-          })
-        },
+        (question) => fillOfficialPyqTags(hybridFillRequestForQuestion(question, full.exam)),
         {
+          concurrency: HYBRID_FILL_PART_SIZE,
           onProgress: (index) => {
-            setNote('Question ' + (index + 1) + ' of ' + total)
+            const from = index - (index % HYBRID_FILL_PART_SIZE) + 1
+            const to = Math.min(from + HYBRID_FILL_PART_SIZE - 1, total)
+            setNote('Questions ' + from + '–' + to + ' of ' + total + ' (two at a time)')
           },
           onApplied: (_row, soFar) => {
             setReview(soFar)
@@ -131,7 +105,7 @@ export default function OfficialPyqReplicaControls({ paper, onCreated, onFilled 
       setNote(
         'Hybrid AI filled ' +
           filledCount +
-          ' question(s), one at a time. ' +
+          ' question(s), two at a time. ' +
           (look ? look + ' need a look. ' : '') +
           'Review them, then use them if they look right. Nothing is saved yet.',
       )
@@ -548,8 +522,8 @@ export default function OfficialPyqReplicaControls({ paper, onCreated, onFilled 
   return (
     <div data-testid="official-pyq-replica-controls">
       <p className="form-hint">
-        Ask Hybrid AI to fill walks this paper one question at a time. Question 1 gets metatags, the
-        answer, and a short solution, then the next question starts on its own. Create a similar paper
+        Ask Hybrid AI to fill walks this paper two questions at a time, one request per question. Each
+        question gets metatags, the answer, and a short exact solution, then the next part starts. Create a similar paper
         makes four pending papers, one original question at a time. Nothing is published until you approve it.
       </p>
       <div className="official-pyq-actions official-pyq-paper-actions" data-testid="official-pyq-paper-actions">

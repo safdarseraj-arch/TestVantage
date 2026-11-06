@@ -3,7 +3,8 @@
 Original files live in data/official_pyq_originals/ (not served publicly).
 Admin crops of original pages live in data/official_pyq_crops/ and are served as question pictures.
 Nothing here rewrites a question. Gemini only reports differences and may
-suggest a correction copied from the page; the admin decides.
+suggest a correction copied from the page; the admin decides. Drawings in a
+suggestion are boxes on the page that are cut out here, never redrawn.
 """
 
 from __future__ import annotations
@@ -88,6 +89,12 @@ class CompareDifference(BaseModel):
     detail: str = Field(..., description="Short, concrete: what the page shows vs what the card shows.")
 
 
+class CompareFigure(BaseModel):
+    place: str = Field(..., description="Where the drawing belongs on the card: text | passage | A | B | C | D")
+    page: int = Field(..., description="Page number of the image the drawing is printed on")
+    box_2d: list[float] = Field(..., description="[ymin, xmin, ymax, xmax] of the drawing on that page, scaled 0-1000")
+
+
 class CompareVerdict(BaseModel):
     verdict: str = Field(..., description="matches | differs | not_found")
     differences: list[CompareDifference] = Field(default_factory=list)
@@ -102,6 +109,10 @@ class CompareVerdict(BaseModel):
     suggested_passage: str = Field(
         default="",
         description="Whole corrected shared passage / question stem copied only from the page image. Empty if it matches or unsure.",
+    )
+    figures: list[CompareFigure] = Field(
+        default_factory=list,
+        description="Boxes around drawings the card is missing or draws wrong. Empty if every picture is right.",
     )
     found_on_page: int | None = None
 
@@ -572,6 +583,173 @@ def read_crop(name: str) -> bytes:
     return path.read_bytes()
 
 
+_MAX_FIGURE_BOXES = 12
+_MIN_FIGURE_W = 0.02
+_MIN_FIGURE_H = 0.015
+_MAX_FIGURE_AREA = 0.6
+_INK_DPI = 100
+_INK_LEVEL = 200
+_INK_STEP = 0.004
+_INK_REACH = 0.05
+_INK_MARGIN = 0.008
+_LABEL_WORD_RE = re.compile(r"^(?:\([A-Ha-h1-4]\)|Q\.?\d{1,3})$")
+
+Box = tuple[float, float, float, float]
+
+
+def figure_place(raw: Any) -> str:
+    """'text', 'passage', or an option letter 'A'-'H'; '' if Gemini named something else."""
+    s = re.sub(r"[\s()\[\]._:-]+", " ", str(raw or "")).strip().lower()
+    s = re.sub(r"^option\s+", "", s)
+    if s in ("text", "question", "question text", "stem"):
+        return "text"
+    if s in ("passage", "paragraph", "question stem"):
+        return "passage"
+    if re.fullmatch(r"[a-h]", s):
+        return s.upper()
+    return ""
+
+
+def figure_box_fraction(box_2d: Any) -> Box | None:
+    """Gemini's [ymin, xmin, ymax, xmax] (0-1000) as page fractions (x0, y0, x1, y1), or None if unusable."""
+    try:
+        values = [float(v) for v in box_2d]
+    except (TypeError, ValueError):
+        return None
+    if len(values) != 4 or not all(v == v and abs(v) != float("inf") for v in values):
+        return None
+    scale = 1000.0 if max(values) > 1.5 else 1.0
+    y0, x0, y1, x1 = (min(1.0, max(0.0, v / scale)) for v in values)
+    x0, x1 = sorted((x0, x1))
+    y0, y1 = sorted((y0, y1))
+    if x1 - x0 < _MIN_FIGURE_W or y1 - y0 < _MIN_FIGURE_H or (x1 - x0) * (y1 - y0) > _MAX_FIGURE_AREA:
+        return None
+    return x0, y0, x1, y1
+
+
+def snap_box_to_ink(ink: Any, box: Box, labels: list[Box] | None = None) -> Box | None:
+    """Grow edges that cut through a drawing (a little), keep option letters / question numbers out,
+    then trim white space. ink: 2-D bool array of the page. None if the box holds no drawing."""
+    rows, cols = ink.shape
+    x0, y0, x1, y1 = box
+
+    def px(v: float, n: int) -> int:
+        return int(round(min(1.0, max(0.0, v)) * n))
+
+    def edge_has_ink(side: str) -> bool:
+        c0, c1, r0, r1 = px(x0, cols), max(px(x1, cols), px(x0, cols) + 1), px(y0, rows), max(px(y1, rows), px(y0, rows) + 1)
+        if side == "left":
+            return bool(ink[r0:r1, min(c0, cols - 1)].any())
+        if side == "right":
+            return bool(ink[r0:r1, min(c1 - 1, cols - 1)].any())
+        if side == "top":
+            return bool(ink[min(r0, rows - 1), c0:c1].any())
+        return bool(ink[min(r1 - 1, rows - 1), c0:c1].any())
+
+    start = box
+    for _ in range(int(_INK_REACH / _INK_STEP)):
+        grew = False
+        if edge_has_ink("left") and x0 > 0 and start[0] - x0 < _INK_REACH:
+            x0, grew = max(0.0, x0 - _INK_STEP), True
+        if edge_has_ink("right") and x1 < 1 and x1 - start[2] < _INK_REACH:
+            x1, grew = min(1.0, x1 + _INK_STEP), True
+        if edge_has_ink("top") and y0 > 0 and start[1] - y0 < _INK_REACH:
+            y0, grew = max(0.0, y0 - _INK_STEP), True
+        if edge_has_ink("bottom") and y1 < 1 and y1 - start[3] < _INK_REACH:
+            y1, grew = min(1.0, y1 + _INK_STEP), True
+        if not grew:
+            break
+    for lx0, ly0, lx1, ly1 in labels or []:
+        overlaps = lx1 > x0 and lx0 < x1 and ly1 > y0 and ly0 < y1
+        if overlaps and (lx0 + lx1) / 2 < x0 + 0.35 * (x1 - x0):
+            x0 = max(x0, lx1 + 0.002)
+    if x1 - x0 < _MIN_FIGURE_W:
+        return None
+    c0, c1, r0, r1 = px(x0, cols), px(x1, cols), px(y0, rows), px(y1, rows)
+    region = ink[r0:r1, c0:c1]
+    if region.size == 0 or not region.any():
+        return None
+    used_rows = region.any(axis=1).nonzero()[0]
+    used_cols = region.any(axis=0).nonzero()[0]
+    snapped = (
+        max(0.0, (c0 + used_cols[0]) / cols - _INK_MARGIN),
+        max(0.0, (r0 + used_rows[0]) / rows - _INK_MARGIN),
+        min(1.0, (c0 + used_cols[-1] + 1) / cols + _INK_MARGIN),
+        min(1.0, (r0 + used_rows[-1] + 1) / rows + _INK_MARGIN),
+    )
+    for lx0, ly0, lx1, ly1 in labels or []:
+        if lx1 > snapped[0] and lx0 < snapped[2] and ly1 > snapped[1] and ly0 < snapped[3]:
+            if (lx0 + lx1) / 2 < snapped[0] + 0.35 * (snapped[2] - snapped[0]):
+                snapped = (max(snapped[0], lx1 + 0.002), *snapped[1:])
+    if snapped[2] - snapped[0] < _MIN_CROP_FRACTION or snapped[3] - snapped[1] < _MIN_CROP_FRACTION:
+        return None
+    return tuple(float(v) for v in snapped)
+
+
+def _page_ink_and_labels(path: Path, page: int) -> tuple[Any, list[Box]]:
+    import numpy as np
+
+    with fitz.open(str(path)) as doc:
+        pdf_page = doc[page - 1]
+        rect = pdf_page.rect
+        scale = (_INK_DPI / 72.0) if path.suffix == ".pdf" else min(1.0, 1000.0 / max(rect.width, 1.0))
+        pix = pdf_page.get_pixmap(matrix=fitz.Matrix(scale, scale), colorspace=fitz.csGRAY, alpha=False)
+        gray = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.stride)[:, : pix.width]
+        labels: list[Box] = []
+        if path.suffix == ".pdf":
+            w, h = rect.width or 1.0, rect.height or 1.0
+            for word in pdf_page.get_text("words") or []:
+                if _LABEL_WORD_RE.match(str(word[4])):
+                    labels.append((word[0] / w, word[1] / h, word[2] / w, word[3] / h))
+    return gray < _INK_LEVEL, labels
+
+
+def crop_suggested_figures(paper_id: str, pages: list[int], figures: list[Any]) -> dict[str, Any]:
+    """Cut Gemini's figure boxes out of the original page (pixels only), grouped by place.
+    Boxes off the page, too small, too big, blank, or for an unknown place are skipped."""
+    path = _original_file(paper_id)
+    out: dict[str, Any] = {"text": [], "passage": [], "options": []}
+    if path is None:
+        return out
+    with fitz.open(str(path)) as doc:
+        page_count = doc.page_count
+    allowed = [p for p in pages if 1 <= p <= page_count] or ([1] if path.suffix != ".pdf" else [])
+    ink_cache: dict[int, tuple[Any, list[Box]]] = {}
+    options: dict[int, list[str]] = {}
+    for fig in figures[:_MAX_FIGURE_BOXES]:
+        data = fig.model_dump() if hasattr(fig, "model_dump") else dict(fig or {})
+        place = figure_place(data.get("place"))
+        box = figure_box_fraction(data.get("box_2d"))
+        try:
+            page = int(data.get("page") or 0)
+        except (TypeError, ValueError):
+            page = 0
+        if page not in allowed and 1 <= page <= len(allowed):
+            page = allowed[page - 1]
+        if not place or box is None or page not in allowed:
+            logger.info("Compare figure box skipped: %s", data)
+            continue
+        if page not in ink_cache:
+            ink_cache[page] = _page_ink_and_labels(path, page)
+        ink, labels = ink_cache[page]
+        snapped = snap_box_to_ink(ink, box, labels)
+        if snapped is None:
+            logger.info("Compare figure box holds no drawing: %s", data)
+            continue
+        try:
+            crop = crop_original_page(paper_id, page, dict(zip(("x0", "y0", "x1", "y1"), snapped)))
+        except (ValueError, OriginalMissingError) as exc:
+            logger.warning("Compare figure crop failed (%s): %s", exc, data)
+            continue
+        if place in ("text", "passage"):
+            out[place].append(crop["url"])
+        else:
+            options.setdefault(ord(place) - 65, []).append(crop["url"])
+    if options:
+        out["options"] = [options.get(i, []) for i in range(max(options) + 1)]
+    return out
+
+
 _OPTION_LABEL_RE = re.compile(r"^\s*(?:\(\s*[A-Za-z1-9]\s*\)|[A-Da-d][.)])\s*")
 
 
@@ -588,6 +766,27 @@ def _real_suggested_options(raw: list[Any]) -> list[str]:
     return cleaned if any(cleaned) else []
 
 
+_SMILES_RE = re.compile(r"<smiles>.*?</smiles>", re.IGNORECASE | re.DOTALL)
+_RAW_PICTURE_RE = re.compile(r"\\includegraphics|!\[[^\]]*\]\(|/api/official-pyq/original/crops/", re.IGNORECASE)
+_RAW_TEX_RE = re.compile(r"\$|\\[A-Za-z]{2,}")
+
+
+def _screen_problems(body: dict[str, Any]) -> list[str]:
+    """What a student would see wrong on the card: problems the app already found,
+    plus raw code left in the drawn text (complete pictures are drawn as [picture])."""
+    found = [str(p).strip() for p in body.get("screen_problems") or [] if str(p or "").strip()][:4]
+    drawn = "\n".join(
+        [str(body.get("drawn_passage") or ""), str(body.get("drawn_text") or "")]
+        + [str(o or "") for o in body.get("drawn_options") or []]
+    )
+    drawn = _SMILES_RE.sub(" ", drawn)
+    if not found and _RAW_PICTURE_RE.search(drawn):
+        found.append("a picture line is broken, so the card shows \\includegraphics code instead of the picture")
+    elif not found and _RAW_TEX_RE.search(drawn):
+        found.append("raw code or a formula that does not draw shows on the card")
+    return found
+
+
 def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
     opts = _labelled_options(body.get("options")) or "(no options)"
     answer = str(body.get("answer_key") or "").strip() or "(none on card)"
@@ -595,9 +794,9 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
     passage = str(body.get("passage_text") or "").strip()
     subject = str(body.get("subject") or "").strip()
     page_note = (
-        f"The images are page(s) {', '.join(str(p) for p in pages)} of the original paper."
+        f"The images are page(s) {', '.join(str(p) for p in pages)} of the original paper, in that order."
         if pages
-        else "The image is the original page."
+        else "The image is the original page (page 1)."
     )
     where = f" in the {subject} part" if subject else ""
     drawn_text = str(body.get("drawn_text") or "").strip()
@@ -611,7 +810,20 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         if drawn_text or drawn_passage
         else ""
     )
+    problems = _screen_problems(body)
+    problem_block = (
+        "--- problems the app already found on the card as drawn ---\n"
+        + "".join(f"- {p}\n" for p in problems)
+        if problems
+        else ""
+    )
     drawn_rules = (
+        "- Judge the card by what students SEE (the AS DRAWN text), not only the stored LaTeX. "
+        "There a complete picture shows as [picture]. Raw code left in the drawn text "
+        "(\\includegraphics, a picture address, $ signs, \\frac or other backslash commands, "
+        "unmatched { }), text or a formula that stops mid-way, or a figure printed on the page "
+        "that the card does not draw are all differences: verdict 'differs' even if the words "
+        "match (kind other, missing_text or missing_figure).\n"
         "- The AS DRAWN text is what students see. Superscripts/subscripts appear inline there "
         "(Fe2+, 10−2, KMnO4) and no spaces around + − × = is normal — not a difference. But "
         "words, numbers, units or formulas glued together there that the page separates "
@@ -646,12 +858,14 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         f"--- options ---\n{opts}\n"
         f"--- answer key on card ---\n{answer}\n"
         f"--- card has a figure --- {figure}\n"
-        f"{drawn_block}\n"
+        f"{drawn_block}"
+        f"{problem_block}\n"
         "Rules:\n"
         f"{passage_rules}"
         f"{drawn_rules}"
-        "- verdict 'matches' if the card says the same thing as the page. Ignore LaTeX vs plain "
-        "formatting that renders the same, line breaks, and the question-number prefix.\n"
+        "- verdict 'matches' only if the card says the same thing as the page AND draws cleanly "
+        "for students. Ignore LaTeX vs plain formatting that renders the same, line breaks, and "
+        "the question-number prefix. If problems are listed above, the verdict is 'differs'.\n"
         "- verdict 'differs' with a short list of concrete differences: missing text, wrong "
         "number/unit/symbol, wrong option, wrong alignment of reactions/tables/lists, missing "
         "figure, or extra_card if this card is not a real question on the page.\n"
@@ -662,9 +876,23 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         "unsure. Use $...$ for math. Inside math put ~ between a number and its unit and between "
         "unit words, e.g. $105~\\mathrm{kcal}~\\mathrm{mol}^{-1}$. A table is one plain "
         "\\begin{tabular} with & and \\\\ rows. Copy every \\includegraphics{...} and ![](...) line "
-        "from the card into the suggested text or passage unchanged; never drop a picture.\n"
+        "from the card into the suggested text or passage unchanged; never drop a picture "
+        "(unless you give figure boxes for that part, see below).\n"
         "- If an option is a drawing (structure, graph, diagram) you cannot write as text, leave "
-        "suggested_options empty. Never return only the letters (A), (B), (C), (D).\n"
+        "suggested_options empty and give figure boxes instead. Never return only the letters (A), (B), (C), (D).\n"
+        "- figures: only when a difference is about drawings (a figure, chemical structure, graph, "
+        "circuit or reaction scheme that the card is missing, draws broken or as wrong/incomplete "
+        "SMILES, or splits into broken text). For each part that needs it - place 'text' (question), "
+        "'passage', or option letter 'A'-'D' - box EVERY drawing of that part; the app cuts the boxes "
+        "out of the page and they replace that part's old pictures and SMILES. page = the page number "
+        "of the image it is on. box_2d = [ymin, xmin, ymax, xmax] scaled 0-1000, around the whole "
+        "drawing with its printed labels (e.g. Q, R, S under structures) but never the option letter "
+        "(A) or the question number. A reaction scheme (arrows, reagents, structures) is ONE box. "
+        "Drawings side by side in one option may be one box. Order boxes as read. Leave figures empty "
+        "if the card already draws every picture right.\n"
+        "- With figure boxes for the question text or passage, write [figure] in suggested_text / "
+        "suggested_passage where each boxed drawing goes (in box order) and leave out the words that "
+        "are inside the drawing (reagents, labels).\n"
         "- Do not judge the answer key unless the page prints one.\n"
         "Return JSON only."
     )
@@ -672,7 +900,8 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
 
 _SHORT_ANSWER_NOTE = (
     "\n\nYour last answer was cut off. Answer again in under 300 words: verdict and at most 4 "
-    "short differences. Leave suggested_text, suggested_options and suggested_passage empty."
+    "short differences. Leave suggested_text, suggested_options and suggested_passage empty; "
+    "figures may stay."
 )
 
 
@@ -743,12 +972,24 @@ async def compare_question(body: dict[str, Any]) -> dict[str, Any]:
         kind = "differs" if verdict.differences else "matches"
     if kind == "matches" and verdict.differences:
         kind = "differs"
+    differences = [d.model_dump() for d in verdict.differences][:8]
+    problems = _screen_problems(body)
+    if kind == "matches" and problems:
+        kind = "differs"
+        differences = [
+            {"kind": "card_problem", "detail": f"The words match the original, but {p}."} for p in problems
+        ]
+    figures: dict[str, Any] = {"text": [], "passage": [], "options": []}
+    if kind == "differs" and verdict.figures:
+        figures = await asyncio.to_thread(crop_suggested_figures, paper_id, pages, verdict.figures)
     return {
         "verdict": kind,
-        "differences": [d.model_dump() for d in verdict.differences][:8],
+        "text_matches": bool(problems) and all(d.get("kind") == "card_problem" for d in differences),
+        "differences": differences,
         "suggested_text": verdict.suggested_text.strip() if kind == "differs" else "",
         "suggested_options": _real_suggested_options(verdict.suggested_options) if kind == "differs" else [],
         "suggested_passage": verdict.suggested_passage.strip() if kind == "differs" else "",
+        "suggested_figures": figures,
         "pages": pages,
         "model": COMPARE_MODEL,
     }

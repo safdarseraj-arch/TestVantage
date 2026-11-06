@@ -13,6 +13,15 @@ function norm(text) {
   return String(text ?? '').replace(/\s+/g, '').toLowerCase()
 }
 
+/** Case counts inside math and molecules: c1 (aromatic) and C1 are different SMILES. */
+function optionKey(text) {
+  return String(text ?? '')
+    .split(/(<smiles>[\s\S]*?<\/smiles>|\$[^$]*\$)/i)
+    .map((part, i) => (i % 2 ? part : part.toLowerCase()))
+    .join('')
+    .replace(/\s+/g, '')
+}
+
 function cardBlob(q) {
   return [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])].join('\n')
 }
@@ -69,7 +78,7 @@ function optionLabelMissing(q) {
   ])
   const used = new Set()
   for (const opt of filled(q.options)) {
-    for (const m of opt.matchAll(/\(\s*([PQRS1-5])\s*\)/gi)) used.add(m[1].toUpperCase())
+    for (const m of opt.matchAll(/\(\s*([PQRSTpqrst1-5]|I{1,3}|IV)\s*\)/g)) used.add(m[1].toUpperCase())
   }
   const missing = [...used].filter((label) => !have.has(label))
   if (!missing.length) return ''
@@ -203,7 +212,7 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
       if (opts.length < 2) reasons.push('An MCQ option is empty')
       const seen = new Set()
       for (const opt of opts) {
-        const key = norm(opt)
+        const key = optionKey(opt)
         if (seen.has(key)) reasons.push('Two options are the same')
         seen.add(key)
       }

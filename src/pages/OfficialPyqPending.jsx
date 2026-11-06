@@ -32,6 +32,7 @@ import {
 } from '../utils/officialPyqPendingStore'
 import ErrorBoundary from '../components/ErrorBoundary.jsx'
 import OfficialPyqReplicaControls from '../components/OfficialPyqReplicaControls.jsx'
+import OfficialPyqPendingFill from '../components/OfficialPyqPendingFill.jsx'
 import OfficialPyqTabList from './OfficialPyqTabList.jsx'
 import OfficialPyqPreviewPager from './OfficialPyqPreviewPager.jsx'
 import { resetOfficialPyqSplitWorker, peekOfficialPyqSplitKeep } from '../utils/officialPyqSplitWorker.js'
@@ -997,7 +998,7 @@ export default function OfficialPyqPending() {
         const acceptable = localOfficialPyqReparseAcceptable(count, target, paperNow.exam, previousCount)
         setMessage(
           acceptable
-            ? `Re-parsed ${count} question(s) from stored OCR (was ${previousCount}). Local split done — Gemini flash-lite will fill tags, answers, and solutions.`
+            ? `Re-parsed ${count} question(s) from stored OCR (was ${previousCount}). Local split done — press Fill tags, answers & solutions (Hybrid AI) to fill them two at a time.`
             : `Re-parsed ${count} question(s) from stored OCR (was ${previousCount}). Review the count before approving.`,
         )
         if (count < expectedMinOfficialPyqCount(paperNow.exam)) {
@@ -1012,35 +1013,8 @@ export default function OfficialPyqPending() {
           setError('')
         }
         if (acceptable) {
-          setProgressLabel('Gemini flash-lite tags, answers, solutions…')
-          setProgressPct(88)
-          await yieldToUi()
-          try {
-            const { enrichQuestionsLightClient } = await import('../utils/mathpixGeminiPipeline.js')
-            const fresh = resolveFreshPaper(paperNow) || paperNow
-            const enriched = await enrichQuestionsLightClient(fresh.questions || [], {
-              paperMeta: {
-                exam: fresh.exam,
-                year: fresh.year,
-                session: fresh.session,
-                paperLabel: fresh.paperLabel,
-              },
-              deferSolutions: false,
-              signal: reparseCtl.signal,
-              timeoutMs: 20_000,
-            })
-            if (!isWorkStale(gen) && Array.isArray(enriched) && enriched.length) {
-              updateOfficialPyqPendingPaper(fresh.id, { questions: enriched })
-              setPreviewReload((n) => n + 1)
-              setMessage(
-                `Re-parsed ${enriched.length} question(s) locally. Gemini flash-lite filled tags, answers, and brief solutions.`,
-              )
-            }
-          } catch {
-            /* local cards stay */
-          }
           bump()
-          setProgressLabel('Done (local split + Gemini light)')
+          setProgressLabel('Done (local split)')
           setProgressPct(100)
           await yieldToUi()
           return
@@ -1711,6 +1685,13 @@ export default function OfficialPyqPending() {
                             {reParseBusy ? 'Re-parsing…' : 'Re-parse stored OCR'}
                           </button>
                         )}
+                        <OfficialPyqPendingFill
+                          paperId={selected.id}
+                          onChanged={() => {
+                            bump()
+                            setPreviewReload((n) => n + 1)
+                          }}
+                        />
                         <ErrorBoundary compact title="Compare with original paper hit an error">
                           <Suspense fallback={null}>
                             <OfficialPyqOriginalComparePanel

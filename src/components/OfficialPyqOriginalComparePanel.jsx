@@ -14,6 +14,7 @@ import {
   getOfficialPyqOriginalStatus,
   uploadOfficialPyqOriginal,
 } from '../utils/officialPyqOriginalCompare.js'
+import { OFFICIAL_PYQ_AUTO_FIX_MAX, autoFixFlaggedOfficialPyqCards } from '../utils/officialPyqAutoFix.js'
 
 /**
  * @param {{ paperId: string, flaggedGoTo?: number[], onChanged?: () => void }} props
@@ -113,6 +114,58 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
     }
   }
 
+  async function onAutoFix() {
+    if (busy) return
+    setError('')
+    setSummary('')
+    if (!status?.available) {
+      setError(ORIGINAL_MISSING_MESSAGE)
+      return
+    }
+    if (!status?.gemini_key) {
+      setError(GEMINI_KEY_MISSING_MESSAGE)
+      return
+    }
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(
+        `Auto-fix flagged questions? Each flagged question (at most ${OFFICIAL_PYQ_AUTO_FIX_MAX} this time) is compared with the original paper (one Gemini request each). A correction is saved only if it draws cleanly and adds no new alert, and you can Undo it on the card. Questions you edited yourself are not changed. Nothing is published.`,
+      )
+    ) {
+      return
+    }
+    const ctl = new AbortController()
+    abortRef.current = ctl
+    setBusy(true)
+    try {
+      const out = await autoFixFlaggedOfficialPyqCards(paperId, {
+        signal: ctl.signal,
+        onProgress: (_done, _total, label) => setProgress(label),
+      })
+      onChanged?.()
+      const lines = []
+      if (out.fixed?.length) lines.push(`Fixed and now passing: Q ${out.fixed.join(', ')}.`)
+      if (out.stillFlagged?.length) lines.push(`Corrected but still flagged: Q ${out.stillFlagged.join(', ')}.`)
+      if (out.needsAdmin?.length) {
+        lines.push(`Needs you: ${out.needsAdmin.map((n) => `Q${n.goTo} (${n.reason})`).join('; ')}.`)
+      }
+      if (out.skippedAdminEdited?.length) {
+        lines.push(`Not changed because you edited them: Q ${out.skippedAdminEdited.join(', ')} — use Compare this question on the card.`)
+      }
+      if (out.skippedTried?.length) lines.push(`Already tried before (no new Gemini request): Q ${out.skippedTried.join(', ')}.`)
+      if (out.notTried?.length) lines.push(`Left for the next run: Q ${out.notTried.join(', ')}.`)
+      if (!out.ok) {
+        setError(`${out.error || 'Auto-fix stopped.'} ${lines.join(' ')}`.trim())
+        return
+      }
+      setSummary(lines.length ? `${lines.join(' ')} Wrong fix? Open the card and click Undo last edit.` : 'No flagged questions to fix.')
+    } finally {
+      abortRef.current = null
+      setBusy(false)
+      setProgress('')
+    }
+  }
+
   return (
     <div className="official-pyq-original-compare" data-testid="official-pyq-original-compare">
       <p className="form-hint">
@@ -140,6 +193,16 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
           onClick={() => void onCompareAll()}
         >
           {busy ? 'Comparing…' : 'Compare with original paper'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          data-testid="official-pyq-auto-fix"
+          disabled={busy}
+          aria-busy={busy}
+          onClick={() => void onAutoFix()}
+        >
+          Auto-fix flagged questions (compare with original)
         </button>
         <span className="form-hint" data-testid="official-pyq-compare-flagged-count">
           {flagged.length

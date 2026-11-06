@@ -36,6 +36,23 @@ HYBRID_SOLUTION_INSTRUCTION = (
     "Be complete: give the actual method and the final result, enough for a student to follow. "
     "Do not tease or stop early."
 )
+
+# Official PYQ answer-key solutions: exact working, not a hint and not an essay.
+OFFICIAL_PYQ_SOLUTION_INSTRUCTION = (
+    "step_by_step_solution is the answer-key solution for this past exam question. "
+    "Write 3 to 8 short lines, each one real working step, under about 150 words in total. "
+    "First line: the principle, law, or formula used. "
+    "Middle lines: the key working with the actual numbers; put maths in $...$. "
+    "For multiple-correct or matching questions, give one short line per option or pair saying why it is right or wrong. "
+    "Last line: 'Answer: (X)' for options, or 'Answer: value with unit' for numbers. It must agree with correct_answer. "
+    "Do not restate the question. No hint, no 'think about', no 'let us', no 'we need to', "
+    "no background theory, no essay. Put each line on its own line (newline between lines). "
+    "Never hedge ('or', 'possibly', 'likely'): if a structure, graph, or value you need is not "
+    "in the text or the attached pictures, return an empty step_by_step_solution and an empty correct_answer."
+)
+_CROP_URL_RE = re.compile(r"/api/official-pyq/original/crops/([A-Za-z0-9_.-]{1,160}\.png)")
+_MAX_FILL_PICTURES = 4
+_PUBLISHED_FILL_TIMEOUT_MS = 75_000
 _CACHE_CLONE_MODEL = _MODEL_FLASH
 _CLONE_CACHE_DISPLAY_NAME = "testvantage-clone-batch-reference"
 
@@ -926,8 +943,8 @@ def _published_fill_prompt(params: dict[str, Any]) -> str:
         "If you are not sure of a tag, return an empty string for that field.\n"
         "correct_answer is a letter (A-D), letters joined by commas, or the number. "
         "Empty if you cannot mark it.\n"
-        f"{HYBRID_SOLUTION_INSTRUCTION}\n"
-        "If the stored solution is a hint or a story, replace it with this concise complete solution. "
+        f"{OFFICIAL_PYQ_SOLUTION_INSTRUCTION}\n"
+        "If the stored solution is a hint, a story, or longer than this, replace it with this concise complete solution. "
         "If you cannot solve it, return an empty step_by_step_solution.\n"
         f"Stored subject: {params.get('subject') or ''}\n"
         f"Stored unit: {params.get('unit') or params.get('section') or ''}\n"
@@ -941,7 +958,63 @@ def _published_fill_prompt(params: dict[str, Any]) -> str:
         f"Stored solution: {params.get('solution') or ''}\n"
         f"Stem:\n{params.get('question_text') or ''}\n"
         f"Options:\n{params.get('options_text') or ''}\n"
+        "Pictures named in \\includegraphics lines above are attached in the same order; read structures, "
+        "graphs, and tables from them.\n"
     )
+
+
+def _published_fill_pictures(params: dict[str, Any]) -> list[types.Part]:
+    """Crops the stem or options point at, so the model sees molecule P and graphs, not just their URLs."""
+    from official_pyq_compare import read_crop
+
+    text = f"{params.get('question_text') or ''}\n{params.get('options_text') or ''}"
+    parts: list[types.Part] = []
+    seen: set[str] = set()
+    for name in _CROP_URL_RE.findall(text):
+        if name in seen or len(parts) >= _MAX_FILL_PICTURES:
+            continue
+        seen.add(name)
+        try:
+            parts.append(types.Part.from_bytes(data=read_crop(name), mime_type="image/png"))
+        except Exception:
+            logger.warning("Fill picture %s is not on this computer", name)
+    return parts
+
+
+def solution_as_lines(text: str) -> str:
+    """One working step per line. Splits a single paragraph at sentence ends outside $...$."""
+    raw = str(text or "").strip()
+    if not raw or "\n" in raw:
+        return raw
+    lines: list[str] = []
+    start = 0
+    in_math = False
+    i = 0
+    while i < len(raw):
+        ch = raw[i]
+        if ch == "\\" and i + 1 < len(raw):
+            i += 2
+            continue
+        if ch == "$":
+            in_math = not in_math
+        elif (
+            not in_math
+            and ch in ".;"
+            and i + 2 < len(raw)
+            and raw[i + 1] == " "
+            and (raw[i + 2].isupper() or raw[i + 2] in "($")
+        ):
+            lines.append(raw[start : i + 1].strip())
+            start = i + 2
+        i += 1
+    lines.append(raw[start:].strip())
+    out: list[str] = []
+    for line in lines:
+        head, sep, tail = line.partition(" Answer:")
+        out.append(head.strip())
+        if sep:
+            out.append(f"Answer:{tail}".strip())
+    return "\n".join(line for line in out if line)
 
 
 def published_fill_model(params: dict[str, Any] | None) -> str:
@@ -968,15 +1041,17 @@ def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
     client = _client()
     code_subject = hybrid_code_execution_subject(params)
     model = published_fill_model(params)
+    config = _generation_config(
+        response_schema=PublishedPyqFillOutput,
+        subject=code_subject,
+        use_code_tools=code_subject is not None,
+        max_output_tokens=_MAX_OUTPUT_TOKENS,
+    )
+    config.http_options = types.HttpOptions(timeout=_PUBLISHED_FILL_TIMEOUT_MS)
     response = client.models.generate_content(
         model=model,
-        contents=_published_fill_prompt(params),
-        config=_generation_config(
-            response_schema=PublishedPyqFillOutput,
-            subject=code_subject,
-            use_code_tools=code_subject is not None,
-            max_output_tokens=_MAX_OUTPUT_TOKENS,
-        ),
+        contents=[_published_fill_prompt(params), *_published_fill_pictures(params)],
+        config=config,
     )
     parsed = _structured_output_from_response(response, PublishedPyqFillOutput)
     if not isinstance(parsed, PublishedPyqFillOutput):
@@ -991,7 +1066,7 @@ def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
         "toughness_level": parsed.toughness_level,
         "source": parsed.source,
         "correct_answer": parsed.correct_answer,
-        "step_by_step_solution": parsed.step_by_step_solution,
+        "step_by_step_solution": solution_as_lines(parsed.step_by_step_solution),
         "model": model,
     }
 

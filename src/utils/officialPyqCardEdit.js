@@ -11,12 +11,284 @@ import {
   officialPyqCardIsAdminEdited,
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
-import { LOCAL_QUALITY_REVISION, localOfficialPyqQualityCheck } from './officialPyqLocalQuality.js'
+import {
+  LOCAL_QUALITY_REVISION,
+  localOfficialPyqQualityCheck,
+  persistOfficialPyqQualityRun,
+} from './officialPyqLocalQuality.js'
 import { officialPyqCardAsShown } from './officialPyqCardAsShown.js'
+import { ORIGINAL_CROP_URL_PREFIX, consumeIncludeGraphics, isOriginalCropUrl } from './mathpixMedia.js'
+import { paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
 
 export const OFFICIAL_PYQ_CARD_CHANGED_EVENT = 'testvantage:official-pyq-card-changed'
 
 const LETTERS = 'ABCDEFGH'
+
+/** Earlier versions kept on each card for "Undo last edit". Kept small: browser storage is shared. */
+export const OFFICIAL_PYQ_EDIT_HISTORY_MAX = 5
+
+const SNAPSHOT_FIELDS = [
+  'text',
+  'stem',
+  'passageText',
+  'passageSource',
+  'options',
+  'correctIndex',
+  'correctIndices',
+  'correctInteger',
+  'correctNumerical',
+  'answerSource',
+  'questionImage',
+  'adminEdited',
+  'adminEditedAt',
+  'adminApproved',
+  'adminApprovedAt',
+  'editSource',
+]
+/** Not changed by the Edit box; a later Hybrid AI fill must survive an undo, so these are kept only when they differ. */
+const SNAPSHOT_FIELDS_IF_CHANGED = ['solution', 'solutionSource']
+
+/** @param {any} before @param {any} after */
+function cardSnapshot(before, after) {
+  /** @type {Record<string, unknown>} */
+  const card = {}
+  for (const field of SNAPSHOT_FIELDS) {
+    if (before?.[field] !== undefined) card[field] = before[field]
+  }
+  for (const field of SNAPSHOT_FIELDS_IF_CHANGED) {
+    if (JSON.stringify(before?.[field]) !== JSON.stringify(after?.[field])) card[field] = before?.[field] ?? null
+  }
+  return { savedAt: Date.now(), card }
+}
+
+/**
+ * `after` with `before` pushed onto its edit history (newest first).
+ * @param {any} before @param {any} after
+ */
+export function withOfficialPyqEditHistory(before, after) {
+  const prior = Array.isArray(before?.editHistory) ? before.editHistory : []
+  return {
+    ...after,
+    editHistory: [cardSnapshot(before, after), ...prior].slice(0, OFFICIAL_PYQ_EDIT_HISTORY_MAX),
+  }
+}
+
+/** @param {any} card @param {Record<string, unknown>} snap */
+function cardFromSnapshot(card, snap) {
+  const next = { ...card }
+  for (const field of SNAPSHOT_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(snap, field)) next[field] = snap[field]
+    else delete next[field]
+  }
+  for (const field of SNAPSHOT_FIELDS_IF_CHANGED) {
+    if (!Object.prototype.hasOwnProperty.call(snap, field)) continue
+    if (snap[field] == null) delete next[field]
+    else next[field] = snap[field]
+  }
+  return next
+}
+
+const CROP_FILE_RE = /^[A-Za-z0-9_.-]{1,160}\.png(?:\?[A-Za-z0-9_.=&-]*)?$/
+
+/** @param {string} url */
+function figureUrlProblem(url) {
+  const u = String(url ?? '').trim()
+  if (/^https?:\/\/\S+$/i.test(u)) return ''
+  if (isOriginalCropUrl(u) && CROP_FILE_RE.test(u.slice(ORIGINAL_CROP_URL_PREFIX.length))) return ''
+  return `the picture address "${u.slice(0, 60)}${u.length > 60 ? '…' : ''}" is cut off or wrong`
+}
+
+/**
+ * Why the figure lines in this text would show as code instead of a picture, or ''.
+ * @param {unknown} text
+ */
+export function officialPyqFigureMarkupProblem(text) {
+  const t = String(text ?? '')
+  let at = t.indexOf('\\includegraphics')
+  while (at >= 0) {
+    const g = consumeIncludeGraphics(t, at)
+    if (!g?.url || t[g.end - 1] !== '}') return 'a picture line (\\includegraphics{…}) is cut off — it has no closing }'
+    const bad = figureUrlProblem(g.url)
+    if (bad) return bad
+    at = t.indexOf('\\includegraphics', g.end)
+  }
+  for (const m of t.matchAll(/!\[[^\]]*\]\(([^)]*)(\)?)/g)) {
+    if (!m[2]) return 'a picture line (![](…)) is cut off — it has no closing )'
+    const bad = figureUrlProblem(m[1])
+    if (bad) return bad
+  }
+  return ''
+}
+
+/**
+ * First broken picture line in a draft, e.g. "Question text: the picture address … is cut off".
+ * @param {{ text?: string, passageText?: string, options?: string[] }} draft
+ */
+export function officialPyqDraftFigureProblem(draft) {
+  const parts = [
+    ['Question text', draft?.text],
+    ['Passage', draft?.passageText],
+    ...(Array.isArray(draft?.options) ? draft.options : []).map((o, i) => [`Option ${LETTERS[i] ?? i + 1}`, o]),
+  ]
+  for (const [where, value] of parts) {
+    const bad = officialPyqFigureMarkupProblem(value)
+    if (bad) return `${where}: ${bad}`
+  }
+  return ''
+}
+
+/**
+ * Put a picture cropped from the original page into the draft. An option picture
+ * replaces that option; question / passage pictures go on a new line at the end.
+ * @param {{ text: string, passageText: string, options: string[] }} draft
+ * @param {string} target 'text' | 'passage' | option index
+ * @param {string} url
+ */
+export function insertOfficialPyqCropFigure(draft, target, url) {
+  const bad = figureUrlProblem(url)
+  if (bad) throw new Error(`The helper returned a bad picture address: ${bad}.`)
+  const fig = `\\includegraphics{${String(url).trim()}}`
+  if (target === 'text') return { ...draft, text: `${String(draft.text ?? '').trimEnd()}\n${fig}`.trim() }
+  if (target === 'passage') {
+    return { ...draft, passageText: `${String(draft.passageText ?? '').trimEnd()}\n${fig}`.trim() }
+  }
+  const options = (draft.options || []).slice()
+  options[Number(target)] = fig
+  return { ...draft, options }
+}
+
+const FIGURE_MARKUP = /\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[[^\]]*\]\([^)]+\)/g
+const SMILES_MARKUP = /<smiles>[\s\S]*?<\/smiles>/gi
+const FIGURE_PLACEHOLDER = /\[\s*figure\s*\d*\s*\]/gi
+const OPTION_LABEL = /^\s*(?:\(\s*[A-Da-d1-4]\s*\)|[A-Da-d][.)])\s*/
+
+/** @param {unknown} text */
+function withoutFigurePlaceholders(text) {
+  return String(text ?? '').replace(FIGURE_PLACEHOLDER, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/** @param {unknown} option */
+export function officialPyqOptionHasContent(option) {
+  return Boolean(withoutFigurePlaceholders(String(option ?? '').replace(OPTION_LABEL, '')))
+}
+
+/** @param {unknown} urls */
+function cropUrls(urls) {
+  return (Array.isArray(urls) ? urls : []).map((u) => String(u ?? '').trim()).filter((u) => u && isOriginalCropUrl(u) && !figureUrlProblem(u))
+}
+
+/**
+ * Pictures Compare cut out of the original page, by place. Only crop addresses are kept.
+ * @param {any} raw
+ * @returns {{ text: string[], passage: string[], options: string[][] }}
+ */
+export function officialPyqSuggestedFigures(raw) {
+  const options = (Array.isArray(raw?.options) ? raw.options : []).map(cropUrls)
+  while (options.length && !options[options.length - 1].length) options.pop()
+  return { text: cropUrls(raw?.text), passage: cropUrls(raw?.passage), options }
+}
+
+/** @param {{ text: string[], passage: string[], options: string[][] }} figures */
+function figureCount(figures) {
+  return figures.text.length + figures.passage.length + figures.options.reduce((n, o) => n + o.length, 0)
+}
+
+/**
+ * Does this compare result carry anything "Fix it now" can save?
+ * @param {any} compare card.originalCompare
+ */
+export function officialPyqCompareHasSuggestion(compare) {
+  return (
+    Boolean(withoutFigurePlaceholders(compare?.suggestedText)) ||
+    Boolean(withoutFigurePlaceholders(compare?.suggestedPassage)) ||
+    (Array.isArray(compare?.suggestedOptions) ? compare.suggestedOptions : []).some(officialPyqOptionHasContent) ||
+    figureCount(officialPyqSuggestedFigures(compare?.suggestedFigures)) > 0
+  )
+}
+
+/** @param {any} card */
+export function officialPyqDraftFromCard(card) {
+  return {
+    text: String(card?.text ?? card?.stem ?? ''),
+    passageText: String(card?.passageText ?? ''),
+    options: Array.isArray(card?.options) ? card.options.map((o) => String(o ?? '')) : [],
+    answerKey: formatOfficialPyqAnswerKey(card),
+    removeFigure: false,
+  }
+}
+
+/** A text-only correction must not lose a picture the card already shows. */
+function keepCardFigures(before, after) {
+  const next = withoutFigurePlaceholders(after)
+  const lost = (String(before ?? '').match(FIGURE_MARKUP) || []).filter((fig) => {
+    const url = fig.match(/https?:\/\/[^\s)}]+/)?.[0]
+    return !next.includes(url || fig)
+  })
+  return lost.length ? `${next}\n${lost.join('\n')}` : next
+}
+
+/**
+ * Crops replace the old pictures and SMILES of one place. Each [figure] in the corrected text takes
+ * the next crop (the last one takes the rest); without corrected text the crops go where the
+ * first old picture / SMILES was, else at the end.
+ * @param {string} before @param {string} suggested @param {string[]} urls
+ */
+function placeCropFigures(before, suggested, urls) {
+  const figs = urls.map((u) => `\\includegraphics{${u}}`)
+  let text = String(suggested ?? '').trim()
+  if (text) text = text.replace(FIGURE_MARKUP, '').replace(SMILES_MARKUP, '')
+  else {
+    let first = true
+    text = String(before ?? '').replace(new RegExp(`${FIGURE_MARKUP.source}|${SMILES_MARKUP.source}`, 'gi'), () => {
+      const mark = first ? '[figure]' : ''
+      first = false
+      return mark
+    })
+  }
+  const marks = (text.match(FIGURE_PLACEHOLDER) || []).length
+  if (!marks) text = `${text}\n[figure]`
+  let used = 0
+  let seen = 0
+  text = text.replace(/\s*\[\s*figure\s*\d*\s*\]\s*/gi, () => {
+    seen += 1
+    const take = seen === Math.max(marks, 1) ? figs.slice(used) : figs.slice(used, used + 1)
+    used += take.length
+    return take.length ? `\n${take.join('\n')}\n` : ' '
+  })
+  return text.replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/**
+ * Draft from a Compare suggestion: corrected words from the page, and pictures cut out of the
+ * original page where the card had broken SMILES / pictures. Nothing is drawn by Gemini.
+ * @param {any} card
+ * @param {{ suggestedText?: string, suggestedOptions?: string[], suggestedPassage?: string, suggestedFigures?: any }} compare
+ */
+export function officialPyqDraftFromSuggestion(card, compare) {
+  const base = officialPyqDraftFromCard(card)
+  const figures = officialPyqSuggestedFigures(compare?.suggestedFigures)
+  const text = String(compare?.suggestedText ?? '').trim()
+  const passage = String(compare?.suggestedPassage ?? '').trim()
+  const opts = Array.isArray(compare?.suggestedOptions) ? compare.suggestedOptions : []
+  const count = Math.max(base.options.length, opts.length, figures.options.length)
+  /** Gemini sends "(A)" or "" for a drawing it cannot write; the card's own option stays then. */
+  const options = Array.from({ length: count }, (_, i) => {
+    const suggested = String(opts[i] ?? '').replace(OPTION_LABEL, '')
+    const crops = figures.options[i] || []
+    if (crops.length) return placeCropFigures('', officialPyqOptionHasContent(suggested) ? suggested : '[figure]', crops)
+    return officialPyqOptionHasContent(suggested) ? keepCardFigures(base.options[i], suggested) : String(base.options[i] ?? '')
+  })
+  const fix = (before, suggested, crops) => {
+    if (crops.length) return placeCropFigures(before, withoutFigurePlaceholders(suggested) ? suggested : '', crops)
+    return withoutFigurePlaceholders(suggested) ? keepCardFigures(before, suggested) : before
+  }
+  return {
+    ...base,
+    text: fix(base.text, text, figures.text),
+    passageText: fix(base.passageText, passage, figures.passage),
+    options,
+  }
+}
 
 /** @param {any} q */
 export function officialPyqCardHasAnswerKey(q) {
@@ -80,6 +352,14 @@ export function parseOfficialPyqAnswerKey(raw, card) {
   return { ok: false, error: 'Answer key: use option letters (A or A, C) or a number.' }
 }
 
+/** An integer / numerical card has no options; all-blank option boxes only trip the quality check. @param {any} card */
+function dropBlankNumericOptions(card) {
+  const type = String(card?.questionType ?? '').toLowerCase()
+  if (!['integer', 'numerical'].includes(type) || !Array.isArray(card.options)) return card
+  if (!card.options.length || card.options.some((o) => String(o ?? '').trim())) return card
+  return { ...card, options: [] }
+}
+
 /** @param {Record<string, unknown>} obj */
 function dropUndefined(obj) {
   const out = { ...obj }
@@ -138,7 +418,14 @@ export function saveOfficialPyqCardEdit(paperId, index, draft) {
   const card = questions[index]
   if (!card) return { ok: false, error: 'Question not found on this paper.' }
   if (!String(draft.text ?? '').trim()) return { ok: false, error: 'Question text cannot be empty.' }
-  let next = applyOfficialPyqCardDraft(card, draft)
+  const figureProblem = officialPyqDraftFigureProblem(draft)
+  if (figureProblem) {
+    return {
+      ok: false,
+      error: `Not saved. ${figureProblem}. Put the picture in again with "Crop a picture from this page", or delete that whole line.`,
+    }
+  }
+  let next = dropBlankNumericOptions(applyOfficialPyqCardDraft(card, draft))
   if (officialPyqCardHasAnswerKey(card) || String(draft.answerKey ?? '').trim()) {
     const parsed = parseOfficialPyqAnswerKey(draft.answerKey ?? '', card)
     if (!parsed.ok) return parsed
@@ -161,8 +448,9 @@ export function saveOfficialPyqCardEdit(paperId, index, draft) {
     adminApproved: undefined,
     adminApprovedAt: undefined,
     originalCompare: undefined,
+    editSource: draft.source ? String(draft.source) : undefined,
   })
-  questions[index] = next
+  questions[index] = withOfficialPyqEditHistory(card, next)
   if (passageChanged) {
     for (const i of officialPyqPassageGroupIndexes(questions, index)) {
       if (i === index || !questions[i]) continue
@@ -172,7 +460,7 @@ export function saveOfficialPyqCardEdit(paperId, index, draft) {
       if (next.passageText) mate.passageText = next.passageText
       else delete mate.passageText
       mate.adminEditedAt = Math.max(editedAt, (Number(questions[i].adminEditedAt) || 0) + 1)
-      questions[i] = mate
+      questions[i] = withOfficialPyqEditHistory(questions[i], mate)
     }
   }
   const saved = updateOfficialPyqPendingPaper(paper.id, { questions })
@@ -264,8 +552,129 @@ export function approveOfficialPyqCard(paperId, index) {
   else delete next.passageText
   const figure = String(shown.healed?.questionImage ?? '').trim()
   if (figure) next.questionImage = figure
-  questions[index] = next
+  questions[index] = withOfficialPyqEditHistory(card, next)
   return saveOneCard(paper, questions, index)
+}
+
+/** Save an undo, then re-run the paper's quality check so the red banner updates. */
+function saveUndoneCard(paper, questions, index) {
+  const saved = updateOfficialPyqPendingPaper(paper.id, { questions, releaseAdminEditIndexes: [index] })
+  if (!saved) return { ok: false, error: 'Could not save — browser storage may be full.' }
+  let checked = saved
+  try {
+    checked = persistOfficialPyqQualityRun(saved) || saved
+  } catch {
+    checked = recheckOfficialPyqCardQuality(paper.id, index) || saved
+  }
+  notifyOfficialPyqCardChanged(paper.id, index)
+  return { ok: true, paper: checked, card: (checked.questions || saved.questions || [])[index] || questions[index] }
+}
+
+/**
+ * Put back the version of ONE card from before its last admin save
+ * (Edit question, crop picture, approve, or Go back to the scanned version).
+ * @param {string} paperId
+ * @param {number} index 0-based card index
+ */
+export function undoOfficialPyqCardEdit(paperId, index) {
+  const found = pendingCardFor(paperId, index)
+  if (found.error) return { ok: false, error: found.error }
+  const { paper, questions, card } = found
+  const history = Array.isArray(card.editHistory) ? card.editHistory : []
+  const last = history[0]
+  if (!last?.card || typeof last.card !== 'object') {
+    return { ok: false, error: 'There is no earlier version of this question to go back to.' }
+  }
+  const next = cardFromSnapshot(card, last.card)
+  delete next.originalCompare
+  if (history.length > 1) next.editHistory = history.slice(1)
+  else delete next.editHistory
+  if (next.adminEdited === true) {
+    next.adminEditedAt = Math.max(Date.now(), (Number(card.adminEditedAt) || 0) + 1)
+  }
+  questions[index] = next
+  return { ...saveUndoneCard(paper, questions, index), restoredScan: next.adminEdited !== true }
+}
+
+/** @param {unknown} text */
+function scanWords(text) {
+  return new Set(
+    String(text ?? '')
+      .replace(/<smiles>[\s\S]*?<\/smiles>/gi, ' ')
+      .replace(/\\[a-zA-Z]+/g, ' ')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length > 3),
+  )
+}
+
+/** The scan item for this card: same printed number and subject, else the closest words. */
+function scanItemForCard(items, card) {
+  const mine = scanWords(`${card?.passageText ?? ''} ${card?.text ?? ''}`)
+  const overlap = (item) => {
+    const theirs = scanWords(item?.text)
+    if (!mine.size || !theirs.size) return 0
+    let same = 0
+    for (const w of theirs) if (mine.has(w)) same += 1
+    return same / Math.max(theirs.size, 1)
+  }
+  const n = Number(card?.printedNumber)
+  const subject = String(card?.subject ?? '')
+  const numbered = items.filter(
+    (it) => n > 0 && Number(it?.printedNumber) === n && (!subject || !it?.subject || String(it.subject) === subject),
+  )
+  const pool = numbered.length ? numbered : items
+  let best = null
+  let bestScore = numbered.length === 1 ? -1 : 0.5
+  for (const it of pool) {
+    const score = overlap(it)
+    if (score > bestScore) {
+      best = it
+      bestScore = score
+    }
+  }
+  return best
+}
+
+/**
+ * "Go back to the scanned version": rebuild ONE card from the paper's stored
+ * scan text and drop the admin lock, so re-parse / heal / quality fix look
+ * after it again. The admin version stays in the edit history (Undo brings it back).
+ * @param {string} paperId
+ * @param {number} index 0-based card index
+ */
+export function restoreOfficialPyqCardFromScan(paperId, index) {
+  const found = pendingCardFor(paperId, index)
+  if (found.error) return { ok: false, error: found.error }
+  const { paper, questions, card } = found
+  const ocr = getOfficialPyqPendingOcrText(paper.id) || String(paper.preparedText ?? '')
+  if (ocr.length < 80) return { ok: false, error: 'This paper has no stored scan text to rebuild the question from.' }
+  let items = []
+  try {
+    items = paperItemsFromMathpixOcr(ocr)
+  } catch {
+    items = []
+  }
+  const item = scanItemForCard(Array.isArray(items) ? items : [], card)
+  if (!item || !String(item.text ?? '').trim()) {
+    return { ok: false, error: 'Could not find this question in the stored scan. Use Edit question instead.' }
+  }
+  const next = dropBlankNumericOptions({
+    ...card,
+    text: String(item.text),
+    options: Array.isArray(item.options) ? item.options.map((o) => String(o ?? '')) : [],
+  })
+  if (Object.prototype.hasOwnProperty.call(card, 'stem')) next.stem = next.text
+  if (card.passageSource === 'admin_edit') {
+    if (String(item.passageText ?? '').trim()) next.passageText = String(item.passageText)
+    else delete next.passageText
+    delete next.passageSource
+  }
+  for (const field of ['adminEdited', 'adminEditedAt', 'adminApproved', 'adminApprovedAt', 'originalCompare']) {
+    delete next[field]
+  }
+  questions[index] = withOfficialPyqEditHistory(card, next)
+  return saveUndoneCard(paper, questions, index)
 }
 
 /**

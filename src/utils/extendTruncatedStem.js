@@ -16,7 +16,7 @@
 import { findFirstOptionsBlockStart } from './mcqOptionMarkers.js'
 import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
 import { extractLatexItemizeMcq, extractLatexTabularMcq } from './mathpixQuestionSplit.js'
-import { restoreMissingOptionGridGraphs } from './mathpixMedia.js'
+import { isOriginalCropUrl, restoreMissingOptionGridGraphs } from './mathpixMedia.js'
 import { repairScanStructureCodes } from './smilesDisplay.js'
 import {
   parsePaperSectionMap,
@@ -544,7 +544,8 @@ function hasListTwoEntries(text) {
   if (last >= 0) {
     const after = t.slice(last)
     const listIAt = after.search(/(?:List|Column)\s*[-–]?\s*I(?!I)\b/i)
-    const numAt = after.search(/\(\s*[1-5]\s*\)/)
+    const romanI = countListMarkers(t, ['I', 'II', 'III', 'IV']) >= 2
+    const numAt = after.search(romanI ? /\(\s*(?:[1-5]|[PQRST])\s*\)/ : /\(\s*[1-5]\s*\)/)
     if (numAt >= 0 && (listIAt < 0 || numAt < listIAt)) return true
   }
   if (
@@ -670,7 +671,7 @@ export function matchQuestionMissingListI(q) {
   if (looksLikeMatchingListStem(t) && !hasListIEntries(t, q?.options)) return true
   if (
     /match\s+(?:the|each)\b/i.test(t) &&
-    /(?:List|Column)\s*[-–]?\s*I(?!I)/i.test(t) &&
+    /(?:List|Column)\s*[-–]?\s*I(?!I)\b/i.test(t) &&
     countListMarkers(t, ['P', 'Q', 'R', 'S']) < 2 &&
     countListMarkers(t, ['A', 'B', 'C', 'D']) < 3
   ) {
@@ -1018,6 +1019,8 @@ function dropStolenFigures(stem, source, printedNumber, map, { passage = false }
   const spanUrls = span ? new Set(extractMathpixImageUrls(span)) : null
   let next = t
   for (const url of urls) {
+    // A picture cropped from this card's original page is never in the OCR and never stolen.
+    if (isOriginalCropUrl(url)) continue
     // Only drop when this card's OCR span clearly owns other figures and not this URL.
     if (span && span.length >= 80 && spanUrls && spanUrls.size > 0 && !spanUrls.has(url)) {
       next = stripUrlFromStem(next, url)
@@ -1027,7 +1030,7 @@ function dropStolenFigures(stem, source, printedNumber, map, { passage = false }
     if (figureSubjectConflictsStem(t, ctx)) next = stripUrlFromStem(next, url)
   }
   next = next.replace(/\n{3,}/g, '\n\n').trim()
-  const kept = extractMathpixImageUrls(next)
+  const kept = extractMathpixImageUrls(next).filter((url) => !isOriginalCropUrl(url))
   if (!kept.length) return next
   if (stemMentionsFigure(next)) return next
   if (kept.length >= 2 && mathpixFiguresSupplyListI(next)) return next
@@ -1049,7 +1052,8 @@ function dropStolenFigures(stem, source, printedNumber, map, { passage = false }
       return owned.replace(/\n{3,}/g, '\n\n').trim()
     }
   }
-  return stripMathpixImageMarkup(next)
+  if (kept.length === extractMathpixImageUrls(next).length) return stripMathpixImageMarkup(next)
+  return kept.reduce((s, url) => stripUrlFromStem(s, url), next).replace(/\n{3,}/g, '\n\n').trim()
 }
 
 function spliceListIIntoStem(stem, listIBlock) {
@@ -1747,6 +1751,20 @@ export function matchMappingOptionIsCutOff(opt) {
   ) {
     return false
   }
+  if (
+    ['I', 'II', 'III', 'IV'].every((roman) =>
+      new RegExp(`(?:^|[^A-Za-z])${roman}\\s*\\)?\\s*(?:\\\\rightarrow|→|->)`).test(t),
+    )
+  ) {
+    return false
+  }
+  if (
+    ['I', 'II', 'III', 'IV'].every((roman) =>
+      new RegExp(`(?:^|[^A-Za-z])${roman}\\s*\\)?\\s*(?:\\\\rightarrow|→|->)`).test(t),
+    )
+  ) {
+    return false
+  }
   return /\(\s*P\s*\)/.test(t) && /(?:\\rightarrow|→|->)/.test(t)
 }
 
@@ -2034,6 +2052,8 @@ function restoreTabularOptionsFromOcr(stem, options, source) {
   const tab = extractLatexTabularMcq(window)
   if (!tab || tab.options.length < 2) return opts
   const next = tab.options.slice(0, 4).map((o) => String(o ?? ''))
+  // "options (A), (B), (C) and (D)" in a section instruction leaves only commas and "and".
+  if (next.filter((o) => /[\p{L}\d\\<]/u.test(o.replace(/^\s*(?:and|or)\s*$/i, ''))).length < 2) return opts
   while (next.length < 4) next.push('')
   return next
 }
@@ -2154,7 +2174,7 @@ export function healUploadQuestionCard(q, source, map) {
   options = (Array.isArray(glued.options) ? glued.options : []).map((o) =>
     stripTrailingPyqSectionHeader(ensureOptionMathDelimiters(o)),
   )
-  options = restoreTabularOptionsFromOcr(text, options, src)
+  if (!/^(?:integer|numerical)$/.test(String(q.questionType ?? ''))) options = restoreTabularOptionsFromOcr(text, options, src)
   options = dropForeignOptionFigures(options, text, src)
   options = dropLoneMatchArrowDebris(options, text, src)
   options = dropSmilesFragmentsFromMatchOptions(options, text)
@@ -2470,6 +2490,7 @@ function mergeTwoQuestionCards(prev, next) {
 
 function matchingListQuestionType(prev, next, joinedStem, options) {
   const n = (Array.isArray(options) ? options : []).filter((o) => String(o ?? '').trim()).length
+  if (prev?.typeSource === 'admin_facts') return prev.questionType
   if (n >= 2 && hasListIEntries(joinedStem)) {
     const prevType = String(prev?.questionType || next?.questionType || 'single_correct')
     return prevType === 'matrix_match' ? 'single_correct' : prevType
@@ -2913,7 +2934,10 @@ export function extendOfficialPyqHealCard(q, source) {
     text,
     options,
     questionType:
-      nOpts >= 2 && hasListIEntries(text) && q.questionType === 'matrix_match'
+      nOpts >= 2 &&
+      q.typeSource !== 'admin_facts' &&
+      hasListIEntries(text) &&
+      q.questionType === 'matrix_match'
         ? 'single_correct'
         : q.questionType,
   }

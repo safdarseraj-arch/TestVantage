@@ -18,12 +18,19 @@ import {
   OFFICIAL_PYQ_CARD_CHANGED_EVENT,
   applyOfficialPyqCardDraft,
   approveOfficialPyqCard,
-  formatOfficialPyqAnswerKey,
+  insertOfficialPyqCropFigure,
   officialPyqCardForAdmin,
   officialPyqCardHasAnswerKey,
+  officialPyqCompareHasSuggestion,
+  officialPyqDraftFigureProblem,
+  officialPyqDraftFromCard,
+  officialPyqDraftFromSuggestion,
   officialPyqPassageGroupIndexes,
+  officialPyqSuggestedFigures,
+  restoreOfficialPyqCardFromScan,
   saveOfficialPyqCardEdit,
   unapproveOfficialPyqCard,
+  undoOfficialPyqCardEdit,
 } from '../utils/officialPyqCardEdit.js'
 
 const OfficialPyqPreviewMath = lazy(() => import('../pages/OfficialPyqPreviewMath.jsx'))
@@ -371,6 +378,7 @@ const DIFF_LABELS = {
   missing_figure: 'Missing figure',
   wrong_passage: 'Passage',
   extra_card: 'Not a question on the original',
+  card_problem: 'Problem on the card',
   other: 'Difference',
 }
 
@@ -380,59 +388,49 @@ function cardSyncKey(q) {
     q?.text ?? '',
     q?.passageText ?? '',
     q?.options ?? [],
+    q?.adminEdited === true,
     q?.adminEditedAt ?? 0,
     q?.adminApprovedAt ?? 0,
     q?.originalCompare?.checkedAt ?? 0,
+    Array.isArray(q?.editHistory) ? q.editHistory.length : 0,
   ])
 }
 
-/** @param {any} card */
-function draftFromCard(card) {
-  const options = Array.isArray(card?.options) ? card.options.map((o) => String(o ?? '')) : []
-  return {
-    text: String(card?.text ?? card?.stem ?? ''),
-    passageText: String(card?.passageText ?? ''),
-    options,
-    answerKey: formatOfficialPyqAnswerKey(card),
-    removeFigure: false,
-  }
+const draftFromCard = officialPyqDraftFromCard
+const draftFromSuggestion = officialPyqDraftFromSuggestion
+
+const FIGURE_THUMB_STYLE = {
+  maxHeight: '72px',
+  maxWidth: '240px',
+  background: '#fff',
+  border: '1px solid #ddd',
+  marginRight: '0.4rem',
+  verticalAlign: 'middle',
 }
 
-const FIGURE_MARKUP = /\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[[^\]]*\]\([^)]+\)/g
-
-/** The compare reply is text only, so a picture the card already shows must carry over. */
-function keepCardFigures(before, after) {
-  const next = String(after ?? '')
-  const lost = (String(before ?? '').match(FIGURE_MARKUP) || []).filter((fig) => {
-    const url = fig.match(/https?:\/\/[^\s)}]+/)?.[0]
-    return !next.includes(url || fig)
-  })
-  return lost.length ? `${next}\n${lost.join('\n')}` : next
-}
-
-/** @param {unknown} option */
-function optionHasContent(option) {
-  return Boolean(String(option ?? '').replace(/^\s*(?:\(\s*[A-Da-d1-4]\s*\)|[A-Da-d][.)])\s*/, '').trim())
-}
-
-/** @param {any} card @param {{ suggestedText?: string, suggestedOptions?: string[], suggestedPassage?: string }} compare */
-function draftFromSuggestion(card, compare) {
-  const base = draftFromCard(card)
-  const text = String(compare?.suggestedText ?? '').trim()
-  const passage = String(compare?.suggestedPassage ?? '').trim()
-  const opts = Array.isArray(compare?.suggestedOptions) ? compare.suggestedOptions : []
-  const count = Math.max(base.options.length, opts.length)
-  /** Gemini sends "(A)" or "" for a drawing it cannot write; the card's own option stays then. */
-  const options = Array.from({ length: count }, (_, i) => {
-    const suggested = String(opts[i] ?? '')
-    return optionHasContent(suggested) ? keepCardFigures(base.options[i], suggested) : String(base.options[i] ?? '')
-  })
-  return {
-    ...base,
-    text: text ? keepCardFigures(base.text, text) : base.text,
-    passageText: passage ? keepCardFigures(base.passageText, passage) : base.passageText,
-    options,
-  }
+/** Pictures Compare cut out of the original page, so the admin sees them before Fix it now. @param {{ figures: any }} props */
+function SuggestedFigures({ figures }) {
+  const groups = [
+    { label: 'Question', urls: figures.text },
+    { label: 'Passage', urls: figures.passage },
+    ...figures.options.map((urls, i) => ({ label: `Option ${String.fromCharCode(65 + i)}`, urls })),
+  ].filter((g) => g.urls.length)
+  if (!groups.length) return null
+  return (
+    <div data-testid="official-pyq-compare-figures">
+      <p style={{ margin: '0.4rem 0 0.2rem' }}>Pictures cut from the original page (Fix it now puts them in):</p>
+      {groups.map((g) => (
+        <div key={g.label} style={{ margin: '0.2rem 0' }}>
+          <span className="form-hint" style={{ display: 'inline-block', minWidth: '5.5rem' }}>
+            {g.label}:
+          </span>
+          {g.urls.map((url) => (
+            <img key={url} src={url} alt={`${g.label} picture from the original page`} style={FIGURE_THUMB_STYLE} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 /**
@@ -494,10 +492,8 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
   const hasFigure = Boolean(String(card?.questionImage ?? '').trim())
   const compare = card?.originalCompare
   const goTo = index + 1
-  const hasSuggestion =
-    Boolean(String(compare?.suggestedText ?? '').trim()) ||
-    Boolean(String(compare?.suggestedPassage ?? '').trim()) ||
-    (compare?.suggestedOptions || []).some(optionHasContent)
+  const hasSuggestion = officialPyqCompareHasSuggestion(compare)
+  const suggestedFigures = officialPyqSuggestedFigures(compare?.suggestedFigures)
   const useSuggestion = compare?.verdict === 'differs' && hasSuggestion
   const hasPassage = Boolean(
     String(card?.passageText ?? '').trim() || card?.passageId || card?.passageGroup || draft.passageText,
@@ -519,21 +515,66 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     ...Array.from({ length: optionCount }, (_, i) => ({ id: String(i), label: `Option ${String.fromCharCode(65 + i)}` })),
   ]
 
-  /** A cropped option picture replaces that option; question / passage pictures are added at the end. */
   function onCropPicked(target, url) {
-    const fig = `\\includegraphics{${url}}`
-    const put = (d) => {
-      if (target === 'text') return { ...d, text: `${d.text.trimEnd()}\n${fig}`.trim() }
-      if (target === 'passage') return { ...d, passageText: `${d.passageText.trimEnd()}\n${fig}`.trim() }
-      const options = d.options.slice()
-      options[Number(target)] = fig
-      return { ...d, options }
-    }
     const where = cropTargets.find((t) => t.id === target)?.label || 'the card'
-    if (editing) setDraft(put)
-    else openEditor(put(draftFromCard(adminCard || officialPyqCardForAdmin(paperId, card))))
-    setNote(`Picture from the original page put in ${where}. Check the live preview, then click Save.`)
+    try {
+      insertOfficialPyqCropFigure({ text: '', passageText: '', options: [] }, 'text', url)
+      if (editing) setDraft((d) => insertOfficialPyqCropFigure(d, target, url))
+      else openEditor(insertOfficialPyqCropFigure(draftFromCard(adminCard || officialPyqCardForAdmin(paperId, card)), target, url))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not put the picture in.')
+      return
+    }
+    setNote(
+      `Picture from the original page put in ${where}. Do not change the \\includegraphics{…} line by hand — check the live preview, then click Save.`,
+    )
   }
+
+  const historyCount = Array.isArray(card.editHistory) ? card.editHistory.length : 0
+
+  /** @param {{ ok: boolean, error?: string, paper?: any, restoredScan?: boolean }} result @param {string} done */
+  function afterUndo(result, done) {
+    if (!result.ok) {
+      setError(result.error || 'Could not undo.')
+      return
+    }
+    const passed = !(result.paper?.localQuality?.failedGoTo || []).includes(goTo)
+    setNote(`${done} Quality check re-run: ${passed ? 'this card passed' : 'this card still needs a look'}. Not published.`)
+    onSaved?.(result.paper?.questions?.[index] ?? card)
+  }
+
+  function onUndo() {
+    setError('')
+    if (!window.confirm(`Undo the last change to Q${goTo}? The question goes back to how it was before that save.`)) return
+    const result = undoOfficialPyqCardEdit(paperId, index)
+    afterUndo(
+      result,
+      result.restoredScan
+        ? `Q${goTo} is back to the scanned version. Re-parse and auto-heal can fix it again.`
+        : `Undid the last change to Q${goTo}.`,
+    )
+  }
+
+  function onRestoreScan() {
+    setError('')
+    if (
+      !window.confirm(
+        `Go back to the scanned version of Q${goTo}? Your edits on this question are replaced by the text from the stored scan, and re-parse / auto-heal can fix it again. (You can Undo this.)`,
+      )
+    ) {
+      return
+    }
+    afterUndo(restoreOfficialPyqCardFromScan(paperId, index), `Q${goTo} is back to the scanned version.`)
+  }
+
+  const draftFigureProblem = editing ? officialPyqDraftFigureProblem(draft) : ''
+  const flaggedNow = (() => {
+    try {
+      return (getOfficialPyqPendingPreviewPaper(paperId)?.localQuality?.failedGoTo || []).map(Number).includes(goTo)
+    } catch {
+      return false
+    }
+  })()
 
   function onCancel() {
     setEditing(false)
@@ -556,6 +597,29 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     const shared = result.passageShared?.length ? ` The passage was also saved on Q${result.passageShared.join(', Q')}.` : ''
     setNote(
       `Saved Q${goTo}.${shared} Quality check re-run: ${passed ? 'this card passed' : 'this card still needs a look'}. Not published.`,
+    )
+    onSaved?.(result.card)
+  }
+
+  function onUseCorrection() {
+    setError('')
+    const nextDraft = draftFromSuggestion(officialPyqCardForAdmin(paperId, card), compare)
+    const problem = officialPyqDraftFigureProblem(nextDraft)
+    if (problem) {
+      openEditor(nextDraft, true)
+      setError(problem)
+      return
+    }
+    const result = saveOfficialPyqCardEdit(paperId, index, nextDraft)
+    if (!result.ok) {
+      setError(result.error || 'Could not save the corrected version.')
+      return
+    }
+    const passed = !(result.paper?.localQuality?.failedGoTo || []).includes(goTo)
+    setNote(
+      `Fixed Q${goTo} with the corrected version from the original paper. Quality check re-run: ${
+        passed ? 'this card passed' : 'this card still needs a look'
+      }. Not published. Wrong? Click Undo last edit.`,
     )
     onSaved?.(result.card)
   }
@@ -623,15 +687,15 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
       doneNote =
         verdict === 'matches'
           ? `Compare finished at ${at}: Q${goTo} matches the original paper.`
-          : verdict === 'error'
+          : out.result?.textMatches || out.result?.text_matches
+            ? `Compare finished at ${at}: the words of Q${goTo} match the original, but the card still has a problem on screen — see the list above. Fix it before approving.`
+            : verdict === 'error'
             ? `Compare stopped at ${at}: Gemini could not check Q${goTo}. ${
                 String(out.result?.error ?? '').trim() || 'Try again.'
               }`
             : `Compare finished at ${at}: Q${goTo} differs from the original — see the list above.${
-                String(out.result?.suggested_text ?? '').trim() ||
-                String(out.result?.suggested_passage ?? '').trim() ||
-                (out.result?.suggested_options || []).some((o) => String(o ?? '').trim())
-                  ? ' Click Edit question to see the corrected version.'
+                officialPyqCompareHasSuggestion(out.card?.originalCompare)
+                  ? ' Click Fix it now to save the corrected version, or Edit question to check it first.'
                   : ''
               }`
     } catch (err) {
@@ -653,17 +717,23 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
       ) : card.adminEdited ? (
         <p className="form-hint official-pyq-admin-edited" data-testid="official-pyq-admin-edited">
           <span className="bank-review-badge">Edited by admin</span> Re-parse, quality fix, and auto-heal
-          will not change this card.
+          will not change this card.{' '}
+          {historyCount ? 'Undo last edit puts back the version before your last save.' : 'Go back to the scanned version undoes your edits.'}
         </p>
       ) : null}
 
       {compare ? (
         <div
-          className={compare.verdict === 'differs' ? 'upload-error' : 'form-hint'}
+          className={compare.verdict === 'differs' || (compare.verdict === 'matches' && flaggedNow) ? 'upload-error' : 'form-hint'}
           data-testid="official-pyq-compare-result"
           role="status"
         >
-          {compare.verdict === 'matches' ? (
+          {compare.verdict === 'matches' && flaggedNow ? (
+            <span data-testid="official-pyq-compare-flagged">
+              The words matched the original paper{compare.pages?.length ? ` (page ${compare.pages[0]})` : ''}, but the
+              quality check still flags Q{goTo} — the card has a problem on screen. Fix it before approving.
+            </span>
+          ) : compare.verdict === 'matches' ? (
             <span>
               Matches the original paper{compare.pages?.length ? ` (page ${compare.pages[0]})` : ''}.
               {compare.checkedAt
@@ -677,8 +747,9 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
           ) : (
             <>
               <strong>
-                Q{goTo} differs from the original paper
-                {compare.pages?.length ? ` (page ${compare.pages[0]})` : ''}:
+                {compare.textMatches
+                  ? `The words of Q${goTo} match the original paper${compare.pages?.length ? ` (page ${compare.pages[0]})` : ''}, but the card still has a problem:`
+                  : `Q${goTo} differs from the original paper${compare.pages?.length ? ` (page ${compare.pages[0]})` : ''}:`}
               </strong>
               <ul className="official-pyq-compare-diffs">
                 {(compare.differences || []).map((d, i) => (
@@ -687,9 +758,10 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
                   </li>
                 ))}
               </ul>
+              <SuggestedFigures figures={suggestedFigures} />
               {hasSuggestion ? (
                 <p data-testid="official-pyq-open-suggestion">
-                  Click Edit question — the corrected version is filled in for you.
+                  Click Fix it now to save the corrected version (you can Undo), or Edit question to check it first.
                 </p>
               ) : null}
             </>
@@ -719,6 +791,17 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
               Approve this question
             </button>
           )}
+          {useSuggestion && !card.adminApproved ? (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              data-testid="official-pyq-use-correction"
+              title="Save the corrected version that Compare read from the original paper. Undo last edit puts it back."
+              onClick={onUseCorrection}
+            >
+              Fix it now
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -734,6 +817,27 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
           >
             {useSuggestion ? 'Edit question (corrected)' : 'Edit question'}
           </button>
+          {historyCount ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              data-testid="official-pyq-undo-edit"
+              title="Put back the version of this question from before the last save."
+              onClick={onUndo}
+            >
+              Undo last edit
+            </button>
+          ) : card.adminEdited ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              data-testid="official-pyq-restore-scan"
+              title="Throw away the admin edits and rebuild this question from the stored scan."
+              onClick={onRestoreScan}
+            >
+              Go back to the scanned version
+            </button>
+          ) : null}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -834,11 +938,17 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
               <OfficialPyqPreviewMath q={previewCard} />
             </Suspense>
           </div>
+          {draftFigureProblem ? (
+            <p className="upload-error" data-testid="official-pyq-edit-figure-problem">
+              {draftFigureProblem}. Put the picture in again with the crop tool, or delete that whole line.
+            </p>
+          ) : null}
           <div className="official-pyq-actions">
             <button
               type="button"
               className="btn btn-primary btn-sm"
               data-testid="official-pyq-edit-save"
+              disabled={Boolean(draftFigureProblem)}
               onClick={onSave}
             >
               Save

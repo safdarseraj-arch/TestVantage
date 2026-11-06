@@ -33,6 +33,7 @@ export function prepareAndCheckSolution(raw) {
     quality = localOfficialPyqQualityCheck({
       questions: [card],
       preparedText: source,
+      officialPyq: false,
     })
   } catch (err) {
     return {

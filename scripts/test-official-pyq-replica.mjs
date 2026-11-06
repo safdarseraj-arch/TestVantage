@@ -247,8 +247,10 @@ assert.ok(source.slice(cloneAt, cloneAt + 1100).includes('HYBRID_SOLUTION_INSTRU
 assert.ok(source.includes('def official_replica_prompt'))
 assert.ok(source.includes('avoid_texts'))
 assert.ok(source.includes('Do not paste the parent stem unchanged.'))
-assert.ok(source.slice(fillAt, fillAt + 1200).includes('HYBRID_SOLUTION_INSTRUCTION'))
-assert.ok(source.slice(fillAt, fillAt + 1400).includes('If the stored solution is a hint or a story'))
+assert.ok(source.slice(fillAt, fillAt + 1200).includes('OFFICIAL_PYQ_SOLUTION_INSTRUCTION'))
+assert.ok(source.slice(fillAt, fillAt + 1400).includes('If the stored solution is a hint, a story, or longer'))
+assert.ok(source.includes("Last line: 'Answer: (X)'"))
+assert.ok(source.includes('_PUBLISHED_FILL_TIMEOUT_MS'))
 assert.ok(source.includes('Do not rewrite the question stem'))
 
 const asked = []
@@ -389,5 +391,143 @@ const approveUi = fs.readFileSync(
   'utf8',
 )
 assert.ok(approveUi.includes("sub_bank_type = 'similar_pyq'"))
+
+const { officialPyqSolutionProblem, HYBRID_FILL_PART_SIZE } = await import('../src/utils/officialPyqReplica.js')
+const { applyHybridPatchToPendingCard, fillOfficialPyqPendingPaperPartByPart } = await import(
+  '../src/utils/officialPyqPendingFill.js'
+)
+const GOOD_SOLUTION = 'Use $\\det(kA)=k^3\\det A$.\n$\\det(2A)=8\\times 2=16$.\nAnswer: (B)'
+assert.equal(HYBRID_FILL_PART_SIZE, 2)
+assert.equal(officialPyqSolutionProblem(GOOD_SOLUTION), '')
+assert.ok(officialPyqSolutionProblem('Hint: think about the determinant of a scaled matrix.'))
+assert.ok(officialPyqSolutionProblem("Let us start by recalling what a determinant is. " + 'x'.repeat(40)))
+assert.ok(officialPyqSolutionProblem('x '.repeat(1000)))
+assert.ok(officialPyqSolutionProblem(''))
+
+let inFlight = 0
+let maxInFlight = 0
+const appliedOrder = []
+const partRows = await fillPaperQuestionByQuestion(
+  [1, 2, 3, 4, 5].map((n) => ({ text: `Stem number ${n}.`, options: ['1', '2', '3', '4'] })),
+  async (question) => {
+    inFlight += 1
+    maxInFlight = Math.max(maxInFlight, inFlight)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    inFlight -= 1
+    return { correct_answer: 'B', step_by_step_solution: GOOD_SOLUTION, chapter: question.text }
+  },
+  { concurrency: 2, onApplied: (row) => appliedOrder.push(row.index) },
+)
+assert.equal(maxInFlight, 2)
+assert.deepEqual(appliedOrder, [0, 1, 2, 3, 4])
+assert.equal(partRows.filter((row) => row.patch).length, 5)
+
+let hintCalls = 0
+const [retried] = await fillPaperQuestionByQuestion([{ text: 'Hint retry stem.' }], async () => {
+  hintCalls += 1
+  return {
+    correct_answer: 'B',
+    step_by_step_solution: hintCalls === 1 ? 'Hint: think about scaling each row.' : GOOD_SOLUTION,
+  }
+})
+assert.equal(hintCalls, 2)
+assert.equal(retried.needsLook, false)
+assert.equal(retried.patch.solution, GOOD_SOLUTION)
+const [essay] = await fillPaperQuestionByQuestion([{ text: 'Essay stem.' }], async () => ({
+  correct_answer: 'B',
+  step_by_step_solution: 'Long words. '.repeat(200),
+}))
+assert.equal(essay.needsLook, true)
+assert.ok(/essay/i.test(essay.problem))
+
+const stopCtl = new AbortController()
+let stopCalls = 0
+const stopRows = await fillPaperQuestionByQuestion(
+  [1, 2, 3, 4].map((n) => ({ text: `Stop stem ${n}.` })),
+  async () => {
+    stopCalls += 1
+    stopCtl.abort()
+    return { correct_answer: 'A', step_by_step_solution: GOOD_SOLUTION }
+  },
+  { concurrency: 2, signal: stopCtl.signal, skip: (q) => q.text.endsWith('2.') },
+)
+assert.equal(stopCalls, 1)
+assert.equal(stopRows.length, 2)
+assert.equal(stopRows[1].skipped, true)
+
+const keptCard = applyHybridPatchToPendingCard(
+  { text: 'Q', subject: 'physics', questionType: 'integer', correctInteger: 4, answerSource: 'from_paper' },
+  { subject: 'chemistry', questionType: 'mcq', chapter: 'Kinematics', correctInteger: 7, solution: GOOD_SOLUTION },
+)
+assert.equal(keptCard.subject, 'physics')
+assert.equal(keptCard.questionType, 'integer')
+assert.equal(keptCard.correctInteger, 4)
+assert.equal(keptCard.chapter, 'Kinematics')
+assert.equal(keptCard.solution, GOOD_SOLUTION)
+assert.equal(keptCard.solutionSource, 'hybrid_ai')
+const handCard = applyHybridPatchToPendingCard(
+  { text: 'Q', adminEdited: true, solution: 'Mine.', correctIndex: 0 },
+  { chapter: 'Optics', correctIndex: 2, solution: GOOD_SOLUTION },
+)
+assert.equal(handCard.solution, 'Mine.')
+assert.equal(handCard.correctIndex, 0)
+assert.equal(handCard.chapter, 'Optics')
+
+const fillPaper = addOfficialPyqPendingPaper({
+  exam: 'jee-advanced',
+  year: 2022,
+  session: 'Paper 2',
+  paperLabel: 'JEE Advanced 2022 Paper 2',
+  paperId: 'jee-advanced-2022-part-fill',
+  sourceLabel: 'test',
+  questions: [
+    { text: 'Fill stem one.', options: ['1', '2', '3', '4'], subject: 'mathematics' },
+    { text: 'Fill stem two.', options: ['1', '2', '3', '4'], subject: 'mathematics' },
+    {
+      text: 'Already done.',
+      options: ['1', '2', '3', '4'],
+      chapter: 'Matrices & Determinants',
+      correctIndex: 1,
+      solution: GOOD_SOLUTION,
+    },
+  ],
+})
+const realFetch = globalThis.fetch
+const sentStems = []
+globalThis.fetch = async (_url, init) => {
+  const body = JSON.parse(init.body)
+  sentStems.push(body.question_text)
+  return new Response(
+    JSON.stringify({ ok: true, chapter: 'Matrices & Determinants', correct_answer: 'B', step_by_step_solution: GOOD_SOLUTION }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+const progress = []
+try {
+  const filledRun = await fillOfficialPyqPendingPaperPartByPart(fillPaper.id, {
+    onProgress: (info) => progress.push(`${info.from}-${info.to}/${info.total}`),
+  })
+  assert.equal(filledRun.asked, 2)
+  assert.equal(filledRun.filled, 2)
+  assert.deepEqual(filledRun.needsLook, [])
+} finally {
+  globalThis.fetch = realFetch
+}
+assert.deepEqual(sentStems.sort(), ['Fill stem one.', 'Fill stem two.'])
+assert.ok(progress.includes('1-2/3'))
+const savedFill = getOfficialPyqPendingPaper(fillPaper.id)
+assert.equal(savedFill.questions[0].correctIndex, 1)
+assert.equal(savedFill.questions[0].answerSource, 'hybrid_ai')
+assert.equal(savedFill.questions[1].solution, GOOD_SOLUTION)
+assert.equal(savedFill.questions[1].chapter, 'Matrices & Determinants')
+assert.equal(savedFill.questions[1].text, 'Fill stem two.')
+
+const pendingPage = fs.readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/pages/OfficialPyqPending.jsx'),
+  'utf8',
+)
+assert.equal(pendingPage.includes('enrichQuestionsLightClient'), false)
+assert.ok(pendingPage.includes('<OfficialPyqPendingFill'))
+assert.equal(approveUi.includes('enrichQuestionsLightClient'), false)
 
 console.log('official pyq replica ok')

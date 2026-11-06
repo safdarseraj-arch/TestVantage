@@ -1081,35 +1081,15 @@ export async function reExtractOfficialPyqPendingPaperWithGemini(paper, io = {})
       progress(100, 'Done (local Mathpix)')
       return { ...result, geminiNote: '', usedGemini: false, apiDown: false }
     }
-    progress(88, 'Gemini flash-lite tags, answers, solutions…')
-    let usedLight = false
-    try {
-      const { enrichQuestionsLightClient } = await import('./mathpixGeminiPipeline.js')
-      const latest = getOfficialPyqPendingPaper(paper.id) || result
-      const enriched = await enrichQuestionsLightClient(latest.questions || result.questions || [], {
-        paperMeta,
-        deferSolutions: false,
-        signal: io.signal,
-        timeoutMs: 20_000,
-      })
-      if (Array.isArray(enriched) && enriched.length) {
-        updateOfficialPyqPendingPaper(paper.id, { questions: enriched })
-        usedLight = true
-      }
-    } catch {
-      /* local cards stay */
-    }
-    progress(100, usedLight ? 'Done (local split + Gemini light)' : 'Done (local Mathpix)')
+    progress(100, 'Done (local Mathpix)')
     const finalPaper = getOfficialPyqPendingPaper(paper.id)
     const finalCount = finalPaper?.questions?.length ?? result.count
     return {
       ...result,
       count: finalCount,
       questions: finalPaper?.questions ?? result.questions,
-      geminiNote: usedLight
-        ? `Local split found ${result.count} question(s). Gemini flash-lite filled tags, answers, and brief solutions.`
-        : `Local Mathpix split found ${result.count} clean question(s). Gemini light skipped (no key or timeout).`,
-      usedGemini: usedLight,
+      geminiNote: `Local Mathpix split found ${result.count} clean question(s). Press Fill tags, answers & solutions (Hybrid AI) to fill them two at a time.`,
+      usedGemini: false,
       apiDown: false,
     }
   }

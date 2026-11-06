@@ -12,6 +12,7 @@ import { matchListRowPlan } from '../utils/parseMatchingListDisplay.js'
 export default function MatchListDisplay({ parsed }) {
   if (!parsed?.listI?.length) return null
   const intro = String(parsed.intro ?? '').trim()
+  const outro = String(parsed.outro ?? '').trim()
   const rows = matchListRowPlan(parsed.listI, parsed.listII)
   const showRight = rows.some((row) => row.right)
 
@@ -57,6 +58,13 @@ export default function MatchListDisplay({ parsed }) {
           )
         })}
       </div>
+      {outro
+        ? outro.split(/\n\s*\n/).map((para, i) => (
+            <div key={`outro-${i}`} className="match-list-intro match-list-outro">
+              <MathText text={para} />
+            </div>
+          ))
+        : null}
     </div>
   )
 }

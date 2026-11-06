@@ -273,12 +273,14 @@ export async function structureTextThenMaybeSave(rawText, opts = {}) {
   if (localOk) {
     progress(86)
     let questions = applyUploadQualityGuards(healedLocal, text)
-    questions = await enrichQuestionsLightClient(questions, {
-      paperMeta,
-      deferSolutions: opts.deferSolutions === true,
-      signal: opts.signal,
-      timeoutMs: opts.officialPyq ? 20_000 : 12_000,
-    })
+    if (opts.officialPyq !== true) {
+      questions = await enrichQuestionsLightClient(questions, {
+        paperMeta,
+        deferSolutions: opts.deferSolutions === true,
+        signal: opts.signal,
+        timeoutMs: 12_000,
+      })
+    }
     questions = stampBankUploadIds(
       opts.deferSolutions === true
         ? questions.map((d) => ({

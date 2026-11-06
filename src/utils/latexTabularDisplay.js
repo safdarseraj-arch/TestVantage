@@ -51,14 +51,33 @@ export function expandUnsupportedTableCommands(text) {
   return out + s.slice(last)
 }
 
+/** One \left / \right delimiter: \{ \| \langle \lVert \lfloor …, or ( [ | . / ) ]. */
+export const LATEX_FENCE = String.raw`(?:\\[a-zA-Z]+|\\[{}|]|[()[\]|./<>])`
+
 /** \left( and \right) inside a table cell clip the header. Plain parentheses stay. */
+const LEFT_BEFORE_FENCE = new RegExp(String.raw`\\left\s*(?=${LATEX_FENCE})`, 'g')
+const RIGHT_BEFORE_FENCE = new RegExp(String.raw`\\right\s*(?=${LATEX_FENCE})`, 'g')
+
+function dropLeftRight(s) {
+  return s.replace(LEFT_BEFORE_FENCE, '').replace(RIGHT_BEFORE_FENCE, '')
+}
+
 function softenLeftRightInTables(text) {
   return String(text ?? '').replace(
-    /\\begin\{(?:tabular|array)\}[\s\S]*?\\end\{(?:tabular|array)\}/gi,
-    (block) =>
-      block
-        .replace(/\\left\s*(?=[([|./])/g, '')
-        .replace(/\\right\s*(?=[)\]|./])/g, ''),
+    /\\begin\{(tabular|array)\}[\s\S]*?\\end\{\1\}/gi,
+    (block, env) => {
+      if (env.toLowerCase() !== 'array') return dropLeftRight(block)
+      // In a math array a \left … \right pair inside one cell draws fine; only a pair split across cells breaks.
+      return block
+        .split(/(&|\\\\)/)
+        .map((cell, i) => {
+          if (i % 2 === 1) return cell
+          const opens = (cell.match(/\\left\b/g) || []).length
+          const closes = (cell.match(/\\right\b/g) || []).length
+          return opens === closes ? cell : dropLeftRight(cell)
+        })
+        .join('')
+    },
   )
 }
 

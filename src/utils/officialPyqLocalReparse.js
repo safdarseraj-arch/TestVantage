@@ -335,6 +335,7 @@ function keepAdminEditedCards(next, prev) {
       adminEdited: true,
       adminEditedAt: old.adminEditedAt,
       ...(old.adminApproved === true ? { adminApproved: true, adminApprovedAt: old.adminApprovedAt } : {}),
+      ...(Array.isArray(old.editHistory) ? { editHistory: old.editHistory } : {}),
     }
   })
 }

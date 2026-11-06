@@ -26,7 +26,8 @@ import {
   paperItemsFromMathpixOcr,
   recoverOptionsFromStem,
 } from '../src/utils/mathpixQuestionSplit.js'
-import { mergeAdjacentOptionTails } from '../src/utils/extendTruncatedStem.js'
+import { mergeAdjacentOptionTails, storedMatchOptionsAreCutOff } from '../src/utils/extendTruncatedStem.js'
+import { parseMatchingListForDisplay } from '../src/utils/parseMatchingListDisplay.js'
 import { looksLikePyqSectionInstructionStem } from '../src/utils/bulkExtractClean.js'
 import { reviewOfficialPyqCards } from '../src/utils/officialPyqUnifiedCheck.js'
 import { officialPyqContentReviewMessages } from '../src/utils/officialPyqReviewFlags.js'
@@ -552,6 +553,220 @@ test('the scan settles restart vs continuous numbering, so Chemistry Q.3 is not 
   assert.equal(stamped[38].subject, 'chemistry')
   assert.equal(enforceAdminFactsOnQuestions(cards, admin, continuousOcr)[38].printedNumber, 39)
   assert.equal(draftAdminFacts(restartOcr, cards).numbering, 'restart')
+})
+
+test('determinants inside one $$ formula keep \\left| … \\right| and draw (2022 P1 Q14)', () => {
+  const plainQ = (n) =>
+    `\\item[Q.] ${n} Find the value of $x^{${n}}$ when the matrix is singular and real.\n\\begin{itemize}\n\\item[(A)] $1$\n\\item[(B)] $2$\n\\item[(C)] $3$\n\\item[(D)] $4$\n\\end{itemize}`
+  const ocr = [
+    '\\begin{itemize}',
+    plainQ(13),
+    '\\item[Q.] 14 Let $|M|$ denote the determinant of a square matrix $M$. Let',
+    '$$f(\\theta)=\\frac{1}{2}\\left|\\begin{array}{ccc}',
+    '1 & \\sin \\theta & 1 \\\\',
+    '-1 & -\\sin \\theta & 1',
+    '\\end{array}\\right|+\\left|\\begin{array}{cc}',
+    '\\sin \\pi & \\cos \\left(\\theta+\\frac{\\pi}{4}\\right) \\\\',
+    '\\cot \\left(\\theta+\\frac{\\pi}{4}\\right) & \\tan \\pi',
+    '\\end{array}\\right| .$$',
+    'Then, which of the following is/are TRUE ?',
+    '\\begin{itemize}',
+    '\\item[(A)] $p(1)<0$',
+    '\\item[(B)] $p(2)>0$',
+    '\\item[(C)] $p(3)>0$',
+    '\\item[(D)] $p(4)<0$',
+    '\\end{itemize}',
+    plainQ(15),
+    '\\end{itemize}',
+  ].join('\n')
+  const card = paperItemsFromMathpixOcr(ocr).find((q) => /denote the determinant/.test(q.text))
+  assert.ok(card)
+  assert.equal(/\\left\|\$\$|\$\$\\right\|/.test(card.text), false, card.text)
+  assert.ok(card.text.includes('\\cos \\left(\\theta+\\frac{\\pi}{4}\\right)'))
+  assert.equal(mathDrawFailure(card.text), '')
+  const shown = prepareTextForMathTextDisplay('$$x=\\frac{1}{2}\\left|\\begin{array}{cc}1&2\\\\3&4\\end{array}\\right| .$$')
+  assert.equal(/\\left\|\$\$|\$\$\\right\|/.test(shown), false, shown)
+  const stored = '$$f=\\left|$$\\begin{array}{cc}\n1 & 2 \\\\\n3 & 4\n\\end{array}$$\\right| .$$'
+  assert.equal(mathDrawFailure(stored) === '' && !/\\left\|\$\$/.test(prepareTextForMathTextDisplay(stored)), true)
+})
+
+const romanPlainQ = (n) =>
+  `\\item[Q.] ${n} Find the value of $x^{${n}}$ when the matrix is singular and real.\n\\begin{itemize}\n\\item[(A)] $1$\n\\item[(B)] $2$\n\\item[(C)] $3$\n\\item[(D)] $4$\n\\end{itemize}`
+const romanOpts = [
+  '\\item[(A)] (I) → (P); (II) → (S); (III) → (P); (IV) → (S)',
+  '\\item[(B)] (I) → (P); (II) → (P); (III) → (T); (IV) → (R)',
+  '\\item[(C)] (I) → (Q); (II) → (P); (III) → (T); (IV) → (S)',
+  '\\item[(D)] (I) → (Q); (II) → (S); (III) → (P); (IV) → (R)',
+]
+const romanLabels = (card) => {
+  const parsed = parseMatchingListForDisplay(card.text, card.options)
+  return `${(parsed?.listI || []).map((r) => r.label).join('')}|${(parsed?.listII || []).map((r) => r.label).join('')}`
+}
+
+test('List-I (I)–(IV) × List-II (P)–(T) table keeps its labels, (T) row and set math', () => {
+  const ocr = [
+    '\\begin{itemize}',
+    romanPlainQ(14),
+    '\\end{itemize}',
+    'Q. 15 Consider the following lists:',
+    '',
+    '\\begin{tabular}[t]{|l|l|}',
+    '\\hline List-I & List-II \\\\',
+    '\\hline (I) $\\left\\{x \\in\\left[-\\frac{2 \\pi}{3}, \\frac{2 \\pi}{3}\\right]: \\cos x+\\sin x=1\\right\\}$ & (P) has two elements \\\\',
+    '\\hline (II) $\\left\\{x \\in\\left[-\\frac{5 \\pi}{18}, \\frac{5 \\pi}{18}\\right]: \\sqrt{3} \\tan 3 x=1\\right\\}$ & (Q) has three elements \\\\',
+    '\\hline (III) $\\left\\{x \\in\\left[-\\frac{6 \\pi}{5}, \\frac{6 \\pi}{5}\\right]: 2 \\cos (2 x)=\\sqrt{3}\\right\\}$ & (R) has four elements \\\\',
+    '\\hline (IV) $\\left\\{x \\in\\left[-\\frac{7 \\pi}{4}, \\frac{7 \\pi}{4}\\right]: \\sin x-\\cos x=1\\right\\}$ & (S) has five elements \\\\',
+    '\\hline & (T) has six elements \\\\',
+    '\\hline',
+    '\\end{tabular}',
+    '',
+    'The correct option is:',
+    '\\begin{itemize}',
+    ...romanOpts,
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    romanPlainQ(16),
+    '\\end{itemize}',
+  ].join('\n')
+  const card = paperItemsFromMathpixOcr(ocr).find((q) => /Consider the following lists/.test(q.text))
+  assert.ok(card)
+  assert.ok(card.text.includes('(I) $\\left\\{x \\in\\left[-\\frac{2 \\pi}{3}, \\frac{2 \\pi}{3}\\right]'), card.text)
+  assert.ok(/\(T\) has six elements/.test(card.text), card.text)
+  assert.equal(/\\begin\{tabular\}|\[t\]\{/.test(card.text), false, card.text)
+  assert.equal(mathDrawFailure(card.text), '')
+  assert.equal(romanLabels(card), '(I)(II)(III)(IV)|(P)(Q)(R)(S)(T)')
+  assert.equal(card.options.filter(Boolean).length, 4)
+  assert.equal(storedMatchOptionsAreCutOff(card.options), false)
+  const review = reviewOfficialPyqCards([card], ocr, null, { cardsOnly: true })
+  assert.equal(review.messages.some((m) => /not in the lists/.test(m)), false, review.messages.join(' | '))
+})
+
+test('roman List-I with A–D printed before List-II keeps one List-II and clean mapping options', () => {
+  const ocr = [
+    '\\begin{itemize}',
+    romanPlainQ(15),
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    '\\item[Q.] 16 List I describes four systems, each with two particles $A$ and $B$ in relative motion. List II gives possible magnitudes of their relative velocities.',
+    '',
+    '\\section*{List-I}',
+    '(I) $A$ and $B$ are moving on a horizontal circle of radius $1 m$.',
+    '(II) Projectiles $A$ and $B$ are fired at $t=0$ and $t=0.1 s$ respectively.',
+    '(III) Two harmonic oscillators $A$ and $B$ moving in the $x$ direction.',
+    '(IV) Particle $A$ is rotating in a horizontal circular path of radius $1 m$.',
+    'Which one of the following options is correct?',
+    '\\begin{itemize}',
+    '\\item[(A)] I → R, II → T, III → P, IV → S',
+    '\\item[(B)] I → S, II → P, III → Q, IV → R',
+    '\\item[(C)] I → S, II → T, III → P, IV → R',
+    '\\item[(D)] I → T, II → P, III → R, IV → S',
+    '\\end{itemize}',
+    '',
+    'List-II',
+    '\\begin{itemize}',
+    '\\item[(P)] $\\frac{\\sqrt{3}+1}{2}$',
+    '\\item[(Q)] $\\frac{(\\sqrt{3}-1)}{\\sqrt{2}}$',
+    '\\item[(R)] $\\sqrt{10}$',
+    '\\item[(R)] $\\sqrt{10}$',
+    '\\item[(S)] $\\sqrt{2}$',
+    '\\item[(T)] $\\sqrt{25 \\pi^{2}+1}$',
+    '\\end{itemize}',
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    romanPlainQ(17),
+    '\\end{itemize}',
+  ].join('\n')
+  const card = paperItemsFromMathpixOcr(ocr).find((q) => /relative velocities/.test(q.text))
+  assert.ok(card)
+  assert.equal((card.text.match(/List-II\s*\n/g) || []).length, 1, card.text)
+  assert.equal((card.text.match(/\(R\)/g) || []).length, 1, card.text)
+  assert.deepEqual(card.options, [
+    'I → R, II → T, III → P, IV → S',
+    'I → S, II → P, III → Q, IV → R',
+    'I → S, II → T, III → P, IV → R',
+    'I → T, II → P, III → R, IV → S',
+  ])
+  assert.equal(romanLabels(card), '(I)(II)(III)(IV)|(P)(Q)(R)(S)(T)')
+})
+
+test('roman List-I \\item rows and a figure List-II keep (I)–(IV) and (T)', () => {
+  const fig = (y) => `\\begin{figure}\n\\captionsetup{labelformat=empty}\n\\caption{(${y})}\n\\includegraphics[alt={},max width=\\textwidth]{https://cdn.mathpix.com/cropped/demo-29.jpg?height=296&width=366&top_left_y=${100 + 'PQRST'.indexOf(y) * 300}&top_left_x=1371}\n\\end{figure}`
+  const ocr = [
+    '\\begin{itemize}',
+    romanPlainQ(14),
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    '\\item[Q.] 15 Match the rate expressions in LIST-I for the decomposition of X with the corresponding profiles provided in LIST-II.',
+    '',
+    'LIST-I',
+    '\\begin{itemize}',
+    '\\item[(I)] rate $=k[X]$ under all possible initial concentrations of X',
+    '\\item[(II)] rate $=k[X]$ where initial concentrations of X are much less',
+    '\\item[(III)] rate $=k$ where initial concentrations of X are much higher',
+    '\\item[(IV)] rate $=k[X]^{2}$ where initial concentration of X is much higher',
+    '\\end{itemize}',
+    '',
+    'LIST-II',
+    ...'PQRST'.split('').map(fig),
+    '\\item[(A)] I→ P; II→ Q; III → S; IV → T',
+    '\\item[(B)] I→ R; II→ S; III → S; IV → T',
+    '\\item[(C)] I→ P; II→ Q; III → Q; IV → R',
+    '\\item[(D)] I→ R; II→ S; III → Q; IV → R',
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    romanPlainQ(16),
+    '\\end{itemize}',
+  ].join('\n')
+  const card = paperItemsFromMathpixOcr(ocr).find((q) => /rate expressions/.test(q.text))
+  assert.ok(card)
+  assert.equal(card.options[3], 'I→ R; II→ S; III → Q; IV → R')
+  assert.equal(romanLabels(card), '(I)(II)(III)(IV)|(P)(Q)(R)(S)(T)')
+})
+
+test('a stem that opens with "List I describes…" keeps its words, its figure, and the question line under the lists (2022 P1 Q33, Q35, Q53)', () => {
+  const rows = (labels, body) => labels.map((L) => `(${L})\n${body(L)}`).join('\n\n')
+  const fig = '\\includegraphics{https://cdn.mathpix.com/cropped/demo-17.jpg?height=443&width=376&top_left_y=1117&top_left_x=932}'
+  const q33 = [
+    'A small loop carries current $I$ as shown in the figure. List-I gives time dependences of $\\hat{n}$. List-II gives the torques. Let $\\alpha=\\frac{A}{2 R}$.',
+    fig,
+    '',
+    'List-I',
+    '',
+    rows(['I', 'II', 'III', 'IV'], (L) => `$\\frac{1}{\\sqrt{2}}(\\sin \\omega t \\hat{\\jmath}) ${L}$`),
+    '',
+    'List-II',
+    '',
+    rows(['P', 'Q', 'R', 'S', 'T'], (L) => `$-\\frac{\\alpha}{4} ${L}$`),
+    '',
+    'Which one of the following options is correct?',
+  ].join('\n')
+  const a = parseMatchingListForDisplay(q33, ['I→ Q, II→P, III→S, IV→T', 'I→ S, II→ T, III→Q, IV→P', 'I→ Q, II→P, III→S, IV→R', 'I→ T, II→Q, III→P,IV→R'])
+  assert.match(a.intro, /List-I gives time dependences/)
+  assert.match(a.intro, /Let \$\\alpha/)
+  assert.ok(a.intro.includes(fig))
+  assert.equal(a.outro, 'Which one of the following options is correct?')
+  assert.equal(a.listII[4].text, '$-\\frac{\\alpha}{4} T$')
+
+  const q35 = [
+    'List I describes thermodynamic processes in four different systems. List II gives the magnitudes of possible changes in the internal energy.',
+    '',
+    'List-I',
+    '',
+    rows(['I', 'II', 'III', 'IV'], (L) => `Process ${L} of an ideal gas at $500 K$.`),
+    '',
+    'List-II',
+    '',
+    rows(['P', 'Q', 'R', 'S', 'T'], (L) => `$${'PQRST'.indexOf(L) + 2} k J$`),
+    '',
+    '[Given: Atomic number of $\\mathrm{Cr}=24$ ]',
+    '',
+    'Match each process in LIST-I with LIST-II, and choose the correct option',
+  ].join('\n')
+  const b = parseMatchingListForDisplay(q35)
+  assert.match(b.intro, /^List I describes thermodynamic processes/)
+  assert.equal(b.listI.length, 4)
+  assert.equal(b.listII[4].text, '$6 k J$')
+  assert.match(b.outro, /^\[Given: Atomic number[\s\S]*\n\nMatch each process/)
 })
 
 console.log(`official-pyq admin facts: ${passed} tests passed`)

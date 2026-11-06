@@ -11,7 +11,12 @@ import { extractMathpixImageUrls, hasMathpixMedia, restoreMissingOptionGridGraph
 import { dropStemRepeatOptions, optionLooksLikeStemRepeat } from './optionStemLeak.js'
 import { mergeAdjacentOptionTails, applyUploadQualityGuards } from './extendTruncatedStem.js'
 import { mixedSmilesFigureOptions } from './labelledFigureOptions.js'
-import { looksLikeMatchingListStem, normalizeMatchAnswerKey, rewriteLatexItemLabels } from './parseMatchingListDisplay.js'
+import {
+  flattenTabularMatchLists,
+  looksLikeMatchingListStem,
+  normalizeMatchAnswerKey,
+  rewriteLatexItemLabels,
+} from './parseMatchingListDisplay.js'
 import { detectAnswerFromPaper } from './answerProvenance.js'
 import { annotateMathpixCleanStatus, cleanMathpixCardText, preCleanMathpixOcr } from './mathpixCleanPipeline.js'
 import { stripLeakedOptionsFromStem } from './stripLeakedOptionsFromStem.js'
@@ -85,16 +90,53 @@ const NEXT_FULL_STEM_RE =
  * @param {unknown} raw
  */
 export function sanitizeMathpixOcrText(raw) {
-  return preCleanMathpixOcr(
-    String(raw ?? '')
-      .replace(/^\uFEFF/, '')
-      .replace(/\uFFFD+/g, '')
-      .replace(/\u0000/g, '')
-      .replace(/\r\n/g, '\n')
-      .replace(/\r/g, '\n')
-      .replace(/(\\[A-Za-z]+(?:\s*\{[^{}]*\})+)([A-Za-z])/g, '$1 $2')
-      .replace(/[ \t]+\n/g, '\n')
-      .trim(),
+  return restoreGluedQuestionNumbers(
+    preCleanMathpixOcr(
+      String(raw ?? '')
+        .replace(/^\uFEFF/, '')
+        .replace(/\uFFFD+/g, '')
+        .replace(/\u0000/g, '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .replace(/(\\[A-Za-z]+(?:\s*\{[^{}]*\})+)([A-Za-z])/g, '$1 $2')
+        .replace(/[ \t]+\n/g, '\n')
+        .trim(),
+    ),
+  )
+}
+
+/**
+ * The scan glues the next question number to the stem: `\item[Q.] $8 \mathrm{H}_2S$`
+ * (Q.8 inside the formula) or `Q. 1250 mL` (Q.12 then "50 mL"). The number that
+ * follows the previous marker is split back out; other numbers are left alone.
+ * @param {string} text
+ */
+export function restoreGluedQuestionNumbers(text) {
+  let prev = 0
+  return String(text ?? '').replace(
+    /(\\item\s*\[\s*Q\s*\.?\s*(?:(\d{1,3})\s*)?\]\s*|(?:^|\n)[ \t]*Q\s*\.\s*)(\$[ \t]*)?(\d{1,5})?/g,
+    (whole, marker, inside, dollar, digits, offset, str) => {
+      if (inside) {
+        prev = Number(inside)
+        return whole
+      }
+      if (!digits || (dollar && !/^\\item/.test(marker))) return whole
+      const want = String(prev + 1)
+      const next = String(str)
+        .slice(offset + whole.length)
+        .match(/\\item\s*\[\s*Q\s*\.?\s*(\d{1,3})?\s*\]\s*\$?(\d{1,3})?\b|\n[ \t]*Q\s*\.\s*(\d{1,3})\b/)
+      const nextN = Number(next?.[1] ?? next?.[2] ?? next?.[3])
+      if (Number(digits) === prev + 1 && !(dollar && nextN === prev + 1)) {
+        prev += 1
+        return dollar ? `${marker}${digits} $` : whole
+      }
+      if (prev > 0 && nextN === prev + 2 && digits.length > want.length && digits.startsWith(want)) {
+        prev += 1
+        return `${marker}${want} ${dollar ?? ''}${digits.slice(want.length)}`
+      }
+      if (!dollar) prev = Number(digits)
+      return whole
+    },
   )
 }
 
@@ -357,6 +399,26 @@ function optionsArePeeledReactionSteps(options, stem) {
   })
 }
 
+/** A table inside one \item option (P = … | R = … | U = …) becomes one line, so the option is not cut at \hline. */
+function inlineOptionTabulars(opt) {
+  let s = String(opt ?? '')
+  const inner =
+    /\\begin\{tabular\}(?:\s*\[[^\]]*\])?(?:\s*\{[^{}]*\})?((?:(?!\\begin\{tabular\})[\s\S])*?)\\end\{tabular\}/i
+  for (let n = 0; n < 6 && inner.test(s); n += 1) {
+    s = s.replace(inner, (_, body) => {
+      const rows = splitTabularRows(body).map((row) =>
+        row.split('&').map((c) => c.replace(/\\hline/gi, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean),
+      )
+      return ` ${rows.map((cells) => cells.join('; ')).filter(Boolean).join(' ')} `
+    })
+  }
+  return s.replace(/[ \t]{2,}/g, ' ').trim()
+}
+
+function splitTabularRows(body) {
+  return String(body ?? '').split(/\\\\(?![a-zA-Z])/)
+}
+
 export function extractLatexItemizeMcq(raw) {
   const t = String(raw ?? '').replace(/\\item\s*\[\s*Q[^\]]*\]\s*\d{0,3}\s*/gi, '')
   if (/\\item\s*\[\s*-\s*\]/.test(t) && /this section contains|maximum marks/i.test(t)) {
@@ -405,7 +467,7 @@ export function extractLatexItemizeMcq(raw) {
   const cut = stripSectionAndItemizeFromStem(head)
   const stem = stripVisibleItemizeCommands(cut.stem)
   if (stem.length < 12) return null
-  return { stem, options: parts.slice(0, 4).map(stripVisibleItemizeCommands) }
+  return { stem, options: parts.slice(0, 4).map(inlineOptionTabulars).map(stripVisibleItemizeCommands) }
 }
 
 function startOfSecondStem(text, letIndex) {
@@ -891,7 +953,10 @@ export function recoverOptionsFromStem(stem, options) {
       instructionText: cut.instructionText,
     }
   }
-  const smiles = peelSmilesAsOptions(joined) || peelSmilesAsOptions(stem)
+  const optionsOwnSmiles =
+    !/<smiles>/i.test(stem) &&
+    opts.filter((o) => String(o).trim() && !looksLikeMarkingSchemeOption(o)).length >= 3
+  const smiles = optionsOwnSmiles ? null : peelSmilesAsOptions(joined) || peelSmilesAsOptions(stem)
   if (
     smiles &&
     smiles.options.length >= 2 &&
@@ -1175,6 +1240,41 @@ function optionIsListStructureFragment(opt, stem) {
   })
 }
 
+/** A List-I / List-II table becomes labelled rows before the card clean strips cell math. */
+function flattenListTabular(body) {
+  const at = body.search(/\\begin\{tabular\}/i)
+  if (at < 0 || !/(?:List|Column)\s*[-–]?\s*I/i.test(body.slice(at, at + 220))) return body
+  return flattenTabularMatchLists(body)
+}
+
+/** OCR sometimes reads one list row twice in a row: (R) 4 kJ (R) 4 kJ. Keep one. */
+function dropRepeatedListRows(text) {
+  const chunks = String(text ?? '').split(/(?=\n[ \t]*\(\s*(?:[PQRST1-5]|I{1,3}|IV)\s*\))/)
+  const flat = (s) => s.replace(/\s+/g, ' ').trim()
+  return chunks.filter((c, i) => i === 0 || flat(c) !== flat(chunks[i - 1])).join('')
+}
+
+/**
+ * Match cards: lift only the \item[(A)]–\item[(D)] mapping rows (I → R, …) out of
+ * the block. Both lists stay on the stem even when List-II is printed after A–D.
+ * @returns {{ body: string, options: string[] } | null}
+ */
+function peelMatchMappingOptions(body) {
+  const src = String(body ?? '')
+  const re =
+    /\\item\s*\[\s*\(?\s*([A-D])\s*\)?\s*\]([\s\S]*?)(?=\\item\s*\[|\\end\{itemize\}|\n\s*(?:\\section\*?\{\s*)?(?:List|LIST|Column)\s*[-–]?\s*I|\n\s*\n|$)/g
+  const hits = [...src.matchAll(re)].filter((m) => /→|\\rightarrow|->/.test(m[2]))
+  const letters = hits.map((m) => m[1].toUpperCase()).join('')
+  if (!/^ABCD$|^ABC$/.test(letters)) return null
+  let rest = src
+  for (const m of [...hits].reverse()) {
+    rest = rest.slice(0, m.index) + rest.slice(m.index + m[0].length)
+  }
+  const options = hits.map((m) => m[2].replace(/\s+/g, ' ').trim())
+  while (options.length < 4) options.push('')
+  return { body: rest, options }
+}
+
 function blockToMathpixDraft(block, i, attached, paper) {
   const num = extractMathpixQuestionNumber(block) || i + 1
   const body = stripMathpixQuestionMarker(block)
@@ -1183,7 +1283,7 @@ function blockToMathpixDraft(block, i, attached, paper) {
   const parsed = parseQuestionText(rec.stem || body)
   let text = stripVisibleItemizeCommands(rec.stem || parsed.text || body)
   if (isMatch && !rec.reactionStepsInStem) {
-    text = stripMathpixFigureChrome(body)
+    text = dropRepeatedListRows(stripMathpixFigureChrome(flattenListTabular(body)))
   } else if (!rec.reactionStepsInStem && (hasMathpixMedia(body) || hasMathpixMedia(text))) {
     // Option graphs stay on A–D. Do not paste that table back onto the stem.
     text = appendStemFiguresOutsideOptions(text, body, rec.options || [])
@@ -1194,8 +1294,12 @@ function blockToMathpixDraft(block, i, attached, paper) {
       ? rec.options
       : parsed.options
   options = (options || []).map(stripKeyLeak).map(stripVisibleItemizeCommands)
-  if (isMatch && !rec.reactionStepsInStem) {
-    text = stripMathpixFigureChrome(body) || body
+  const mapped = isMatch && !rec.reactionStepsInStem ? peelMatchMappingOptions(body) : null
+  if (mapped) {
+    text = dropRepeatedListRows(stripMathpixFigureChrome(flattenListTabular(mapped.body))) || body
+    options = mapped.options
+  } else if (isMatch && !rec.reactionStepsInStem) {
+    text = dropRepeatedListRows(stripMathpixFigureChrome(flattenListTabular(body))) || body
     const tab = extractLatexTabularMcq(body)
     if (tab?.options?.length >= 2) {
       // The A–D table in THIS block stays on this question. Do not drop it

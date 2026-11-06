@@ -30,7 +30,7 @@ import {
   matchOptionsFoldedIntoLists,
   parseMatchingListForDisplay,
 } from './parseMatchingListDisplay.js'
-import { restoreMissingOptionGridGraphs, stripEmptyFigureShells, stripEmptyImageMarkdown } from './mathpixMedia.js'
+import { hasOriginalPageCrop, restoreMissingOptionGridGraphs, stripEmptyFigureShells, stripEmptyImageMarkdown } from './mathpixMedia.js'
 import { stripImageWatermarkOcr } from './stripImageWatermarkOcr.js'
 import { stripUploadUiOcr } from './stripUploadUiOcr.js'
 import { rejoinSplitMathEnvironments, unescapeAccidentalDoubleBackslash } from './wrapBareLatexRuns.js'
@@ -694,12 +694,14 @@ export function validateMathpixQuestion(q) {
     ).length >= 2
   if (looksLikeMatchingListStem(text) || mappedChoices) {
     const parsed = parseMatchingListForDisplay(text, q.options)
-    if ((parsed?.listI?.length ?? 0) < 2) {
+    // A picture cut from the original page holds the lists the text does not.
+    const listsInPicture = hasOriginalPageCrop(text)
+    if (!listsInPicture && (parsed?.listI?.length ?? 0) < 2) {
       issues.push({
         code: 'missing_column',
         note: 'Match-the-column is missing List-I. Not inventing rows.',
       })
-    } else if ((parsed?.listII?.length ?? 0) < 2) {
+    } else if (!listsInPicture && (parsed?.listII?.length ?? 0) < 2) {
       issues.push({
         code: 'missing_column',
         note: 'Match-the-column is missing List-II. Not inventing rows.',

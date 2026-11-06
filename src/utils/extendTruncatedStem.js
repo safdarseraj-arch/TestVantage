@@ -16,7 +16,7 @@
 import { findFirstOptionsBlockStart } from './mcqOptionMarkers.js'
 import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
 import { extractLatexItemizeMcq, extractLatexTabularMcq } from './mathpixQuestionSplit.js'
-import { isOriginalCropUrl, restoreMissingOptionGridGraphs } from './mathpixMedia.js'
+import { hasOriginalPageCrop, isOriginalCropUrl, restoreMissingOptionGridGraphs } from './mathpixMedia.js'
 import { repairScanStructureCodes } from './smilesDisplay.js'
 import {
   parsePaperSectionMap,
@@ -670,6 +670,7 @@ export function matchQuestionMissingListI(q) {
   const t = String(q?.text ?? '').trim()
   if (!t) return false
   if (hasListIEntries(t, q?.options)) return false
+  if (hasOriginalPageCrop(t)) return false
   if (looksLikeOrphanListTwo(q)) return true
   if (looksLikeMatchInstructionOnly(t) && !hasListIEntries(t, q?.options)) return true
   if (looksLikeMatchingListStem(t) && !hasListIEntries(t, q?.options)) return true

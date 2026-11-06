@@ -755,7 +755,7 @@ export function optionsLookLikeMatchAnswers(options) {
   const mapping = opts.filter((o) =>
     /\(\s*P\s*\)\s*\$?\s*(?:\\rightarrow|→|->)/i.test(o) ||
     /(?:^|[\s(;,])I\s*\)?\s*\$?\s*(?:\\rightarrow|→|->)[\s\S]*\bII\s*\)?\s*\$?\s*(?:\\rightarrow|→|->)/.test(o) ||
-    /\bP\s*\$?\s*(?:\\rightarrow|→|->)\s*\$?\s*\(?[1-5QRS]/i.test(o) ||
+    /\bP\s*\}?\s*\$?\s*(?:\\rightarrow|→|->)\s*\$?\s*\(?[1-5QRS]/i.test(o) ||
     /\bP\s*[-–]\s*[1-5]\b/i.test(o) && /\bQ\s*[-–]\s*[1-5]\b/i.test(o),
   )
   return mapping.length >= 2
@@ -1396,6 +1396,10 @@ export function parseMatchingListForDisplay(text, options) {
   const key = `${optKey}\u0000${t}`
   if (matchParseCache.has(key)) return matchParseCache.get(key) ?? null
   let parsed = parseMatchingListForDisplayNoCache(t, options)
+  if (!parsed) {
+    const labelled = labelBareListRows(t)
+    if (labelled !== t) parsed = parseMatchingListForDisplayNoCache(labelled, options)
+  }
   // One original-page picture of both lists is the whole table, not row (P) of List-I.
   if (
     parsed?.listI?.length === 1 &&
@@ -1409,6 +1413,24 @@ export function parseMatchingListForDisplay(text, options) {
   }
   matchParseCache.set(key, parsed)
   return parsed
+}
+
+/**
+ * "LIST-I / P. The function f1 is" and "LIST-II / 1. NOT continuous / (2) <newline> continuous":
+ * bare "P." / "1." row labels and a label alone on its line become "(P) …" / "(2) …".
+ * Only between standalone List-I and List-II heading lines.
+ * @param {string} text
+ */
+function labelBareListRows(text) {
+  const t = String(text ?? '')
+  const one = t.match(/(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]*[ \t]*I[ \t]*(?=\n)/i)
+  const two = t.match(/(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]*[ \t]*II[ \t]*(?=\n)/i)
+  if (!one || !two || (two.index ?? 0) <= (one.index ?? 0)) return t
+  const joinLoneLabels = (s) => s.replace(/(^|\n)[ \t]*\(\s*([PQRSTU]|[1-6])\s*\)[ \t]*\n+[ \t]*(?=[^\s(])/g, '$1($2) ')
+  const head = t.slice(0, one.index)
+  const listOne = joinLoneLabels(t.slice(one.index, two.index).replace(/(^|\n)[ \t]*([PQRSTU])\.[ \t]+/g, '$1($2) '))
+  const listTwo = joinLoneLabels(t.slice(two.index).replace(/(^|\n)[ \t]*([1-6])\.[ \t]+/g, '$1($2) '))
+  return `${head}${listOne}${listTwo}`
 }
 
 function parseMatchingListForDisplayNoCache(text, options) {

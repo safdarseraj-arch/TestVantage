@@ -35,7 +35,8 @@ const { officialPyqDrawnRawCode, officialPyqDrawnText } = await import('../src/u
 const { stripMistakenOfficialPyqPassages } = await import('../src/utils/passage.js')
 const { buildPaperFacts } = await import('../src/utils/officialPyqPaperFacts.js')
 const { splitGluedChemDisplayEquations } = await import('../src/utils/healTruncatedLatex.js')
-const { extendOfficialPyqHealCard, restoreMissingListIIFromSource } = await import('../src/utils/extendTruncatedStem.js')
+const { extendOfficialPyqHealCard, restoreMissingListIIFromSource, matchQuestionMissingListI } = await import('../src/utils/extendTruncatedStem.js')
+const { keepApprovedOfficialPyqCards } = await import('../src/utils/officialPyqApproval.js')
 const { keepAdminEditedCards, copyAnswersOntoCanonical } = await import('../src/utils/officialPyqLocalReparse.js')
 const { sanitizeStemForDisplay, shownStemLooksIncomplete } = await import('../src/utils/sanitizeStemForDisplay.js')
 const { reviewMarkSpans } = await import('../src/utils/officialPyqReviewFlags.js')
@@ -968,12 +969,17 @@ test('an automatic auto-fix card that still misses a list gives way to a fresh p
     text: 'The desired product X can be prepared by reacting the major product of the reactions in LIST-I with one or more appropriate reagents in LIST-II.\n\nList-I\n(P) aldehyde\n(Q) amine\n(R) ketone\n(S) ester\n\nList-II\n(1) $\\mathrm{I}_{2}, \\mathrm{NaOH}$\n(2) Tollens\n(3) Fehling solution\n(4) HCHO, NaOH\n(5) NaOBr',
     options: ['P → 1; Q → 2,3', 'P → 1,5; Q → 3,4', 'P → 1,5; Q → 3,4; R → 5', 'P → 1,5; Q → 2,3'],
   }
-  const auto = { ...fresh, text: crop, adminEdited: true, adminEditedAt: 1, editSource: 'auto_compare' }
-  assert.ok(validateMathpixQuestion(auto).issues.some((x) => x.code === 'missing_column'), 'crop card should read as missing a list')
+  const lost = 'The desired product X can be prepared by reacting the major product of the reactions in LIST-I with one or more appropriate reagents in LIST-II.\n\nLIST-I\nLIST-II\n<smiles>CC(C)(C)Br</smiles>\n<smiles>CC(C)(C)O</smiles>\nThe correct option is'
+  const auto = { ...fresh, text: lost, adminEdited: true, adminEditedAt: 1, editSource: 'auto_compare' }
+  assert.ok(validateMathpixQuestion(auto).issues.some((x) => x.code === 'missing_column'), 'lost-list card should read as missing a list')
   assert.equal(keepAdminEditedCards([fresh], [auto])[0].text, fresh.text)
   assert.equal(copyAnswersOntoCanonical([fresh], [auto])[0].text, fresh.text)
   const byHand = { ...auto, editSource: undefined }
-  assert.equal(keepAdminEditedCards([fresh], [byHand])[0].text, crop)
+  assert.equal(keepAdminEditedCards([fresh], [byHand])[0].text, lost)
+  // The original-page picture of both lists is complete; the auto-fix card keeps it.
+  const autoCrop = { ...auto, text: crop }
+  assert.equal(validateMathpixQuestion(autoCrop).issues.some((x) => x.code === 'missing_column'), false)
+  assert.equal(keepAdminEditedCards([fresh], [autoCrop])[0].text, crop)
 })
 
 test('"+ HNO2" after a drawn List-I row stays in that row; one original-page picture of both lists is not row (P) (2018 P2 chem Q16, Q17)', () => {
@@ -1017,6 +1023,38 @@ test('false alarms on published papers: printed "Answer: [0.7 to 0.8]", "2<P<8" 
     '',
   )
   assert.equal(mathDrawFailure('a stray <div class="x">table</div> left by the scan'), 'raw HTML')
+})
+
+test('Compare\'s original-page picture of both lists is not "missing List-I"; bare "P." / "1." rows parse; an approved card without an id is published as saved (2018 P2 Q34, Q35, Q54)', () => {
+  const crop = '\\includegraphics{/api/official-pyq/original/crops/x-p20-927cb0f4.png?page=20&x0=0.18&y0=0.14&x1=0.70&y1=0.57}'
+  const options = ['$\\mathbf{P} \\rightarrow 1 ; \\mathbf{Q} \\rightarrow 2,3$', '$\\mathbf{P} \\rightarrow 1,5 ; \\mathbf{Q} \\rightarrow 3,4$', '$\\mathbf{P} \\rightarrow 1,5 ; \\mathbf{Q} \\rightarrow 3,4$ ; R → 5', '$\\mathbf{P} \\rightarrow 1,5 ; \\mathbf{Q} \\rightarrow 2,3$']
+  const card = {
+    text: `The desired product X can be prepared by reacting the major product of the reactions in LIST-I with one or more appropriate reagents in LIST-II.\n${crop}\nThe correct option is`,
+    options,
+    questionType: 'single_correct',
+  }
+  assert.equal(validateMathpixQuestion(card).issues.some((x) => x.code === 'missing_column'), false)
+  assert.equal(matchQuestionMissingListI(card), false)
+  assert.equal(parseMatchingListForDisplay(card.text, card.options), null, '"$\\mathbf{P} \\rightarrow 1$" choices are not List-I rows; the picture stays')
+  const matchCard = {
+    text: `LIST-I contains reactions and LIST-II contains major products.\n${crop}\nMatch each reaction in LIST-I with one or more products in LIST-II and choose the correct option.`,
+    options: ['P → 1,5; Q → 2; R → 3; S → 4', 'P → 1,4; Q → 2; R → 4; S → 3', 'P → 1,4; Q → 1,2; R → 3,4; S → 4', 'P → 4,5; Q → 4; R → 4; S → 3,4'],
+    questionType: 'single_correct',
+  }
+  assert.equal(matchQuestionMissingListI(matchCard), false)
+  assert.equal(matchQuestionMissingListI({ ...matchCard, text: matchCard.text.replace(crop, '') }), true, 'without the picture it is still flagged')
+
+  const bare = 'Let f be given.\n\nLIST-I\nP. The function $f_{1}$ is\nQ. The function $f_{2}$ is\nR. The function $f_{3}$ is\nS. The function $f_{4}$ is\n\nLIST-II\n1. NOT continuous at $x=0$\n\n(2)\ncontinuous at $x=0$\n\n(3)\ndifferentiable at $x=0$\n\n(4)\nits derivative is continuous at $x=0$'
+  const rows = parseMatchingListForDisplay(bare, ['P → 2; Q → 3; R → 1; S → 4', 'P → 4; Q → 1; R → 2; S → 3'])
+  assert.deepEqual([rows?.listI?.length, rows?.listII?.length], [4, 4], JSON.stringify(rows))
+  assert.equal(rows.listII[1].text, 'continuous at $x=0$')
+
+  const approvedCard = { text: `LIST-I contains reactions.\n${crop}`, pyqSlot: 35, questionNumber: 35, subject: 'chemistry', adminApproved: true }
+  const healedCard = { text: 'LIST-I contains reactions.\n\nLIST-I\nLIST-II\n<smiles>CC</smiles>', pyqSlot: 35, questionNumber: 35, subject: 'chemistry' }
+  const other = { text: 'Q36', pyqSlot: 36, questionNumber: 36, subject: 'chemistry' }
+  const kept = keepApprovedOfficialPyqCards({ questions: [approvedCard, other] }, [healedCard, other])
+  assert.equal(kept[0], approvedCard)
+  assert.equal(kept[1], other)
 })
 
 if (failed) {

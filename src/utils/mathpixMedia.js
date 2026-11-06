@@ -11,6 +11,11 @@ export function isOriginalCropUrl(url) {
   return String(url ?? '').startsWith(ORIGINAL_CROP_URL_PREFIX)
 }
 
+/** A picture cut from the original page (Compare / Fix it now / admin crop) sits in this text. */
+export function hasOriginalPageCrop(text) {
+  return /\\includegraphics(?:\[[^\]]*\])?\{\/api\/official-pyq\/original\/crops\/[^}]+\}/.test(String(text ?? ''))
+}
+
 function mathStateBefore(str, offset) {
   const before = String(str ?? '').slice(0, offset)
   let i = 0

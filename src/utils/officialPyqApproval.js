@@ -80,14 +80,17 @@ import {
 } from './officialPyqMissingSlots.js'
 
 /** Cards the admin approved one by one are published exactly as saved, never re-healed. */
-function keepApprovedOfficialPyqCards(paper, healed) {
-  const approved = new Map(
-    (Array.isArray(paper?.questions) ? paper.questions : [])
-      .filter((q) => q?.adminApproved === true && String(q?.id ?? '').trim())
-      .map((q) => [String(q.id), q]),
-  )
-  if (!approved.size) return healed
-  return healed.map((q) => approved.get(String(q?.id ?? '')) || q)
+export function keepApprovedOfficialPyqCards(paper, healed) {
+  const approved = (Array.isArray(paper?.questions) ? paper.questions : []).filter((q) => q?.adminApproved === true)
+  if (!approved.length) return healed
+  const byId = new Map(approved.filter((q) => String(q?.id ?? '').trim()).map((q) => [String(q.id), q]))
+  // Some saved cards carry no id; the slot and subject still name the same question.
+  const slotKey = (q) => {
+    const slot = Number(q?.pyqSlot ?? q?.questionNumber)
+    return Number.isFinite(slot) && slot > 0 ? `${slot}/${String(q?.subject ?? '')}` : ''
+  }
+  const bySlot = new Map(approved.filter((q) => slotKey(q)).map((q) => [slotKey(q), q]))
+  return healed.map((q) => byId.get(String(q?.id ?? '').trim()) || bySlot.get(slotKey(q)) || q)
 }
 
 function healOfficialPyqPaperQuestionsEnriched(paper, opts) {
@@ -321,7 +324,7 @@ function officialPyqApproveCheck(paper, preHealed) {
         : []
     if (!(Array.isArray(preHealed) && preHealed.length)) {
       try {
-        const live = healOfficialPyqPaperQuestionsEnriched(ready)
+        const live = keepApprovedOfficialPyqCards(ready, healOfficialPyqPaperQuestionsEnriched(ready))
         if (Array.isArray(live) && live.length) healed = live
       } catch {
         /* use stored cards */

@@ -336,7 +336,7 @@ export function missingBracketedGivenLine(stem, ocrWindow) {
     if (at < 0) return ''
     region = window.slice(at)
   }
-  const cut = region.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]|Q\.\s*\d+)/)
+  const cut = region.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d|Q\.\s*\d+)/)
   if (cut > 40) region = region.slice(0, cut)
   const match = region.match(/\[\s*Given\s*:[\s\S]*?\]/)
   if (!match) return ''
@@ -653,6 +653,8 @@ export function cleanMathpixCardText(text) {
   t = ensureMatrixStemDelimiters(t)
   t = wrapBareMatrixEnvs(t)
   t = rejoinSplitMathEnvironments(t)
+  // An option cut just before the next list item keeps a dangling \item[ at its end.
+  t = t.replace(/\s*\\item\s*(?:\[\s*\]?)?\s*$/, '')
   return peelPrintedAnswerFromStem(dropBakedMatchListRowLabels(t))
 }
 

@@ -427,12 +427,13 @@ export function rewriteLatexItemLabels(text) {
     .replace(/\\section\*?\{\s*(\(\s*[1-5]\s*\))\s*\$([^$]*)\$\s*\}/g, '\n$1 $$$2$$\n')
     .replace(/\\begin\{(?:itemize|enumerate)\}/gi, '\n')
     .replace(/\\end\{(?:itemize|enumerate)\}/gi, '\n')
-    .replace(/\\item\s*\[\s*Q[^\]]*\]/gi, ' ')
+    .replace(/\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\](?=\s*\$?\s*\d))/gi, ' ')
     .replace(/\\item\s*\[\s*-\s*\]/gi, ' ')
     .replace(/\\item\s*\[\s*\]/gi, ' ')
-    .replace(/\\item\s*\[\s*\(\s*(I{1,3}|IV|V)\s*\)\s*\]/g, '\n($1) ')
+    .replace(/\\item\s*\[\s*\(\s*(I{1,3}|IV|VI?)\s*\)\s*\]/g, '\n($1) ')
+    .replace(/\\item\s*\[\s*\(\s*(i{1,3}|iv|vi?)\s*\)\s*\]/g, '\n($1) ')
     .replace(
-      /\\item\s*\[\s*(\(\s*[PQRSTABCD1-5]\s*\)|[PQRSTABCD1-5]\s*[.:]?)\s*\]/gi,
+      /\\item\s*\[\s*(\(\s*[PQRSTUVWABCD1-6]\s*\)|[PQRSTUVWABCD1-6]\s*[.:]?)\s*\]/gi,
       (_, inner) => {
         const letter = String(inner ?? '')
           .replace(/[().:.\s]/g, '')

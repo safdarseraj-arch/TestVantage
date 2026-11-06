@@ -27,7 +27,7 @@ const SECTION_ANCHOR_RE =
   /\\section\*?\{[^}\n]*SECTION[^}]*\}|(?:^|\n)\s*SECTION\s+\d+\b/gi
 
 const PARA_ANCHOR_RE =
-  /\\section\*?\{[^}\n]*PARAGRAPH[^}]*\}|(?:^|\n)\s*PARAGRAPH\s*["']?[IVXL\d]|(?:^|\n)\s*Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:^|\n)\s*(?:Passage|Comprehension)\s*:|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}/gi
+  /\\section\*?\{[^}\n]*PARAGRAPH[^}]*\}|(?:^|\n)\s*PARAGRAPH\s*["']?[IVXL\d]|(?:^|\n)\s*Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:^|\n)\s*(?:Passage|Comprehension)\s*:|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/gi
 
 const Q_ITEM_RE = /\\item\s*\[\s*Q[^\]]*\]\s*(\d{1,3})\b|(?:^|\n)\s*Q\s*\.?\s*(\d{1,3})\b(?!\s*[,;])/gi
 
@@ -129,9 +129,10 @@ export function parseExplicitQuestionRange(text) {
       return { from: Math.min(...nums), to: Math.max(...nums) }
     }
   }
-  const pair = t.match(
-    /\b(?:Paragraph\s+for\s+(?:Questions?|Q\.?)|Question\s+Stem\s+for\s+Question\s+Nos?\.?)\s*(\d{1,3})\s+and\s+(\d{1,3})\b/i,
-  )
+  const pair =
+    t.match(
+      /\b(?:Paragraph\s+for\s+(?:Questions?|Q\.?)|Question\s+Stem\s+for\s+Question\s+Nos?\.?)\s*(\d{1,3})\s+and\s+(\d{1,3})\b/i,
+    ) || t.match(/\bAnswer\s+Q\.?\s*(\d{1,3})\s+and\s+Q\.?\s*(\d{1,3})\b/i)
   if (pair) {
     const a = Number(pair[1])
     const b = Number(pair[2])

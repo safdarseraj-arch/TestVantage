@@ -57,7 +57,10 @@ function nothingLost(q, ocr) {
     if (!card.includes(num.replace(/\s+/g, ''))) missing.push(num)
   }
   const optionLetters = new Set((span.match(/\(\s*[A-D]\s*\)/g) || []).map((l) => l.replace(/\s+/g, '')))
-  if (optionLetters.size > filled(q?.options).length) missing.push(`${optionLetters.size} options in the scan`)
+  const numerical = ['numerical', 'integer', 'passage_integer'].includes(String(q?.questionType ?? ''))
+  if (!numerical && optionLetters.size >= 2 && optionLetters.size > filled(q?.options).length) {
+    missing.push(`${optionLetters.size} options in the scan`)
+  }
   const labels = span.match(/\(\s*[PQRS]\s*\)|\(\s*[1-5]\s*\)/g) || []
   for (const label of labels) {
     const compact = label.replace(/\s+/g, '')
@@ -210,6 +213,9 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     if (lost) reasons.push(lost)
     if (/single_correct|multiple_correct|matrix_match/.test(type)) {
       if (opts.length < 2) reasons.push('An MCQ option is empty')
+      if (opts.some((opt) => /<smiles>\s*<\/smiles>/i.test(opt))) {
+        reasons.push('An option has an empty structure (the scan lost the drawing)')
+      }
       const seen = new Set()
       for (const opt of opts) {
         const key = optionKey(opt)

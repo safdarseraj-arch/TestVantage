@@ -33,7 +33,9 @@ const {
   autoFixFlaggedOfficialPyqCards,
   officialPyqAlertGoTo,
   officialPyqAutoFixRejectReason,
+  officialPyqAutoFixTodo,
 } = await import('../src/utils/officialPyqAutoFix.js')
+const { readFileSync } = await import('node:fs')
 
 let failed = 0
 async function test(name, fn) {
@@ -212,6 +214,103 @@ await test('reject reason: number-answer correction with options, and wrong prin
   assert.equal(officialPyqAutoFixRejectReason(card, { text: 'Q.7 Find $n^2$.', passageText: '', options: [] }, { printedNumber: 7 }), '')
 })
 
+await test('a card changed by an earlier auto-fix is tried again when flagged, not listed as edited by the admin', async () => {
+  const paper = freshPaper(2089, {
+    flagged: [3],
+    edit: { 2: { adminEdited: true, adminEditedAt: 1, editSource: OFFICIAL_PYQ_AUTO_FIX_SOURCE, text: BROKEN } },
+  })
+  const { asked, compare } = stubCompare({
+    3: { verdict: 'differs', differences: [{ kind: 'math', detail: 'x' }], suggested_text: FIXED },
+  })
+  const out = await autoFixFlaggedOfficialPyqCards(paper.id, { compare })
+  assert.deepEqual(asked, [3])
+  assert.deepEqual(out.skippedAdminEdited, [])
+  assert.equal(getOfficialPyqPendingPaper(paper.id).questions[2].text, FIXED)
+})
+
+await test('the to-do list skips cards a person edited and versions already tried', async () => {
+  const paper = freshPaper(2090, { flagged: [1, 2, 3], edit: { 1: { adminEdited: true } } })
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [1, 3])
+  await autoFixFlaggedOfficialPyqCards(paper.id, { compare: stubCompare({}).compare, max: 1 })
+  updateOfficialPyqPendingPaper(paper.id, { localQuality: { ok: false, failedGoTo: [1, 2, 3], lines: [] } })
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [3])
+})
+
+await test('new pending papers: the panel runs auto-fix on its own and upload stores the original first', () => {
+  const panel = readFileSync(new URL('../src/components/OfficialPyqOriginalComparePanel.jsx', import.meta.url), 'utf8')
+  assert.match(panel, /officialPyqAutoFixTodo\(paper\)/)
+  assert.match(panel, /void runAutoFix\(true\)/)
+  assert.match(panel, /!auto &&\s*typeof window/)
+  const page = readFileSync(new URL('../src/pages/OfficialPyqPending.jsx', import.meta.url), 'utf8')
+  const upload = page.indexOf('uploadOfficialPyqOriginal(paper.id, file)')
+  assert.ok(upload > 0)
+  assert.match(page.slice(upload - 200, upload), /await import\('\.\.\/utils\/officialPyqOriginalCompare\.js'\)/)
+  assert.ok(page.indexOf('openOfficialPaper(paper)', upload) > upload)
+})
+await test('a Gemini timeout does not use up the try: the next run asks again, the second failure goes to the admin', async () => {
+  const paper = freshPaper(2091, { flagged: [2] })
+  const failing = { 2: { verdict: 'error', error: 'Gemini did not answer in time.' } }
+  const first = stubCompare(failing)
+  const out1 = await autoFixFlaggedOfficialPyqCards(paper.id, { compare: first.compare })
+  assert.deepEqual(first.asked, [2])
+  assert.match(out1.needsAdmin[0].reason, /tried again/)
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [2])
+  const second = stubCompare(failing)
+  const out2 = await autoFixFlaggedOfficialPyqCards(paper.id, { compare: second.compare })
+  assert.deepEqual(second.asked, [2])
+  assert.match(out2.needsAdmin[0].reason, /failed 2 times/)
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [])
+})
+await test('a re-split that shifts card numbers keeps each fixed card on its own question, once, still labelled auto-fixed', async () => {
+  const { keepAdminEditedCards, copyAnswersOntoCanonical } = await import('../src/utils/officialPyqLocalReparse.js')
+  const { keepAdminEditedOfficialPyqCards } = await import('../src/utils/officialPyqPendingStore.js')
+  const card = (n, text, options = [], extra = {}) => ({
+    id: `new-${n}`, printedNumber: n, pyqSlot: n, questionNumber: n, subject: 'mathematics', text, options, ...extra,
+  })
+  const matchStem = 'Which of the following is the only CORRECT combination?'
+  const scanned45 = 'Suppose det of the matrix with sum k and sum binomial n k holds for some positive integer n then find'
+  const fixed = (id, n, text, options, at) => ({
+    ...card(n, text, options),
+    id,
+    adminEdited: true,
+    adminEditedAt: at,
+    editSource: OFFICIAL_PYQ_AUTO_FIX_SOURCE,
+    autoFix: { tried: ['x'] },
+    editHistory: [{ savedAt: at, card: { text: text.replace('fixed ', ''), options } }],
+  })
+  // Old split was one card behind: the "Suppose det" question sat on card 45.
+  const fix45 = fixed('old-45', 45, `fixed ${scanned45}`, [], 1000)
+  const fix53 = fixed('old-53', 53, matchStem, ['(I), (S)', '(I), (U)', '(II), (Q)', '(II), (T)'], 2000)
+  const prev = [
+    card(44, 'Let f be given by f of x equals x minus 1 times x minus 2'),
+    fix45,
+    { ...fix45, id: 'old-45-copy', editSource: undefined, autoFix: undefined },
+    card(52, matchStem, ['(I), (P), (R)', '(II), (Q), (T)', '(I), (Q), (U)', '(II), (R), (S)']),
+    fix53,
+  ]
+  const next = [
+    card(44, 'Let f be given by f of x equals x minus 1 times x minus 2'),
+    card(45, 'Five persons A B C D and E are seated in a circular arrangement'),
+    card(46, scanned45),
+    card(52, matchStem, ['(I), (P), (R)', '(II), (Q), (T)', '(I), (Q), (U)', '(II), (R), (S)']),
+    card(53, matchStem, ['(I), (S)', '(I), (U)', '(II), (Q)', '(II), (T)']),
+  ]
+  for (const merge of [keepAdminEditedCards, copyAnswersOntoCanonical]) {
+    const merged = merge(next, prev)
+    const kept = keepAdminEditedOfficialPyqCards(prev, merged)
+    assert.equal(kept.length, 5, merge.name)
+    assert.match(kept[1].text, /^Five persons/)
+    assert.equal(kept[1].adminEdited, undefined)
+    assert.equal(kept[2].text, fix45.text)
+    assert.equal(kept[2].id, 'old-45')
+    assert.equal(kept[2].editSource, OFFICIAL_PYQ_AUTO_FIX_SOURCE)
+    assert.deepEqual(kept[2].autoFix, { tried: ['x'] })
+    assert.equal(kept[3].adminEdited, undefined)
+    assert.equal(kept[4].id, 'old-53')
+    assert.equal(kept[4].editSource, OFFICIAL_PYQ_AUTO_FIX_SOURCE)
+    assert.equal(kept.filter((q) => q.text === fix45.text).length, 1)
+  }
+})
 if (failed) {
   console.error(`\n${failed} auto-fix test(s) failed`)
   process.exit(1)

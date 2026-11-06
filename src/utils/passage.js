@@ -650,6 +650,7 @@ export function officialPyqCardHasMistakenPassage(q, source = '') {
     return false
   }
   if (String(source ?? '').length < 40) return false
+  if (q.passageSource === 'ocr-header' && String(q.passageText ?? '').trim()) return false
   return !officialPyqCardAllowsPassage(
     {
       ...q,
@@ -758,6 +759,9 @@ export function recoverOfficialPyqPassageFromSource(q, source) {
   if (!q || typeof q !== 'object') return q
   if (passageSetByAdmin(q)) return q
   const stored = stripOfficialPyqPaperChrome(q.passageText)
+  if (q.passageSource === 'ocr-header' && stored) {
+    return stored === String(q.passageText ?? '').trim() ? q : { ...q, passageText: stored }
+  }
   const blob = `${q.text || ''} ${q.subject || ''} ${stored}`
   const src = String(source ?? '')
   const allowsBySlot = officialPyqCardAllowsPassage(
@@ -1139,7 +1143,7 @@ function childStemFromOcrNearParagraph(source, n, passageText) {
   if (at < 0) return ''
   const tail = src.slice(at)
   const cut = tail.slice(8).search(
-    /(?:\\item\s*\[\s*Q[^\]]*\]|(?:^|\n)Q\s*\.?\s*\d{1,3}\b|(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?(?:XII|XI|VIII|VII|VI|IV|IX|III|II|I|V|X|\d+)))/i,
+    /(?:\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|(?:^|\n)Q\s*\.?\s*\d{1,3}\b|(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?(?:XII|XI|VIII|VII|VI|IV|IX|III|II|I|V|X|\d+)))/i,
   )
   const window = (cut >= 0 ? tail.slice(0, cut + 8) : tail.slice(0, 900)).trim()
   const stem = stripOfficialPyqPaperChrome(
@@ -1380,7 +1384,7 @@ export function looksLikeOfficialPyqPassageOnly(text) {
   const t = String(text ?? '').trim()
   if (!looksLikePyqParagraphHeader(t)) return false
   if (/\(\s*A\s*\)[\s\S]{4,}\(\s*B\s*\)/.test(t)) return false
-  if (/(?:^|\n)\s*(?:\\item\s*\[\s*Q|Q\s*\.?\s*\d{1,3}\b)/i.test(t.slice(20))) return false
+  if (/(?:^|\n)\s*(?:\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|Q\s*\.?\s*\d{1,3}\b)/i.test(t.slice(20))) return false
   return (
     /^Paragraph\s+for\b/i.test(t) ||
     /^(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?(?:XII|XI|VIII|VII|VI|IV|IX|III|II|I|V|X|\d+))/i.test(t) ||

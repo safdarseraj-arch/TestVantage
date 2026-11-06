@@ -57,7 +57,7 @@ export function questionScanWindow(stem, source) {
   }
   if (bestAt >= 0) {
     const slice = src.slice(Math.max(0, bestAt - 700), bestAt + 1800)
-    const cut = slice.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]|Q\.\s*\d+)/)
+    const cut = slice.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d|Q\.\s*\d+)/)
     return cut > 80 ? slice.slice(0, cut) : slice
   }
   const head = stemText.split('$')[0].replace(/\s+/g, ' ').trim()
@@ -65,7 +65,7 @@ export function questionScanWindow(stem, source) {
   const at = src.toLowerCase().indexOf(head.toLowerCase())
   if (at < 0) return direct || ''
   const slice = src.slice(at, at + 2400)
-  const cut = slice.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]|Q\.\s*\d+)/)
+  const cut = slice.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d|Q\.\s*\d+)/)
   return cut > 80 ? slice.slice(0, cut) : slice
 }
 
@@ -90,7 +90,7 @@ function optionRowsWindow(stem, source) {
   }
   if (at < 0) return stemWindow
   const slice = src.slice(at, at + 4000)
-  const cut = slice.search(/\n\s*\\item\s*\[\s*Q\.?\s*\]/)
+  const cut = slice.search(/\n\s*\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d/)
   const extended = (cut > 40 ? slice.slice(0, cut) : slice).trim()
   return extended.length > stemWindow.length ? extended : stemWindow
 }
@@ -105,7 +105,7 @@ function mathBreakWindow(stem, source) {
   const at = src.indexOf(head)
   if (at < 0) return ''
   const slice = src.slice(at, at + 4000)
-  const cut = slice.search(/\n\s*\\item\s*\[\s*Q\.?\s*\]/)
+  const cut = slice.search(/\n\s*\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d/)
   return (cut > 40 ? slice.slice(0, cut) : slice).trim()
 }
 

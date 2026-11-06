@@ -84,7 +84,7 @@ function softenLeftRightInTables(text) {
 /** Cells are already in math once wrapped in $$ — leftover $…$ breaks KaTeX. */
 export function stripDollarsInsideLatexEnvs(text) {
   return String(text ?? '').replace(
-    /(\\begin\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix)\}[\s\S]*?\\end\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix)\})/gi,
+    /(\\begin\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix|aligned|align\*?|gathered|split)\}[\s\S]*?\\end\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix|aligned|align\*?|gathered|split)\})/gi,
     (block) => block.replace(/\$+/g, ''),
   )
 }

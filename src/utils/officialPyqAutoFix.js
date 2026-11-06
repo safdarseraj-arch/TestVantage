@@ -28,8 +28,10 @@ import { mathDrawFailure } from './mathDrawCheck.js'
 import { reviewOfficialPyqCards } from './officialPyqUnifiedCheck.js'
 
 export const OFFICIAL_PYQ_AUTO_FIX_SOURCE = 'auto_compare'
+/** Runs that may retry a card after a timeout or network failure. */
+export const OFFICIAL_PYQ_AUTO_FIX_ERROR_RETRIES = 2
 /** Gemini calls one run may spend on a paper. */
-export const OFFICIAL_PYQ_AUTO_FIX_MAX = 8
+export const OFFICIAL_PYQ_AUTO_FIX_MAX = 30
 
 const MCQ_TYPES = /single_correct|multiple_correct|matrix_match/
 
@@ -114,6 +116,24 @@ export function officialPyqAutoFixRejectReason(card, draft, ctx = {}) {
   return ''
 }
 
+/** Edited by a person, not by an earlier auto-fix. @param {any} card */
+export function officialPyqCardHumanEdited(card) {
+  return card?.adminEdited === true && card?.editSource !== OFFICIAL_PYQ_AUTO_FIX_SOURCE
+}
+
+/**
+ * Go-to numbers the next run would send: alert cards not edited by a person and
+ * not already tried in this version.
+ * @param {any} paper
+ */
+export function officialPyqAutoFixTodo(paper) {
+  const questions = Array.isArray(paper?.questions) ? paper.questions : []
+  return officialPyqAlertGoTo(paper).filter((goTo) => {
+    const card = questions[goTo - 1]
+    return card && !isOfficialPyqPlaceholder(card) && !officialPyqCardHumanEdited(card) && !alreadyTried(card)
+  })
+}
+
 /** @param {any} card */
 function alreadyTried(card) {
   const tried = Array.isArray(card?.autoFix?.tried) ? card.autoFix.tried : []
@@ -164,7 +184,7 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
   for (const goTo of officialPyqAlertGoTo(paper)) {
     const card = paper.questions[goTo - 1]
     if (!card || isOfficialPyqPlaceholder(card)) continue
-    if (card.adminEdited === true) out.skippedAdminEdited.push(goTo)
+    if (officialPyqCardHumanEdited(card)) out.skippedAdminEdited.push(goTo)
     else if (alreadyTried(card)) out.skippedTried.push(goTo)
     else todo.push(goTo)
   }
@@ -194,11 +214,25 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
       markAttempt(paperId, index, [signature], { outcome: 'needs_admin', reason })
     }
     if (verdict === 'error') {
-      note(`Compare failed: ${result?.error || 'no answer'}`)
+      // A timeout or network failure does not use up the card's one try, up to OFFICIAL_PYQ_AUTO_FIX_ERROR_RETRIES runs.
+      const errors = (Number(card.autoFix?.errors) || 0) + 1
+      if (errors < OFFICIAL_PYQ_AUTO_FIX_ERROR_RETRIES) {
+        out.needsAdmin.push({ goTo, reason: `Compare failed: ${result?.error || 'no answer'} It will be tried again next run.` })
+        markAttempt(paperId, index, [], { outcome: 'error', errors, reason: String(result?.error || '') })
+      } else {
+        note(`Compare failed ${errors} times: ${result?.error || 'no answer'}`)
+      }
       continue
     }
     if (verdict === 'matches' || !compared || !officialPyqCompareHasSuggestion(compared)) {
-      note('Compare found no correction, but the alert is still there')
+      const lost =
+        result?.notFound === true ||
+        (Array.isArray(result?.differences) && result.differences.some((d) => d?.kind === 'extra_card'))
+      note(
+        lost
+          ? `Compare could not find this question on the original page it looked at (page ${(result?.pages || []).join(', ') || '?'}); check the card's question number`
+          : 'Compare found no correction, but the alert is still there',
+      )
       continue
     }
     const shown = officialPyqCardForAdmin(paperId, card)

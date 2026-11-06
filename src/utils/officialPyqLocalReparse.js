@@ -309,21 +309,101 @@ export function healAndPersistOfficialPyqPaper(paper, opts = {}) {
   return { ok: true, changed: true, count: healed.length, previousCount, questions: healed }
 }
 
-function keepAdminEditedCards(next, prev) {
+/**
+ * Places where printed numbers do not run 1, 2, 3… (restarting at 1 per subject).
+ * A question with no "Q." marker in the scan makes the marker count one short, so the
+ * count alone would keep an old list that skips a number.
+ */
+function printedNumberBreaks(questions) {
+  const pn = (Array.isArray(questions) ? questions : []).map((q) => Number(q?.printedNumber) || 0)
+  return pn.filter((n, i) => i > 0 && n !== pn[i - 1] + 1 && n !== 1).length
+}
+
+/** Ordered word pairs of text + options, so matrix-match cards sharing one stem still differ. */
+function cardWordPairs(card) {
+  const options = Array.isArray(card?.options) ? card.options : []
+  const words = String([card?.text ?? '', ...options].join(' ')).toLowerCase().match(/[a-z0-9]+/g) || []
+  const pairs = new Set()
+  for (let i = 1; i < words.length; i += 1) pairs.add(`${words[i - 1]} ${words[i]}`)
+  if (words.length === 1) pairs.add(words[0])
+  return pairs
+}
+
+function pairOverlap(a, b) {
+  if (!a.size || !b.size) return 0
+  let shared = 0
+  for (const p of a) if (b.has(p)) shared += 1
+  return (2 * shared) / (a.size + b.size)
+}
+
+const SAME_CARD_MIN_OVERLAP = 0.6
+
+/**
+ * Card numbers shift when the splitter improves, so an edited card goes to the
+ * new card holding the same question (edited or scanned wording), not the same number.
+ */
+function placeAdminEditedCards(cards, prior, admins) {
+  const nextPairs = cards.map(cardWordPairs)
+  const scored = []
+  admins.forEach((a, ai) => {
+    const history = Array.isArray(a.editHistory) ? a.editHistory : []
+    const versions = [a, ...history.map((h) => h?.card).filter(Boolean)].map(cardWordPairs)
+    nextPairs.forEach((pairs, qi) => {
+      const subject = String(cards[qi]?.subject || '')
+      if (a.subject && subject && String(a.subject) !== subject) return
+      const score = Math.max(...versions.map((v) => pairOverlap(v, pairs)))
+      if (score >= SAME_CARD_MIN_OVERLAP) scored.push({ ai, qi, score })
+    })
+  })
+  scored.sort((x, y) => y.score - x.score)
+  /** @type {Map<number, any>} */
+  const byNext = new Map()
+  const placed = new Set()
+  for (const { ai, qi } of scored) {
+    if (placed.has(ai) || byNext.has(qi)) continue
+    byNext.set(qi, admins[ai])
+    placed.add(ai)
+  }
+  admins.forEach((a, ai) => {
+    if (placed.has(ai)) return
+    let at = cards.findIndex(
+      (q, i) =>
+        !byNext.has(i) &&
+        Number(a.printedNumber) > 0 &&
+        Number(a.printedNumber) === Number(q?.printedNumber) &&
+        String(a.subject || '') === String(q?.subject || ''),
+    )
+    if (at < 0) at = prior.indexOf(a)
+    if (at >= 0 && at < cards.length && !byNext.has(at)) byNext.set(at, a)
+  })
+  return byNext
+}
+
+/** Two edited cards with the same text and options are one question kept twice; keep the labelled one. */
+function uniqueAdminCards(admins) {
+  const best = new Map()
+  for (const a of admins) {
+    const key = JSON.stringify([a.text ?? '', a.options ?? []])
+    const have = best.get(key)
+    if (!have || (!have.editSource && a.editSource)) best.set(key, a)
+  }
+  return [...best.values()]
+}
+
+export function keepAdminEditedCards(next, prev) {
   const prior = Array.isArray(prev) ? prev : []
-  const admins = prior.filter((q) => q?.adminEdited === true)
+  const cards = Array.isArray(next) ? next : []
+  const admins = uniqueAdminCards(prior.filter((q) => q?.adminEdited === true))
   if (!admins.length) return next
-  return (Array.isArray(next) ? next : []).map((q, i) => {
-    const old =
-      admins.find(
-        (a) =>
-          Number(a.printedNumber) > 0 &&
-          Number(a.printedNumber) === Number(q?.printedNumber) &&
-          String(a.subject || '') === String(q?.subject || ''),
-      ) || (prior[i]?.adminEdited === true ? prior[i] : null)
+  const byNext = placeAdminEditedCards(cards, prior, admins)
+  return cards.map((q, i) => {
+    const old = byNext.get(i)
     if (!old?.adminEdited) return q
     return {
       ...q,
+      id: old.id || q.id,
+      ...(old.editSource ? { editSource: old.editSource } : {}),
+      ...(old.autoFix ? { autoFix: old.autoFix } : {}),
       text: old.text,
       options: old.options,
       passageText: old.passageText,
@@ -341,14 +421,18 @@ function keepAdminEditedCards(next, prev) {
 }
 
 /** @param {unknown[]} canonical @param {unknown[]} prev */
-function copyAnswersOntoCanonical(canonical, prev) {
+export function copyAnswersOntoCanonical(canonical, prev) {
   const byNum = new Map()
   for (const q of prev) {
     const n = Number(q?.questionNumber)
     if (Number.isFinite(n) && n > 0) byNum.set(n, q)
   }
+  const admins = uniqueAdminCards(prev.filter((q) => q?.adminEdited === true))
+  const adminAt = admins.length ? placeAdminEditedCards(canonical, prev, admins) : new Map()
   return canonical.map((q, i) => {
-    const old = byNum.get(Number(q.questionNumber)) || prev[i]
+    const placed = adminAt.get(i)
+    let old = placed || byNum.get(Number(q.questionNumber)) || prev[i]
+    if (!placed && old?.adminEdited === true) old = null
     if (!old) return q
     if (old.adminEdited === true) {
       return {
@@ -682,12 +766,15 @@ export async function reExtractOfficialPyqPendingPaperLocalAsync(paper, { yieldF
   if (mustRebuild) {
     const rebuiltQs = questions
     const leakedStored = officialPyqQuestionsHaveMistakenPassages(paper.questions, preparedText)
-    questions =
-      pickQuestionListCloserToExpected(
-        leakedStored ? [rebuiltQs] : [rebuiltQs, paper.questions ?? []],
-        targetCount,
-        minKeep,
-      ) || rebuiltQs
+    const cleanerRun =
+      rebuiltQs.length >= minKeep && printedNumberBreaks(rebuiltQs) < printedNumberBreaks(paper.questions)
+    questions = cleanerRun
+      ? rebuiltQs
+      : pickQuestionListCloserToExpected(
+          leakedStored ? [rebuiltQs] : [rebuiltQs, paper.questions ?? []],
+          targetCount,
+          minKeep,
+        ) || rebuiltQs
   } else {
     questions = restoreMatchListIFromOcrLight(questions, preparedText)
   }

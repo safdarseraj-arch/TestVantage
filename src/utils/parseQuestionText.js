@@ -42,18 +42,32 @@ function indexInsideSmiles(text, index) {
   return close < open
 }
 
+/** OCR "[A] opt" labels → "(A)". Not inside $…$ ($[B]$ is a dimension) or table rows ([A] is a concentration). */
+function bracketLabelsToParens(text) {
+  return String(text ?? '')
+    .split('\n')
+    .map((line) => {
+      if (/&|\\hline/.test(line)) return line
+      let dollars = 0
+      return line.replace(/\\\$|\$|\[\s*([A-D])\s*\]/gi, (m, letter) => {
+        if (m === '$') dollars += 1
+        if (!letter) return m
+        return dollars % 2 ? m : `(${letter})`
+      })
+    })
+    .join('\n')
+}
+
 /** Fix misread MCQ labels before parsing */
 function normalizeMcqOptionLabels(text) {
   return normalizeOptionMarkersInText(
-    text
+    bracketLabelsToParens(text)
       .replace(/\(\s*©\s*\)/gi, '(C)')
       .replace(/\(\s*®\s*\)/gi, '(C)')
       .replace(/\(\s*℗\s*\)/gi, '(C)')
       .replace(/\(\s*@\s*\)/gi, '(C)')
       .replace(/\(\s*¢\s*\)/gi, '(C)')
-      .replace(/\(\s*C\s*O\s*\)/gi, '(C)')
-      // Keep $\ce{…}$ chemistry options intact (JEE/NEET PCMB).
-      .replace(/\[\s*([A-D])\s*\]/gi, '($1)'),
+      .replace(/\(\s*C\s*O\s*\)/gi, '(C)'),
   )
 }
 

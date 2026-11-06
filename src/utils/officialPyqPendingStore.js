@@ -144,6 +144,7 @@ export const OFFICIAL_PYQ_ADMIN_EDIT_FIELDS = [
   'adminApproved',
   'adminApprovedAt',
   'editHistory',
+  'editSource',
 ]
 
 /** @param {unknown} q */
@@ -184,6 +185,11 @@ export function keepAdminEditedOfficialPyqCards(prevQuestions, nextQuestions, op
     const id = String(/** @type {any} */ (q)?.id ?? '').trim()
     if (id && !nextById.has(id)) nextById.set(id, i)
   })
+  const editedContent = new Set(
+    next
+      .filter((q) => officialPyqCardIsAdminEdited(q))
+      .map((q) => JSON.stringify([/** @type {any} */ (q).text ?? '', /** @type {any} */ (q).options ?? []])),
+  )
   const edited = new Map()
   /** @type {Map<number, any>} */
   const carried = new Map()
@@ -192,7 +198,9 @@ export function keepAdminEditedOfficialPyqCards(prevQuestions, nextQuestions, op
     // A card that moved slot (e.g. a passage card before it was removed) keeps its edit by id.
     const at = nextById.get(String(q?.id ?? '').trim())
     if (at != null && officialPyqCardIsAdminEdited(next[at])) carried.set(at, q)
-    else edited.set(officialPyqCardSlotKey(q, i), q)
+    else if (!editedContent.has(JSON.stringify([q.text ?? '', q.options ?? []]))) {
+      edited.set(officialPyqCardSlotKey(q, i), q)
+    }
   })
   if (!edited.size && !carried.size) return next
   let changed = false

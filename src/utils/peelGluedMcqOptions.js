@@ -289,7 +289,7 @@ export function peelGluedMcqOptions(text, options = [], source = '') {
 
 function clipToThisQuestion(slice, probeAt) {
   const t = String(slice ?? '')
-  const re = /(?:\\item\s*\[\s*Q[^\]]*\]|(?:^|\n)\s*Q\s*\.?\s*\d{1,2}\b)/gi
+  const re = /(?:\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|(?:^|\n)\s*Q\s*\.?\s*\d{1,2}\b)/gi
   const markers = [...t.matchAll(re)]
   if (!markers.length) return t
   const at = Number.isFinite(Number(probeAt)) ? Number(probeAt) : 0

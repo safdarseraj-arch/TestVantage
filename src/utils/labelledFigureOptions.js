@@ -61,7 +61,7 @@ function scanSliceForStem(stem, source) {
   const at = src.indexOf(head)
   if (at < 0 || src.indexOf(head, at + 1) >= 0) return ''
   const rest = src.slice(at + head.length)
-  const next = rest.search(/\\item\s*\[\s*Q\.?\s*\]|(?:^|\n)\s*Q\s*\.\s*\d{1,2}\b|\\section\*?\{/)
+  const next = rest.search(/\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d|(?:^|\n)\s*Q\s*\.\s*\d{1,2}\b|\\section\*?\{/)
   return src.slice(at, at + head.length + (next >= 0 ? next : Math.min(rest.length, 2500)))
 }
 
@@ -85,6 +85,54 @@ function restoreFromScan(q, source) {
   return { ...q, text: stem, options: scan.options }
 }
 
+const FIGURE_RE = /\\includegraphics(?:\[[^\]]*\])?\{([^}\s]+)\}|!\[[^\]]*\]\(([^)\s]+)\)/g
+const ASKS_FOR_A_PICTURE_RE =
+  /\bwill\s+(?:look\s+like|be)\b|\bwhich\s+(?:one\s+)?of\s+the\s+following\b|\bcorrect\s+(?:shape|plot|graph|figure|option)|\bis\s*\(\s*are\s*\)\s+correct\b|\brepresents?\b/i
+
+function cropBox(url) {
+  const num = (key) => Number((String(url).match(new RegExp(`[?&]${key}=(\\d+)`)) || [])[1])
+  const box = { x: num('top_left_x'), y: num('top_left_y'), h: num('height') }
+  return Object.values(box).every((n) => Number.isFinite(n) && n > 0) ? box : null
+}
+
+/**
+ * All four (A)-(D) labels were lost and the option pictures sit at the end of
+ * the stem (2020 Physics Q3, Q5; Chemistry Q8). Four same-size crops in one row
+ * or a 2×2 grid, after a question that asks which picture is right, are the
+ * options in reading order. A fifth, earlier picture stays in the stem.
+ * @param {string} text
+ * @returns {{ stem: string, options: string[] } | null}
+ */
+function trailingFigureOptions(text) {
+  const figures = [...text.matchAll(FIGURE_RE)]
+  if (figures.length < 4 || figures.length > 5) return null
+  const tail = figures.slice(-4)
+  const firstAt = tail[0].index ?? 0
+  const between = text.slice(firstAt).replace(FIGURE_RE, '')
+  if (between.trim()) return null
+  const prose = text.slice(0, firstAt).replace(FIGURE_RE, ' ')
+  if (!ASKS_FOR_A_PICTURE_RE.test(prose)) return null
+  const boxes = tail.map((m) => cropBox(m[1] || m[2]))
+  if (boxes.some((b) => !b)) return null
+  const heights = boxes.map((b) => b.h)
+  if (Math.max(...heights) > Math.min(...heights) * 1.35) return null
+  const rows = []
+  for (const [i, b] of boxes.entries()) {
+    const row = rows.find((r) => Math.abs(r.y - b.y) < 60)
+    if (row) row.items.push({ ...b, i })
+    else rows.push({ y: b.y, items: [{ ...b, i }] })
+  }
+  const shape = rows.map((r) => r.items.length).join('x')
+  if (shape !== '4' && shape !== '2x2') return null
+  const order = rows
+    .sort((a, b) => a.y - b.y)
+    .flatMap((r) => r.items.sort((a, b) => a.x - b.x).map((item) => item.i))
+  return {
+    stem: text.slice(0, firstAt).trim(),
+    options: order.map((i) => asOptionFigure(tail[i][0])),
+  }
+}
+
 /**
  * @template {Record<string, any>} T
  * @param {T} q
@@ -98,6 +146,10 @@ export function restoreLabelledFigureOptions(q, source = '') {
   const bare = (Array.isArray(q.options) ? q.options : []).map((o) => String(o ?? '')).filter((o) => o.trim())
   if (bare.length >= LETTERS.length) return q
   const matches = [...text.matchAll(LABELLED_FIGURE)]
+  if (!matches.length && !bare.length) {
+    const trailing = trailingFigureOptions(text)
+    if (trailing && trailing.stem.length >= 20) return { ...q, text: trailing.stem, options: trailing.options }
+  }
   if (!matches.length) return restoreFromScan(q, source)
   const first = matches[0].index ?? 0
   const tail = text.slice(first).replace(/\s+/g, '')

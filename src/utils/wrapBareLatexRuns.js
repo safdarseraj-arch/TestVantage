@@ -339,9 +339,12 @@ export function stripStrayMathDelimiters(text) {
       const lineEdge = /\n[ \t]*$/.test(out) || /^[ \t]*\n/.test(t.slice(i + dl))
       const afterRowLabel = /(?:^|\s)\(\s*(?:[A-Z]|[IVX]{1,4}|\d{1,2})\s*\)\s*$/.test(out)
       const beforeRowLabel = /^\s*\(\s*(?:[A-Z]|[IVX]{1,4}|\d{1,2})\s*\)(?:\s|$)/.test(t.slice(i + dl))
+      // $\epsilon_{r} =$ ________ — an answer blank after the closer is English, not a subscript.
+      const answerBlankAfter = /^_{2,}/.test(t.slice(j))
       if (
         leftMath &&
         rightMath &&
+        !answerBlankAfter &&
         !closedGroupThenParen &&
         !hyphenBeforeCommand &&
         !closerBeforeEnglishBracket &&

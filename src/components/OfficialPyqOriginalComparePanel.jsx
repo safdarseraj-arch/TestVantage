@@ -14,7 +14,18 @@ import {
   getOfficialPyqOriginalStatus,
   uploadOfficialPyqOriginal,
 } from '../utils/officialPyqOriginalCompare.js'
-import { OFFICIAL_PYQ_AUTO_FIX_MAX, autoFixFlaggedOfficialPyqCards } from '../utils/officialPyqAutoFix.js'
+import { OFFICIAL_PYQ_AUTO_FIX_MAX, autoFixFlaggedOfficialPyqCards, officialPyqAutoFixTodo } from '../utils/officialPyqAutoFix.js'
+import { getOfficialPyqPendingPaper } from '../utils/officialPyqPendingStore.js'
+
+const AUTO_RUN_KEY = 'testvantage-official-pyq-auto-fix-auto'
+
+function readAutoRun() {
+  try {
+    return localStorage.getItem(AUTO_RUN_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
 
 /**
  * @param {{ paperId: string, flaggedGoTo?: number[], onChanged?: () => void }} props
@@ -29,6 +40,9 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
   const [summary, setSummary] = useState('')
   const [error, setError] = useState('')
   const abortRef = useRef(/** @type {AbortController | null} */ (null))
+  const [autoRun, setAutoRun] = useState(readAutoRun)
+  const autoRanRef = useRef(/** @type {Set<string>} */ (new Set()))
+  const flaggedKey = flagged.join(',')
 
   const loadStatus = useCallback(async () => {
     setStatusError('')
@@ -48,7 +62,29 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
     return () => abortRef.current?.abort()
   }, [loadStatus])
 
+  useEffect(() => {
+    if (!autoRun || busy || !status?.available || !status?.gemini_key || !isAdminLoggedIn()) return
+    const paper = getOfficialPyqPendingPaper(paperId)
+    if (String(paper?.status) !== 'pending_review') return
+    const todo = officialPyqAutoFixTodo(paper)
+    if (!todo.length) return
+    const key = paperId + ':' + todo.join(',')
+    if (autoRanRef.current.has(key)) return
+    autoRanRef.current.add(key)
+    void runAutoFix(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, busy, status, paperId, flaggedKey])
+
   if (!isAdminLoggedIn()) return null
+
+  function onAutoRunChange(on) {
+    setAutoRun(on)
+    try {
+      localStorage.setItem(AUTO_RUN_KEY, on ? '1' : '0')
+    } catch {
+      /* setting is only for this session */
+    }
+  }
 
   async function onAttach(file) {
     setError('')
@@ -114,7 +150,7 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
     }
   }
 
-  async function onAutoFix() {
+  async function runAutoFix(auto = false) {
     if (busy) return
     setError('')
     setSummary('')
@@ -127,6 +163,7 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
       return
     }
     if (
+      !auto &&
       typeof window !== 'undefined' &&
       !window.confirm(
         `Auto-fix flagged questions? Each flagged question (at most ${OFFICIAL_PYQ_AUTO_FIX_MAX} this time) is compared with the original paper (one Gemini request each). A correction is saved only if it draws cleanly and adds no new alert, and you can Undo it on the card. Questions you edited yourself are not changed. Nothing is published.`,
@@ -158,7 +195,8 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
         setError(`${out.error || 'Auto-fix stopped.'} ${lines.join(' ')}`.trim())
         return
       }
-      setSummary(lines.length ? `${lines.join(' ')} Wrong fix? Open the card and click Undo last edit.` : 'No flagged questions to fix.')
+      const lead = auto ? 'Auto-fix ran on its own (new alerts on this pending paper). ' : ''
+      setSummary(lines.length ? `${lead}${lines.join(' ')} Wrong fix? Open the card and click Undo last edit.` : 'No flagged questions to fix.')
     } finally {
       abortRef.current = null
       setBusy(false)
@@ -200,7 +238,7 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
           data-testid="official-pyq-auto-fix"
           disabled={busy}
           aria-busy={busy}
-          onClick={() => void onAutoFix()}
+          onClick={() => void runAutoFix(false)}
         >
           Auto-fix flagged questions (compare with original)
         </button>
@@ -214,6 +252,9 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
             Stop
           </button>
         ) : null}
+        <label className="form-hint" data-testid="official-pyq-auto-fix-auto">
+          <input type="checkbox" checked={autoRun} onChange={(e) => onAutoRunChange(e.target.checked)} /> Auto-fix new alerts on their own
+        </label>
         <label className="btn btn-ghost btn-sm">
           {status?.available ? 'Replace original PDF' : 'Attach original PDF / page image'}
           <input

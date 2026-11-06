@@ -27,9 +27,18 @@ function normalizeSubject(name) {
   return ''
 }
 
+/** OCR prints the letter O as a zero in count words ("TW0 (02)"). */
+function fixZeroInCountWords(text) {
+  return String(text ?? '').replace(/\b[A-Za-z]*0[A-Za-z0]*\b/g, (w) => {
+    if (!/[A-Za-z]/.test(w)) return w
+    const fixed = w.replace(/0/g, 'O')
+    return WORD[fixed.toLowerCase()] ? fixed : w
+  })
+}
+
 function sectionType(window) {
   const t = String(window || '')
-  if (/matching\s+list|match\s+list|match\s+the\s+following/i.test(t)) return 'matrix_match'
+  if (/matching\s+list|match\s+list|list[-\s]match|match\s+the\s+following/i.test(t)) return 'matrix_match'
   if (/one\s+or\s+more/i.test(t)) return 'multiple_correct'
   if (/only\s+one/i.test(t)) return 'single_correct'
   if (/numerical/i.test(t)) return 'numerical'
@@ -44,11 +53,11 @@ function sectionType(window) {
  * @param {unknown} raw
  */
 export function buildPaperFacts(raw) {
-  const text = String(raw ?? '').replace(/\r\n/g, '\n')
+  const text = fixZeroInCountWords(String(raw ?? '').replace(/\r\n/g, '\n'))
   const sections = []
   const notes = []
   const re =
-    /This section contains\s+([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*(question stems?|paragraphs?|matching list(?:\s+sets)?|questions?)/gi
+    /This section contains\s+([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)/gi
   let m
   let subject = ''
   let sawHeading = false
@@ -85,7 +94,10 @@ export function buildPaperFacts(raw) {
       const each =
         window.match(
           /([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*questions?\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b/i,
-        ) || window.match(/\beach\b[^.\n]{0,120}?([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*questions?/i)
+        ) ||
+        window.match(
+          /\beach\b[^.\n]{0,120}?([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*(?:multiple\s+choice\s+)?questions?/i,
+        )
       const k = each ? wordNumber(each[1], each[2]) : 0
       count = k ? n * k : 0
       if (!k) notes.push(`OCR does not say how many questions sit under “${m[0].replace(/\s+/g, ' ')}”.`)
@@ -156,7 +168,8 @@ function passageBodyFromCard(text) {
     stripPyqJunkText(
       String(text ?? '')
         .replace(/\\section\*?\{([^}]*)\}/gi, '$1')
-        .replace(/^(?:Paragraph|PARAGRAPH|Passage|Question\s+Stem(?:\s+for\s+Question\s+Nos?\.?\s*\d{1,2}\s+and\s+\d{1,2})?)\b[:.\s-]*/i, ''),
+        .replace(/^(?:Paragraph|PARAGRAPH|Passage|Question\s+Stem(?:\s+for\s+Question\s+Nos?\.?\s*\d{1,2}\s+and\s+\d{1,2})?)\b[:.\s-]*/i, '')
+        .replace(/^["“”']\s*[A-Z0-9]{1,4}\s*["“”']\s*/, ''),
     ),
   )
 }

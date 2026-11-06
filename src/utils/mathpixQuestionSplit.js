@@ -58,7 +58,7 @@ function sectionStartRe() {
 }
 
 function paragraphStartRe() {
-  return /(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}/gi
+  return /(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/gi
 }
 
 const SECTION_CUT_RE =
@@ -80,6 +80,21 @@ const CLOSER_THEN_OPENER_RE =
  */
 const NEXT_ITEM_OPENER_RE =
   /\b(?:Let|(?<!and\s+only\s+)If(?!\s+and\s+only\s+if)|Which|Consider|Suppose|Match\s+(?:the|each)|For\s+the|How\s+many|What\s+is|The\s+value|An\s+integer|(?<!\b(?:as|of)\s)A\s+(?:particle|function|student|light ray|thin uniform|source\s*\()|Four identical|One mole of|The circuit shown|Q\s*\.?\s*\d)\b/i
+
+/**
+ * First NEXT_ITEM_OPENER_RE match that starts with a capital letter. A new paper item
+ * never opens mid-sentence: "(D) For case I, if the joint is 5 cm…" is still option D.
+ * @param {string} text
+ */
+function searchItemOpener(text) {
+  const re = new RegExp(NEXT_ITEM_OPENER_RE.source, 'gi')
+  let m
+  while ((m = re.exec(String(text ?? ''))) !== null) {
+    if (/[A-Z]/.test(m[0][0])) return m.index
+    if (!m[0]) re.lastIndex += 1
+  }
+  return -1
+}
 
 /** New physics/chem stem glued after a finished match item (no Q. N marker). */
 const NEXT_FULL_STEM_RE =
@@ -144,8 +159,29 @@ export function restoreGluedQuestionNumbers(text) {
  * Turn Mathpix `\\item[Q.]` markers into `Q. N` so existing bulk splitters work.
  * @param {unknown} raw
  */
+/** Mathpix sets a question's first line as a heading: "\section*{Q. 15 The compound $\mathbf{Y}$ is}". */
+function unwrapQuestionHeadings(text) {
+  const open = /\\section\*?\{\s*(?=Q\s*\.?\s*\d{1,3}\b)/g
+  let out = ''
+  let from = 0
+  let m
+  while ((m = open.exec(text)) !== null) {
+    let depth = 1
+    let j = m.index + m[0].length
+    for (; j < text.length && depth > 0; j += 1) {
+      if (text[j] === '{' && text[j - 1] !== '\\') depth += 1
+      else if (text[j] === '}' && text[j - 1] !== '\\') depth -= 1
+    }
+    if (depth !== 0) continue
+    out += `${text.slice(from, m.index)}\n${text.slice(m.index + m[0].length, j - 1)}`
+    from = j
+    open.lastIndex = j
+  }
+  return out + text.slice(from)
+}
+
 export function normalizeMathpixQuestionMarkers(raw) {
-  return sanitizeMathpixOcrText(raw)
+  return unwrapQuestionHeadings(sanitizeMathpixOcrText(raw))
     .replace(itemQInsideRe(), '\n\nQ. $1 ')
     .replace(itemQOutsideRe(), '\n\nQ. $1 ')
 }
@@ -592,8 +628,34 @@ function shouldRefuseSplit(head, next) {
     looksLikeMatchRowLet(head, next) ||
     looksLikeOrphanMatchListTail(head, next) ||
     samePrintedQuestionNumber(head, next) ||
-    looksLikeInsidePyqParagraph(head, next)
+    looksLikeInsidePyqParagraph(head, next) ||
+    looksLikeStemBeforeItsOptions(head, next) ||
+    looksLikeSetupBeforeItsQuestion(head, next)
   )
+}
+
+const FIGURE_LINK_RE = /!\[[^\]]*\]\([^)]*\)|\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g
+
+/** "The figure below is the plot of … [figure]" then "What is the value …" — one question. */
+function looksLikeSetupBeforeItsQuestion(head, next) {
+  const prose = String(head ?? '').replace(FIGURE_LINK_RE, ' ').replace(/^\s*Q\s*\.?\s*\d{1,3}\s*/i, '').trim()
+  if (!prose || /\?/.test(prose) || OPTION_A_RE.test(prose)) return false
+  if (!/\b(?:figure|graph|plot|diagram|scheme)\s+(?:below|shown)|\b(?:shown|given)\s+below\b/i.test(prose)) return false
+  if (/\b(?:find|calculate|determine|what|which|how|is equal to|choose|select|evaluate|value of)\b/i.test(prose)) return false
+  return /^\s*(?:What|Which|How|Find|Calculate|Determine)\b/.test(String(next ?? ''))
+}
+
+const OPTION_A_RE = /\(\s*A\s*\)|\\item\s*\[\s*\(?\s*A\s*\)?\s*\]/i
+
+/** "Choose the correct option(s) … [figure] Consider Q, R and S …" — A–D still to come, same question. */
+function looksLikeStemBeforeItsOptions(head, next) {
+  const h = String(head ?? '')
+  if (!/\b(?:choose the correct option|which of the following)/i.test(h) || OPTION_A_RE.test(h)) return false
+  const n = String(next ?? '')
+  const optAt = n.search(OPTION_A_RE)
+  if (optAt < 0 || optAt > 400) return false
+  const qAt = n.slice(1).search(/\n\s*Q\s*\.?\s*\d{1,3}\b|\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)/i)
+  return qAt < 0 || optAt <= qAt + 1
 }
 
 function firstStemLooksFinished(head) {
@@ -609,7 +671,8 @@ function firstStemLooksFinished(head) {
   const beforeDisplay = t.replace(/\s*(?:\$\$|\\begin\{aligned\})[\s\S]*$/i, '').trim()
   if (beforeDisplay.length >= 36 && /\b(?:is|equals|find)\s*$/i.test(beforeDisplay)) return true
   if (t.length >= 80 && /\bprobability\b/i.test(t) && /\bstudent\b/i.test(t)) return true
-  if (t.length >= 80 && /choose the correct option/i.test(t)) return true
+  const prose = t.replace(/!\[[^\]]*\]\([^)]*\)|\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g, ' ').trim()
+  if (prose.length >= 80 && /choose the correct option/i.test(prose)) return true
   if (t.length >= 80 && /\bis equal to\b/i.test(t) && /\b(?:figure|Case)\b/i.test(t)) return true
   return false
 }
@@ -623,7 +686,7 @@ export function findGluedNextQuestionStart(raw) {
   const t = String(raw ?? '')
   if (t.length < 48) return -1
 
-  const midPara = t.slice(40).search(/\n\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}/i)
+  const midPara = t.slice(40).search(/\n\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/i)
   if (midPara >= 0) {
     const abs = 40 + midPara
     const head = t.slice(0, abs)
@@ -631,7 +694,7 @@ export function findGluedNextQuestionStart(raw) {
     if (head.trim().length >= 24 && !shouldRefuseSplit(head, next)) return abs
   }
 
-  const midItem = t.slice(40).search(/\\item\s*\[\s*Q/i)
+  const midItem = t.slice(40).search(/\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)/i)
   if (midItem >= 0) {
     const abs = 40 + midItem
     if (!shouldRefuseSplit(t.slice(0, abs), t.slice(abs))) return abs
@@ -683,12 +746,12 @@ export function findGluedNextQuestionStart(raw) {
     const dEnd = tail.search(/\(\s*D\s*\)/)
     const restFrom = dEnd >= 0 ? dEnd + 3 : 0
     const rest = tail.slice(restFrom)
-    let opener = rest.search(NEXT_ITEM_OPENER_RE)
+    let opener = searchItemOpener(rest)
     const bodyStart = rest.search(/\S/)
     if (opener >= 0 && opener <= bodyStart) {
       // "(D) If the surface of the bubble…" — the opener is option D's own first word.
       const lineEnd = rest.indexOf('\n', bodyStart)
-      const later = lineEnd >= 0 ? rest.slice(lineEnd).search(NEXT_ITEM_OPENER_RE) : -1
+      const later = lineEnd >= 0 ? searchItemOpener(rest.slice(lineEnd)) : -1
       opener = later >= 0 ? lineEnd + later : -1
     }
     if (opener >= 0) {
@@ -720,7 +783,7 @@ export function findGluedNextQuestionStart(raw) {
 
   const closer = t.search(CLOSER_THEN_OPENER_RE)
   if (closer >= 20) {
-    const afterWord = t.slice(closer).search(NEXT_ITEM_OPENER_RE)
+    const afterWord = searchItemOpener(t.slice(closer))
     if (afterWord >= 0) {
       const abs = closer + afterWord
       const head = t.slice(0, abs)
@@ -881,6 +944,26 @@ function looksLikeInstructionOnly(text) {
  * @param {string} stem
  * @param {unknown[]} [options]
  */
+function labelledLineOptions(raw) {
+  const t = String(raw ?? '')
+  const marks = [...t.matchAll(/(?:^|\n)[ \t]*(?:\\item\s*)?\(\s*([A-D])\s*\)[ \t]*/g)]
+  if (marks.length !== 4 || marks.map((m) => m[1]).join('') !== 'ABCD') return null
+  const options = marks.map((m, k) => {
+    const lines = t
+      .slice(m.index + m[0].length, k < 3 ? marks[k + 1].index : undefined)
+      .replace(/\\end\{itemize\}[\s\S]*$/, '')
+      .split('\n')
+    const keep = [lines[0]]
+    for (const line of lines.slice(1)) {
+      if (!/^\s*(?:<smiles>|!\[|\\includegraphics)/i.test(line)) break
+      keep.push(line)
+    }
+    return keep.join('\n').trim()
+  })
+  if (options.filter(Boolean).length < 3) return null
+  return { stem: stripVisibleItemizeCommands(t.slice(0, marks[0].index).trim()), options }
+}
+
 function peelSmilesAsOptions(raw) {
   const t = String(raw ?? '')
   if (
@@ -889,6 +972,9 @@ function peelSmilesAsOptions(raw) {
   ) {
     return null
   }
+  // Printed "(A) P and Q" … "(D) R and S" lines are the options; the SMILES are the stem's structures.
+  const labelled = /<smiles>/i.test(t) ? labelledLineOptions(t) : null
+  if (labelled) return labelled
   const chunks = extractSmilesOptionChunks(t)
   if (chunks.length < 2) return null
   const mixed = chunks.length < 4 ? mixedSmilesFigureOptions(t) : null
@@ -953,9 +1039,9 @@ export function recoverOptionsFromStem(stem, options) {
       instructionText: cut.instructionText,
     }
   }
+  const realOpts = opts.filter((o) => String(o).trim() && !looksLikeMarkingSchemeOption(o))
   const optionsOwnSmiles =
-    !/<smiles>/i.test(stem) &&
-    opts.filter((o) => String(o).trim() && !looksLikeMarkingSchemeOption(o)).length >= 3
+    realOpts.length >= 3 && (!/<smiles>/i.test(stem) || !realOpts.some((o) => /<smiles>/i.test(o)))
   const smiles = optionsOwnSmiles ? null : peelSmilesAsOptions(joined) || peelSmilesAsOptions(stem)
   if (
     smiles &&
@@ -1263,7 +1349,13 @@ function peelMatchMappingOptions(body) {
   const src = String(body ?? '')
   const re =
     /\\item\s*\[\s*\(?\s*([A-D])\s*\)?\s*\]([\s\S]*?)(?=\\item\s*\[|\\end\{itemize\}|\n\s*(?:\\section\*?\{\s*)?(?:List|LIST|Column)\s*[-–]?\s*I|\n\s*\n|$)/g
-  const hits = [...src.matchAll(re)].filter((m) => /→|\\rightarrow|->/.test(m[2]))
+  let hits = [...src.matchAll(re)].filter((m) => /→|\\rightarrow|->/.test(m[2]))
+  if (!/^ABCD$|^ABC$/.test(hits.map((m) => m[1].toUpperCase()).join(''))) {
+    // Plain lines "(A) P→2, Q→3, R→2, S→2" after the two lists.
+    hits = [...src.matchAll(/(?:^|\n)[ \t]*\(\s*([A-D])\s*\)[ \t]*([^\n]+)/g)].filter((m) =>
+      /→|\\rightarrow|->/.test(m[2]),
+    )
+  }
   const letters = hits.map((m) => m[1].toUpperCase()).join('')
   if (!/^ABCD$|^ABC$/.test(letters)) return null
   let rest = src
@@ -1361,6 +1453,193 @@ function blockToMathpixDraft(block, i, attached, paper) {
   }
 }
 
+const MATCH_PARAGRAPH_RE =
+  /(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*(\d{1,3})\s+and\s+Q\.?\s*(\d{1,3})\s+by\s+appropriately\s+matching[^\n]*/gi
+const MATCH_INSTRUCTION_CARD_RE =
+  /^\s*Answer\s+Q\.?\s*(\d{1,3})\s+and\s+Q\.?\s*(\d{1,3})\s+by\s+appropriately\s+matching/i
+
+/**
+ * "Answer Q. 15 and Q. 16 by appropriately matching the lists based on the
+ * information given in the paragraph" blocks (JEE Advanced 2019+), in page order.
+ * @param {unknown} raw
+ * @returns {Array<{ from: number, to: number, passageText: string }>}
+ */
+export function matchListParagraphsFromOcr(raw) {
+  const t = String(raw ?? '')
+  const out = []
+  for (const m of t.matchAll(MATCH_PARAGRAPH_RE)) {
+    const from = Number(m[1])
+    const to = Number(m[2])
+    if (!(from > 0 && to > from && to - from <= 2)) continue
+    const start = (m.index ?? 0) + m[0].length
+    const after = t.slice(start, start + 6000)
+    const end = after.search(
+      new RegExp(`(?:^|\\n)\\s*(?:\\\\item\\s*\\[\\s*Q[^\\]]*\\]\\s*|Q\\s*\\.?\\s*)${from}\\b`),
+    )
+    if (end < 20) continue
+    const body = cleanMathpixCardText(stripVisibleItemizeCommands(after.slice(0, end)))
+    if (body.length < 40) continue
+    const instruction = m[0].replace(/^\\section\*?\{\s*/, '').replace(/\}\s*$/, '').trim()
+    out.push({ from, to, passageText: `${instruction}\n\n${body}` })
+  }
+  return out
+}
+
+/**
+ * Printed numbers restart in each subject, so "Q.17" alone matches three
+ * paragraphs. The k-th "Answer Q.17 and Q.18" block belongs to the k-th subject
+ * section that has a Q.17; its two cards get that paragraph, and a card holding
+ * only the instruction + paragraph is dropped.
+ * @param {unknown[]} questions
+ * @param {unknown} raw
+ */
+export function attachMatchListParagraphs(questions, raw) {
+  const list = Array.isArray(questions) ? questions : []
+  const groups = matchListParagraphsFromOcr(raw)
+  if (!groups.length) return list
+  const isInstructionCard = (q) => MATCH_INSTRUCTION_CARD_RE.test(String(q?.text ?? ''))
+  const printed = (q) => Number(q?.printedNumber ?? q?.questionNumber) || 0
+  const sectionOf = new Map()
+  let section = 0
+  let prevPn = 0
+  let prevSubject = ''
+  for (const q of list) {
+    if (!q || typeof q !== 'object' || isInstructionCard(q)) continue
+    const pn = printed(q)
+    const subject = String(q.subject || '')
+    if ((pn && prevPn && pn < prevPn - 3) || (subject && prevSubject && subject !== prevSubject)) section += 1
+    if (pn) prevPn = pn
+    if (subject) prevSubject = subject
+    sectionOf.set(q, section)
+  }
+  /** @type {Map<string, string>} */
+  const passageFor = new Map()
+  const applied = new Set()
+  const byPair = new Map()
+  for (const g of groups) {
+    const key = `${g.from}-${g.to}`
+    if (!byPair.has(key)) byPair.set(key, [])
+    byPair.get(key).push(g)
+  }
+  for (const [key, rows] of byPair) {
+    const { from } = rows[0]
+    const sections = []
+    for (const [q, s] of sectionOf) {
+      if (printed(q) === from && !sections.includes(s)) sections.push(s)
+    }
+    if (sections.length !== rows.length) continue
+    rows.forEach((g, k) => passageFor.set(`${sections[k]}:${key}`, g.passageText))
+    applied.add(key)
+  }
+  if (!applied.size) return list
+  const out = []
+  for (const q of list) {
+    if (isInstructionCard(q)) {
+      const m = String(q.text).match(MATCH_INSTRUCTION_CARD_RE)
+      if (m && applied.has(`${Number(m[1])}-${Number(m[2])}`)) continue
+      out.push(q)
+      continue
+    }
+    const s = sectionOf.get(q)
+    const pn = printed(q)
+    const pair = [...applied].find((key) => {
+      const [a, b] = key.split('-').map(Number)
+      return pn >= a && pn <= b
+    })
+    const passageText = pair != null ? passageFor.get(`${s}:${pair}`) : undefined
+    if (!passageText) {
+      out.push(q)
+      continue
+    }
+    const group = `pyq-match-${s + 1}-${pair}`
+    out.push({
+      ...q,
+      passageText,
+      passageGroup: group,
+      passageId: group,
+      passageRole: 'comprehension_child',
+      passageSource: 'ocr-header',
+    })
+  }
+  return out
+}
+
+const REPEATED_PARAGRAPH_RE =
+  /(?:\\section\*?\{\s*)?PARAGRAPH\s*["“”']\s*([A-Z0-9]{1,4})\s*["“”']\s*\}?([\s\S]{20,4000}?)(?:\(\s*There\s+are\s+(?:two|three|four|\d)\s+questions\s+based\s+on\s+PARAGRAPH[^)]*\)\s*)?(?:\\begin\{itemize\}\s*)?(?:\\item\s*\[\s*Q\s*\.?\s*\]\s*|\\item\s*\[\s*Q\s*\.?\s*(?=\d)|(?:\\section\*?\{\s*|\n\s*)Q\s*\.?\s*)(\d{1,3})\b/gi
+const PARAGRAPH_BODY_HAS_Q_RE = /\\item\s*\[\s*Q|(?:^|\n|\\section\*?\{)\s*Q\s*\.?\s*\d{1,3}\b/i
+
+/**
+ * JEE Advanced 2018 prints the paragraph again above each of its questions:
+ * PARAGRAPH "X" <body> (There are two questions based on PARAGRAPH "X", the
+ * question given below is one of them) Q.15 ... Each copy belongs to the card
+ * right after it. Only paragraphs printed at least twice are used, so a paper
+ * that prints a paragraph once keeps its normal passage handling. Cards are
+ * matched in page order because printed numbers restart in each subject.
+ * @param {unknown[]} questions
+ * @param {unknown} raw
+ */
+export function attachRepeatedParagraphHeaders(questions, raw) {
+  const list = Array.isArray(questions) ? questions : []
+  const fold = (m) => `${m[1].toUpperCase()}|${m[2].replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 80)}`
+  const all = [...String(raw ?? '').matchAll(REPEATED_PARAGRAPH_RE)].filter(
+    (m) => !PARAGRAPH_BODY_HAS_Q_RE.test(m[2]),
+  )
+  const seen = new Map()
+  for (const m of all) seen.set(fold(m), (seen.get(fold(m)) || 0) + 1)
+  const hits = all.filter((m) => seen.get(fold(m)) >= 2)
+  if (!hits.length) return list
+  const printed = (q) => Number(q?.printedNumber ?? q?.questionNumber) || 0
+  const out = list.slice()
+  let section = 0
+  const sectionAt = []
+  for (let i = 0; i < out.length; i++) {
+    const prev = printed(out[i - 1])
+    if (i && printed(out[i]) && prev && printed(out[i]) < prev - 3) section += 1
+    sectionAt.push(section)
+  }
+  const head = (text) => String(text ?? '').replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 60)
+  const owners = new Set()
+  const ownedHeads = new Set()
+  let cursor = 0
+  for (const m of hits) {
+    const n = Number(m[3])
+    const at = out.findIndex((q, i) => i >= cursor && printed(q) === n)
+    if (at < 0) continue
+    cursor = at + 1
+    const body = cleanMathpixCardText(stripVisibleItemizeCommands(m[2]))
+    if (body.length < 30) continue
+    const group = `pyq-para-${sectionAt[at] + 1}-${m[1].toUpperCase()}`
+    out[at] = {
+      ...out[at],
+      passageText: body,
+      passageGroup: group,
+      passageId: group,
+      passageRole: 'comprehension_child',
+      passageSource: 'ocr-header',
+    }
+    owners.add(at)
+    ownedHeads.add(head(body))
+  }
+  return out.map((q, i) => {
+    if (owners.has(i) || !q?.passageText || !ownedHeads.has(head(q.passageText))) return q
+    const next = { ...q }
+    for (const key of ['passageText', 'passageGroup', 'passageId', 'passageRole', 'passageSource']) delete next[key]
+    return next
+  })
+}
+
+/** Q.14, [slot number 37], Q.16 — the card in the gap is Q.15. */
+export function fillPrintedNumberGaps(questions) {
+  const list = Array.isArray(questions) ? questions : []
+  const printed = (q) => Number(q?.printedNumber) || 0
+  return list.map((q, i) => {
+    const before = printed(list[i - 1])
+    const after = printed(list[i + 1])
+    if (!before || after !== before + 2 || printed(q) === before + 1) return q
+    return { ...q, printedNumber: before + 1 }
+  })
+}
+
 export function mathpixSplitToBankDrafts(raw, opts = {}) {
   const sectionMap = opts.sectionMap && Array.isArray(opts.sectionMap.ranges)
     ? opts.sectionMap
@@ -1379,7 +1658,12 @@ export function mathpixSplitToBankDrafts(raw, opts = {}) {
   )
   return {
     drafts: annotateMathpixCleanStatus(
-      applyUploadQualityGuards(shaped.questions, raw, sectionMap),
+      attachRepeatedParagraphHeaders(
+        fillPrintedNumberGaps(
+          attachMatchListParagraphs(applyUploadQualityGuards(shaped.questions, raw, sectionMap), raw),
+        ),
+        raw,
+      ),
     ),
     instructionText: attached,
     sectionMap,

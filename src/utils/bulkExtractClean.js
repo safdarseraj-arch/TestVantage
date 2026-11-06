@@ -195,6 +195,8 @@ export function stripTrailingPyqSectionHeader(text) {
     .replace(/\\section\*?\{[^}]*SECTION[\s\S]*$/i, '')
     .replace(/\\section\*?\{?\s*SECTION[\s\S]*$/i, '')
     .replace(/\n+\s*SECTION\s+[A-Z0-9()][\s\S]*$/i, '')
+    // $\$$\$ PART-II: the next part's heading, with OCR dollar junk, glued under the last stem.
+    .replace(/\n+[ \t]*[$\\]*[ \t]*PART\s*[-\u2013\u2014]?\s*(?:IV|I{1,3}|[1-3])\b[^\n]*$/i, '')
     .replace(/\s+SECTION\s+\d+\s*(?:\(Maximum Marks:[^)]*\))?[\s\S]*$/i, '')
     .replace(/\bThis section contains\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)[\s\S]*$/i, '')
     // Trailing marking-scheme chrome glued after a real stem (OCR option leak).

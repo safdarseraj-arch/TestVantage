@@ -8,6 +8,7 @@
 
 import katex from 'katex'
 import { convertLatexTabularToArray } from './latexTabularDisplay.js'
+import { answerBlanksInMath, prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import {
   getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
@@ -197,6 +198,19 @@ function drawnTablesAndPictures(text) {
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '[picture]')
 }
 
+/** The same display preparation MathText runs, so the check judges what students see. Molecules draw separately. */
+function preparedLikeCard(text) {
+  const raw = String(text ?? '')
+  if (!raw.trim()) return raw
+  try {
+    return raw
+      .split(/(<smiles>[\s\S]*?<\/smiles>)/i)
+      .map((seg) => (/^<smiles>/i.test(seg) ? seg : prepareTextForMathTextDisplay(seg)))
+      .join('')
+  } catch {
+    return raw
+  }
+}
 /**
  * Card text as students see it: each $…$ drawn by KaTeX and flattened to
  * plain text. KaTeX drops spaces inside math, so `$0.03 \mathrm{M} \mathrm{KMnO}_4$`
@@ -204,7 +218,7 @@ function drawnTablesAndPictures(text) {
  * @param {unknown} text
  */
 export function officialPyqDrawnText(text) {
-  const raw = drawnTablesAndPictures(text)
+  const raw = answerBlanksInMath(drawnTablesAndPictures(preparedLikeCard(text)))
   if (!raw.includes('$')) return raw
   /** @param {string} latex @param {boolean} displayMode @param {string} whole */
   const draw = (latex, displayMode, whole) => {
@@ -228,6 +242,15 @@ export function officialPyqDrawnText(text) {
     const latex = String(display ?? inline ?? '').trim()
     if (!latex) return ''
     // The card draws an answer blank `$____ \mathrm{cm}$` as a line; KaTeX alone rejects the bare underscores.
+    if (/\\underline\{\\hspace\{2em\}\}/.test(latex)) {
+      return latex
+        .split(/\\underline\{\\hspace\{2em\}\}/)
+        .map((piece) => piece.trim())
+        .map((piece) => (piece ? draw(piece, false, `$${piece}$`) : ''))
+        .join(' ____ ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    }
     const blank = latex.match(/^(?:\\?_\s*){2,}/)
     if (blank) {
       const rest = latex.slice(blank[0].length).trim()

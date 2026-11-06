@@ -422,7 +422,7 @@ function sliceUntilStemEnd(taken) {
   if (midSec > 40) end = Math.min(end, midSec)
   const nextNum = t.slice(24).search(/\n(?:Q(?:uestion)?\s*\.?\s*)?\d{1,2}[\.\)]\s/)
   if (nextNum >= 0) end = Math.min(end, 24 + nextNum)
-  const nextItemQ = t.slice(20).search(/\\item\s*\[\s*Q/i)
+  const nextItemQ = t.slice(20).search(/\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)/i)
   if (nextItemQ >= 0) end = Math.min(end, 20 + nextItemQ)
   const nextQDot = t.slice(20).search(/\nQ\s*\.\s*\d{1,3}\b/)
   if (nextQDot >= 0) end = Math.min(end, 20 + nextQDot)
@@ -727,7 +727,7 @@ function extractListIIBlockFromWindow(window) {
  * Also cut at a new full paper stem glued without a Q. N marker.
  */
 const OCR_STEM_BOUNDARY_RE =
-  /(?:\\item\s*\[\s*Q[^\]]*\]|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?|(?:^|\n)Q\s*\.?\s*\d{1,2}\b|\b(?:Four identical|A light ray is incident|A thin uniform rod|A source\s*\(\s*S\s*\)|One mole of a|The circuit shown in the figure|A parallel plate|Two identical thin|Based on VSEPR|List-I contains various|Among the following phenolic|In a conductometric|The option\(s\) with correct sequence|A particle of charge|PARAGRAPH|Question\s+Stem\s+for\s+Question\s+Nos?)\b)/gi
+  /(?:\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?|(?:^|\n)Q\s*\.?\s*\d{1,2}\b|\b(?:Four identical|A light ray is incident|A thin uniform rod|A source\s*\(\s*S\s*\)|One mole of a|The circuit shown in the figure|A parallel plate|Two identical thin|Based on VSEPR|List-I contains various|Among the following phenolic|In a conductometric|The option\(s\) with correct sequence|A particle of charge|PARAGRAPH|Question\s+Stem\s+for\s+Question\s+Nos?)\b)/gi
 
 function clipOcrWindowToQuestion(window, probeAt) {
   const t = String(window ?? '')
@@ -2015,7 +2015,7 @@ function freshReactionSequenceStem(stem, source) {
   const sentence = src.lastIndexOf('In the following', idx)
   const from = sentence >= 0 && idx - sentence < 80 ? sentence : idx
   const window = src.slice(from, from + 2200)
-  const cut = window.search(/\n\\item\s*\[\s*Q|\n\\section\*?\s*\{[^}]*SECTION|\nQ\s*\.\s*\d{1,3}\b/i)
+  const cut = window.search(/\n\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|\n\\section\*?\s*\{[^}]*SECTION|\nQ\s*\.\s*\d{1,3}\b/i)
   const slice = cut > 80 ? window.slice(0, cut) : window
   const peeled = extractLatexItemizeMcq(slice)
   if (!peeled?.reactionStepsInStem || String(peeled.stem ?? '').length < 40) return ''
@@ -2314,8 +2314,14 @@ export function applyUploadQualityGuards(questions, source, map) {
     const prevFp = cardOpenDedupeKey(prev?.text)
     // Identical stems drop. A shared "Match each entry…" opener is not identity —
     // cardOpenDedupeKey ignores that sentence, so different List-I sets both stay.
+    // Paired match questions share one stem ("…considering List-I and List-II?")
+    // and differ only in A–D, so different filled options keep both.
     if (prev && prevFp && prevFp === fp && prevFp.length >= 80) {
-      continue
+      const filled = (c) => (Array.isArray(c?.options) ? c.options : []).map((o) => String(o ?? '').trim())
+      const a = filled(prev)
+      const b = filled(healed)
+      const thin = a.filter(Boolean).length < 2 || b.filter(Boolean).length < 2
+      if (thin || a.join('\n') === b.join('\n')) continue
     }
     out.push(healed)
   }

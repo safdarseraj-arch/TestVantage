@@ -29,8 +29,11 @@ const { stripStrayMathDelimiters } = await import('../src/utils/wrapBareLatexRun
 const { reviewOfficialPyqCards } = await import('../src/utils/officialPyqUnifiedCheck.js')
 const { healUploadQuestionCard } = await import('../src/utils/uploadQualityGuards.js')
 const { looksLikeMatchingListStem, parseMatchingListForDisplay } = await import('../src/utils/parseMatchingListDisplay.js')
-const { validateMathpixQuestion } = await import('../src/utils/mathpixCleanPipeline.js')
+const { validateMathpixQuestion, cleanMathpixCardText } = await import('../src/utils/mathpixCleanPipeline.js')
+const { stripTrailingPyqSectionHeader } = await import('../src/utils/bulkExtractClean.js')
 const { officialPyqDrawnRawCode, officialPyqDrawnText } = await import('../src/utils/officialPyqOriginalCompare.js')
+const { stripMistakenOfficialPyqPassages } = await import('../src/utils/passage.js')
+const { buildPaperFacts } = await import('../src/utils/officialPyqPaperFacts.js')
 
 let failed = 0
 function test(name, fn) {
@@ -260,6 +263,391 @@ test('source files are UTF-8, never UTF-16 (the editor once saved files as UTF-1
   }
   for (const root of roots) if (fs.existsSync(root)) walk(root)
   assert.deepEqual(bad, [])
+})
+
+test('answer blanks next to math: the closing $ stays, and the card is not flagged (2018 P1 Q11, Q14)', () => {
+  const pic = '\n\\includegraphics{https://cdn.mathpix.com/cropped/a-06.jpg?height=691&top_left_y=1837&top_left_x=578}'
+  const cases = [
+    'The value of $\\epsilon_{r} =$ ________.' + pic,
+    'then $K_{1} / K_{2}=$ ________.' + pic,
+    'The value of $\\epsilon_{r}= ____$.' + pic,
+    'then $K_{1} / K_{2}= ____$.' + pic,
+    'If $x_{1}=2$ then $y=$ ____ units.',
+  ]
+  for (const text of cases) {
+    assert.equal(mathDrawFailure(text), '', text)
+    assert.deepEqual(officialPyqDrawnRawCode(officialPyqDrawnText(text)), [], text)
+  }
+  assert.equal(stripStrayMathDelimiters('of $\\epsilon_{r} =$ ________.'), 'of $\\epsilon_{r} =$ ________.')
+  assert.doesNotMatch(prepareTextForMathTextDisplay(cases[0]), /\$\\includegraphics/)
+})
+test('new pending papers 2018-2020: aligned $, PART headings, dangling \\item and the check matching the display', () => {
+  const aligned = 'Let $f$ be given by\n$$f(x)=\\left\\{\\begin{aligned}\nx^{2}-x+1, & 0 \\leq x<1 ; \\\\\n$\\frac{2}{3} x^{3}$, & 1 \\leq x<3 ; \\\\\nx+$\\frac{10}{3}$, & x \\geq 3 .\n\\end{aligned}\\right.$$\nThen which'
+  assert.equal(mathDrawFailure(aligned), '')
+  assert.deepEqual(officialPyqDrawnRawCode(officialPyqDrawnText(aligned)), [])
+  assert.doesNotMatch(cleanMathpixCardText(aligned), /\\begin\{aligned\}[^]*\$\\frac/)
+
+  const part = 'where $t$ is $____$.\n\\includegraphics{https://x.jpg}\n\n$\\$$\\$ PART-II'
+  assert.doesNotMatch(stripTrailingPyqSectionHeader(part), /PART/)
+  assert.match(stripTrailingPyqSectionHeader('Find the string in PART-II of the figure.'), /PART-II/)
+
+  const option = '<smiles>COc1ccc(CCCC(=O)O)cc1</smiles> <smiles>COc1ccc2c(c1)C(=O)CCC2</smiles> \\item['
+  assert.equal(cleanMathpixCardText(option), '<smiles>COc1ccc(CCCC(=O)O)cc1</smiles> <smiles>COc1ccc2c(c1)C(=O)CCC2</smiles>')
+  assert.deepEqual(officialPyqDrawnRawCode(officialPyqDrawnText(option)), [])
+  assert.equal(officialPyqDrawnText('the speed is $____ \\mathrm{m} \\mathrm{s}^{-1}$.'), 'the speed is ____ ms−1.')
+})
+test('a lowercase "if" inside option D does not start a new question (2019 P1 Q5)', () => {
+  const ocr = String.raw`\begin{itemize}
+\item[Q.] 5 A capillary tube is dipped vertically in water in two configurations, case I and II. Which of the following option(s) is(are) correct?
+\begin{itemize}
+\item[(A)] The correction in the height will be different for both cases.
+\item[(B)] For case II, if the capillary joint is 5 cm above the water surface, the height of water column raised in the tube will be 3.75 cm.
+\item[(C)] For case I, if the joint is kept at 8 cm above the water surface, the height of water column in the tube will be 7.5 cm.
+\item[(D)] For case I, if the capillary joint is 5 cm above the water surface, the height of water column raised in the tube will be more than 8.75 cm.
+\end{itemize}
+\end{itemize}
+\begin{itemize}
+\item[Q.] 6 A conducting wire of parabolic shape is moving. Then the correct option(s) is(are)
+\item[(A)] one
+\item[(B)] two
+\item[(C)] three
+\item[(D)] four
+\end{itemize}`
+  const out = paperItemsFromMathpixOcr(ocr)
+  const items = out?.items || out || []
+  assert.equal(items.length, 2)
+  assert.match(String(items[0].options?.[3] ?? ''), /more than 8\.75 cm/)
+})
+const matchSubject = (title, para15, para17) => `\\section*{JEE (ADVANCED) 2019 PAPER 2 PART-${title}}
+
+Q. 14 A ball of mass $m$ is dropped from height $h$ on a fixed floor. Find the speed just before it hits the floor.
+(A) $\\sqrt{g h}$
+(B) $\\sqrt{2 g h}$
+(C) $2 g h$
+(D) $g h$
+
+Answer Q. 15 and Q. 16 by appropriately matching the lists based on the information given in the paragraph
+
+${para15} List-I gives four strings while List-II lists the magnitude of some quantity.
+
+List-I
+\\begin{itemize}
+\\item[(I)] String-1 $(\\mu)$
+\\item[(II)] String-2 $(2 \\mu)$
+\\end{itemize}
+
+List-II
+\\begin{itemize}
+\\item[(P)] 1
+\\item[(T)] 3/16
+\\item[(U)] 1/16
+\\end{itemize}
+Q. 15 Which of the following options has the correct combination considering List-I and List-II?
+(A) (I), (P)
+(B) (I), (T)
+(C) (II), (P)
+(D) (II), (U)
+Q. 16 Which of the following options has the correct combination considering List-I and List-II?
+(A) (III), (P)
+(B) (III), (T)
+(C) (IV), (P)
+(D) (IV), (U)
+
+\\section*{Answer Q. 17 and Q. 18 by appropriately matching the lists based on the information given in the paragraph}
+
+${para17} The List-I below gives some quantities and List-II gives some possible values.
+
+List-I
+\\begin{itemize}
+\\item[(I)] Work done by the system
+\\item[(II)] Change in internal energy
+\\end{itemize}
+
+List-II
+\\begin{itemize}
+\\item[(P)] $R T_{0}$
+\\item[(U)] $\\frac{5}{6} R T_{0}$
+\\end{itemize}
+Q. 17 If the process on one mole of gas is as shown in the figure, the correct match is,
+(A) I → P, II → U
+(B) I → U, II → P
+(C) I → P, II → P
+(D) I → U, II → U
+Q. 18 If the process on one mole of gas is as shown in the second figure, the correct match is,
+(A) I → U, II → U
+(B) I → P, II → U
+(C) I → U, II → P
+(D) I → P, II → P
+`
+
+test('"Answer Q.15 and Q.16 by appropriately matching…" paragraphs go to that subject\'s two cards only (2019 P2)', () => {
+  const ocr =
+    matchSubject('I PHYSICS', 'A musical instrument is made using four different metal strings.', 'In a thermodynamic process on an ideal monatomic gas the heat absorbed is T dX.') +
+    matchSubject('II CHEMISTRY', 'Consider the Bohr model of a one-electron atom.', 'List-I includes starting materials and reagents of selected chemical reactions.')
+  const items = paperItemsFromMathpixOcr(ocr)
+  assert.deepEqual(items.map((q) => q.printedNumber), [14, 15, 16, 17, 18, 14, 15, 16, 17, 18])
+  assert.ok(items.every((q) => !/^\s*Answer Q/i.test(q.text)), 'no instruction-only cards')
+  const passage = (i) => String(items[i].passageText ?? '')
+  assert.equal(passage(0), '')
+  assert.match(passage(1), /musical instrument/)
+  assert.match(passage(2), /musical instrument/)
+  assert.match(passage(3), /thermodynamic process/)
+  assert.match(passage(4), /thermodynamic process/)
+  assert.match(passage(6), /Bohr model/)
+  assert.match(passage(7), /Bohr model/)
+  assert.match(passage(8), /starting materials/)
+  assert.match(passage(9), /starting materials/)
+  assert.doesNotMatch(passage(8), /thermodynamic/)
+  assert.match(passage(1), /\(U\) 1\/16/)
+  const kept = stripMistakenOfficialPyqPassages(items, ocr)
+  assert.ok([1, 2, 3, 4, 6, 7, 8, 9].every((i) => String(kept[i].passageText ?? '').trim()), 'later clean-up keeps them')
+  assert.deepEqual(items[2].options, ['(III), (P)', '(III), (T)', '(IV), (P)', '(IV), (U)'])
+})
+
+test('a Column-I row labelled "\\item[Q.]" is not a new question (2020 P1 Q6)', () => {
+  const ocr = String.raw`Q. 6 The Fischer projection of D-erythrose is shown below. D-Erythrose and its isomers are listed as P, Q, R, and S in Column-I. Choose the correct relationship of P, Q, R, and S with D-erythrose from Column II.
+
+Column-I
+\begin{itemize}
+\item[P.]
+<smiles>O=C[C@H](O)[C@H](O)CO</smiles>
+\item[Q.]
+<smiles>O=CC(O)C(O)CO</smiles>
+\item[R.]
+<smiles>O=C[C@@H](O)[C@H](O)CO</smiles>
+\item[S.]
+<smiles>O=CC(O)C(CO)CO</smiles>
+\end{itemize}
+
+Column-II
+\begin{itemize}
+\item[1.] Diastereomer
+\item[2.] Identical
+\item[3.] Enantiomer
+\end{itemize}
+(A) P→2, Q→3, R→2, S→2
+(B) P→3, Q→1, R→1, S→2
+(C) P→2, Q→1, R→1, S→3
+(D) P→2, Q→3, R→3, S→1
+\item[Q.] 7 In thermodynamics, the $P-V$ work done is given by $w=-\int d V P_{\mathrm{ext}}$. Which process is this?
+(A) reversible and isothermal
+(B) reversible and adiabatic
+(C) irreversible at constant pressure
+(D) none of these`
+  const items = paperItemsFromMathpixOcr(ocr)
+  assert.deepEqual(items.map((q) => q.printedNumber), [6, 7])
+  assert.match(items[0].text, /O=CC\(O\)C\(O\)CO[\s\S]*Diastereomer[\s\S]*Enantiomer/)
+  assert.deepEqual(items[0].options, [
+    'P→2, Q→3, R→2, S→2',
+    'P→3, Q→1, R→1, S→2',
+    'P→2, Q→1, R→1, S→3',
+    'P→2, Q→3, R→3, S→1',
+  ])
+})
+
+test('"Choose the correct option(s) … [figure] Consider Q, R and S …" stays one card with its options (2019 P2 chem Q7)', () => {
+  const ocr = String.raw`Q. 6 Choose the correct option(s) that give(s) an aromatic compound as the major product
+(A) benzene
+(B) toluene
+(C) phenol
+(D) cyclohexane
+Q. 7 Choose the correct option(s) for the following reaction sequence
+![](https://cdn.mathpix.com/cropped/6ad5e50f-17.jpg?height=199&width=1541&top_left_y=281&top_left_x=318)
+Consider Q, R and S as major products
+\begin{itemize}
+\item[(A)] <smiles>COc1ccc(C(O)CCC(=O)O)cc1</smiles>
+\item[(B)] <smiles>COc1ccc2c(c1)C(=O)CC=C2</smiles>
+\item[(C)] <smiles>COc1ccc2c(c1)C(=O)CCC2</smiles>
+\item[(D)] <smiles>COc1ccc2c(c1)CCCC2</smiles>
+\end{itemize}
+Q. 8 Choose the correct option(s) from the following
+(A) Natural rubber is polyisoprene
+(B) Nylon-6 has amide linkages
+(C) Teflon is made from tetrafluoroethene
+(D) Cellulose has only alpha-glycosidic linkages`
+  const items = paperItemsFromMathpixOcr(ocr)
+  assert.deepEqual(items.map((q) => q.printedNumber), [6, 7, 8])
+  assert.match(items[1].text, /Consider Q, R and S as major products/)
+  assert.equal(items[1].options.filter((o) => String(o).trim()).length, 4)
+})
+
+test('"The figure below is the plot … [figure]" then "What is the value …" is one question (2020 P2 chem Q15)', () => {
+  const ocr = String.raw`Q. 14 The total number of lone pairs of electrons present in the whole molecule of $\mathrm{XeF}_{4}$ is
+Q. 15 The figure below is the plot of potential energy versus internuclear distance (d) of $\mathrm{H}_{2}$ molecule in the electronic ground state.
+\includegraphics{https://cdn.mathpix.com/cropped/d771ecc7-f5d8-4005-9ec7-41db-15.jpg}
+What is the value of the net potential energy $E_{0}$ (as indicated in the figure) in $\mathrm{kJ} \mathrm{mol}^{-1}$, for $d=d_{0}$?
+Q. 16 Consider the reaction sequence from P to Q shown below. What is the amount in grams of Q obtained from 9.3 mL of P?`
+  const items = paperItemsFromMathpixOcr(ocr)
+  assert.deepEqual(items.map((q) => q.printedNumber), [14, 15, 16])
+  assert.match(items[1].text, /What is the value of the net potential energy/)
+})
+
+test('"TW0 (02) List-Match sets … TWO (02) Multiple Choice Questions" counts four matching questions (2019 P2)', () => {
+  const facts = buildPaperFacts(String.raw`\section*{SECTION 3 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains TW0 (02) List-Match sets.
+\item[-] Each List-Match set has TW0 (02) Multiple Choice Questions.
+\item[-] Each List-Match set has two lists: List-I and List-II.
+\end{itemize}`)
+  assert.equal(facts.sections.length, 1)
+  assert.equal(facts.sections[0].count, 4)
+  assert.equal(facts.sections[0].type, 'matrix_match')
+})
+
+const choices = (n) => ['A', 'B', 'C', 'D'].map((l, k) => `(${l}) value ${n * 10 + k}`).join('\n')
+const PARA_2018 = (subject, x, a) => String.raw`\section*{JEE (ADVANCED) 2018 PAPER 1 PART-${subject}}
+Q. 14 The value of $n$ is \_\_\_\_.
+\section*{SECTION 3 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains TWO (02) paragraphs. Based on each paragraph, there are TWO (02) questions.
+\end{itemize}
+
+\section*{PARAGRAPH "X"}
+
+${x}
+(There are two questions based on PARAGRAPH "X", the question given below is one of them)
+
+\section*{Q. 15 The first X question is}
+${choices(15)}
+
+PARAGRAPH "X"
+${x}
+(There are two questions based on PARAGRAPH "X", the question given below is one of them)
+Q. 16 The second X question is
+${choices(16)}
+
+\section*{PARAGRAPH "A"}
+
+${a}
+\begin{itemize}
+\item[Q.] 17 The first A question is
+\end{itemize}
+${choices(17)}
+
+\section*{PARAGRAPH "A"}
+
+${a}
+\begin{itemize}
+\item[Q.] 18 The second A question is
+\end{itemize}
+${choices(18)}
+`
+
+test('a paragraph printed again above each of its questions goes to those two cards only, without its "X"/"A" label (2018 P1 Q15–18)', () => {
+  const ocr = [
+    PARA_2018('I PHYSICS', 'In electromagnetic theory, the electric and magnetic phenomena are related to each other.', 'If the measurement errors in all the independent quantities are known, then it is possible.'),
+    PARA_2018('II CHEMISTRY', 'Treatment of benzene with CO/HCl in the presence of anhydrous AlCl3 gives compound X.', 'An organic acid P can easily be oxidized to a dibasic acid which reacts with ethyleneglycol.'),
+    String.raw`\section*{JEE (ADVANCED) 2018 PAPER 1 PART-III MATHEMATICS}
+Q. 1 For a non-zero complex number $z$, which of the following is TRUE?
+(A) one
+(B) two
+(C) three
+(D) four`,
+  ].join('\n')
+  const items = paperItemsFromMathpixOcr(ocr)
+  const card = (subjectIndex, n) => items.filter((q) => q.printedNumber === n)[subjectIndex]
+  for (const [s, x, a] of [[0, /^In electromagnetic theory/, /^If the measurement errors/], [1, /^Treatment of benzene/, /^An organic acid P/]]) {
+    for (const n of [15, 16]) assert.match(card(s, n)?.passageText || '', x, `subject ${s} Q${n}`)
+    for (const n of [17, 18]) assert.match(card(s, n)?.passageText || '', a, `subject ${s} Q${n}`)
+    for (const n of [15, 16, 17, 18]) assert.doesNotMatch(card(s, n).passageText, /^["“]|There are two questions/)
+    assert.equal(card(s, 15).passageGroup, card(s, 16).passageGroup)
+    assert.notEqual(card(s, 15).passageGroup, card(s, 17).passageGroup)
+  }
+  const mathQ1 = items.find((q) => /non-zero complex number/.test(q.text))
+  assert.ok(!mathQ1?.passageText, 'the next part\'s Q1 gets no paragraph')
+})
+
+test('"[A]" in a table heading and "$[B]$" in math are not option labels (2019 P1 chem Q17, 2018 P1 phys Q15)', () => {
+  const ocr = String.raw`Q. 16 The value of $x$ is \_\_\_\_
+\item[Q.] 17 Consider the kinetic data given in the following table for the reaction $\mathrm{A}+\mathrm{B}+\mathrm{C} \rightarrow$ Product .
+
+\begin{tabular}[t]{|l|l|l|l|l|}
+\hline Experiment No. & [A] $\left(\mathrm{mol} \mathrm{dm}{ }^{-3}\right)$ & [B] $\left(\mathrm{mol} \mathrm{dm}^{-3}\right)$ & [C] $\left(\mathrm{mol} \mathrm{dm}{ }^{-3}\right)$ & Rate \\
+\hline 1 & 0.2 & 0.1 & 0.1 & $6.0 \times 10^{-5}$ \\
+\hline
+\end{tabular}
+The rate is found to be $\mathrm{Y} \times 10^{-5}$. The value of Y is \_\_\_\_
+\item[Q.] 18 The relation between $[E]$ and $[B]$ is
+(A) $[E]=[B][L][T]$
+(B) $[E]=[B][L]^{-1}[T]$
+(C) $[E]=[B][L][T]^{-1}$
+(D) $[E]=[B][L]^{-1}[T]^{-1}$`
+  const items = paperItemsFromMathpixOcr(ocr)
+  const q17 = items.find((q) => q.printedNumber === 17)
+  assert.deepEqual(q17.options.filter((o) => String(o).trim()), [])
+  assert.match(q17.text, /& \[A\] /)
+  assert.match(q17.text, /The value of Y is/)
+  const q18 = items.find((q) => q.printedNumber === 18)
+  assert.match(q18.text, /\$\[E\]\$ and \$\[B\]\$/)
+  assert.equal(q18.options[3], '$[E]=[B][L]^{-1}[T]^{-1}$')
+})
+
+test('printed "(A) P and Q" options win over the structures drawn in the stem; "(B) X is <empty>" keeps its slot (2020 P1 Q22, P2 Q30)', () => {
+  const ocr = String.raw`Q. 4 Newman projections P, Q, R and S are shown below:
+<smiles>CCC1C(C)C2(C)CCC1(C)C2(C)C</smiles>
+
+<smiles>CCc1ccc(C)c(C)c1C</smiles>
+
+<smiles>CCC1=CC(C)C(CC)C(C)C1O</smiles>
+
+Which one of the following options represents identical molecules?
+(A) P and Q
+(B) Q and S
+(C) Q and R
+(D) R and S
+\item[Q.] 5 Consider the following transformations of a compound P.
+Choose the correct option(s).
+(A) P is
+<smiles>C#CCC1CC=CCC1</smiles>
+(B) X is
+<smiles></smiles>
+(C) P is
+<smiles>C#CCC1C=CCCC1</smiles>
+(D) R is
+<smiles>C=C(C#CCC1CC=CCC1)c1ccccc1</smiles>`
+  const items = paperItemsFromMathpixOcr(ocr)
+  assert.deepEqual(items[0].options, ['P and Q', 'Q and S', 'Q and R', 'R and S'])
+  assert.match(items[0].text, /<smiles>CCc1ccc\(C\)c\(C\)c1C<\/smiles>/)
+  assert.match(items[1].options[0], /^P is\s*<smiles>C#CCC1CC=CCC1<\/smiles>$/)
+  assert.match(items[1].options[1], /^X is/)
+  assert.match(items[1].options[3], /^R is/)
+  const review = reviewOfficialPyqCards([{ ...items[1], questionType: 'multiple_correct' }], '', null, { cardsOnly: true })
+  assert.deepEqual(review.failedGoTo, [1], 'the lost drawing in option B is flagged')
+})
+
+test('four same-size pictures after "will look like" are the options A–D in reading order (2020 P1 Q3)', () => {
+  const img = (y, x, h = 270) => `![](https://cdn.mathpix.com/cropped/p-02.jpg?height=${h}&width=320&top_left_y=${y}&top_left_x=${x})`
+  const q = {
+    questionType: 'single_correct',
+    text: [
+      'A small roller of diameter 20 cm has an axle of diameter 10 cm. After the roller has moved 50 cm, the position of the scale will look like (figures are schematic)',
+      img(528, 434, 205),
+      img(946, 470),
+      img(946, 1339),
+      img(1379, 513),
+      img(1375, 1286),
+    ].join('\n'),
+    options: ['', '', '', ''],
+  }
+  const healed = healUploadQuestionCard(q, '')
+  assert.deepEqual(
+    healed.options.map((o) => o.match(/top_left_y=(\d+)&top_left_x=(\d+)/).slice(1).join(',')),
+    ['946,470', '946,1339', '1379,513', '1375,1286'],
+  )
+  assert.match(healed.text, /top_left_y=528/)
+  const plain = { ...q, text: q.text.replace('will look like', 'moves') }
+  assert.deepEqual(healUploadQuestionCard(plain, '').options, ['', '', '', ''], 'pictures stay put when the question does not ask for one')
+})
+
+test('"weak base (B)" in a number-answer question is not a missing option (2020 P2 chem Q13)', () => {
+  const ocr = String.raw`\item[Q.] 13 A solution of 0.1 M weak base (B) is titrated with 0.1 M of a strong acid (HA). What is the $\mathrm{p} K_{\mathrm{b}}$ of the base?
+\item[Q.] 14 Liquids A and B form ideal solution.`
+  const card = {
+    questionType: 'numerical',
+    text: 'A solution of 0.1 M weak base (B) is titrated with 0.1 M of a strong acid (HA). What is the $\\mathrm{p} K_{\\mathrm{b}}$ of the base?',
+    options: [],
+  }
+  assert.deepEqual(reviewOfficialPyqCards([card], ocr, null, { cardsOnly: true }).failedGoTo, [])
 })
 
 if (failed) {

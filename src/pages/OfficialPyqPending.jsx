@@ -858,7 +858,9 @@ export default function OfficialPyqPending() {
         },
       )
       if (paper?.id && /\.(pdf|png|jpe?g|webp)$/i.test(String(file.name || ''))) {
-        void import('../utils/officialPyqOriginalCompare.js')
+        // Auto-fix compares with this file, so it must be stored before the paper opens.
+        setProgressLabel('Storing the original paper for Compare…')
+        await import('../utils/officialPyqOriginalCompare.js')
           .then(({ uploadOfficialPyqOriginal }) => uploadOfficialPyqOriginal(paper.id, file))
           .catch(() => {
             /* compare can still use "Attach original PDF" later */

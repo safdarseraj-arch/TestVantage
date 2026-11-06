@@ -709,7 +709,7 @@ function listTwoBlockLooksUsable(block) {
   const t = String(block ?? '')
   if (!t.trim()) return false
   const labels = t.match(/\(\s*[1-5]\s*\)/g) || []
-  const letterLabels = t.match(/\(\s*[PQRST]\s*\)/g) || []
+  const letterLabels = t.match(/\(\s*[PQRSTU]\s*\)/g) || []
   if (labels.length < 4 && letterLabels.length < 4) return false
   // $3 C_{0\n$} style smash
   if (/\$[^$\n]{0,80}\n\s*\$/.test(t.slice(0, 320))) return false
@@ -1130,7 +1130,7 @@ const MEDIA_TOKEN_RE =
   /(?:List|Column)\s*[-–]?\s*II\b|(?:List|Column)\s*[-–]?\s*I(?!I)\b|\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[\s*[^\]]*\]\s*\(\s*https?:\/\/cdn\.mathpix\.com[^\s)]+\)?|<smiles>[\s\S]*?<\/smiles>|\(\s*[PQRS1-5]\s*\)/gi
 
 const MEDIA_TOKEN_ROMAN_RE =
-  /(?:[Ll][Ii][Ss][Tt]|[Cc]olumn|COLUMN)\s*[-–]?\s*II\b|(?:[Ll][Ii][Ss][Tt]|[Cc]olumn|COLUMN)\s*[-–]?\s*I(?!I)\b|\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[\s*[^\]]*\]\s*\(\s*https?:\/\/cdn\.mathpix\.com[^\s)]+\)?|<smiles>[\s\S]*?<\/smiles>|\(\s*(?:[PQRST]|I{1,3}|IV)\s*\)/g
+  /(?:[Ll][Ii][Ss][Tt]|[Cc]olumn|COLUMN)\s*[-–]?\s*II\b|(?:[Ll][Ii][Ss][Tt]|[Cc]olumn|COLUMN)\s*[-–]?\s*I(?!I)\b|\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[\s*[^\]]*\]\s*\(\s*https?:\/\/cdn\.mathpix\.com[^\s)]+\)?|<smiles>[\s\S]*?<\/smiles>|\(\s*(?:[PQRSTU]|I{1,3}|IV)\s*\)/g
 
 const MEDIA_TOKEN_ALPHA_RE = new RegExp(MEDIA_TOKEN_RE.source.replace('[PQRS1-5]', '[A-D1-5]'), 'gi')
 
@@ -1141,7 +1141,7 @@ function mediaTokenKind(tok, roman = false, alpha = false) {
   if (/^\\includegraphics|^!\[|<smiles>/i.test(t)) return 'media'
   if (roman) {
     if (/^\(\s*(?:I{1,3}|IV)\s*\)$/.test(t)) return 'labI'
-    return /^\(\s*[PQRST]\s*\)$/.test(t) ? 'labII' : 'other'
+    return /^\(\s*[PQRSTU]\s*\)$/.test(t) ? 'labII' : 'other'
   }
   const L = t.match(alpha ? /^\(\s*([A-D1-5])\s*\)$/i : /^\(\s*([PQRS1-5])\s*\)$/i)?.[1]
   if (!L) return 'other'
@@ -1167,7 +1167,7 @@ export function parseMediaMatchLists(text) {
   const roman = hasRomanListI(raw)
   const alpha = !roman && hasAlphaListI(raw)
   const lettersI = roman ? ROMAN_LIST_I : alpha ? ALPHA_LIST_I : ['P', 'Q', 'R', 'S']
-  const lettersII = roman ? ['P', 'Q', 'R', 'S', 'T'] : ['1', '2', '3', '4', '5']
+  const lettersII = roman ? ['P', 'Q', 'R', 'S', 'T', 'U'] : ['1', '2', '3', '4', '5']
   const tokens = [...raw.matchAll(roman ? MEDIA_TOKEN_ROMAN_RE : alpha ? MEDIA_TOKEN_ALPHA_RE : MEDIA_TOKEN_RE)]
   if (tokens.length < 3) return null
   /** @type {Record<string, string>} */
@@ -1300,7 +1300,7 @@ function preferRicherMatchParse(parsed, media) {
   }
   const alpha = !roman && rowsAreAlpha(media.listI)
   const lettersI = roman ? ROMAN_LIST_I : alpha ? ALPHA_LIST_I : ['P', 'Q', 'R', 'S']
-  const lettersII = roman ? ['P', 'Q', 'R', 'S', 'T'] : ['1', '2', '3', '4', '5']
+  const lettersII = roman ? ['P', 'Q', 'R', 'S', 'T', 'U'] : ['1', '2', '3', '4', '5']
   const lastI = `(${lettersI[lettersI.length - 1]})`
   const parsedS = parsed.listI.some((x) => x.label === lastI)
   const mediaS = media.listI.some((x) => x.label === lastI)
@@ -1473,6 +1473,25 @@ function parseMatchingListForDisplayUnsafe(text, options) {
     return null
   }
 
+  // "List-I  List-II" printed side by side: both lists' rows follow the two headings.
+  // Each heading alone on its line, so "…considering List-I and List-II?" before the
+  // answer choices is not mistaken for the pair.
+  const stackedHeads = raw.match(
+    /(?:^|\n)[ \t]*\**[ \t]*((?:List|Column)[ \t]*[-–]?[ \t]*I)[ \t]*\**[ \t]*\n[ \t]*\**[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*II[ \t]*\**[ \t]*\n/i,
+  )
+  if (stackedHeads && stackedHeads.index != null) {
+    const rows = raw.slice(stackedHeads.index + stackedHeads[0].length)
+    const firstP = rows.search(/\(\s*P\s*\)/)
+    if (firstP > 0 && countMarkers(rows.slice(0, firstP), ROMAN_LIST_I) >= 2) {
+      const column = /column/i.test(stackedHeads[1])
+      intro = raw.slice(0, stackedHeads.index)
+      listITitle = column ? 'Column I' : 'List-I'
+      listIITitle = column ? 'Column II' : 'List-II'
+      listIBlock = `${listITitle}\n${rows.slice(0, firstP)}`
+      listIIBlock = `${listIITitle}\n${rows.slice(firstP)}`
+    }
+  }
+
   const optGlue = listIIBlock.search(/\(\s*A\s*\)\s*(?:\(|P|\\)/)
   if (optGlue > 8) listIIBlock = listIIBlock.slice(0, optGlue)
   const keyGlue = listIIBlock.search(
@@ -1566,7 +1585,7 @@ function parseMatchingListForDisplayUnsafe(text, options) {
   const numCount = countMarkers(listIIBlock, ['1', '2', '3', '4'])
   const colPQ = countMarkers(listIIBlock, ['P', 'Q', 'R', 'S'])
   const listIILetters =
-    numCount >= 2 && numCount >= colPQ ? ['1', '2', '3', '4', '5'] : ['P', 'Q', 'R', 'S', 'T']
+    numCount >= 2 && numCount >= colPQ ? ['1', '2', '3', '4', '5'] : ['P', 'Q', 'R', 'S', 'T', 'U']
 
   let itemsII = splitMatchListItems(listIIBlock, listIILetters).filter((x) => String(x.text).trim())
   // Labels present but bodies empty (missing figs) — do not steal List-I media.

@@ -650,6 +650,126 @@ test('"weak base (B)" in a number-answer question is not a missing option (2020 
   assert.deepEqual(reviewOfficialPyqCards([card], ocr, null, { cardsOnly: true }).failedGoTo, [])
 })
 
+test('"List-I  List-II" printed side by side, then rows (I)–(IV) and (P)–(U): both lists show, (U) is its own row (2019 P2 Q15)', () => {
+  const text = [
+    'Answer Q. 15 and Q. 16 by appropriately matching the lists based on the information given in the paragraph',
+    'Consider the Bohr\'s model of a one-electron atom. List-I contains some quantities and List-II contains how they depend on $n$.',
+    'List-I\nList-II',
+    '(I) Radius of the orbit',
+    '(II) Angular momentum of the electron',
+    '(III) Kinetic energy of the electron',
+    '(IV) Potential energy of the electron',
+    '(P) $\\propto n^{-2}$',
+    '(Q) $\\propto n^{-1}$',
+    '(R) $\\propto n^{0}$',
+    '(S) $\\propto n^{1}$',
+    '(T) $\\propto n^{2}$',
+    '(U) $\\propto n^{1 / 2}$',
+  ].join('\n')
+  const parsed = parseMatchingListForDisplay(text, [])
+  assert.ok(parsed, 'no match parse')
+  assert.deepEqual(parsed.listI.map((row) => row.label), ['(I)', '(II)', '(III)', '(IV)'], JSON.stringify(parsed.listI))
+  assert.deepEqual(parsed.listII.map((row) => row.label), ['(P)', '(Q)', '(R)', '(S)', '(T)', '(U)'], JSON.stringify(parsed.listII))
+  assert.ok(!/\(\s*U\s*\)/.test(parsed.listII[4].text), parsed.listII[4].text)
+  assert.ok(/Radius/.test(parsed.listI[0].text), parsed.listI[0].text)
+})
+
+test('"…considering List-I and List-II?" followed by choices "(I), (Q), (T), (U)" is not drawn as a table; the choices stay (2019 P2 chem Q17, Q18)', () => {
+  for (const options of [
+    ['(I), (Q), (T), (U)', '(II), (P), (S), (T)', '(II), (P), (S), (U)', '(I), (S), (Q), (R)'],
+    ['(III), (S), (R)', '(IV), (Q), (U)', '(III), (T), (U)', '(IV), (Q), (R)'],
+  ]) {
+    const stem = 'Which of the following options has correct combination considering List-I and List-II?'
+    const text = `${stem}\n${options.map((o, k) => `(${'ABCD'[k]}) ${o}`).join('\n')}`
+    assert.equal(parseMatchingListForDisplay(text, options), null, options[0])
+    assert.equal(parseMatchingListForDisplay(stem, options), null, options[0])
+  }
+})
+
+test('a match paragraph keeps its List-I pictures when physics prints the same "Answer Q. 17 and Q. 18" heading (2019 P2 chem Q17)', () => {
+  const url = (y) => `https://cdn.mathpix.com/cropped/6ad5e50f-8e34-4d86-9132-8c3f027bdcd0-21.jpg?height=233&width=607&top_left_y=${y}&top_left_x=268`
+  const physUrl = 'https://cdn.mathpix.com/cropped/6ad5e50f-8e34-4d86-9132-8c3f027bdcd0-13.jpg?height=348&width=552&top_left_y=396&top_left_x=818'
+  const head = 'Answer Q. 17 and Q. 18 by appropriately matching the lists based on the information given in the paragraph'
+  const physics = String.raw`\section*{JEE (ADVANCED) 2019 PAPER 2 PART-I PHYSICS}
+Answer Q. 17 and Q. 18 by appropriately matching the lists based on the information given in the paragraph}
+
+In a thermodynamic process on an ideal monatomic gas, the infinitesimal heat absorbed by the gas is given by $T \Delta X$, where $T$ is temperature of the system and $\Delta X$ is the infinitesimal change in a thermodynamic quantity $X$ of the system.
+
+The List-I below gives some quantities involved in a process and List-II gives some possible values of these quantities.
+
+List-I
+\begin{itemize}
+\item[(I)] Work done by the system in process 1→2→3
+\item[(II)] Change in internal energy in process 1→2→3
+\item[(III)] Heat absorbed by the system in process 1→2→3
+\item[(IV)] Heat absorbed by the system in process 1→2
+\end{itemize}
+
+List-II
+\begin{itemize}
+\item[(P)] $\frac{1}{3} R T_{0} \ln 2$
+\item[(Q)] $\frac{1}{3} R T_{0}$
+\item[(R)] $R T_{0}$
+\item[(S)] $\frac{4}{3} R T_{0}$
+\item[(T)] $\frac{1}{3} R T_{0}(3+\ln 2)$
+\item[(U)] $\frac{5}{6} R T_{0}$
+\end{itemize}
+\begin{itemize}
+\item[Q.] 17 If the process carried out on one mole of monatomic ideal gas is as shown in figure in the $P V$-diagram with $P_{0} V_{0}=\frac{1}{3} R T_{0}$, the correct match is,
+![](${physUrl})
+(A) I → Q, II → R, III → P, IV → U
+(B) I → Q, II → R, III → S, IV → U
+(C) I → S, II → R, III → Q, IV → T
+(D) I → Q, II → S, III → R, IV → U
+\item[Q.] 18 If the process on one mole of monatomic ideal gas is as shown in the $T V$-diagram with $P_{0} V_{0}=\frac{1}{3} R T_{0}$, the correct match is,
+(A) I → P, II → R, III → T, IV → S
+(B) I → P, II → T, III → Q, IV → T
+(C) I → P, II → R, III → T, IV → P
+(D) I → S, II → T, III → Q, IV → U
+\end{itemize}`
+  const chemPara = [
+    head,
+    '',
+    'List-I includes starting materials and reagents of selected chemical reactions. List-II gives structures of compounds that may be formed as intermediate products and/or final products from the reactions of List-I.',
+    '',
+    'List-I\nList-II',
+    `(I)\n![](${url(652)})\n(P)\n<smiles>O=CCc1ccccc1C(=O)O</smiles>`,
+    `(II)\n![](${url(1007)})\n(Q)\n<smiles>OCCc1ccccc1CO</smiles>`,
+    `(III)\n![](${url(1362)})\n(R)\n<smiles>c1ccc2c(c1)CCOC2</smiles>`,
+    `(IV)\n![](${url(1700)})\n(S)\n<smiles>O=C(O)c1ccccc1CCO</smiles>`,
+    '(T)\n<smiles>O=C(O)Cc1ccccc1C(=O)O</smiles>\n(U)\n<smiles>O=C1OCCc2ccccc21</smiles>',
+  ].join('\n')
+  const ocr = [
+    physics,
+    '',
+    '\\section*{JEE (ADVANCED) 2019 PAPER 2 PART-II CHEMISTRY}',
+    'Q. 16 Which of the following is the strongest acid among the given compounds?\n(A) acetic acid\n(B) formic acid\n(C) benzoic acid\n(D) phenol',
+    '',
+    chemPara,
+    'Q. 17 Which of the following options has correct combination considering List-I and List-II?\n(A) (I), (Q), (T), (U)\n(B) (II), (P), (S), (T)\n(C) (II), (P), (S), (U)\n(D) (I), (S), (Q), (R)',
+    'Q. 18 Which of the following options has correct combination considering List-I and List-II?\n(A) (III), (S), (R)\n(B) (IV), (Q), (U)\n(C) (III), (T), (U)\n(D) (IV), (Q), (R)',
+  ].join('\n')
+  const card = {
+    subject: 'chemistry',
+    printedNumber: 17,
+    questionNumber: 35,
+    pyqSlot: 35,
+    questionType: 'matrix_match',
+    passageText: chemPara.replace(/!\[\]\(([^)]+)\)/g, '\\includegraphics{$1}'),
+    passageRole: 'comprehension_child',
+    text: 'Which of the following options has correct combination considering List-I and List-II?',
+    options: ['(I), (Q), (T), (U)', '(II), (P), (S), (T)', '(II), (P), (S), (U)', '(I), (S), (Q), (R)'],
+  }
+  const healed = healUploadQuestionCard(card, `${ocr}\n\n${ocr}`)
+  for (const y of [652, 1007, 1362, 1700]) assert.ok(String(healed.passageText).includes(url(y)), healed.passageText)
+  assert.ok(!String(healed.passageText).includes(physUrl), healed.passageText)
+})
+
+test('the next part\'s page heading glued onto option D is cut off (2019 P2 phys Q18)', () => {
+  assert.equal(stripTrailingPyqSectionHeader('$\\frac{5}{6} R T_{0}$ JEE (ADVANCED) 2019 PAPER 2 PART-II CHEMISTRY'), '$\\frac{5}{6} R T_{0}$')
+  assert.equal(stripTrailingPyqSectionHeader('(IV), (Q)\n\\section*{JEE (ADVANCED) 2019 PAPER 2 PART-III MATHEMATICS}'), '(IV), (Q)')
+})
+
 if (failed) {
   console.error(`\n${failed} recurrence test(s) failed`)
   process.exit(1)

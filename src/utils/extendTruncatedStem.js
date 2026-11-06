@@ -1004,6 +1004,27 @@ function matchWindowOwnsStem(window, stem) {
   return windowBelongsToStem(w, stem)
 }
 
+/**
+ * Printed numbers repeat per subject, so a paragraph's pictures are checked against the
+ * scan right after its own wording, not the first "Q. 17" span.
+ */
+function passageWordingOwnsUrls(passage, source, urls) {
+  const src = String(source ?? '')
+  const lines = stripMathpixImageMarkup(String(passage ?? ''))
+    .replace(/<smiles>[\s\S]*?<\/smiles>/gi, ' ')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 30)
+    .sort((a, b) => b.length - a.length)
+  for (const line of lines.slice(0, 3)) {
+    for (let at = src.indexOf(line); at >= 0; at = src.indexOf(line, at + 1)) {
+      const region = src.slice(at, at + String(passage).length + 2000)
+      if (urls.every((url) => region.includes(url))) return true
+    }
+  }
+  return false
+}
+
 /** Wrong-question drawings: drop URLs that are not in this card's OCR span. */
 function dropStolenFigures(stem, source, printedNumber, map, { passage = false } = {}) {
   const t = String(stem ?? '').trim()
@@ -1011,6 +1032,7 @@ function dropStolenFigures(stem, source, printedNumber, map, { passage = false }
   const urls = extractMathpixImageUrls(t)
   if (!urls.length) return t
   const src = String(source ?? '')
+  if (passage && passageWordingOwnsUrls(t, src, urls.filter((url) => !isOriginalCropUrl(url)))) return t
   // A shared passage owns the figures of its whole range (heading to last child), not one
   // child's span, which can run into the next stem's heading and figure.
   const n = Number(printedNumber)

@@ -1112,7 +1112,10 @@ export function healPaperItemCards(questions) {
     for (let i = 0; i < pieces.length; i++) {
       const rec = recoverOptionsFromStem(pieces[i], i === pieces.length - 1 ? q.options : [])
       const text = stripTrailingPyqSectionHeader(stripVisibleItemizeCommands(rec.stem))
-      const options = (rec.options || []).map(stripKeyLeak).map(stripVisibleItemizeCommands)
+      const options = (rec.options || [])
+        .map(stripKeyLeak)
+        .map(stripVisibleItemizeCommands)
+        .map((o) => (String(o ?? '').trim() ? stripTrailingPyqSectionHeader(o) : o))
       while (options.length < 4) options.push('')
       const filledOpts = options.filter((o) => String(o).trim()).length
       if (looksLikeInstructionOnly(text)) continue

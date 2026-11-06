@@ -90,11 +90,7 @@ export function QuestionStem({
   const parsedLists = parseMatchingListForDisplay(sanitized, options)
   const showMatchLayout = Boolean(parseMatchLists && parsedLists?.listI?.length)
   const extractionIncomplete = latexExtractionIncomplete(sanitized)
-  const previewText = showMatchLayout
-    ? parsedLists.intro
-    : parsedLists && !parseMatchLists
-      ? stemTextForPreview(parsedLists.intro, options)
-      : stemTextForPreview(sanitized, options)
+  const previewText = showMatchLayout ? parsedLists.intro : stemTextForPreview(sanitized, options)
   const displayText =
     !showMatchLayout &&
     latexExtractionIncomplete(previewText) &&

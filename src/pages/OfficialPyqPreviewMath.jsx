@@ -34,7 +34,7 @@ export default function OfficialPyqPreviewMath({ q, sourceText = '', sourceTick 
           <QuestionStem
             text={passage}
             options={[]}
-            parseMatchLists={false}
+            parseMatchLists={/List\s*-?\s*I\b/i.test(passage) && /List\s*-?\s*II\b/i.test(passage)}
             highlightProblems={flagProblems}
             className="official-pyq-simple-stem"
           />

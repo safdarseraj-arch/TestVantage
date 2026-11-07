@@ -10,6 +10,7 @@ import { wrapBareLatexRuns } from './wrapBareLatexRuns.js'
 import { extractMathpixImageUrls, hasMathpixMedia, restoreMissingOptionGridGraphs, stripMathpixFigureChrome } from './mathpixMedia.js'
 import { dropStemRepeatOptions, optionLooksLikeStemRepeat } from './optionStemLeak.js'
 import { mergeAdjacentOptionTails, applyUploadQualityGuards } from './extendTruncatedStem.js'
+import { restoreStructureLabels } from './structureLabels.js'
 import { mixedSmilesFigureOptions } from './labelledFigureOptions.js'
 import {
   flattenTabularMatchLists,
@@ -1700,7 +1701,10 @@ export function mathpixSplitToBankDrafts(raw, opts = {}) {
     drafts: annotateMathpixCleanStatus(
       attachRepeatedParagraphHeaders(
         fillPrintedNumberGaps(
-          attachMatchListParagraphs(applyUploadQualityGuards(shaped.questions, raw, sectionMap), raw),
+          attachMatchListParagraphs(
+            applyUploadQualityGuards(shaped.questions, raw, sectionMap).map(restoreStructureLabels),
+            raw,
+          ),
         ),
         raw,
       ),

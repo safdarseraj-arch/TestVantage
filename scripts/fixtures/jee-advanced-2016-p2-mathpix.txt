@@ -1,0 +1,652 @@
+\section*{PART I : PHYSICS}
+
+SECTION 1 (Maximum Marks: 18)
+\begin{itemize}
+\item[-] This section contains SIX questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened.
+Zero Marks : 0 If none of the bubbles is darkened.
+Negative Marks : -1 In all other cases.
+\item[Q.] 1 The electrostatic energy of $Z$ protons uniformly distributed throughout a spherical nucleus of radius $R$ is given by
+$$E=\frac{3}{5} \frac{Z(Z-1) e^{2}}{4 \pi \varepsilon_{0} R}$$
+The measured masses of the neutron, ${ }_{1}^{1} \mathrm{H},{ }_{7}^{15} \mathrm{~N}$ and ${ }_{8}^{15} \mathrm{O}$ are 1.008665 u, 1.007825 u, 15.000109 u and 15.003065 u, respectively. Given that the radii of both the ${ }_{7}^{15} \mathrm{~N}$ and ${ }_{8}^{15} \mathrm{O}$ nuclei are same, $1 \mathrm{u}=931.5 \mathrm{MeV} / c^{2}$ ( $c$ is the speed of light) and $e^{2} /\left(4 \pi \varepsilon_{0}\right)=1.44 \mathrm{MeV} \mathrm{fm}$. Assuming that the difference between the binding energies of ${ }_{7}^{15} \mathrm{~N}$ and ${ }_{8}^{15} \mathrm{O}$ is purely due to the electrostatic energy, the radius of either of the nuclei is
+$\left(1 \mathrm{fm}=10^{-15} \mathrm{~m}\right)$
+(A) 2.85 fm
+(B) 3.03 fm
+(C) 3.42 fm
+(D) 3.80 fm
+\item[Q.] 2 An accident in a nuclear laboratory resulted in deposition of a certain amount of radioactive material of half-life 18 days inside the laboratory. Tests revealed that the radiation was 64 times more than the permissible level required for safe operation of the laboratory. What is the minimum number of days after which the laboratory can be considered safe for use?
+(A) 64
+(B) 90
+(C) 108
+(D) 120
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 3 A gas is enclosed in a cylinder with a movable frictionless piston. Its initial thermodynamic state at pressure $P_{i}=10^{5} \mathrm{~Pa}$ and volume $V_{i}=10^{-3} \mathrm{~m}^{3}$ changes to a final state at $P_{f}=(1 / 32) \times 10^{5} \mathrm{~Pa}$ and $V_{f}=8 \times 10^{-3} \mathrm{~m}^{3}$ in an adiabatic quasi-static process, such that $P^{3} V^{5}=$ constant. Consider another thermodynamic process that brings the system from the same initial state to the same final state in two steps: an isobaric expansion at $P_{i}$ followed by an isochoric (isovolumetric) process at volume $V_{f}$. The amount of heat supplied to the system in the two-step process is approximately
+(A) 112 J
+(B) 294 J
+(C) 588 J
+(D) 813 J
+\item[Q.] 4 The ends Q and R of two thin wires, PQ and RS, are soldered (joined) together. Initially each of the wires has a length of 1 m at 10 °C. Now the end P is maintained at 10 °C, while the end S is heated and maintained at 400 °C. The system is thermally insulated from its surroundings. If the thermal conductivity of wire PQ is twice that of the wire RS and the coefficient of linear thermal expansion of PQ is $1.2 \times 10^{-5} \mathrm{~K}^{-1}$, the change in length of the wire PQ is
+(A) 0.78 mm
+(B) 0.90 mm
+(C) 1.56 mm
+(D) 2.34 mm
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 5 A small object is placed 50 cm to the left of a thin convex lens of focal length 30 cm. A convex spherical mirror of radius of curvature 100 cm is placed to the right of the lens at a distance of 50 cm. The mirror is tilted such that the axis of the mirror is at an angle $\theta=30^{\circ}$ to the axis of the lens, as shown in the figure.
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-03.jpg?height=648&width=1449&top_left_y=396&top_left_x=314)
+If the origin of the coordinate system is taken to be at the centre of the lens, the coordinates (in cm) of the point $(x, y)$ at which the image is formed are
+(A) $(0,0)$
+(B) $(50-25 \sqrt{3}, 25)$
+$(25,25 \sqrt{3})$
+(D) $(125 / 3,25 / \sqrt{3})$
+\end{itemize}
+
+\section*{ \\ }
+\begin{itemize}
+\item[Q.] 6 There are two Vernier calipers both of which have 1 cm divided into 10 equal divisions on the main scale. The Vernier scale of one of the calipers $\left(C_{1}\right)$ has 10 equal divisions that correspond to 9 main scale divisions. The Vernier scale of the other caliper $\left(C_{2}\right)$ has 10 equal divisions that correspond to 11 main scale divisions. The readings of the two calipers are shown in the figure. The measured values (in cm) by calipers $C_{1}$ and $C_{2}$, respectively, are
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-04.jpg?height=754&width=989&top_left_y=475&top_left_x=622)
+(A) 2.85 and 2.82
+(B) 2.87 and 2.83
+(C) 2.87 and 2.86
+(D) 2.87 and 2.87
+\end{itemize}
+
+\section*{ \\ }
+
+\section*{SECTION 2 (Maximum Marks: 32)}
+\begin{itemize}
+\item[-] This section contains EIGHT questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct.
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened. \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened. \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened. \\
+\hline Negative Marks & : -2 & In all other cases. \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[-] For example, if (A), (C) and (D) are all the correct options for a question, darkening all these three will result in +4 marks; darkening only (A) and (D) will result in +2 marks; and darkening (A) and (B) will result in -2 marks, as a wrong option is also darkened.
+\item[Q.] 7 Two thin circular discs of mass $m$ and $4 m$, having radii of $a$ and $2 a$, respectively, are rigidly fixed by a massless, rigid rod of length $l=\sqrt{24} a$ through their centers. This assembly is laid on a firm and flat surface, and set rolling without slipping on the surface so that the angular speed about the axis of the rod is $\omega$. The angular momentum of the entire assembly about the point ' $O$ ' is $\vec{L}$ (see the figure). Which of the following statement(s) is(are) true?
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-05.jpg?height=495&width=1060&top_left_y=1416&top_left_x=548)
+\begin{itemize}
+\item[(A)] The center of mass of the assembly rotates about the $z$-axis with an angular speed of $\omega / 5$
+\item[(B)] The magnitude of angular momentum of center of mass of the assembly about the point O is $81 m a^{2} \omega$
+\item[(C)] The magnitude of angular momentum of the assembly about its center of mass is $17 m a^{2} \omega / 2$
+\item[(D)] The magnitude of the $z$-component of $\vec{L}$ is $55 m a^{2} \omega$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 8 light of wavelength $\lambda_{\mathrm{ph}}$ falls on a cathode plate inside a vacuum tube as shown in the figure. The work function of the cathode surface is $\phi$ and the anode is a wire mesh of conducting material kept at a distance $d$ from the cathode. A potential difference $V$ is maintained between the electrodes. If the minimum de Broglie wavelength of the electrons passing through the anode is $\lambda_{\mathrm{e}}$, which of the following statement(s) is(are) true?
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-06.jpg?height=598&width=997&top_left_y=428&top_left_x=564)
+\begin{itemize}
+\item[(A)] $\lambda_{\mathrm{e}}$ decreases with increase in $\phi$ and $\lambda_{\mathrm{ph}}$
+\item[(B)] $\lambda_{\mathrm{e}}$ is approximately halved, if $d$ is doubled
+\item[(C)] For large potential difference $(V \gg \phi / e), \lambda_{\mathrm{e}}$ is approximately halved if $V$ is made four times
+\item[(D)] $\lambda_{\mathrm{e}}$ increases at the same rate as $\lambda_{\mathrm{ph}}$ for $\lambda_{\mathrm{ph}}<h c / \phi$
+\end{itemize}
+\end{itemize}
+
+\section*{Space for rough work}
+
+\section*{ \\ }
+\begin{itemize}
+\item[Q.] 9 In an experiment to determine the acceleration due to gravity $g$, the formula used for the time period of a periodic motion is $T=2 \pi \sqrt{\frac{7(R-r)}{5 g}}$. The values of $R$ and $r$ are measured to be (60 ± 1) mm and (10 ± 1) mm, respectively. In five successive measurements, the time period is found to be 0.52 s, 0.56 s, 0.57 s, 0.54 s and 0.59 s. The least count of the watch used for the measurement of time period is 0.01 s. Which of the following statement(s) is(are) true?
+\begin{itemize}
+\item[(A)] The error in the measurement of $r$ is 10\%
+\item[(B)] The error in the measurement of $T$ is 3.57\%
+\item[(C)] The error in the measurement of $T$ is 2\%
+\item[(D)] The error in the determined value of $g$ is $11 \%$
+\end{itemize}
+\item[Q.] 10 Consider two identical galvanometers and two identical resistors with resistance $R$. If the internal resistance of the galvanometers $R_{\mathrm{C}}<R / 2$, which of the following statement(s) about any one of the galvanometers is(are) true?
+\begin{itemize}
+\item[(A)] The maximum voltage range is obtained when all the components are connected in series
+\item[(B)] The maximum voltage range is obtained when the two resistors and one galvanometer are connected in series, and the second galvanometer is connected in parallel to the first galvanometer
+\item[(C)] The maximum current range is obtained when all the components are connected in parallel
+\item[(D)] The maximum current range is obtained when the two galvanometers are connected in series and the combination is connected in parallel with both the resistors
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 11 In the circuit shown below, the key is pressed at time $t=0$. Which of the following statement(s) is(are) true?
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-08.jpg?height=499&width=532&top_left_y=264&top_left_x=820)
+\begin{itemize}
+\item[(A)] The voltmeter displays -5 V as soon as the key is pressed, and displays +5 V after a long time
+\item[(B)] The voltmeter will display 0 V at time $t=\ln 2$ seconds
+\item[(C)] The current in the ammeter becomes $1 / e$ of the initial value after 1 second
+\item[(D)] The current in the ammeter becomes zero after a long time
+\end{itemize}
+\item[Q.] 12 A block with mass $M$ is connected by a massless spring with stiffness constant $k$ to a rigid wall and moves without friction on a horizontal surface. The block oscillates with small amplitude $A$ about an equilibrium position $x_{0}$. Consider two cases: (i) when the block is at $x_{0}$; and (ii) when the block is at $x=x_{0}+A$. In both the cases, a particle with mass $m(<M)$ is softly placed on the block after which they stick to each other. Which of the following statement(s) is(are) true about the motion after the mass $m$ is placed on the mass $M$ ?
+\begin{itemize}
+\item[(A)] The amplitude of oscillation in the first case changes by a factor of $\sqrt{\frac{M}{m+M}}$, whereas in the second case it remains unchanged
+\item[(B)] The final time period of oscillation in both the cases is same
+\item[(C)] The total energy decreases in both the cases
+\item[(D)] The instantaneous speed at $x_{0}$ of the combined masses decreases in both the cases
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 13 While conducting the Young's double slit experiment, a student replaced the two slits with a large opaque plate in the $x-y$ plane containing two small holes that act as two coherent point sources $\left(S_{1}, S_{2}\right)$ emitting light of wavelength 600 nm. The student mistakenly placed the screen parallel to the $x-z$ plane (for $z>0$ ) at a distance $D=3 \mathrm{~m}$ from the mid-point of $S_{1} S_{2}$, as shown schematically in the figure. The distance between the sources $d=0.6003 \mathrm{~mm}$. The origin $O$ is at the intersection of the screen and the line joining $S_{1} S_{2}$. Which of the following is(are) true of the intensity pattern on the screen?
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-09.jpg?height=536&width=1158&top_left_y=522&top_left_x=461)
+\begin{itemize}
+\item[(A)] Straight bright and dark bands parallel to the $x$-axis
+\item[(B)] The region very close to the point O will be dark
+\item[(C)] Hyperbolic bright and dark bands with foci symmetrically placed about O in the $x$-direction
+\item[(D)] Semi circular bright and dark bands centered at point O
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 14 A rigid wire loop of square shape having side of length $L$ and resistance $R$ is moving along the $x$-axis with a constant velocity $\mathrm{v}_{0}$ in the plane of the paper. At $t=0$, the right edge of the loop enters a region of length $3 L$ where there is a uniform magnetic field $B_{0}$ into the plane of the paper, as shown in the figure. For sufficiently large $\mathrm{v}_{0}$, the loop eventually crosses the region. Let $x$ be the location of the right edge of the loop. Let $\mathrm{v}(x), I(x)$ and $F(x)$ represent the velocity of the loop, current in the loop, and force on the loop, respectively, as a function of $x$. Counter-clockwise current is taken as positive.
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-10.jpg?height=521&width=1153&top_left_y=557&top_left_x=495)
+Which of the following schematic plot(s) is(are) correct? (Ignore gravity)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-10.jpg?height=386&width=598&top_left_y=1319&top_left_x=425)
+$I(x)$
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-10.jpg?height=484&width=587&top_left_y=1233&top_left_x=1291)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-10.jpg?height=387&width=563&top_left_y=1910&top_left_x=417)
+$F(x)$
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-10.jpg?height=512&width=548&top_left_y=1799&top_left_x=1250)
+\end{itemize}
+
+SECTION 3 (Maximum Marks: 12)
+\begin{itemize}
+\item[-] This section contains TWO paragraphs.
+\item[-] Based on each paragraph, there are TWO questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened.
+Zero Marks : 0 In all other cases.
+\end{itemize}
+
+\section*{PARAGRAPH 1}
+
+A frame of reference that is accelerated with respect to an inertial frame of reference is called a non-inertial frame of reference. A coordinate system fixed on a circular disc rotating about a fixed axis with a constant angular velocity $\omega$ is an example of a non-inertial frame of reference. The relationship between the force $\vec{F}_{\text {rot }}$ experienced by a particle of mass $m$ moving on the rotating disc and the force $\vec{F}_{\text {in }}$ experienced by the particle in an inertial frame of reference is
+$$\vec{F}_{\mathrm{rot}}=\vec{F}_{\mathrm{in}}+2 m\left(\vec{v}_{\mathrm{rot}} \times \vec{\omega}\right)+m(\vec{\omega} \times \vec{r}) \times \vec{\omega},$$
+where $\vec{v}_{\text {rot }}$ is the velocity of the particle in the rotating frame of reference and $\vec{r}$ is the position vector of the particle with respect to the centre of the disc.
+Now consider a smooth slot along a diameter of a disc of radius $R$ rotating counter-clockwise with a constant angular speed $\omega$ about its vertical axis through its center. We assign a coordinate system with the origin at the center of the disc, the $x$-axis along the slot, the $y$-axis perpendicular to the slot and the $z$-axis along the rotation axis $(\vec{\omega}=\omega \hat{k})$. A small block of mass $m$ is gently placed in the slot at $\vec{r}=(R / 2) \hat{i}$ at $t=0$ and is constrained to move only along the slot.
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-12.jpg?height=597&width=799&top_left_y=1195&top_left_x=674)
+\begin{itemize}
+\item[Q.] 15 The distance $r$ of the block at time $t$ is
+(A) $\frac{R}{4}\left(e^{\omega t}+e^{-\omega t}\right)$
+(B) $\frac{R}{2} \cos \omega t$
+(C) $\frac{R}{4}\left(e^{2 \omega t}+e^{-2 \omega t}\right)$
+(D) $\frac{R}{2} \cos 2 \omega t$
+\item[Q.] 16 The net reaction of the disc on the block is
+(A) $\frac{1}{2} m \omega^{2} R\left(e^{2 \omega t}-e^{-2 \omega t}\right) \hat{j}+m g \hat{k}$
+(B) $\frac{1}{2} m \omega^{2} R\left(e^{\omega t}-e^{-\omega t}\right) \hat{j}+m g \hat{k}$
+(C) $-m \omega^{2} R \cos \omega t \hat{j}-m g \hat{k}$
+(D) $m \omega^{2} R \sin \omega t \hat{j}-m g \hat{k}$
+\end{itemize}
+
+PARAGRAPH 2
+Consider an evacuated cylindrical chamber of height $h$ having rigid conducting plates at the ends and an insulating curved surface as shown in the figure. A number of spherical balls made of a light weight and soft material and coated with a conducting material are placed on the bottom plate. The balls have a radius $r \ll h$. Now a high voltage source (HV) is connected across the conducting plates such that the bottom plate is at $+V_{0}$ and the top plate at $-V_{0}$. Due to their conducting surface, the balls will get charged, will become equipotential with the plate and are repelled by it. The balls will eventually collide with the top plate, where the coefficient of restitution can be taken to be zero due to the soft nature of the material of the balls. The electric field in the chamber can be considered to be that of a parallel plate capacitor. Assume that there are no collisions between the balls and the interaction between them is negligible. (Ignore gravity)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-13.jpg?height=438&width=638&top_left_y=867&top_left_x=732)
+\begin{itemize}
+\item[Q.] 17 Which one of the following statements is correct?
+\begin{itemize}
+\item[(A)] The balls will stick to the top plate and remain there
+\item[(B)] The balls will bounce back to the bottom plate carrying the same charge they went up with
+\item[(C)] The balls will bounce back to the bottom plate carrying the opposite charge they went up with
+\item[(D)] The balls will execute simple harmonic motion between the two plates
+\end{itemize}
+\item[Q.] 18 The average current in the steady state registered by the ammeter in the circuit will be
+(A) zero
+(B) proportional to the potential $V_{0}$
+(C) proportional to $V_{0}^{1 / 2}$
+(D) proportional to $V_{0}^{2}$
+\end{itemize}
+
+END OF PART I : PHYSICS
+
+\section*{PART II : CHEMISTRY}
+
+SECTION 1 (Maximum Marks: 18)
+\begin{itemize}
+\item[-] This section contains SIX questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened.
+Zero Marks : 0 If none of the bubbles is darkened.
+Negative Marks : -1 In all other cases.
+\item[Q.] 19 For the following electrochemical cell at 298 K,
+$$\begin{aligned}
+& \operatorname{Pt}(s) \mid \mathrm{H}_{2}(g, 1 \text { bar })\left|\mathrm{H}^{+}(a q, 1 \mathrm{M})\right|\left|\mathrm{M}^{4+}(a q), \mathrm{M}^{2+}(a q)\right| \operatorname{Pt}(s) \\
+& E_{\text {cell }}=0.092 \mathrm{~V} \text { when } \frac{\left[\mathrm{M}^{2+}(a q)\right]}{\left[\mathrm{M}^{4+}(a q)\right]}=10^{x} .
+\end{aligned}$$
+Given : $E_{\mathrm{M}^{4+} / \mathrm{M}^{2+}}^{0}=0.151 \mathrm{~V} ; 2.303 \frac{R T}{F}=0.059 \mathrm{~V}$
+The value of $x$ is
+(A) -2
+(B) -1
+(C) 1
+(D) 2
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 20 The qualitative sketches I, II and III given below show the variation of surface tension with molar concentration of three different aqueous solutions of $\mathrm{KCl}, \mathrm{CH}_{3} \mathrm{OH}$ and $\mathrm{CH}_{3}\left(\mathrm{CH}_{2}\right)_{11} \mathrm{OSO}_{3}{ }^{-} \mathrm{Na}^{+}$at room temperature. The correct assignment of the sketches is
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-15.jpg?height=445&width=455&top_left_y=355&top_left_x=329)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-15.jpg?height=445&width=452&top_left_y=350&top_left_x=822)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-15.jpg?height=446&width=457&top_left_y=341&top_left_x=1317)
+\begin{itemize}
+\item[(A)] I : KCl II : $\mathrm{CH}_{3} \mathrm{OH}$ III : $\mathrm{CH}_{3}\left(\mathrm{CH}_{2}\right)_{11} \mathrm{OSO}_{3}{ }^{-} \mathrm{Na}^{+}$
+\item[(B)] I : $\mathrm{CH}_{3}\left(\mathrm{CH}_{2}\right)_{11} \mathrm{OSO}_{3}{ }^{-} \mathrm{Na}^{+}$ II : $\mathrm{CH}_{3} \mathrm{OH}$ III : KCl
+\item[(C)] I : KCl II : $\mathrm{CH}_{3}\left(\mathrm{CH}_{2}\right)_{11} \mathrm{OSO}_{3}{ }^{-} \mathrm{Na}^{+}$ III : $\mathrm{CH}_{3} \mathrm{OH}$
+\item[(D)] I : $\mathrm{CH}_{3} \mathrm{OH}$ II : KCl III : $\mathrm{CH}_{3}\left(\mathrm{CH}_{2}\right)_{11} \mathrm{OSO}_{3}{ }^{-} \mathrm{Na}^{+}$
+\end{itemize}
+\item[Q.] 21 In the following reaction sequence in aqueous solution, the species $\mathbf{X}, \mathbf{Y}$ and $\mathbf{Z}$, respectively, are
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-15.jpg?height=182&width=1166&top_left_y=1298&top_left_x=477)
+(A) $\left[\mathrm{Ag}\left(\mathrm{S}_{2} \mathrm{O}_{3}\right)_{2}\right]^{3-}, \mathrm{Ag}_{2} \mathrm{~S}_{2} \mathrm{O}_{3}, \mathrm{Ag}_{2} \mathrm{~S}$
+(B) $\left[\mathrm{Ag}\left(\mathrm{S}_{2} \mathrm{O}_{3}\right)_{3}\right]^{5-}, \mathrm{Ag}_{2} \mathrm{SO}_{3}, \mathrm{Ag}_{2} \mathrm{~S}$
+(C) $\left[\mathrm{Ag}\left(\mathrm{SO}_{3}\right)_{2}\right]^{3-}, \mathrm{Ag}_{2} \mathrm{~S}_{2} \mathrm{O}_{3}, \mathrm{Ag}$
+(D) $\left[\mathrm{Ag}\left(\mathrm{SO}_{3}\right)_{3}\right]^{3-}, \mathrm{Ag}_{2} \mathrm{SO}_{4}, \mathrm{Ag}$
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 22 The geometries of the ammonia complexes of $\mathrm{Ni}^{2+}, \mathrm{Pt}^{2+}$ and $\mathrm{Zn}^{2+}$, respectively, are
+\begin{itemize}
+\item[(A)] octahedral, square planar and tetrahedral
+\item[(B)] square planar, octahedral and tetrahedral
+\item[(C)] tetrahedral, square planar and octahedral
+\item[(D)] octahedral, tetrahedral and square planar
+\end{itemize}
+\item[Q.] 23 The correct order of acidity for the following compounds is
+<smiles>O=C(O)c1c(O)cccc1O</smiles>
+
+<smiles>O=C(O)c1ccccc1O</smiles>
+
+<smiles>O=C(O)c1cccc(O)c1</smiles>
+
+III
+<smiles>O=C(O)c1ccc(O)cc1</smiles>
+
+(A) I > II > III > IV
+(B) III > I > II > IV
+(C) III > IV > II > I
+(D) I $>$ III $>$ IV $>$ II
+\item[Q.] 24 The major product of the following reaction sequence is
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-16.jpg?height=213&width=858&top_left_y=1143&top_left_x=648)
+<smiles>CC1(C)COCOC1c1ccccc1</smiles>
+<smiles>CC(C)(COCO)C(=O)c1ccccc1</smiles>
+<smiles>CC1(C)COCOC1(O)c1ccccc1</smiles>
+<smiles>CC(C)(CO)C(=O)c1cccc(CO)c1</smiles>
+\end{itemize}
+
+\section*{Space for rough work}
+
+SECTION 2 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct.
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks :+4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened.
+Partial Marks :+1 For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened.
+Zero Marks : 0 If none of the bubbles is darkened.
+Negative Marks : -2 In all other cases.
+\item[-] For example, if (A), (C) and (D) are all the correct options for a question, darkening all these three will result in +4 marks; darkening only (A) and (D) will result in +2 marks; and darkening (A) and (B) will result in -2 marks, as a wrong option is also darkened.
+\item[Q.] 25 According to Molecular Orbital Theory,
+\begin{itemize}
+\item[(A)] $\mathrm{C}_{2}{ }^{2-}$ is expected to be diamagnetic
+\item[(B)] $\mathrm{O}_{2}{ }^{2+}$ is expected to have a longer bond length than $\mathrm{O}_{2}$
+\item[(C)] $\mathrm{N}_{2}{ }^{+}$and $\mathrm{N}_{2}{ }^{-}$have the same bond order
+\item[(D)] $\mathrm{He}_{2}^{+}$has the same energy as two isolated He atoms
+\end{itemize}
+\item[Q.] 26 Mixture(s) showing positive deviation from Raoult's law at 35 °C is(are)
+(A) carbon tetrachloride + methanol
+(B) carbon disulphide + acetone
+(C) benzene + toluene
+(D) phenol + aniline
+\item[Q.] 27 The CORRECT statement(s) for cubic close packed (ccp) three dimensional structure is(are)
+\begin{itemize}
+\item[(A)] The number of the nearest neighbours of an atom present in the topmost layer is 12
+\item[(B)] The efficiency of atom packing is 74\%
+\item[(C)] The number of octahedral and tetrahedral voids per atom are 1 and 2, respectively
+\item[(D)] The unit cell edge length is $2 \sqrt{2}$ times the radius of the atom
+\end{itemize}
+\end{itemize}
+
+\section*{Space for rough work}
+
+\begin{itemize}
+\item[Q.] 28 Extraction of copper from copper pyrite $\left(\mathrm{CuFeS}_{2}\right)$ involves
+\begin{itemize}
+\item[(A)] crushing followed by concentration of the ore by froth-flotation
+\item[(B)] removal of iron as slag
+\item[(C)] self-reduction step to produce 'blister copper' following evolution of $\mathrm{SO}_{2}$
+\item[(D)] refining of 'blister copper' by carbon reduction
+\end{itemize}
+\item[Q.] 29 The nitrogen containing compound produced in the reaction of $\mathrm{HNO}_{3}$ with $\mathrm{P}_{4} \mathrm{O}_{10}$
+\begin{itemize}
+\item[(A)] can also be prepared by reaction of $\mathrm{P}_{4}$ and $\mathrm{HNO}_{3}$
+\item[(B)] is diamagnetic
+\item[(C)] contains one $\mathrm{N}-\mathrm{N}$ bond
+\item[(D)] reacts with Na metal producing a brown gas
+\end{itemize}
+\item[Q.] 30 For 'invert sugar', the correct statement(s) is(are)
+(Given: specific rotations of (+)-sucrose, (+)-maltose, L-(-)-glucose and L-(+)-fructose in aqueous solution are $+66^{\circ},+140^{\circ},-52^{\circ}$ and $+92^{\circ}$, respectively)
+\begin{itemize}
+\item[(A)] 'invert sugar' is prepared by acid catalyzed hydrolysis of maltose
+\item[(B)] 'invert sugar' is an equimolar mixture of D-(+)-glucose and D-(-)-fructose
+\item[(C)] specific rotation of 'invert sugar' is -20°
+\item[(D)] on reaction with $\mathrm{Br}_{2}$ water, 'invert sugar' forms saccharic acid as one of the products
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 31 Reagent(s) which can be used to bring about the following transformation is(are)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-19.jpg?height=326&width=879&top_left_y=203&top_left_x=636)
+(A) $\mathrm{LiAlH}_{4}$ in $\left(\mathrm{C}_{2} \mathrm{H}_{5}\right)_{2} \mathrm{O}$
+(B) $\mathrm{BH}_{3}$ in THF
+(C) $\mathrm{NaBH}_{4}$ in $\mathrm{C}_{2} \mathrm{H}_{5} \mathrm{OH}$
+(D) Raney $\mathrm{Ni} / \mathrm{H}_{2}$ in THF
+\item[Q.] 32 Among the following, reaction(s) which gives(give) tert-butyl benzene as the major product is(are)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-19.jpg?height=213&width=377&top_left_y=873&top_left_x=385)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-19.jpg?height=175&width=364&top_left_y=899&top_left_x=1141)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-19.jpg?height=193&width=363&top_left_y=1153&top_left_x=391)
+![](https://cdn.mathpix.com/cropped/a7f6a7c4-bac5-4153-8337-1f481c0622d6-19.jpg?height=182&width=386&top_left_y=1155&top_left_x=1146)
+
+\end{itemize}
+
+SECTION 3 (Maximum Marks: 12)
+\begin{itemize}
+\item[-] This section contains TWO paragraphs.
+\item[-] Based on each paragraph, there are TWO questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened.
+Zero Marks : 0 In all other cases.
+\end{itemize}
+
+\section*{PARAGRAPH 1}
+
+Thermal decomposition of gaseous $\mathrm{X}_{2}$ to gaseous X at 298 K takes place according to the following equation :
+$$\mathrm{X}_{2}(g) \rightleftharpoons 2 \mathrm{X}(g)$$
+The standard reaction Gibbs energy, $\Delta_{r} G^{\circ}$, of this reaction is positive. At the start of the reaction, there is one mole of $\mathrm{X}_{2}$ and no X. As the reaction proceeds, the number of moles of X formed is given by $\beta$. Thus, $\beta_{\text {equilibrium }}$ is the number of moles of X formed at equilibrium. The reaction is carried out at a constant total pressure of 2 bar. Consider the gases to behave ideally. (Given : $R=0.083 \mathrm{~L}$ bar $\mathrm{K}^{-1} \mathrm{~mol}^{-1}$ )
+\begin{itemize}
+\item[Q.] 33 The equilibrium constant $K_{P}$ for this reaction at 298 K, in terms of $\beta_{\text {equilibrium }}$, is
+(A) $\frac{8 \beta_{\text {equilibrium }}^{2}}{2-\beta_{\text {equilibrium }}}$
+(B) $\frac{8 \beta_{\text {equilibrium }}^{2}}{4-\beta_{\text {equilibrium }}^{2}}$
+(C) $\frac{4 \beta_{\text {equilibrium }}^{2}}{2-\beta_{\text {equilibrium }}}$
+(D) $\frac{4 \beta_{\text {equilibrium }}^{2}}{4-\beta_{\text {equilibrium }}^{2}}$
+\item[Q.] 34 The INCORRECT statement among the following, for this reaction, is
+\begin{itemize}
+\item[(A)] Decrease in the total pressure will result in formation of more moles of gaseous X
+\item[(B)] At the start of the reaction, dissociation of gaseous $\mathrm{X}_{2}$ takes place spontaneously
+\item[(C)] $\beta_{\text {equilibrium }}=0.7$
+\item[(D)] $K_{C}<1$
+\end{itemize}
+\end{itemize}
+
+\section*{PARAGRAPH 2}
+
+Treatment of compound O with $\mathrm{KMnO}_{4} / \mathrm{H}^{+}$gave P, which on heating with ammonia gave Q. The compound $\mathbf{Q}$ on treatment with $\mathrm{Br}_{2} / \mathrm{NaOH}$ produced $\mathbf{R}$. On strong heating, $\mathbf{Q}$ gave $\mathbf{S}$, which on further treatment with ethyl 2-bromopropanoate in the presence of KOH followed by acidification, gave a compound T.
+<smiles>CCCc1ccccc1CCC</smiles>
+
+(O)
+\begin{itemize}
+\item[Q.] 35 The compound R is
+<smiles>Nc1ccccc1N</smiles>
+<smiles>O=C(Br)c1ccccc1C(=O)Br</smiles>
+<smiles>O=C(NBr)c1ccccc1C(=O)NBr</smiles>
+<smiles>O=C1[N]C(=O)c2ccccc21</smiles>
+\item[Q.] 36 The compound T is
+(A) glycine
+(B) alanine
+(C) valine
+(D) serine
+END OF PART II : CHEMISTRY
+
+\end{itemize}
+
+\section*{PART III : MATHEMATICS}
+
+SECTION 1 (Maximum Marks: 18)
+\begin{itemize}
+\item[-] This section contains SIX questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened.
+Zero Marks : 0 If none of the bubbles is darkened.
+Negative Marks : -1 In all other cases.
+\item[Q.] 37 Let $P=\left[\begin{array}{ccc}1 & 0 & 0 \\ 4 & 1 & 0 \\ 16 & 4 & 1\end{array}\right]$ and $I$ be the identity matrix of order 3. If $Q=\left[q_{i j}\right]$ is a matrix such that $P^{50}-Q=I$, then $\frac{q_{31}+q_{32}}{q_{21}}$ equals
+(A) 52
+(B) 103
+(C) 201
+(D) 205
+\item[Q.] 38 Let $b_{i}>1$ for $i=1,2, \ldots, 101$. Suppose $\log _{e} b_{1}, \log _{e} b_{2}, \ldots, \log _{e} b_{101}$ are in Arithmetic Progression (A.P.) with the common difference $\log _{e} 2$. Suppose $a_{1}, a_{2}, \ldots, a_{101}$ are in A.P. such that $a_{1}=b_{1}$ and $a_{51}=b_{51}$. If $t=b_{1}+b_{2}+\cdots+b_{51}$ and $s=a_{1}+a_{2}+\cdots+a_{51}$, then
+(A) $s>t$ and $a_{101}>b_{101}$
+(B) $s>t$ and $a_{101}<b_{101}$
+(C) $s<t$ and $a_{101}>b_{101}$
+(D) $s<t$ and $a_{101}<b_{101}$
+\item[Q.] 39 The value of $\sum_{k=1}^{13} \frac{1}{\sin \left(\frac{\pi}{4}+\frac{(k-1) \pi}{6}\right) \sin \left(\frac{\pi}{4}+\frac{k \pi}{6}\right)}$ is equal to
+(A) $3-\sqrt{3}$
+(B) $2(3-\sqrt{3})$
+(C) $2(\sqrt{3}-1)$
+(D) $2(2+\sqrt{3})$
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 40 The value of $\int_{-\frac{\pi}{2}}^{\frac{\pi}{2}} \frac{x^{2} \cos x}{1+e^{x}} d x$ is equal to
+(A) $\frac{\pi^{2}}{4}-2$
+(B) $\frac{\pi^{2}}{4}+2$
+(C) $\pi^{2}-e^{\frac{\pi}{2}}$
+(D) $\pi^{2}+e^{\frac{\pi}{2}}$
+\item[Q.] 41 Area of the region $\left\{(x, y) \in \mathbb{R}^{2}: y \geq \sqrt{|x+3|}, 5 y \leq x+9 \leq 15\right\}$ is equal to
+(A) $\frac{1}{6}$
+(B) $\frac{4}{3}$
+(C) $\frac{3}{2}$
+(D) $\frac{5}{3}$
+\item[Q.] 42 Let $P$ be the image of the point $(3,1,7)$ with respect to the plane $x-y+z=3$. Then the equation of the plane passing through $P$ and containing the straight line $\frac{x}{1}=\frac{y}{2}=\frac{z}{1}$ is
+(A) $x+y-3 z=0$
+(B) $3 x+z=0$
+(C) $x-4 y+7 z=0$
+(D) $2 x-y=0$
+\end{itemize}
+
+\section*{Space for rough work}
+
+SECTION 2 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct.
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened. \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened. \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened. \\
+\hline Negative Marks & : -2 & In all other cases. \\
+\hline
+\end{tabular}
+\item[-] For example, if (A), (C) and (D) are all the correct options for a question, darkening all these three will result in +4 marks; darkening only (A) and (D) will result in +2 marks; and darkening (A) and (B) will result in -2 marks, as a wrong option is also darkened.
+\end{itemize}
+Q. 43 Let $f(x)=\lim _{n \rightarrow \infty}\left(\frac{n^{n}(x+n)\left(x+\frac{n}{2}\right) \cdots\left(x+\frac{n}{n}\right)}{n!\left(x^{2}+n^{2}\right)\left(x^{2}+\frac{n^{2}}{4}\right) \cdots\left(x^{2}+\frac{n^{2}}{n^{2}}\right)}\right)^{\frac{x}{n}}$, for all $x>0$. Then
+(A) $f\left(\frac{1}{2}\right) \geq f(1)$
+(B) $f\left(\frac{1}{3}\right) \leq f\left(\frac{2}{3}\right)$
+(C) $f^{\prime}(2) \leq 0$
+(D) $\frac{f^{\prime}(3)}{f(3)} \geq \frac{f^{\prime}(2)}{f(2)}$
+\begin{itemize}
+\item[Q.] 44 Let $a, b \in \mathbb{R}$ and $f: \mathbb{R} \rightarrow \mathbb{R}$ be defined by $f(x)=a \cos \left(\left|x^{3}-x\right|\right)+b|x| \sin \left(\left|x^{3}+x\right|\right)$. Then $f$ is
+\begin{itemize}
+\item[(A)] differentiable at $x=0$ if $a=0$ and $b=1$
+\item[(B)] differentiable at $x=1$ if $a=1$ and $b=0$
+\item[(C)] NOT differentiable at $x=0$ if $a=1$ and $b=0$
+\item[(D)] NOT differentiable at $x=1$ if $a=1$ and $b=1$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 45 Let $f: \mathbb{R} \rightarrow(0, \infty)$ and $g: \mathbb{R} \rightarrow \mathbb{R}$ be twice differentiable functions such that $f^{\prime \prime}$ and $g^{\prime \prime}$ are continuous functions on $\mathbb{R}$. Suppose $f^{\prime}(2)=g(2)=0, f^{\prime \prime}(2) \neq 0$ and $g^{\prime}(2) \neq 0$. If $\lim _{x \rightarrow 2} \frac{f(x) g(x)}{f^{\prime}(x) g^{\prime}(x)}=1$, then
+\begin{itemize}
+\item[(A)] $f$ has a local minimum at $x=2$
+\item[(B)] $f$ has a local maximum at $x=2$
+\item[(C)] $f^{\prime \prime}(2)>f(2)$
+\item[(D)] $f(x)-f^{\prime \prime}(x)=0$ for at least one $x \in \mathbb{R}$
+\end{itemize}
+\item[Q.] 46 Let $f:\left[-\frac{1}{2}, 2\right] \rightarrow \mathbb{R}$ and $g:\left[-\frac{1}{2}, 2\right] \rightarrow \mathbb{R}$ be functions defined by $f(x)=\left[x^{2}-3\right]$ and $g(x)=|x| f(x)+|4 x-7| f(x)$, where $[y]$ denotes the greatest integer less than or equal to $y$ for $y \in \mathbb{R}$. Then
+\begin{itemize}
+\item[(A)] $f$ is discontinuous exactly at three points in $\left[-\frac{1}{2}, 2\right]$
+\item[(B)] $f$ is discontinuous exactly at four points in $\left[-\frac{1}{2}, 2\right]$
+\item[(C)] $g$ is NOT differentiable exactly at four points in $\left(-\frac{1}{2}, 2\right)$
+\item[(D)] $g$ is NOT differentiable exactly at five points in $\left(-\frac{1}{2}, 2\right)$
+\end{itemize}
+\end{itemize}
+
+\author{
+
+}
+\begin{itemize}
+\item[Q.] 47 Let $a, b \in \mathbb{R}$ and $a^{2}+b^{2} \neq 0$. Suppose $S=\left\{z \in \mathbb{C}: z=\frac{1}{a+i b t}, t \in \mathbb{R}, t \neq 0\right\}$, where $i=\sqrt{-1}$. If $z=x+i y$ and $z \in S$, then $(x, y)$ lies on
+\begin{itemize}
+\item[(A)] the circle with radius $\frac{1}{2 a}$ and centre $\left(\frac{1}{2 a}, 0\right)$ for $a>0, b \neq 0$
+\item[(B)] the circle with radius $-\frac{1}{2 a}$ and centre $\left(-\frac{1}{2 a}, 0\right)$ for $a<0, b \neq 0$
+\item[(C)] the $x$-axis for $a \neq 0, b=0$
+\item[(D)] the $y$-axis for $a=0, b \neq 0$
+\end{itemize}
+\item[Q.] 48 Let $P$ be the point on the parabola $y^{2}=4 x$ which is at the shortest distance from the center $S$ of the circle $x^{2}+y^{2}-4 x-16 y+64=0$. Let $Q$ be the point on the circle dividing the line segment SP internally. Then
+\begin{itemize}
+\item[(A)] $S P=2 \sqrt{5}$
+\item[(B)] $S Q: Q P=(\sqrt{5}+1): 2$
+\item[(C)] the $x$-intercept of the normal to the parabola at $P$ is 6
+\item[(D)] the slope of the tangent to the circle at $Q$ is $\frac{1}{2}$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 49 Let $a, \lambda, \mu \in \mathbb{R}$. Consider the system of linear equations
+$$\begin{aligned}
+& a x+2 y=\lambda \\
+& 3 x-2 y=\mu
+\end{aligned}$$
+Which of the following statement(s) is(are) correct?
+\begin{itemize}
+\item[(A)] If $a=-3$, then the system has infinitely many solutions for all values of $\lambda$ and $\mu$
+\item[(B)] If $a \neq-3$, then the system has a unique solution for all values of $\lambda$ and $\mu$
+\item[(C)] If $\lambda+\mu=0$, then the system has infinitely many solutions for $a=-3$
+\item[(D)] If $\lambda+\mu \neq 0$, then the system has no solution for $\alpha=-3$
+\end{itemize}
+\item[Q.] 50 Let $\hat{u}=u_{1} \hat{i}+u_{2} \hat{j}+u_{3} \hat{k}$ be a unit vector in $\mathbb{R}^{3}$ and $\hat{w}=\frac{1}{\sqrt{6}}(\hat{i}+\hat{j}+2 \hat{k})$. Given that there exists a vector $\vec{v}$ in $\mathbb{R}^{3}$ such that $|\hat{u} \times \vec{v}|=1$ and $\hat{w} \cdot(\hat{u} \times \vec{v})=1$. Which of the following statement(s) is(are) correct?
+\begin{itemize}
+\item[(A)] There is exactly one choice for such $\vec{v}$
+\item[(B)] There are infinitely many choices for such $\vec{v}$
+\item[(C)] If $\hat{u}$ lies in the $x y$-plane then $\left|u_{1}\right|=\left|u_{2}\right|$
+\item[(D)] If $\hat{u}$ lies in the $x z$-plane then $2\left|u_{1}\right|=\left|u_{3}\right|$
+\end{itemize}
+\end{itemize}
+
+SECTION 3 (Maximum Marks: 12)
+\begin{itemize}
+\item[-] This section contains TWO paragraphs.
+\item[-] Based on each paragraph, there are TWO questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|}
+\hline Full Marks & : +3 If only the bubble corresponding to the correct option is darkened. \\
+\hline Zero Marks & : 0 In all other cases. \\
+\hline
+\end{tabular}
+\end{itemize}
+
+\section*{PARAGRAPH 1}
+
+Football teams $T_{1}$ and $T_{2}$ have to play two games against each other. It is assumed that the outcomes of the two games are independent. The probabilities of $T_{1}$ winning, drawing and losing a game against $T_{2}$ are $\frac{1}{2}, \frac{1}{6}$ and $\frac{1}{3}$, respectively. Each team gets 3 points for a win, 1 point for a draw and 0 point for a loss in a game. Let $X$ and $Y$ denote the total points scored by teams $T_{1}$ and $T_{2}$, respectively, after two games.
+\begin{itemize}
+\item[Q.] 51 $ P(X>Y)$ is
+(A) $\frac{1}{4}$
+(B) $\frac{5}{12}$
+(C) $\frac{1}{2}$
+(D) $\frac{7}{12}$
+\item[Q.] 52 $ P(X=Y)$ is
+(A) $\frac{11}{36}$
+(B) $\frac{1}{3}$
+(C) $\frac{13}{36}$
+(D) $\frac{1}{2}$
+\end{itemize}
+
+\section*{PARAGRAPH 2}
+
+Let $F_{1}\left(x_{1}, 0\right)$ and $F_{2}\left(x_{2}, 0\right)$, for $x_{1}<0$ and $x_{2}>0$, be the foci of the ellipse $\frac{x^{2}}{9}+\frac{y^{2}}{8}=1$. Suppose a parabola having vertex at the origin and focus at $F_{2}$ intersects the ellipse at point $M$ in the first quadrant and at point $N$ in the fourth quadrant.
+\begin{itemize}
+\item[Q.] 53 The orthocentre of the triangle $F_{1} M N$ is
+(A) $\left(-\frac{9}{10}, 0\right)$
+(B) $\left(\frac{2}{3}, 0\right)$
+(C) $\left(\frac{9}{10}, 0\right)$
+(D) $\left(\frac{2}{3}, \sqrt{6}\right)$
+\item[Q.] 54 If the tangents to the ellipse at $M$ and $N$ meet at $R$ and the normal to the parabola at $M$ meets the $x$-axis at $Q$, then the ratio of area of the triangle $M Q R$ to area of the quadrilateral $M F_{1} N F_{2}$ is
+(A) 3 : 4
+(B) 4 : 5
+(C) 5 : 8
+(D) 2 : 3
+\end{itemize}
+
+\section*{END OF THE QUESTION PAPER}
+
+\section*{Answers for the above questions}
+Ans for Q.1: (C)
+Ans for Q.2: (C)
+Ans for Q.3: (C)
+Ans for Q.4: (A)
+Ans for Q.5: (C)
+Ans for Q.6: (B)
+Ans for Q.8: (C)
+Ans for Q.9: (A), (B) and (D)
+Ans for Q.10: (B) and (C)
+Ans for Q.11: (A), (B), (C) and (D)
+Ans for Q.12: (A), (B) and (D)
+Ans for Q.13: (B) and (D)
+Ans for Q.15: (A)
+Ans for Q.16: (B)
+Ans for Q.17: (C)
+Ans for Q.18: (D)
+Ans for Q.19: (D)
+Ans for Q.20: (D)
+Ans for Q.21: (A)
+Ans for Q.22: (A)
+Ans for Q.23: (A)
+Ans for Q.24: (A)
+Ans for Q.25: (A) and (C)
+Ans for Q.26: (A) and (B)
+Ans for Q.27: (B), (C) and (D)
+Ans for Q.28: (A), (B) and (C)
+Ans for Q.29: (B) and (D)
+Ans for Q.30: (B) and (C)
+Ans for Q.31: (C) and (D)
+Ans for Q.32: (B), (C) and (D)
+Ans for Q.33: (B)
+Ans for Q.34: (C)
+Ans for Q.35: (A)
+Ans for Q.36: (B)
+Ans for Q.37: (B)
+Ans for Q.38: (B)
+Ans for Q.39: (C)
+Ans for Q.40: (A)
+Ans for Q.41: (C)
+Ans for Q.42: (C)
+Ans for Q.43: (B) and (C)
+Ans for Q.44: (A) and (B)
+Ans for Q.45: (A) and (D)
+Ans for Q.46: (B) and (C)
+Ans for Q.47: (A), (C) and (D)
+Ans for Q.48: (A), (C) and (D)
+Ans for Q.49: (B), (C) and (D)
+Ans for Q.50: (B) and (C)
+Ans for Q.51: (B)
+Ans for Q.52: (C)
+Ans for Q.53: (A)
+Ans for Q.54: (C)

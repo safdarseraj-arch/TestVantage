@@ -2,6 +2,7 @@ import { buildPaperFacts } from './officialPyqPaperFacts.js'
 import { mathDrawFailure } from './mathDrawCheck.js'
 import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import { looksLikeMatchingListStem, parseMatchingListForDisplay } from './parseMatchingListDisplay.js'
+import { missingStructureLabels } from './structureLabels.js'
 
 const OPENING = /^Then\b/
 
@@ -241,6 +242,10 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     }
     const label = optionLabelMissing(q)
     if (label) reasons.push(label)
+    const unlabelled = missingStructureLabels(q)
+    if (unlabelled.length) {
+      reasons.push(`The options name structures ${unlabelled.join(', ')}, and the drawings have no such label`)
+    }
     if (!adminSlots && OPENING.test(text.trim()) && !passage) reasons.push('This question has no passage')
     if (/shown in the figure/i.test(text) && !cardHasFigure(q)) {
       reasons.push('The question says shown in the figure, and there is no figure')

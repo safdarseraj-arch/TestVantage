@@ -1335,6 +1335,40 @@ test('2016 layout: "END OF PART I : PHYSICS" and the next part\'s heading never 
   assert.match(kept[0].text, /Part \(ii\) Find the distance/, 'a "Part (ii)" line in a stem is question text')
 })
 
+test('structures the options call I, II, III, IV keep their labels; a card that lost them is flagged (JEE Adv 2016 P2 Q23)', () => {
+  const raw = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), 'fixtures', 'jee-advanced-2016-p2-mathpix.txt'), 'utf8')
+  const meta = { exam: 'jee-advanced', year: 2016, session: 'Paper 2', paperLabel: 'JEE Advanced 2016', sourceLabel: 'Official JEE Advanced archive' }
+  const LABEL_REASON = /drawings have no such label/
+  const labelsInOrder = (text) => {
+    const after = String(text).split(/<smiles>[\s\S]*?<\/smiles>/i).slice(1)
+    return after.map((piece) => (piece.match(/^\s*(I{1,3}|IV)\s*$/m) || [])[1] || '')
+  }
+
+  const built = questionsFromOfficialPyqExtract({ engine: 'mathpix', text: raw, questions: [] }, meta)
+  const q23 = built.questions[22]
+  assert.match(q23.text, /correct order of acidity/)
+  assert.deepEqual(labelsInOrder(q23.text), ['I', 'II', 'III', 'IV'], 'upload puts each label under its structure')
+  assert.ok(!reviewOfficialPyqCards(built.questions, raw).messages.some((m) => LABEL_REASON.test(m)), 'no structure-label alarm after upload')
+
+  // The card saved before the fix (scan kept only "III") is flagged, and the stored-OCR fix relabels it.
+  const scanOnly = raw.match(/\\item\[Q\.\] 23 ([\s\S]*?)\n\(A\)/)[1].trim()
+  const stored = { ...q23, text: scanOnly }
+  const review = reviewOfficialPyqCards([stored], raw, null, { cardsOnly: true })
+  assert.ok(review.messages.some((m) => /Go to Q 1\b/.test(m) && /structures I, II, IV/.test(m)), review.messages.join(' | '))
+  assert.deepEqual(labelsInOrder(healUploadQuestionCard(stored, raw).text), ['I', 'II', 'III', 'IV'])
+
+  // No false alarms: labels already printed, statements (I)/(II), or a kept label out of place (flagged, not relabelled).
+  const mol = (s) => `<smiles>${s}</smiles>`
+  const opts = ['I > II > III', 'II > I > III', 'III > II > I', 'I > III > II']
+  const labelled = { text: `Order the acids\n${mol('OC(=O)C')}\nI\n${mol('OC(=O)CC')}\nII\n${mol('OC(=O)CCC')}\nIII`, options: opts, questionType: 'single_correct' }
+  assert.equal(reviewOfficialPyqCards([labelled], '', null, { cardsOnly: true }).messages.length, 0)
+  const statements = { text: `Consider ${mol('CCO')} and ${mol('CCN')}.\n(I) Both are polar.\n(II) Both are bases.`, options: ['(I) only', '(II) only', 'Both (I) and (II)', 'Neither'], questionType: 'single_correct' }
+  assert.equal(reviewOfficialPyqCards([statements], '', null, { cardsOnly: true }).messages.length, 0)
+  const misplaced = { text: `Order the acids\n${mol('OC(=O)C')}\nIII\n${mol('OC(=O)CC')}\n${mol('OC(=O)CCC')}`, options: opts, questionType: 'single_correct' }
+  assert.equal(healUploadQuestionCard(misplaced, '').text, misplaced.text, 'a label in the wrong place is not used to guess the order')
+  assert.ok(reviewOfficialPyqCards([misplaced], '', null, { cardsOnly: true }).messages.some((m) => LABEL_REASON.test(m)))
+})
+
 test('a long split after Mathpix is not reported as "stalled": the upload watchdog waits for no progress, then stops the upload for a free re-upload (JEE Adv 2016 P1)', () => {
   const page = fs.readFileSync(path.join(process.cwd(), 'src/pages/OfficialPyqPending.jsx'), 'utf8')
   assert.doesNotMatch(page, /Gemini split stalled/, 'the old 15-second false alarm is gone')

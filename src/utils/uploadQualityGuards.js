@@ -24,6 +24,7 @@ import {
 import { unwrapReactionStepTables } from './latexTabularDisplay.js'
 import { enrichMatchListsFromOcr } from './restoreMatchListsOcr.js'
 import { repairScanStructureCodes } from './smilesDisplay.js'
+import { restoreStructureLabels } from './structureLabels.js'
 import {
   missingBracketedGivenLine,
   restoreMissingGivenLine,
@@ -118,7 +119,7 @@ function mathBreakWindow(stem, source) {
 export function applyStoredOcrCardFixes(q, source) {
   const window = questionScanWindow(q?.text, source)
   const optionWindow = optionRowsWindow(q?.text, source)
-  const text = repairScanStructureCodes(
+  const scanText = repairScanStructureCodes(
     unwrapReactionStepTables(
       restoreScanMathBreaks(
         restoreDisplayCloseBeforeInline(restoreMissingGivenLine(q?.text ?? '', window), window),
@@ -133,6 +134,7 @@ export function applyStoredOcrCardFixes(q, source) {
   const options = Array.isArray(restoredOptions)
     ? restoredOptions.map((opt) => repairScanStructureCodes(opt))
     : restoredOptions
+  const text = restoreStructureLabels({ text: scanText, options }).text
   const sameText = text === String(q?.text ?? '')
   const sameOpts = options === q?.options || JSON.stringify(options) === JSON.stringify(q?.options ?? [])
   if (sameText && sameOpts) return q

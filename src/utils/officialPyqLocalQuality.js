@@ -23,6 +23,14 @@ import { givenLineDroppedUnit, inlineSingleSymbolDisplayMath, restoreDroppedMsOn
 import { officialPyqContentReviewMessages, officialPyqMissingListMessage } from './officialPyqReviewFlags.js'
 import { reviewOfficialPyqCards } from './officialPyqUnifiedCheck.js'
 import { enforceAdminFactsOnQuestions, factsForPaper } from './officialPyqAdminFacts.js'
+import { SCRAP_OPTION_RE, restoreLabelledFigureOptions } from './labelledFigureOptions.js'
+
+/** The preview shows the saved options, so a saved "," / "and" option fails even when the cleaned view looks right. */
+function hasScrapOption(q) {
+  return (Array.isArray(q?.options) ? q.options : []).some(
+    (opt) => String(opt ?? '').trim() && SCRAP_OPTION_RE.test(String(opt)),
+  )
+}
 
 export const LOCAL_QUALITY_REVISION = 7
 const MAX_QUALITY_PASSES = 4
@@ -143,7 +151,7 @@ export function localOfficialPyqQualityCheck(paper) {
   questions.forEach((q, index) => {
     if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
     const rawBits = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])]
-    if (rawBits.some((part) => CHECKER_NOTE.test(String(part ?? '')))) {
+    if (rawBits.some((part) => CHECKER_NOTE.test(String(part ?? ''))) || hasScrapOption(q)) {
       failedGoTo.push(index + 1)
       return
     }
@@ -334,7 +342,8 @@ function adoptKnownFixes(q, shown, ocr) {
   ) {
     next = { ...next, options: shown.options.map((opt) => String(opt ?? '')) }
   }
-  const fixed = applyStoredOcrCardFixes(next, ocr)
+  const figured = restoreLabelledFigureOptions(next, ocr)
+  const fixed = applyStoredOcrCardFixes(figured, ocr)
   return fixed === next ? next : fixed
 }
 
@@ -393,6 +402,7 @@ export function repairOfficialPyqUntilQuality(paper) {
         givenLineDroppedUnit(current?.passageText) ||
         storedMatchOptionsAreCutOff(current?.options) ||
         storedCardMissesOcrFix(current, ocr) ||
+        hasScrapOption(current) ||
         officialPyqContentReviewMessages([shown]).length ||
         officialPyqMissingListMessage([shown]) ||
         cardFailsLocalQuality(shown, ocr)

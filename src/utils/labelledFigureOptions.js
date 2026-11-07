@@ -14,6 +14,9 @@ const OPTION_TOKEN_RE =
 
 const LETTERS = ['A', 'B', 'C', 'D']
 
+/** "," / "and" left in an option slot when a printed key "(B), (C) and (D)" was split as options. */
+export const SCRAP_OPTION_RE = /^[\s,;.]*(?:and|or)?[\s,;.]*$/i
+
 /** @param {string} figure */
 function asOptionFigure(figure) {
   return figure.replace(/^\\includegraphics\[[^\]]*\]/, '\\includegraphics')
@@ -88,7 +91,7 @@ function restoreFromScan(q, source) {
 
 const FIGURE_RE = /\\includegraphics(?:\[[^\]]*\])?\{([^}\s]+)\}|!\[[^\]]*\]\(([^)\s]+)\)/g
 const ASKS_FOR_A_PICTURE_RE =
-  /\bwill\s+(?:look\s+like|be)\b|\bwhich\s+(?:one\s+)?of\s+the\s+following\b|\bcorrect\s+(?:shape|plot|graph|figure|option)|\bis\s*\(\s*are\s*\)\s+correct\b|\brepresents?\b/i
+  /\bwill\s+(?:look\s+like|be)\b|\b(?:which\s+(?:one\s+)?of|among)\s+the\s+following\b|\bcorrect\s+(?:shape|plot|graph|figure|option)|\bis\s*\(\s*are\s*\)\s+correct\b|\brepresents?\b/i
 
 function cropBox(url) {
   const num = (key) => Number((String(url).match(new RegExp(`[?&]${key}=(\\d+)`)) || [])[1])
@@ -144,7 +147,9 @@ export function restoreLabelledFigureOptions(q, source = '') {
   if (!q || typeof q !== 'object') return q
   if (!/single_correct|multiple_correct/.test(String(q.questionType ?? ''))) return q
   const text = String(q.text ?? '')
-  const bare = (Array.isArray(q.options) ? q.options : []).map((o) => String(o ?? '')).filter((o) => o.trim())
+  const bare = (Array.isArray(q.options) ? q.options : [])
+    .map((o) => String(o ?? ''))
+    .filter((o) => !SCRAP_OPTION_RE.test(o))
   if (bare.length >= LETTERS.length) return q
   const matches = [...text.matchAll(LABELLED_FIGURE)]
   if (!matches.length && !bare.length) {

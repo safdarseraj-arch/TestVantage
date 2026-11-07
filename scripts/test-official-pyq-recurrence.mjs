@@ -45,6 +45,7 @@ const { enrichParsedWithAnswerProvenance } = await import('../src/utils/answerPr
 const { sanitizeStemForDisplay, shownStemLooksIncomplete } = await import('../src/utils/sanitizeStemForDisplay.js')
 const { matchColumnTableLayout, splitMatchColumnTables } = await import('../src/utils/latexTabularDisplay.js')
 const { reviewMarkSpans } = await import('../src/utils/officialPyqReviewFlags.js')
+const { localOfficialPyqQualityCheck, repairOfficialPyqUntilQuality } = await import('../src/utils/officialPyqLocalQuality.js')
 
 let failed = 0
 function test(name, fn) {
@@ -1367,6 +1368,30 @@ test('structures the options call I, II, III, IV keep their labels; a card that 
   const misplaced = { text: `Order the acids\n${mol('OC(=O)C')}\nIII\n${mol('OC(=O)CC')}\n${mol('OC(=O)CCC')}`, options: opts, questionType: 'single_correct' }
   assert.equal(healUploadQuestionCard(misplaced, '').text, misplaced.text, 'a label in the wrong place is not used to guess the order')
   assert.ok(reviewOfficialPyqCards([misplaced], '', null, { cardsOnly: true }).messages.some((m) => LABEL_REASON.test(m)))
+})
+
+test('"Among the following…" with four unlabelled reaction pictures: the pictures are options A–D; "," / "and" scraps are not options (JEE Adv 2016 P2 Q32)', () => {
+  const raw = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), 'fixtures', 'jee-advanced-2016-p2-mathpix.txt'), 'utf8')
+  const meta = { exam: 'jee-advanced', year: 2016, session: 'Paper 2', paperLabel: 'JEE Advanced 2016', sourceLabel: 'Official JEE Advanced archive' }
+  const built = questionsFromOfficialPyqExtract({ engine: 'mathpix', text: raw, questions: [] }, meta)
+  const q32 = built.questions[31]
+  const crops = (q) => (q.options || []).map((o) => (String(o).match(/top_left_y=(\d+)&top_left_x=(\d+)/) || []).slice(1).join(','))
+  assert.match(q32.text, /tert-butyl benzene as the major product is\(are\)$/, 'the stem keeps no pictures')
+  assert.deepEqual(crops(q32), ['873,385', '899,1141', '1153,391', '1155,1146'], 'A, B on the top row, C, D below')
+  assert.deepEqual(q32.correctIndices, [1, 2, 3])
+
+  // The card saved by the earlier upload had "," "," "and" as its options and the pictures in the stem.
+  const stored = { ...q32, text: `32 ${q32.text}\n${q32.options.join('\n')}`, options: [',', ',', 'and', ''] }
+  const review = reviewOfficialPyqCards([stored], raw, null, { cardsOnly: true })
+  assert.ok(review.failedGoTo.includes(1), 'scrap options are flagged')
+  assert.deepEqual(crops(healUploadQuestionCard(stored, raw)), ['873,385', '899,1141', '1153,391', '1155,1146'])
+
+  // The paper check looks at the saved card the preview shows, and "Run quality check and fix" saves the pictures as options.
+  const paper = { id: 'p', preparedText: built.preparedText, questions: built.questions.map((q, i) => (i === 31 ? stored : q)) }
+  assert.ok(localOfficialPyqQualityCheck(paper).failedGoTo.includes(32), 'the banner names Q32')
+  const repaired = repairOfficialPyqUntilQuality(paper)
+  assert.deepEqual(crops(repaired.paper.questions[31]), ['873,385', '899,1141', '1153,391', '1155,1146'])
+  assert.ok(!repaired.quality.failedGoTo.includes(32))
 })
 
 test('a long split after Mathpix is not reported as "stalled": the upload watchdog waits for no progress, then stops the upload for a free re-upload (JEE Adv 2016 P1)', () => {

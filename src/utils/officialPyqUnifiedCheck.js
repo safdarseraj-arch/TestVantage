@@ -3,11 +3,14 @@ import { mathDrawFailure } from './mathDrawCheck.js'
 import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import { looksLikeMatchingListStem, parseMatchingListForDisplay } from './parseMatchingListDisplay.js'
 import { missingStructureLabels } from './structureLabels.js'
+import { SCRAP_OPTION_RE } from './labelledFigureOptions.js'
 
 const OPENING = /^Then\b/
 
 function filled(options) {
-  return (Array.isArray(options) ? options : []).map((o) => String(o ?? '').trim()).filter(Boolean)
+  return (Array.isArray(options) ? options : [])
+    .map((o) => String(o ?? '').trim())
+    .filter((o) => !SCRAP_OPTION_RE.test(o))
 }
 
 function norm(text) {

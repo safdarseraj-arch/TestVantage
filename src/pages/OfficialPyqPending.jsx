@@ -96,6 +96,13 @@ const API_FETCH_MS = 8000
 const CARD_REVIEW_LINE = /The marked part is the problem|missing a list|^Go to Q /
 /** Local Mathpix re-parse only — no Gemini wait on this button. */
 const RE_PARSE_LOCAL_MS = 45_000
+/**
+ * Upload past Mathpix with no new progress step for this long is stuck. The split, the
+ * 12 s Gemini try, saving and storing the original together can take minutes.
+ */
+const UPLOAD_STALL_MS = 120_000
+const UPLOAD_STALLED_MESSAGE =
+  'The upload made no progress for 2 minutes and was stopped. Nothing new was saved. Upload the same PDF again: the earlier Mathpix reading is reused, so there is no second OCR bill. Do not Approve.'
 
 /** @param {string} label */
 function isReParseProgressLabel(label) {
@@ -237,7 +244,8 @@ export default function OfficialPyqPending() {
   const previewRef = useRef(null)
   const openPreviewIdRef = useRef(selectedId)
   openPreviewIdRef.current = selectedId
-  const geminiStallRef = useRef(null)
+  const uploadAbortRef = useRef(/** @type {AbortController | null} */ (null))
+  const uploadStalledRef = useRef(false)
   const reParseWatchdogRef = useRef(null)
   const reparseAbortRef = useRef(/** @type {AbortController | null} */ (null))
   const workGenRef = useRef(0)
@@ -377,25 +385,17 @@ export default function OfficialPyqPending() {
   }, [bump])
 
   useEffect(() => {
-    if (!busy || progressPct < 60) {
-      if (geminiStallRef.current) {
-        clearTimeout(geminiStallRef.current)
-        geminiStallRef.current = null
-      }
-      return undefined
-    }
-    if (geminiStallRef.current) return undefined
-    geminiStallRef.current = setTimeout(() => {
-      geminiStallRef.current = null
-      setError(
-        'Gemini split stalled. The button is unlocked. Use Re-parse stored OCR if the PDF text was saved, or upload again. Do not Approve.',
-      )
+    if (!busy || !uploadAbortRef.current || progressPct < 60) return undefined
+    const timer = setTimeout(() => {
+      uploadStalledRef.current = true
+      uploadAbortRef.current?.abort()
+      setError(UPLOAD_STALLED_MESSAGE)
       setBusy(false)
       setProgressPct(0)
       setProgressLabel('')
-    }, 15000)
-    return undefined
-  }, [busy, progressPct])
+    }, UPLOAD_STALL_MS)
+    return () => clearTimeout(timer)
+  }, [busy, progressPct, progressLabel])
 
   useEffect(() => {
     if (!reParseBusy) {
@@ -842,6 +842,9 @@ export default function OfficialPyqPending() {
     const file = ev.target.files?.[0]
     ev.target.value = ''
     if (!file) return
+    const uploadCtl = new AbortController()
+    uploadAbortRef.current = uploadCtl
+    uploadStalledRef.current = false
     setBusy(true)
     setError('')
     setMessage('')
@@ -866,7 +869,9 @@ export default function OfficialPyqPending() {
           paperLabel,
         },
         {
+          signal: uploadCtl.signal,
           onProgress: (pct, label) => {
+            if (uploadStalledRef.current) return
             const formatted = formatOfficialPyqProgress(pct, label)
             if (formatted.pct >= 0) setProgressPct(formatted.pct)
             if (formatted.label) setProgressLabel(formatted.label)
@@ -892,6 +897,7 @@ export default function OfficialPyqPending() {
         )
         setMessage(cloudNote || '')
       } else {
+        setError('')
         setMessage(
           `Imported ${paper.questions.length} question(s) into Pending approval — not published yet.${cloudNote ? ` ${cloudNote}` : ''}`,
         )
@@ -900,15 +906,20 @@ export default function OfficialPyqPending() {
       setProgressPct(0)
       setProgressLabel('')
     } catch (e) {
-      try {
-        const { formatOfficialPyqUploadError } = await loadOfficialPyqExtractHelpers()
-        setError(formatOfficialPyqUploadError(e, {}))
-      } catch {
-        setError(e instanceof Error ? e.message : 'Upload failed.')
+      if (uploadStalledRef.current) {
+        setError(UPLOAD_STALLED_MESSAGE)
+      } else {
+        try {
+          const { formatOfficialPyqUploadError } = await loadOfficialPyqExtractHelpers()
+          setError(formatOfficialPyqUploadError(e, {}))
+        } catch {
+          setError(e instanceof Error ? e.message : 'Upload failed.')
+        }
       }
       setProgressPct(0)
       setProgressLabel('')
     } finally {
+      if (uploadAbortRef.current === uploadCtl) uploadAbortRef.current = null
       setBusy(false)
     }
   }

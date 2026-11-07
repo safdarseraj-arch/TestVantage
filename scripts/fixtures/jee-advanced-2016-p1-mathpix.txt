@@ -1,0 +1,511 @@
+\section*{PART I : PHYSICS}
+
+SECTION 1 (Maximum Marks: 15)
+\begin{itemize}
+\item[-] This section contains FIVE questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +3 & If only the bubble corresponding to the correct option is darkened. \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened. \\
+\hline Negative Marks & : -1 & In all other cases. \\
+\hline
+\end{tabular}
+\item[Q.] 1 In a historical experiment to determine Planck's constant, a metal surface was irradiated with light of different wavelengths. The emitted photoelectron energies were measured by applying a stopping potential. The relevant data for the wavelength $(\lambda)$ of incident light and the corresponding stopping potential ( $V_{0}$ ) are given below :
+
+\begin{tabular}[t]{|l|l|}
+\hline $\lambda(\mu \mathrm{m})$ & $V_{0}$ (Volt) \\
+\hline 0.3 & 2.0 \\
+\hline 0.4 & 1.0 \\
+\hline 0.5 & 0.4 \\
+\hline
+\end{tabular}
+Given that $c=3 \times 10^{8} \mathrm{~m} \mathrm{~s}^{-1}$ and $e=1.6 \times 10^{-19} \mathrm{C}$, Planck's constant (in units of J s) found from such an experiment is
+(A) $6.0 \times 10^{-34}$
+(B) $6.4 \times 10^{-34}$
+(C) $6.6 \times 10^{-34}$
+(D) $6.8 \times 10^{-34}$
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 2 A uniform wooden stick of mass 1.6 kg and length $l$ rests in an inclined manner on a smooth, vertical wall of height $h(<l)$ such that a small portion of the stick extends beyond the wall. The reaction force of the wall on the stick is perpendicular to the stick. The stick makes an angle of 30° with the wall and the bottom of the stick is on a rough floor. The reaction of the wall on the stick is equal in magnitude to the reaction of the floor on the stick. The ratio $h / l$ and the frictional force $f$ at the bottom of the stick are
+$$\left(g=10 \mathrm{~m} \mathrm{~s}^{2}\right)$$
+(A) $\frac{h}{l}=\frac{\sqrt{3}}{16}, f=\frac{16 \sqrt{3}}{3} \mathrm{~N}$
+(B) $\frac{h}{l}=\frac{3}{16}, f=\frac{16 \sqrt{3}}{3} \mathrm{~N}$
+(C) $\frac{h}{l}=\frac{3 \sqrt{3}}{16}, f=\frac{8 \sqrt{3}}{3} \mathrm{~N}$
+(D) $\frac{h}{l}=\frac{3 \sqrt{3}}{16}, f=\frac{16 \sqrt{3}}{3} \mathrm{~N}$
+\item[Q.] 3 A water cooler of storage capacity 120 litres can cool water at a constant rate of $P$ watts. In a closed circulation system (as shown schematically in the figure), the water from the cooler is used to cool an external device that generates constantly 3 kW of heat (thermal load). The temperature of water fed into the device cannot exceed 30 °C and the entire stored 120 litres of water is initially cooled to 10 °C. The entire system is thermally insulated. The minimum value of $P$ (in watts) for which the device can be operated for 3 hours is
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-02.jpg?height=282&width=559&top_left_y=1182&top_left_x=783)
+(Specific heat of water is $4.2 \mathrm{~kJ} \mathrm{~kg}^{-1} \mathrm{~K}^{-1}$ and the density of water is $1000 \mathrm{~kg} \mathrm{~m}^{-3}$ )
+(A) 1600
+(B) 2067
+(C) 2533
+(D) 3933
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 4 A parallel beam of light is incident from air at an angle $\alpha$ on the side PQ of a right angled triangular prism of refractive index $n=\sqrt{2}$. Light undergoes total internal reflection in the prism at the face PR when $\alpha$ has a minimum value of 45°. The angle $\theta$ of the prism is
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-03.jpg?height=329&width=309&top_left_y=374&top_left_x=887)
+(A) 15°
+(B) 22.5°
+(C) 30°
+(D) 45°
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 5 An infinite line charge of uniform electric charge density $\lambda$ lies along the axis of an electrically conducting infinite cylindrical shell of radius $R$. At time $t=0$, the space inside the cylinder is filled with a material of permittivity $\varepsilon$ and electrical conductivity $\sigma$. The electrical conduction in the material follows Ohm's law. Which one of the following graphs best describes the subsequent variation of the magnitude of current density $j(t)$ at any point in the material?
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-04.jpg?height=328&width=412&top_left_y=466&top_left_x=448)
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-04.jpg?height=325&width=413&top_left_y=469&top_left_x=1199)
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-04.jpg?height=322&width=415&top_left_y=955&top_left_x=443)
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-04.jpg?height=326&width=417&top_left_y=955&top_left_x=1195)
+\end{itemize}
+
+\section*{SECTION 2 (Maximum Marks: 32)}
+\begin{itemize}
+\item[-] This section contains EIGHT questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct.
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened. \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened. \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened. \\
+\hline Negative Marks & : -2 & In all other cases. \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[-] For example, if (A), (C) and (D) are all the correct options for a question, darkening all these three will result in +4 marks; darkening only (A) and (D) will result in +2 marks; and darkening (A) and (B) will result in -2 marks, as a wrong option is also darkened.
+\item[Q.] 6 Highly excited states for hydrogen-like atoms (also called Rydberg states) with nuclear charge $Z e$ are defined by their principal quantum number $n$, where $n \gg 1$. Which of the following statement(s) is(are) true?
+\begin{itemize}
+\item[(A)] Relative change in the radii of two consecutive orbitals does not depend on $Z$
+\item[(B)] Relative change in the radii of two consecutive orbitals varies as $1 / n$
+\item[(C)] Relative change in the energy of two consecutive orbitals varies as $1 / n^{3}$
+\item[(D)] Relative change in the angular momenta of two consecutive orbitals varies as $1 / n$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 7 Two loudspeakers $M$ and $N$ are located 20 m apart and emit sound at frequencies 118 Hz and 121 Hz, respectively. A car is initially at a point $P, 1800 \mathrm{~m}$ away from the midpoint $Q$ of the line $M N$ and moves towards $Q$ constantly at $60 \mathrm{~km} / \mathrm{hr}$ along the perpendicular bisector of $M N$. It crosses $Q$ and eventually reaches a point $R, 1800 \mathrm{~m}$ away from $Q$. Let $\mathrm{v}(t)$ represent the beat frequency measured by a person sitting in the car at time $t$. Let $v_{P}, v_{Q}$ and $v_{R}$ be the beat frequencies measured at locations $P, Q$ and $R$, respectively. The speed of sound in air is $330 \mathrm{~m} \mathrm{~s}^{-1}$. Which of the following statement(s) is(are) true regarding the sound heard by the person?
+\begin{itemize}
+\item[(A)] $\quad v_{P}+v_{R}=2 v_{Q}$
+\item[(B)] The rate of change in beat frequency is maximum when the car passes through $Q$
+\item[(C)] The plot below represents schematically the variation of beat frequency with time
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-06.jpg?height=351&width=545&top_left_y=820&top_left_x=788)
+\item[(D)] The plot below represents schematically the variation of beat frequency with time
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-06.jpg?height=345&width=544&top_left_y=1294&top_left_x=787)
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 8 An incandescent bulb has a thin filament of tungsten that is heated to high temperature by passing an electric current. The hot filament emits black-body radiation. The filament is observed to break up at random locations after a sufficiently long time of operation due to non-uniform evaporation of tungsten from the filament. If the bulb is powered at constant voltage, which of the following statement(s) is(are) true?
+\begin{itemize}
+\item[(A)] The temperature distribution over the filament is uniform
+\item[(B)] The resistance over small sections of the filament decreases with time
+\item[(C)] The filament emits more light at higher band of frequencies before it breaks up
+\item[(D)] The filament consumes less electrical power towards the end of the life of the bulb
+\end{itemize}
+\item[Q.] 9 A plano-convex lens is made of a material of refractive index $n$. When a small object is placed 30 cm away in front of the curved surface of the lens, an image of double the size of the object is produced. Due to reflection from the convex surface of the lens, another faint image is observed at a distance of 10 cm away from the lens. Which of the following statement(s) is(are) true?
+\begin{itemize}
+\item[(A)] The refractive index of the lens is 2.5
+\item[(B)] The radius of curvature of the convex surface is 45 cm
+\item[(C)] The faint image is erect and real
+\item[(D)] The focal length of the lens is 20 cm
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 10 A length-scale $(l)$ depends on the permittivity $(\varepsilon)$ of a dielectric material, Boltzmann constant $\left(k_{B}\right)$, the absolute temperature $(T)$, the number per unit volume $(n)$ of certain charged particles, and the charge $(q)$ carried by each of the particles. Which of the following expression(s) for $l$ is(are) dimensionally correct?
+(A) $l=\sqrt{\left(\frac{n q^{2}}{\varepsilon k_{B} T}\right)}$
+(B) $l=\sqrt{\left(\frac{\varepsilon k_{B} T}{n q^{2}}\right)}$
+(C) $l=\sqrt{\left(\frac{q^{2}}{\varepsilon n^{2 / 3} k_{B} T}\right)}$
+(D) $l=\sqrt{\left(\frac{q^{2}}{\varepsilon n^{1 / 3} k_{B} T}\right)}$
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 11 A conducting loop in the shape of a right angled isosceles triangle of height 10 cm is kept such that the 90° vertex is very close to an infinitely long conducting wire (see the figure). The wire is electrically insulated from the loop. The hypotenuse of the triangle is parallel to the wire. The current in the triangular loop is in counterclockwise direction and increased at a constant rate of $10 \mathrm{As}^{-1}$. Which of the following statement(s) is(are) true?
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-09.jpg?height=197&width=1133&top_left_y=445&top_left_x=563)
+\begin{itemize}
+\item[(A)] The magnitude of induced emf in the wire is $\left(\frac{\mu_{0}}{\pi}\right)$ volt
+\item[(B)] If the loop is rotated at a constant angular speed about the wire, an additional emf of $\left(\frac{\mu_{0}}{\pi}\right)$ volt is induced in the wire
+\item[(C)] The induced current in the wire is in opposite direction to the current along the hypotenuse
+\item[(D)] There is a repulsive force between the wire and the loop
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 12 The position vector $\vec{r}$ of a particle of mass $m$ is given by the following equation
+$$\vec{r}(t)=\alpha t^{3} \hat{i}+\beta t^{2} \hat{j},$$
+where $\alpha=10 / 3 \mathrm{~m} \mathrm{~s}^{-3}, \beta=5 \mathrm{~m} \mathrm{~s}^{-2}$ and $m=0.1 \mathrm{~kg}$. At $t=1 \mathrm{~s}$, which of the following statement(s) is(are) true about the particle?
+\begin{itemize}
+\item[(A)] The velocity $\vec{v}$ is given by $\vec{v}=(10 \hat{i}+10 \hat{j}) \mathrm{ms}^{-1}$
+\item[(B)] The angular momentum $\vec{L}$ with respect to the origin is given by $\vec{L}=-(5 / 3) \hat{k} \mathrm{~N} \mathrm{~m} \mathrm{~s}$
+\item[(C)] The force $\vec{F}$ is given by $\vec{F}=(\hat{i}+2 \hat{j}) \mathrm{N}$
+\item[(D)] The torque $\vec{\tau}$ with respect to the origin is given by $\vec{\tau}=-(20 / 3) \hat{k} \mathrm{~N} \mathrm{~m}$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 13 A transparent slab of thickness $d$ has a refractive index $n(z)$ that increases with $z$. Here $z$ is the vertical distance inside the slab, measured from the top. The slab is placed between two media with uniform refractive indices $n_{1}$ and $n_{2}\left(>n_{1}\right)$, as shown in the figure. A ray of light is incident with angle $\theta_{i}$ from medium 1 and emerges in medium 2 with refraction angle $\theta_{f}$ with a lateral displacement $l$.
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-11.jpg?height=496&width=575&top_left_y=441&top_left_x=784)
+Which of the following statement(s) is(are) true?
+(A) $n_{1} \sin \theta_{i}=n_{2} \sin \theta_{f}$
+(B) $n_{1} \sin \theta_{i}=\left(n_{2}-n_{1}\right) \sin \theta_{f}$
+(C) $l$ is independent of $n_{2}$
+(D) $l$ is dependent on $n(z)$
+\end{itemize}
+
+SECTION 3 (Maximum Marks: 15)
+\begin{itemize}
+\item[-] This section contains FIVE questions.
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive.
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct answer is darkened.
+Zero Marks : 0 In all other cases.
+\item[Q.] 14 A metal is heated in a furnace where a sensor is kept above the metal surface to read the power radiated ( $P$ ) by the metal. The sensor has a scale that displays $\log _{2}\left(P / P_{0}\right)$, where $P_{0}$ is a constant. When the metal surface is at a temperature of 487 °C, the sensor shows a value 1. Assume that the emissivity of the metallic surface remains constant. What is the value displayed by the sensor when the temperature of the metal surface is raised to 2767 °C?
+\item[Q.] 15 The isotope ${ }_{5}^{12} \mathrm{~B}$ having a mass 12.014 u undergoes $\beta$-decay to ${ }_{6}^{12} \mathrm{C},{ }_{6}^{12} \mathrm{C}$ has an excited state of the nucleus $\left({ }_{6}^{12} \mathrm{C}^{*}\right)$ at 4.041 MeV above its ground state. If ${ }_{5}^{12} \mathrm{~B}$ decays to ${ }_{6}^{12} \mathrm{C}^{*}$, the maximum kinetic energy of the $\beta$-particle in units of MeV is
+$\left(1 \mathrm{u}=931.5 \mathrm{MeV} / c^{2}\right.$, where $c$ is the speed of light in vacuum).
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 16 A hydrogen atom in its ground state is irradiated by light of wavelength $970 \AA$. Taking $h c / e=1.237 \times 10^{-6} \mathrm{eVm}$ and the ground state energy of hydrogen atom as -13.6 eV, the number of lines present in the emission spectrum is
+\item[Q.] 17 Consider two solid spheres $P$ and $Q$ each of density $8 \mathrm{gm} \mathrm{cm}^{-3}$ and diameters 1 cm and 0.5 cm, respectively. Sphere P is dropped into a liquid of density $0.8 \mathrm{gm} \mathrm{cm}^{-3}$ and viscosity $\eta=3$ poiseulles. Sphere Q is dropped into a liquid of density $1.6 \mathrm{gm} \mathrm{cm}^{-3}$ and viscosity $\eta=2$ poiseulles. The ratio of the terminal velocities of P and Q is
+\item[Q.] 18 Two inductors $L_{1}$ (inductance 1 mH , internal resistance $3 \Omega$ ) and $L_{2}$ (inductance 2 mH , internal resistance $4 \Omega$ ), and a resistor $R$ (resistance $12 \Omega$ ) are all connected in parallel across a 5 V battery. The circuit is switched on at time $t=0$. The ratio of the maximum to the minimum current $\left(I_{\text {max }} / I_{\text {min }}\right)$ drawn from the battery is
+\end{itemize}
+
+\section*{END OF PART I : PHYSICS}
+
+\section*{PART II : CHEMISTRY}
+
+SECTION 1 (Maximum Marks: 15)
+\begin{itemize}
+\item[-] This section contains FIVE questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened.
+Zero Marks : 0 If none of the bubbles is darkened.
+Negative Marks : -1 In all other cases.
+\item[Q.] 19 $ P$ is the probability of finding the $1 s$ electron of hydrogen atom in a spherical shell of infinitesimal thickness, $d r$, at a distance $r$ from the nucleus. The volume of this shell is $4 \pi r^{2} d r$. The qualitative sketch of the dependence of $P$ on $r$ is
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-14.jpg?height=404&width=395&top_left_y=1044&top_left_x=393)
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-14.jpg?height=396&width=403&top_left_y=1047&top_left_x=1148)
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-14.jpg?height=386&width=402&top_left_y=1458&top_left_x=381)
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-14.jpg?height=395&width=402&top_left_y=1458&top_left_x=1136)
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 20 One mole of an ideal gas at 300 K in thermal contact with surroundings expands isothermally from 1.0 L to 2.0 L against a constant pressure of 3.0 atm. In this process, the change in entropy of surroundings $\left(\Delta S_{\text {surr }}\right)$ in $\mathrm{J} \mathrm{K}^{-1}$ is (1 L atm = 101.3 J )
+(A) 5.763
+(B) 1.013
+(C) -1.013
+(D) -5.763
+\item[Q.] 21 The increasing order of atomic radii of the following Group 13 elements is
+(A) Al < Ga < In < Tl
+(B) Ga< Al < In < Tl
+(C) Al < In < Ga < Tl
+(D) $\mathrm{Al}<\mathrm{Ga}<\mathrm{Tl}<\mathrm{In}$
+\item[Q.] 22 Among $\left[\mathrm{Ni}(\mathrm{CO})_{4}\right],\left[\mathrm{NiCl}_{4}\right]^{2-},\left[\mathrm{Co}\left(\mathrm{NH}_{3}\right)_{4} \mathrm{Cl}_{2}\right] \mathrm{Cl}, \mathrm{Na}_{3}\left[\mathrm{CoF}_{6}\right], \mathrm{Na}_{2} \mathrm{O}_{2}$ and $\mathrm{CsO}_{2}$, the total number of paramagnetic compounds is
+(A) 2
+(B) 3
+(C) 4
+(D) 5
+\item[Q.] 23 On complete hydrogenation, natural rubber produces
+(A) ethylene-propylene copolymer
+(B) vulcanised rubber
+(C) polypropylene
+(D) polybutylene
+\end{itemize}
+
+SECTION 2 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is (are) correct.
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened.
+Partial Marks : +1 For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened.
+Zero Marks : 0 If none of the bubbles is darkened.
+Negative Marks :-2 In all other cases.
+\item[-] For example, if (A), (C) and (D) are all the correct options for a question, darkening all these three will result in +4 marks; darkening only (A) and (D) will result in +2 marks; and darkening (A) and (B) will result in -2 marks, as a wrong option is also darkened.
+\item[Q.] 24 According to the Arrhenius equation,
+\begin{itemize}
+\item[(A)] a high activation energy usually implies a fast reaction.
+\item[(B)] rate constant increases with increase in temperature. This is due to a greater number of collisions whose energy exceeds the activation energy.
+\item[(C)] higher the magnitude of activation energy, stronger is the temperature dependence of the rate constant.
+\item[(D)] the pre-exponential factor is a measure of the rate at which collisions occur, irrespective of their energy.
+\end{itemize}
+\item[Q.] 25 A plot of the number of neutrons $(N)$ against the number of protons $(P)$ of stable nuclei exhibits upward deviation from linearity for atomic number, $Z>20$. For an unstable nucleus having $N / P$ ratio less than 1, the possible mode(s) of decay is(are)
+(A) $\beta^{-}$-decay ( $\beta$ emission)
+(B) orbital or $K$-electron capture
+(C) neutron emission
+(D) $\beta^{+}$-decay (positron emission)
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 26 The crystalline form of borax has
+\begin{itemize}
+\item[(A)] tetranuclear $\left[\mathrm{B}_{4} \mathrm{O}_{5}(\mathrm{OH})_{4}\right]^{2-}$ unit
+\item[(B)] all boron atoms in the same plane
+\item[(C)] equal number of $s p^{2}$ and $s p^{3}$ hybridized boron atoms
+\item[(D)] one terminal hydroxide per boron atom
+\end{itemize}
+\item[Q.] 27 The compound(s) with TWO lone pairs of electrons on the central atom is(are)
+(A) $\mathrm{BrF}_{5}$
+(B) $\mathrm{ClF}_{3}$
+(C) $\mathrm{XeF}_{4}$
+(D) $\mathrm{SF}_{4}$
+\item[Q.] 28 The reagent(s) that can selectively precipitate $\mathrm{S}^{2-}$ from a mixture of $\mathrm{S}^{2-}$ and $\mathrm{SO}_{4}{ }^{2-}$ in aqueous solution is(are)
+(A) $\mathrm{CuCl}_{2}$
+(B) $\mathrm{BaCl}_{2}$
+(C) $\mathrm{Pb}\left(\mathrm{OOCCH}_{3}\right)_{2}$
+(D) $\mathrm{Na}_{2}\left[\mathrm{Fe}(\mathrm{CN})_{5} \mathrm{NO}\right]$
+\item[Q.] 29 Positive Tollen's test is observed for
+<smiles>C=CC=O</smiles>
+<smiles>O=Cc1ccccc1</smiles>
+<smiles>O=C(c1ccccc1)C(O)c1ccccc1</smiles>
+<smiles>O=C(/C=C/c1ccccc1)c1ccccc1</smiles>
+\end{itemize}
+
+Q. 30 The product(s) of the following reaction sequence is(are)
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-18.jpg?height=273&width=703&top_left_y=251&top_left_x=762)
+<smiles>Brc1cccc(Br)c1</smiles>
+<smiles>Brc1ccc(Br)cc1</smiles>
+<smiles>Brc1cccc(Br)c1Br</smiles>
+<smiles>Brc1cc(Br)c(Br)c(Br)c1</smiles>
+
+Q. 31 The correct statement(s) about the following reaction sequence is(are)
+$$\begin{gathered}
+\text { Cumene }\left(\mathrm{C}_{9} \mathrm{H}_{12}\right) \xrightarrow[\text { ii) } \mathrm{H}_{3} \mathrm{O}^{+}]{\text {i) } \mathrm{O}_{2}} \mathbf{P} \xrightarrow{\mathrm{CHCl}_{3} / \mathrm{NaOH}} \mathbf{Q} \text { (major) }+\mathbf{R} \text { (minor) } \\
+\mathbf{Q} \xrightarrow[P_{\mathrm{PhCH}}^{2} \mathrm{Br}]{\mathrm{NaOH}} \mathbf{S}
+\end{gathered}$$
+\begin{itemize}
+\item[(A)] R is steam volatile
+\item[(B)] Q gives dark violet coloration with 1\% aqueous $\mathrm{FeCl}_{3}$ solution
+\item[(C)] S gives yellow precipitate with 2, 4-dinitrophenylhydrazine
+\item[(D)] S gives dark violet coloration with 1\% aqueous $\mathrm{FeCl}_{3}$ solution
+\end{itemize}
+
+\section*{ \\ }
+
+SECTION 3 (Maximum Marks: 15)
+\begin{itemize}
+\item[-] This section contains FIVE questions.
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive.
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|}
+\hline Full Marks & : +3 If only the bubble corresponding to the correct answer is darkened. \\
+\hline Zero Marks & : 0 In all other cases. \\
+\hline
+\end{tabular}
+\item[Q.] 32 The mole fraction of a solute in a solution is 0.1. At 298 K, molarity of this solution is the same as its molality. Density of this solution at 298 K is $2.0 \mathrm{~g} \mathrm{~cm}^{-3}$. The ratio of the molecular weights of the solute and solvent, $\left(\frac{M W_{\text {solute }}}{M W_{\text {solvent }}}\right)$, is
+\item[Q.] 33 The diffusion coefficient of an ideal gas is proportional to its mean free path and mean speed. The absolute temperature of an ideal gas is increased 4 times and its pressure is increased 2 times. As a result, the diffusion coefficient of this gas increases $x$ times. The value of $x$ is
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 34 In neutral or faintly alkaline solution, 8 moles of permanganate anion quantitatively oxidize thiosulphate anions to produce X moles of a sulphur containing product. The magnitude of X is
+\item[Q.] 35 The number of geometric isomers possible for the complex $\left[\mathrm{CoL}_{2} \mathrm{Cl}_{2}\right]^{-}\left(\mathrm{L}=\mathrm{H}_{2} \mathrm{NCH}_{2} \mathrm{CH}_{2} \mathrm{O}^{-}\right)$ is
+\item[Q.] 36 In the following monobromination reaction, the number of possible chiral products is
+![](https://cdn.mathpix.com/cropped/1bcb8c10-361e-4bb2-8f70-8404e9d9c936-21.jpg?height=214&width=701&top_left_y=576&top_left_x=704)
+(enantiomerically pure)
+\end{itemize}
+
+\section*{END OF PART II : CHEMISTRY}
+
+\section*{PART III : MATHEMATICS}
+
+SECTION 1 (Maximum Marks: 15)
+\begin{itemize}
+\item[-] This section contains FIVE questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is correct.
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened.
+Zero Marks : 0 If none of the bubbles is darkened.
+Negative Marks : -1 In all other cases.
+\item[Q.] 37 Let $-\frac{\pi}{6}<\theta<-\frac{\pi}{12}$. Suppose $\alpha_{1}$ and $\beta_{1}$ are the roots of the equation $x^{2}-2 x \sec \theta+1=0$ and $\alpha_{2}$ and $\beta_{2}$ are the roots of the equation $x^{2}+2 x \tan \theta-1=0$. If $\alpha_{1}>\beta_{1}$ and $\alpha_{2}>\beta_{2}$, then $\alpha_{1}+\beta_{2}$ equals
+(A) $2(\sec \theta-\tan \theta)$
+(B) $2 \sec \theta$
+(C) $-2 \tan \theta$
+(D) 0
+\item[Q.] 38 A debate club consists of 6 girls and 4 boys. A team of 4 members is to be selected from this club including the selection of a captain (from among these 4 members) for the team. If the team has to include at most one boy, then the number of ways of selecting the team is
+(A) 380
+(B) 320
+(C) 260
+(D) 95
+\item[Q.] 39 Let $S=\left\{x \in(-\pi, \pi): x \neq 0, \pm \frac{\pi}{2}\right\}$. The sum of all distinct solutions of the equation $\sqrt{3} \sec x+\operatorname{cosec} x+2(\tan x-\cot x)=0$ in the set $S$ is equal to
+(A) $-\frac{7 \pi}{9}$
+(B) $-\frac{2 \pi}{9}$
+(C) 0
+(D) $\frac{5 \pi}{9}$
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 40 A computer producing factory has only two plants $T_{1}$ and $T_{2}$. Plant $T_{1}$ produces 20\% and plant $T_{2}$ produces 80\% of the total computers produced. 7\% of computers produced in the factory turn out to be defective. It is known that
+$P$ (computer turns out to be defective given that it is produced in plant $T_{1}$ )
+$=10 P$ (computer turns out to be defective given that it is produced in plant $T_{2}$ ),
+where $P(E)$ denotes the probability of an event $E$. A computer produced in the factory is randomly selected and it does not turn out to be defective. Then the probability that it is produced in plant $T_{2}$ is
+(A) $\frac{36}{73}$
+(B) $\frac{47}{79}$
+(C) $\frac{78}{93}$
+(D) $\frac{75}{83}$
+\item[Q.] 41 The least value of $\alpha \in \mathbb{R}$ for which $4 \alpha x^{2}+\frac{1}{x} \geq 1$, for all $x>0$, is
+(A) $\frac{1}{64}$
+(B) $\frac{1}{32}$
+(C) $\frac{1}{27}$
+(D) $\frac{1}{25}$
+\end{itemize}
+
+\begin{itemize}
+\item[-] This section contains EIGHT questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct.
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened. \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened. \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened. \\
+\hline Negative Marks & : -2 & In all other cases. \\
+\hline
+\end{tabular}
+\item[-] For example, if (A), (C) and (D) are all the correct options for a question, darkening all these three will result in +4 marks; darkening only (A) and (D) will result in +2 marks; and darkening (A) and (B) will result in -2 marks, as a wrong option is also darkened.
+\item[Q.] 42 Consider a pyramid $O P Q R S$ located in the first octant $(x \geq 0, y \geq 0, z \geq 0)$ with $O$ as origin, and $O P$ and $O R$ along the $x$-axis and the $y$-axis, respectively. The base $O P Q R$ of the pyramid is a square with $O P=3$. The point $S$ is directly above the mid-point $T$ of diagonal $O Q$ such that $T S=3$. Then
+\begin{itemize}
+\item[(A)] the acute angle between $O Q$ and $O S$ is $\frac{\pi}{3}$
+\item[(B)] the equation of the plane containing the triangle $O Q S$ is $x-y=0$
+\item[(C)] the length of the perpendicular from $P$ to the plane containing the triangle $O Q S$ is $\frac{3}{\sqrt{2}}$
+\item[(D)] the perpendicular distance from $O$ to the straight line containing $R S$ is $\sqrt{\frac{15}{2}}$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 43 Let $f:(0, \infty) \rightarrow \mathbb{R}$ be a differentiable function such that $f^{\prime}(x)=2-\frac{f(x)}{x}$ for all $x \in(0, \infty)$ and $f(1) \neq 1$. Then
+(A) $\lim _{x \rightarrow 0+} f^{\prime}\left(\frac{1}{x}\right)=1$
+(B) $\lim _{x \rightarrow 0+} x f\left(\frac{1}{x}\right)=2$
+(C) $\lim _{x \rightarrow 0+} x^{2} f^{\prime}(x)=0$
+(D) $|f(x)| \leq 2$ for all $x \in(0,2)$
+\item[Q.] 44 Let $P=\left[\begin{array}{ccc}3 & -1 & -2 \\ 2 & 0 & \alpha \\ 3 & -5 & 0\end{array}\right]$, where $\alpha \in \mathbb{R}$. Suppose $Q=\left[q_{i j}\right]$ is a matrix such that $P Q=k I$, where $k \in \mathbb{R}, k \neq 0$ and $I$ is the identity matrix of order 3. If $q_{23}=-\frac{k}{8}$ and $\operatorname{det}(Q)=\frac{k^{2}}{2}$, then
+(A) $\alpha=0, k=8$
+(B) $4 \alpha-k+8=0$
+(C) $\operatorname{det}(P \operatorname{adj}(Q))=2^{9}$
+(D) $\operatorname{det}(Q \operatorname{adj}(P))=2^{13}$
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 45 In a triangle $X Y Z$, let $x, y, z$ be the lengths of sides opposite to the angles $X, Y, Z$, respectively, and $2 s=x+y+z$. If $\frac{s-x}{4}=\frac{s-y}{3}=\frac{s-z}{2}$ and area of incircle of the triangle $X Y Z$ is $\frac{8 \pi}{3}$, then
+\begin{itemize}
+\item[(A)] area of the triangle $X Y Z$ is $6 \sqrt{6}$
+\item[(B)] the radius of circumcircle of the triangle $X Y Z$ is $\frac{35}{6} \sqrt{6}$
+\item[(C)] $\sin \frac{X}{2} \sin \frac{Y}{2} \sin \frac{Z}{2}=\frac{4}{35}$
+\item[(D)] $\sin ^{2}\left(\frac{X+Y}{2}\right)=\frac{3}{5}$
+\end{itemize}
+\item[Q.] 46 A solution curve of the differential equation $\left(x^{2}+x y+4 x+2 y+4\right) \frac{d y}{d x}-y^{2}=0, x>0$, passes through the point (1, 3). Then the solution curve
+\begin{itemize}
+\item[(A)] intersects $y=x+2$ exactly at one point
+\item[(B)] intersects $y=x+2$ exactly at two points
+\item[(C)] intersects $y=(x+2)^{2}$
+\item[(D)] does NOT intersect $y=(x+3)^{2}$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 47 Let $f: \mathbb{R} \rightarrow \mathbb{R}, \quad g: \mathbb{R} \rightarrow \mathbb{R}$ and $h: \mathbb{R} \rightarrow \mathbb{R}$ be differentiable functions such that $f(x)=x^{3}+3 x+2, g(f(x))=x$ and $h(g(g(x)))=x$ for all $x \in \mathbb{R}$. Then
+(A) $g^{\prime}(2)=\frac{1}{15}$
+(B) $h^{\prime}(1)=666$
+(C) $h(0)=16$
+(D) $h(g(3))=36$
+\item[Q.] 48 The circle $C_{1}: x^{2}+y^{2}=3$, with centre at $O$, intersects the parabola $x^{2}=2 y$ at the point $P$ in the first quadrant. Let the tangent to the circle $C_{1}$ at $P$ touches other two circles $C_{2}$ and $C_{3}$ at $R_{2}$ and $R_{3}$, respectively. Suppose $C_{2}$ and $C_{3}$ have equal radii $2 \sqrt{3}$ and centres $Q_{2}$ and $Q_{3}$, respectively. If $Q_{2}$ and $Q_{3}$ lie on the $y$-axis, then
+\begin{itemize}
+\item[(A)] $Q_{2} Q_{3}=12$
+\item[(B)] $R_{2} R_{3}=4 \sqrt{6}$
+\item[(C)] area of the triangle $\mathrm{OR}_{2} \mathrm{R}_{3}$ is $6 \sqrt{2}$
+\item[(D)] area of the triangle $P Q_{2} Q_{3}$ is $4 \sqrt{2}$
+\end{itemize}
+\item[Q.] 49 Let $R S$ be the diameter of the circle $x^{2}+y^{2}=1$, where $S$ is the point (1,0). Let $P$ be a variable point (other than $R$ and $S$ ) on the circle and tangents to the circle at $S$ and $P$ meet at the point $Q$. The normal to the circle at $P$ intersects a line drawn through $Q$ parallel to $R S$ at point $E$. Then the locus of $E$ passes through the point(s)
+(A) $\left(\frac{1}{3}, \frac{1}{\sqrt{3}}\right)$
+(B) $\left(\frac{1}{4}, \frac{1}{2}\right)$
+(C) $\left(\frac{1}{3},-\frac{1}{\sqrt{3}}\right)$
+(D) $\left(\frac{1}{4},-\frac{1}{2}\right)$
+\end{itemize}
+
+\section*{Space for rough work}
+
+SECTION 3 (Maximum Marks: 15)
+\begin{itemize}
+\item[-] This section contains FIVE questions.
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive.
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS.
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct answer is darkened.
+Zero Marks : 0 In all other cases.
+\item[Q.] 50 The total number of distinct $x \in \mathbb{R}$ for which $\left|\begin{array}{ccc} x & x^{2} & 1+x^{3} \\ 2 x & 4 x^{2} & 1+8 x^{3} \\ 3 x & 9 x^{2} & 1+27 x^{3}\end{array}\right|=10$ is
+\item[Q.] 51 Let $m$ be the smallest positive integer such that the coefficient of $x^{2}$ in the expansion of $(1+x)^{2}+(1+x)^{3}+\cdots+(1+x)^{49}+(1+m x)^{50}$ is $(3 n+1)^{51} C_{3}$ for some positive integer $n$. Then the value of $n$ is
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 52 The total number of distinct $x \in[0,1]$ for which $\int_{0}^{x} \frac{t^{2}}{1+t^{4}} d t=2 x-1$ is
+\item[Q.] 53 Let $\alpha, \beta \in \mathbb{R}$ be such that $\lim _{x \rightarrow 0} \frac{x^{2} \sin (\beta x)}{\alpha x-\sin x}=1$. Then $6(\alpha+\beta)$ equals
+\item[Q.] 54 Let $z=\frac{-1+\sqrt{3} i}{2}$, where $i=\sqrt{-1}$, and $r, s \in\{1,2,3\}$. Let $P=\left[\begin{array}{cc}(-z)^{r} & z^{2 s} \\ z^{2 s} & z^{r}\end{array}\right]$ and $I$ be the identity matrix of order 2. Then the total number of ordered pairs $(r, s)$ for which $P^{2}=-I$ is
+\end{itemize}
+
+\section*{END OF THE QUESTION PAPER}
+
+\section*{Answers for the above questions}
+Ans for Q.1: (B)
+Ans for Q.2: (D)
+Ans for Q.3: (B)
+Ans for Q.4: (A)
+Ans for Q.5: (C)
+Ans for Q.6: (A), (B), and (D)
+Ans for Q.7: (A), (B), and (C)
+Ans for Q.8: (C) and (D)
+Ans for Q.9: (A) and (D)
+Ans for Q.10: (B) and (D)
+Ans for Q.11: (A) and (D)
+Ans for Q.12: (A), (B) and (D)
+Ans for Q.13: (A), (C) and (D)
+Ans for Q.14: (9)
+Ans for Q.16: (6)
+Ans for Q.17: (3)
+Ans for Q.18: (8)
+Ans for Q.19: (D)
+Ans for Q.20: (C)
+Ans for Q.21: (B)
+Ans for Q.22: (B)
+Ans for Q.23: (A)
+Ans for Q.24: (B), (C) and (D)
+Ans for Q.25: (B) and (D)
+Ans for Q.26: (A), (C) and (D)
+Ans for Q.27: (B) and (C)
+Ans for Q.29: (A), (B) and (C)
+Ans for Q.30: (B)
+Ans for Q.31: (B) and (C)
+Ans for Q.32: (9)
+Ans for Q.33: (4)
+Ans for Q.34: (6)
+Ans for Q.35: (5)
+Ans for Q.36: (5)
+Ans for Q.37: (C)
+Ans for Q.38: (A)
+Ans for Q.39: (C)
+Ans for Q.40: (C)
+Ans for Q.41: (C)
+Ans for Q.42: (B), (C) and (D)
+Ans for Q.43: (A)
+Ans for Q.44: (B) and (C)
+Ans for Q.45: (A), (C) and (D)
+Ans for Q.46: (A) and (D)
+Ans for Q.47: (B) and (C)
+Ans for Q.48: (A), (B) and (C)
+Ans for Q.49: (A) and (C)
+Ans for Q.50: (2)
+Ans for Q.51: (5)
+Ans for Q.52: (1)
+Ans for Q.53: (7)
+Ans for Q.54: (1)

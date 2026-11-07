@@ -54,16 +54,24 @@ function qDotLineRe() {
   return /(?:^|\n)\s*Q\s*\.?\s*(\d{1,3})\b/gi
 }
 
+/**
+ * "END OF PART I : PHYSICS" / "PART II : CHEMISTRY" / "END OF THE QUESTION PAPER" between
+ * subjects (2016 layout). A bare PART line must name its subject so "Part (i)" never cuts.
+ */
+const PART_BOUNDARY_SRC = String.raw`\\section\*?\{\s*(?:END\s+OF\s+(?:PART\b|THE\s+QUESTION\s+PAPER)|PART\s*[-\u2013\u2014]?\s*(?:IV|I{1,3}|[1-4])\b)|(?:^|\n)[ \t]*END\s+OF\s+(?:PART\s*[-\u2013\u2014]?\s*(?:IV|I{1,3}|[1-4])\b|THE\s+QUESTION\s+PAPER)|(?:^|\n)[ \t]*PART\s*[-\u2013\u2014]?\s*(?:IV|I{1,3}|[1-4])\s*[:\-\u2013\u2014]?\s*(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)[ \t]*(?=\n|$)`
+
 function sectionStartRe() {
-  return /\\section\*?\{?\s*SECTION\b|(?:^|\n)\s*SECTION\s+\d+\s*\(/gi
+  return new RegExp(String.raw`\\section\*?\{?\s*SECTION\b|(?:^|\n)\s*SECTION\s+\d+\s*\(|${PART_BOUNDARY_SRC}`, 'gi')
 }
 
 function paragraphStartRe() {
   return /(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?[IVXL\d]|Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:Passage|Comprehension)\s*:)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}(?:\s*,\s*Q\.?\s*\d{1,3})*\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/gi
 }
 
-const SECTION_CUT_RE =
-  /\\end\{itemize\}\s*(?=\\section\*?\{[^}]*SECTION|\\section\*?\{?\s*SECTION|\\begin\{itemize\}\s*\\item\[-\]|SECTION\s+\d+)|\\section\*?\{[^}]*SECTION|\\section\*?\{?\s*SECTION|(?:^|\n)\s*SECTION\s+\d+\s*\([^)]*Maximum Marks|(?:^|\n)\s*(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*(?:\n|\\section)|\bThis section contains\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)/i
+const SECTION_CUT_RE = new RegExp(
+  String.raw`\\end\{itemize\}\s*(?=\\section\*?\{[^}]*SECTION|\\section\*?\{?\s*SECTION|\\begin\{itemize\}\s*\\item\[-\]|SECTION\s+\d+)|\\section\*?\{[^}]*SECTION|\\section\*?\{?\s*SECTION|(?:^|\n)\s*SECTION\s+\d+\s*\([^)]*Maximum Marks|(?:^|\n)\s*(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*(?:\n|\\section)|\bThis section contains\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)|${PART_BOUNDARY_SRC}`,
+  'i',
+)
 
 const NEXT_LET_PI_RE =
   /(?:\$\$\s*)?(?:\\begin\{aligned\}[\s\S]{0,160})?(?:\\text\s*\{\s*)?Let(?:\s*\}|\s+)(?:\$\\frac\{\\pi\}|\\frac\{\\pi\}|\$\\pi)/i

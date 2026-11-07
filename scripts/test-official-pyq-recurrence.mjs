@@ -1300,6 +1300,59 @@ test('2017 P2 layout: a number glued inside the formula ("Q. $51|…"), clause o
   assert.match(String(fromOld[30].options?.[3] ?? ''), /ZnO/, 'Q31 keeps its own options')
 })
 
+test('2016 layout: "END OF PART I : PHYSICS" and the next part\'s heading never stay on the last question of a subject (JEE Adv 2016 P1 Q18, Q36)', () => {
+  const raw = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), 'fixtures', 'jee-advanced-2016-p1-mathpix.txt'), 'utf8')
+  const meta = { exam: 'jee-advanced', year: 2016, session: 'Paper 1', paperLabel: 'JEE Advanced 2016', sourceLabel: 'Official JEE Advanced archive' }
+  const PAPER_CHROME = /END\s+OF\s+(?:PART|THE\s+QUESTION\s+PAPER)|PART\s+I{1,3}\s*:|\bSECTION\s+\d|This section contains|Maximum Marks|darken the bubble|Ans\s+for\s+Q/i
+
+  const built = questionsFromOfficialPyqExtract({ engine: 'mathpix', text: raw, questions: [] }, meta)
+  const check = (qs, label) => {
+    assert.equal(qs.length, 54, label)
+    qs.forEach((q, i) => {
+      assert.equal(q.subject, i < 18 ? 'physics' : i < 36 ? 'chemistry' : 'mathematics', `${label} Q${i + 1} subject`)
+      const blob = [q.text, ...(q.options || []), q.passageText || ''].join('\n')
+      assert.doesNotMatch(blob, PAPER_CHROME, `${label} Q${i + 1} carries paper instructions`)
+    })
+    assert.match(qs[17].text, /drawn from the battery is$/, `${label} Q18 ends with its own words`)
+    assert.match(qs[35].text, /\(enantiomerically pure\)$/, `${label} Q36 ends with its own words`)
+    assert.match(qs[7].options.join('\n'), /towards the end of the life of the bulb/, `${label} Q8 keeps "the end of the life"`)
+    assert.equal(qs.filter((q) => q.answerSource === 'from_paper').length, 52, `${label} printed answers`)
+    assert.equal(qs[17].correctInteger, 8)
+    assert.equal(qs[35].correctInteger, 5)
+    for (const n of [15, 28]) assert.notEqual(qs[n - 1].answerSource, 'from_paper', `${label} Q${n} is not in the printed key`)
+  }
+  check(built.questions, 'upload')
+  const again = questionsFromOfficialPyqExtract({ engine: 'builtin', text: sanitizeMathpixOcrText(built.preparedText), questions: [] }, meta, {
+    printedAnswerKey: readPrintedAnswerKey(built.preparedText),
+  })
+  check(again.questions, 're-parse')
+
+  // Cards stored before the fix still show clean, and a real stem is not cut.
+  assert.equal(stripTrailingPyqSectionHeader('The ratio drawn from the battery is\n\nEND OF PART I : PHYSICS'), 'The ratio drawn from the battery is')
+  assert.equal(stripTrailingPyqSectionHeader('(enantiomerically pure)\n\n\\section*{END OF PART II : CHEMISTRY}'), '(enantiomerically pure)')
+  const partLine = 'A block slides down the incline as shown and comes to rest.\nPart (ii) Find the distance travelled before it stops.'
+  const kept = paperItemsFromMathpixOcr(`\\item[Q.] 1 ${partLine}\n\\item[Q.] 2 ${partLine}`, { paperMeta: meta })
+  assert.match(kept[0].text, /Part \(ii\) Find the distance/, 'a "Part (ii)" line in a stem is question text')
+})
+
+test('a long split after Mathpix is not reported as "stalled": the upload watchdog waits for no progress, then stops the upload for a free re-upload (JEE Adv 2016 P1)', () => {
+  const page = fs.readFileSync(path.join(process.cwd(), 'src/pages/OfficialPyqPending.jsx'), 'utf8')
+  assert.doesNotMatch(page, /Gemini split stalled/, 'the old 15-second false alarm is gone')
+  const ms = Number((page.match(/const UPLOAD_STALL_MS = ([\d_]+)/)?.[1] ?? '0').replace(/_/g, ''))
+  assert.ok(ms >= 60_000, `stall window ${ms} ms is shorter than a normal split + Gemini try + save`)
+  const watchdog = page.match(/useEffect\(\(\) => \{\s*if \(!busy \|\| !uploadAbortRef\.current[\s\S]*?\}, \[([^\]]*)\]\)/)
+  assert.ok(watchdog, 'upload watchdog effect not found')
+  assert.match(watchdog[0], /return \(\) => clearTimeout\(timer\)/, 'each new progress step restarts the wait')
+  assert.match(watchdog[1], /progressPct/)
+  assert.match(watchdog[1], /progressLabel/)
+  assert.match(watchdog[0], /uploadAbortRef\.current\?\.abort\(\)/, 'a real stall stops the upload instead of leaving it running unseen')
+  assert.match(page, /importFileToPending\([\s\S]{0,400}signal: uploadCtl\.signal/, 'the upload listens to the stop')
+  assert.match(page, /\} else \{\s*setError\(''\)\s*setMessage\(\s*`Imported/, 'a finished upload clears an old red banner')
+  assert.match(page, /UPLOAD_STALLED_MESSAGE =[\s\S]{0,200}no second OCR bill/)
+  const mathpixSrc = fs.readFileSync(path.join(process.cwd(), 'server/mathpix.js'), 'utf8')
+  assert.match(mathpixSrc, /pdfId = await submitPdf[\s\S]{0,80}rememberMathpixPdfJob\(fileHash, pdfId/, 'the Mathpix job is remembered as soon as it is sent, so a re-upload is free')
+})
+
 test('an upload lost to a dropped internet connection says so in plain words, never a bare "fetch failed" (2017 P2)', () => {
   for (const raw of ['fetch failed', 'Fetch failed.', 'socket hang up', 'connect ETIMEDOUT 104.18.1.1:443', 'getaddrinfo ENOTFOUND api.mathpix.com']) {
     const shown = formatOfficialPyqUploadError(new Error(raw))

@@ -1743,6 +1743,24 @@ test('2015 P1 Q14/Q45: next page\'s "PHYSICS" head and the empty answer-box tabl
   for (const n of [14, 45]) assert.ok(!repaired.quality.failedGoTo.includes(n), `Q${n} passes after repair`)
 })
 
+const { validateQuestionReadiness } = await import('../src/utils/questionReadiness.js')
+const { validateOfficialPyqForApprove } = await import('../src/utils/officialPyqApproval.js')
+
+test('2015 P1 grids, MSQs and coded-option List-I/II questions pass the approve and readiness checks', () => {
+  const errors = (q) => validateQuestionReadiness(q).issues.filter((i) => i.severity === 'error').map((i) => i.id)
+  for (const n of GRID_2015) {
+    assert.equal(matchQuestionMissingListI(gridCard(n)), false, `Q${n} List-I`)
+    assert.deepEqual(errors(gridCard(n)), [], `Q${n} readiness`)
+  }
+  for (const n of [9, 15, 30, 31, 35]) assert.deepEqual(errors(at2015(n)), [], `Q${n} MSQ options counted`)
+  const coded = { questionType: 'matrix_match', text: 'In which case will the particle move in a straight line with constant velocity?', options: ['(III) (ii) (R)', '(IV) (i) (S)', '(III) (iii) (P)', '(II) (iii) (S)'] }
+  assert.deepEqual(errors(coded), [])
+  assert.deepEqual(errors({ ...coded, options: ['(III) (ii) (R)', '', '', ''] }), ['mcq-incomplete'])
+  assert.equal(matchQuestionMissingListI({ ...gridCard(19), matrixRows: ['Nuclear fusion'] }), true)
+  const approve = validateOfficialPyqForApprove(paper2015(gridItems2015))
+  assert.ok(!approve.errors.some((e) => /missing List-I/.test(e)), approve.errors.join(' | '))
+})
+
 test('every sample paper: no card keeps page leftovers (running heads, answer tables, empty tables, list/section code, instructions)', () => {
   const dir = new URL('./fixtures/', import.meta.url)
   const papers = fs.readdirSync(dir).filter((f) => /^jee-advanced-.*-mathpix\.txt$/.test(f))

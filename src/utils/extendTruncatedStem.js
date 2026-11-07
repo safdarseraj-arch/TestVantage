@@ -668,6 +668,9 @@ function looksLikeOrphanListTwo(q) {
 
 /** Match-the-column card that still has no List-I (P)–(S) / Titrate / figure rows — do not approve. */
 export function matchQuestionMissingListI(q) {
+  if (isMatrixGridCard(q)) {
+    return (Array.isArray(q.matrixRows) ? q.matrixRows : []).filter((row) => String(row ?? '').trim()).length < 2
+  }
   const t = String(q?.text ?? '').trim()
   if (!t) return false
   if (hasListIEntries(t, q?.options)) return false

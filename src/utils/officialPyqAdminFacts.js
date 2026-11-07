@@ -6,6 +6,12 @@
  */
 
 import { buildPaperFacts, shapeOfficialPyqDrafts } from './officialPyqPaperFacts.js'
+import {
+  MATRIX_GRID_DEFAULT_COLS,
+  MATRIX_GRID_DEFAULT_ROWS,
+  MATRIX_GRID_FACT_TYPE,
+  withFactType,
+} from './matrixGridPyq.js'
 
 export const ADMIN_FACTS_VERSION = 1
 
@@ -21,7 +27,13 @@ export const FACT_TYPES = [
   { id: 'integer', label: 'Integer', options: 0 },
   { id: 'numerical', label: 'Numerical (decimal)', options: 0 },
   { id: 'matrix_match', label: 'Match the lists', options: 4 },
+  { id: MATRIX_GRID_FACT_TYPE, label: 'Matrix match (grid)', options: 0, listI: MATRIX_GRID_DEFAULT_ROWS, listII: MATRIX_GRID_DEFAULT_COLS },
 ]
+
+/** A type whose answer is ticked on the paper, not picked from options. */
+export function typeHasNoOptions(type) {
+  return type === 'integer' || type === 'numerical' || type === MATRIX_GRID_FACT_TYPE
+}
 
 const TYPE_IDS = new Set(FACT_TYPES.map((t) => t.id))
 const SUBJECT_IDS = FACT_SUBJECTS.map((s) => s.id)
@@ -32,6 +44,12 @@ export function subjectLabel(id) {
 
 export function defaultOptionsFor(type) {
   return FACT_TYPES.find((t) => t.id === type)?.options ?? 4
+}
+
+/** Default Column I / Column II sizes for a type ('' when the type has none). */
+export function defaultListSizesFor(type) {
+  const t = FACT_TYPES.find((row) => row.id === type)
+  return { listI: t?.listI ?? '', listII: t?.listII ?? '' }
 }
 
 /** @returns {{ from: number|'', to: number|'', type: string, options: number|'', listI: number|'', listII: number|'' }} */
@@ -109,8 +127,8 @@ export function draftAdminFacts(ocr, questions = []) {
         to: next + count - 1,
         type,
         options: defaultOptionsFor(type),
-        listI: '',
-        listII: '',
+        listI: Number(s.listI) > 0 ? Number(s.listI) : '',
+        listII: Number(s.listII) > 0 ? Number(s.listII) : '',
       })
       const stems = Number(s.stems) || 0
       const each = stems > 0 ? count / stems : 0
@@ -213,6 +231,9 @@ export function validateAdminFacts(admin) {
       if (!TYPE_IDS.has(r.type)) errors.push(`${label}: pick the question type.`)
       const isMcq = r.type === 'single_correct' || r.type === 'multiple_correct' || r.type === 'matrix_match'
       if (isMcq && !(r.options >= 2)) errors.push(`${label}: enter how many options (usually 4).`)
+      if (r.type === MATRIX_GRID_FACT_TYPE && (!(r.listI >= 1) || !(r.listII >= 1))) {
+        errors.push(`${label}: enter how many Column I rows and Column II rows (usually 4 and 5).`)
+      }
     })
     const { groups, bad } = parsePassageGroups(block?.passages)
     for (const piece of bad) errors.push(`${where}: passage "${piece}" — write it like 13-14.`)
@@ -238,7 +259,7 @@ export function validateAdminFacts(admin) {
           part,
           printed: n + shift,
           type: r.type,
-          options: r.type === 'integer' || r.type === 'numerical' ? 0 : r.options || 0,
+          options: typeHasNoOptions(r.type) ? 0 : r.options || 0,
           listI: r.listI || 0,
           listII: r.listII || 0,
           passage: passageOf.get(n) || '',
@@ -431,10 +452,9 @@ export function enforceAdminFactsOnQuestions(questions, admin, ocr) {
     if (!q || typeof q !== 'object' || q.placeholder === true) return q
     const slot = slots[i]
     const next = {
-      ...q,
+      ...withFactType(q, slot.type),
       subject: slot.subject,
       subjectSource: 'admin_facts',
-      questionType: slot.type,
       typeSource: 'admin_facts',
       paperPart: slot.part,
       printedNumber: slot.printed,

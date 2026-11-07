@@ -5,10 +5,14 @@
  */
 
 import { parseMatchColumnUpload, looksLikeMatchColumnUpload } from './parseMatchColumnUpload.js'
+import { isMatrixGridCard } from './matrixGridPyq.js'
+
+/** Whole words only: "blister copper" is not a List question. */
+const MATCH_WORD_RE = /\b(?:match|list|column)/i
 
 function matchQuestionMissingListI(q) {
   const t = String(q?.text ?? '')
-  if (!/Match|List|Column/i.test(t)) return false
+  if (!MATCH_WORD_RE.test(t)) return false
   return !/\(\s*[PQRSABCD]\s*\)\s+(?!\(\s*[PQRSABCD1-5]\s*\))\S/.test(t)
 }
 
@@ -54,12 +58,12 @@ function hasListTwo(text) {
  * @param {unknown} source
  */
 export function enrichMatchListsFromOcr(q, source) {
-  if (!q || typeof q !== 'object' || q.placeholder === true) return q
+  if (!q || typeof q !== 'object' || q.placeholder === true || isMatrixGridCard(q)) return q
   const src = String(source ?? '')
   let text = String(q.text ?? '').trim()
   if (!text || src.length < 40) return q
   const needI = matchQuestionMissingListI({ text, options: q.options })
-  const needII = /Match|List|Column/i.test(text) && !hasListTwo(text)
+  const needII = MATCH_WORD_RE.test(text) && !hasListTwo(text)
   if (!needI && !needII) return q
   const rowP = text.match(/\(\s*P\s*\)\s+[^\n]{8,70}/)
   const distinctive = text.match(

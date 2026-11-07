@@ -66,6 +66,7 @@ import {
   dedupeUploadQuestionSlots,
 } from './officialPyqMissingSlots.js'
 import { stripAnswersFromQuestionCards } from './stripAnswerFromQuestionStem.js'
+import { gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.js'
 
 const PYQ_PREPARED_OCR_MARKER = '--- prepared-ocr ---'
 const PYQ_VISION_TEXT_MARKER = '--- vision-ocr ---'
@@ -342,14 +343,18 @@ const SAME_CARD_MIN_OVERLAP = 0.6
  */
 function placeAdminEditedCards(cards, prior, admins) {
   const nextPairs = cards.map(cardWordPairs)
+  const printedOf = (q) => Number(q?.printedNumber) || 0
+  // A stored card can carry the wrong subject (an old split put Chemistry Q21–39 under Physics),
+  // so when every printed number is used once the number alone finds the card.
+  const printedUnique = new Set(cards.map(printedOf).filter((n) => n > 0)).size === cards.length
   const scored = []
   admins.forEach((a, ai) => {
     const history = Array.isArray(a.editHistory) ? a.editHistory : []
     const versions = [a, ...history.map((h) => h?.card).filter(Boolean)].map(cardWordPairs)
     nextPairs.forEach((pairs, qi) => {
       const subject = String(cards[qi]?.subject || '')
-      if (a.subject && subject && String(a.subject) !== subject) return
       const score = Math.max(...versions.map((v) => pairOverlap(v, pairs)))
+      if (a.subject && subject && String(a.subject) !== subject && !(printedUnique && score >= 0.85)) return
       if (score >= SAME_CARD_MIN_OVERLAP) scored.push({ ai, qi, score })
     })
   })
@@ -369,7 +374,7 @@ function placeAdminEditedCards(cards, prior, admins) {
         !byNext.has(i) &&
         Number(a.printedNumber) > 0 &&
         Number(a.printedNumber) === Number(q?.printedNumber) &&
-        String(a.subject || '') === String(q?.subject || ''),
+        (printedUnique || String(a.subject || '') === String(q?.subject || '')),
     )
     if (at < 0) at = prior.indexOf(a)
     if (at >= 0 && at < cards.length && !byNext.has(at)) byNext.set(at, a)
@@ -392,9 +397,27 @@ function uniqueAdminCards(admins) {
  * An unapproved auto-compare card (a machine fix, not the admin's) that still misses a
  * match list gives way when the fresh parse of the same slot has both lists.
  */
-function autoFixLostToFreshParse(old, fresh) {
+function autoFixLostToFreshParse(old, fresh, paper) {
   if (old?.editSource !== 'auto_compare' || old?.adminApproved === true || !fresh) return false
+  if (isMatrixGridCard(fresh) && !isMatrixGridCard(old)) return true
+  if (carriesOtherQuestionsScanPicture(old, fresh, paper)) return true
   return Boolean(officialPyqMissingListMessage([old])) && !officialPyqMissingListMessage([fresh])
+}
+
+const SCAN_PICTURE_RE = /https?:\/\/cdn\.mathpix\.com\/[^\s)}"'\]]+/gi
+
+function scanPicturesOf(q) {
+  const parts = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])]
+  return new Set(parts.flatMap((p) => String(p ?? '').match(SCAN_PICTURE_RE) || []))
+}
+
+/** The old card shows a scan picture that the fresh parse places under a different question. */
+function carriesOtherQuestionsScanPicture(old, fresh, paper) {
+  const mine = scanPicturesOf(fresh)
+  const extra = [...scanPicturesOf(old)].filter((u) => !mine.has(u))
+  if (!extra.length || !Array.isArray(paper)) return false
+  const elsewhere = new Set(paper.filter((q) => q && q !== fresh).flatMap((q) => [...scanPicturesOf(q)]))
+  return extra.some((u) => elsewhere.has(u))
 }
 
 /** Old card indexes the store may replace because the fresh parse fixed the same slot. */
@@ -407,7 +430,9 @@ function releasedAutoFixIndexes(prev, next) {
     const now =
       fresh.find((q) => old?.id && q?.id === old.id) ||
       fresh.find((q) => Number(q?.pyqSlot ?? q?.questionNumber) === slot)
-    if (now && now.adminEdited !== true && autoFixLostToFreshParse(old, now)) out.push(i)
+    if (!now) return
+    if (now.adminEdited !== true && autoFixLostToFreshParse(old, now, fresh)) out.push(i)
+    else if (old.adminApproved !== true && carriesOtherQuestionsScanPicture(old, now, fresh)) out.push(i)
   })
   return out
 }
@@ -420,7 +445,7 @@ export function keepAdminEditedCards(next, prev) {
   const byNext = placeAdminEditedCards(cards, prior, admins)
   return cards.map((q, i) => {
     const old = byNext.get(i)
-    if (!old?.adminEdited || autoFixLostToFreshParse(old, q)) return q
+    if (!old?.adminEdited || autoFixLostToFreshParse(old, q, cards)) return q
     return {
       ...q,
       id: old.id || q.id,
@@ -433,6 +458,7 @@ export function keepAdminEditedCards(next, prev) {
       correctIndices: old.correctIndices,
       correctInteger: old.correctInteger,
       correctNumerical: old.correctNumerical,
+      ...gridFieldsOf(old),
       solution: old.solution,
       adminEdited: true,
       adminEditedAt: old.adminEditedAt,
@@ -456,7 +482,7 @@ export function copyAnswersOntoCanonical(canonical, prev) {
     let old = placed || byNum.get(Number(q.questionNumber)) || prev[i]
     if (!placed && old?.adminEdited === true) old = null
     if (!old) return q
-    if (old.adminEdited === true && !autoFixLostToFreshParse(old, q)) {
+    if (old.adminEdited === true && !autoFixLostToFreshParse(old, q, canonical)) {
       return {
         ...old,
         questionNumber: q.questionNumber,
@@ -464,6 +490,24 @@ export function copyAnswersOntoCanonical(canonical, prev) {
         printedNumber: q.printedNumber ?? old.printedNumber,
         subject: q.subject || old.subject,
         questionType: old.questionType || q.questionType,
+      }
+    }
+    if (isMatrixGridCard(q)) {
+      const keepOldKey = !q.matrixAnswerKey && isMatrixGridCard(old) && old.matrixAnswerKey
+      return {
+        ...q,
+        id: q.id || old.id,
+        ...(keepOldKey
+          ? {
+              matrixAnswerKey: old.matrixAnswerKey,
+              ...(old.matrixAnswerAlternates ? { matrixAnswerAlternates: old.matrixAnswerAlternates } : {}),
+              answerSource: old.answerSource,
+            }
+          : {}),
+        solution: stripEmptyFigureShells(
+          stripEmptyImageMarkdown(String(old.solution ?? '').trim() ? old.solution : q.solution || ''),
+        ),
+        solutionSource: old.solutionSource || q.solutionSource,
       }
     }
     return {
@@ -622,6 +666,7 @@ export function reExtractOfficialPyqPendingPaperLocal(paper) {
   const updated = updateOfficialPyqPendingPaper(paper.id, {
     ...shaped,
     preparedText,
+    releaseAdminEditIndexes: releasedAutoFixIndexes(paper.questions, questions),
   })
   if (!updated) {
     return {

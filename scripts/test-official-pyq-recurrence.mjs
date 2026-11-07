@@ -1502,6 +1502,227 @@ test('an upload keeps the answers printed on the paper: the key is read from the
   assert.match(String(paper.preparedText), /Ans for Q\.3: \(D\)/, 'the key is stored with the paper so a re-parse keeps it')
   localStorage.clear()
 })
+const grid2015 = fs.readFileSync(new URL('./fixtures/jee-advanced-2015-p1-mathpix.txt', import.meta.url), 'utf8')
+const GRID_2015 = [19, 20, 39, 40, 59, 60]
+const gridMod = await import('../src/utils/matrixGridPyq.js')
+const { draftAdminFacts, validateAdminFacts } = await import('../src/utils/officialPyqAdminFacts.js')
+const { evaluateTest } = await import('../src/utils/scoring.js')
+const { applyPrintedAnswerKey } = await import('../src/utils/printedAnswerKey.js')
+const { officialPyqDraftFromCard, applyOfficialPyqCardDraft, formatOfficialPyqAnswerKey, officialPyqCardHasAnswerKey } =
+  await import('../src/utils/officialPyqCardEdit.js')
+const { applyHybridPatchToCard, hybridFillRequestForQuestion, currentAnswerText } = await import('../src/utils/officialPyqPendingFill.js')
+const { publishedMetaPatchFromHybridFill } = await import('../src/utils/officialPyqReplica.js')
+const { overlayOfficialPyqPublishedMeta } = await import('../src/utils/officialPyqPublishedMeta.js')
+const { pendingQuestionToPyqItem, pyqItemToBankQuestion } = await import('../src/utils/officialPyqApproval.js')
+const gridItems2015 = paperItemsFromMathpixOcr(grid2015)
+const gridCard = (n) => gridItems2015.find((q) => Number(q.printedNumber) === n)
+
+test('2015 P1: Q19, 20, 39, 40, 59, 60 are 4×5 grid cards with no options and the printed answers', () => {
+  assert.equal(gridItems2015.length, 60)
+  assert.deepEqual(gridItems2015.filter(gridMod.isMatrixGridCard).map((q) => Number(q.printedNumber)), GRID_2015)
+  for (const n of GRID_2015) {
+    const q = gridCard(n)
+    assert.equal(q.questionType, 'matrix_match', `Q${n}`)
+    assert.equal(q.matrixRows.length, 4, `Q${n} Column I`)
+    assert.equal(q.matrixCols.length, 5, `Q${n} Column II`)
+    assert.deepEqual(q.matrixColLabels, ['P', 'Q', 'R', 'S', 'T'])
+    assert.equal(q.options.filter((o) => String(o ?? '').trim()).length, 0, `Q${n} has no options`)
+    assert.equal(q.answerSource, 'from_paper', `Q${n} answer read from the paper`)
+    assert.equal(Object.keys(q.matrixAnswerKey).length, 4, `Q${n} all four rows answered`)
+    assert.deepEqual(q.matrixMarking, { perRow: true, correct: 2, wrong: -1, unattempted: 0 })
+    for (const part of [q.text, ...q.matrixRows, ...q.matrixCols]) {
+      assert.doesNotMatch(part, /Matches\s+to|^\s*\$?\s*\\quad/, `Q${n} keeps answer lines and spacing out of the lists`)
+    }
+  }
+  assert.deepEqual(gridCard(19).matrixAnswerKey, { 0: [2], 1: [0, 3], 2: [1, 4], 3: [2] }, 'Q19 A-R, B-P,S, C-Q,T, D-R')
+  assert.deepEqual(gridCard(19).matrixAnswerAlternates, { 0: [[2, 4]] }, 'Q19 A also accepts R and T')
+  assert.deepEqual(gridCard(60).matrixAnswerKey, { 0: [0, 2, 3], 1: [0], 2: [0, 1], 3: [3, 4] })
+  assert.match(gridCard(19).matrixRows[0], /Nuclear fusion/)
+})
+
+test('2015 P1 facts: section 3 drafts as Matrix match (grid) 4×5 and needs no option count', () => {
+  const draft = draftAdminFacts(grid2015, gridItems2015)
+  const rows = draft.pattern.rows
+  assert.deepEqual(
+    rows.map((r) => [r.from, r.to, r.type]),
+    [[1, 8, 'integer'], [9, 18, 'multiple_correct'], [19, 20, 'matrix_grid']],
+  )
+  assert.equal(rows[2].options, 0)
+  assert.equal(rows[2].listI, 4)
+  assert.equal(rows[2].listII, 5)
+  assert.deepEqual(validateAdminFacts(draft).errors, [])
+  const noSize = { ...draft, pattern: { ...draft.pattern, rows: rows.map((r, i) => (i === 2 ? { ...r, listI: '', listII: '' } : r)) } }
+  assert.match(validateAdminFacts(noSize).errors.join(' '), /Column I rows and Column II rows/)
+})
+
+test('grid scoring follows the printed scheme: +2 per exact row, −1 per wrong row, 0 blank; OR answers accepted', () => {
+  const q = { ...gridCard(19), id: 'g19', subject: 'physics' }
+  const old = { id: 'm1', subject: 'physics', questionType: 'matrix_match', matrixRows: ['a', 'b', 'c', 'd'], matrixCols: ['p', 'q', 'r', 's'], options: ['1', '2', '3', '4'], matrixResponseMode: 'options', correctIndex: 2 }
+  const run = (answers) => evaluateTest({ examPatternId: 'jee-advanced', questions: [q, old] }, answers)
+  const all = run({ g19: { 0: [2], 1: [0, 3], 2: [1, 4], 3: [2] } })
+  assert.equal(all.perQuestion[0].marks, 8)
+  assert.equal(all.perQuestion[0].grade, 'correct')
+  assert.equal(all.perQuestion[0].maxMarks, 8)
+  assert.equal(all.perQuestion[0].matrixResponseMode, 'grid', 'results carry the grid')
+  assert.equal(run({ g19: { 0: [2, 4], 1: [0, 3], 2: [1, 4], 3: [2] } }).perQuestion[0].marks, 8, 'A: R and T also scores')
+  const some = run({ g19: { 0: [2], 1: [0], 3: [2] } })
+  assert.equal(some.perQuestion[0].marks, 3, 'two right, one wrong, one blank')
+  assert.equal(some.perQuestion[0].grade, 'partial')
+  assert.equal(run({}).perQuestion[0].grade, 'unattempted')
+  assert.equal(run({ g19: { 0: [0], 1: [1] } }).perQuestion[0].marks, -2)
+  assert.equal(run({ m1: 2 }).perQuestion[1].grade, 'correct', 'old option-style matrix match unchanged')
+  assert.equal(run({ m1: 1 }).perQuestion[1].grade, 'wrong')
+})
+
+test('grid quality check: no options alarm on grid cards; missing Column II is flagged', () => {
+  const cards = GRID_2015.map(gridCard)
+  assert.deepEqual(reviewOfficialPyqCards(cards, '', null, { cardsOnly: true }).failedGoTo ?? [], [])
+  const broken = [{ ...cards[0], matrixCols: [] }, { ...cards[1], matrixRows: cards[1].matrixRows.slice(0, 3) }]
+  const review = reviewOfficialPyqCards(broken, '', null, { cardsOnly: true })
+  assert.deepEqual(review.failedGoTo, [1, 2])
+  assert.match(JSON.stringify(review), /Column I or Column II is missing|Column I should have 4 rows/)
+  assert.deepEqual(localOfficialPyqQualityCheck({ questions: cards, preparedText: '' }).failedGoTo, [])
+})
+
+test('grid edit form: ticks become the answer key; printed letters never land on a grid card', () => {
+  const q = gridCard(19)
+  assert.equal(formatOfficialPyqAnswerKey(q), 'A-R; B-P,S; C-Q,T; D-R')
+  assert.ok(officialPyqCardHasAnswerKey(q))
+  const draft = officialPyqDraftFromCard(q)
+  assert.equal(draft.grid, true)
+  assert.deepEqual(draft.options, [])
+  const next = applyOfficialPyqCardDraft(q, { ...draft, matrixAnswerKey: { ...draft.matrixAnswerKey, 3: [2, 4] } })
+  assert.deepEqual(next.matrixAnswerKey[3], [2, 4])
+  assert.deepEqual(next.options, [])
+  const kept = applyPrintedAnswerKey([q], new Map([[19, '(A)']]))[0]
+  assert.deepEqual(kept.matrixAnswerKey, q.matrixAnswerKey)
+  assert.equal(kept.correctIndex, undefined)
+  assert.equal(kept.answerSource, 'from_paper')
+})
+
+test('grid Hybrid AI fill: asks with both lists, reads "A-P,R; …", never overwrites a printed grid answer', () => {
+  const printed = gridCard(20)
+  const body = hybridFillRequestForQuestion(printed, 'jee-advanced')
+  assert.equal(body.question_type, 'matrix_match_grid')
+  assert.deepEqual(body.options, [])
+  assert.match(body.question_text, /Column I:[\s\S]*\(D\)[\s\S]*Column II:[\s\S]*\(T\)/)
+  assert.equal(currentAnswerText(printed), 'A-P,Q,R,T; B-Q,S; C-P,Q,R,S; D-P,R,T')
+  const reply = { correct_answer: 'A-P; B-Q; C-R; D-S,T', step_by_step_solution: 'Row by row working gives the result.' }
+  const patch = publishedMetaPatchFromHybridFill(printed, reply)
+  assert.deepEqual(patch.matrixAnswerKey, { 0: [0], 1: [1], 2: [2], 3: [3, 4] })
+  assert.deepEqual(applyHybridPatchToCard(printed, patch).matrixAnswerKey, printed.matrixAnswerKey, 'printed answer wins')
+  const blank = { ...printed, matrixAnswerKey: undefined, answerSource: 'unknown' }
+  const filled = applyHybridPatchToCard(blank, patch)
+  assert.deepEqual(filled.matrixAnswerKey, patch.matrixAnswerKey)
+  assert.equal(filled.answerSource, 'hybrid_ai')
+  assert.equal(publishedMetaPatchFromHybridFill(printed, { correct_answer: 'A-P; B-Q' }).matrixAnswerKey, undefined, 'half a grid is not saved')
+  const saved = overlayOfficialPyqPublishedMeta(blank, { ...patch, matrixAnswerKey: filled.matrixAnswerKey })
+  assert.deepEqual(saved.matrixAnswerKey, patch.matrixAnswerKey, 'approved-paper save keeps the grid answer')
+  assert.deepEqual(saved.matrixRows, blank.matrixRows)
+})
+
+test('grid publish: lists, key, OR answers and marking reach the student PYQ and bank rows', () => {
+  const paper = { id: 'p2015', year: 2015, exam: 'jee-advanced', paperId: 'p1', paperLabel: 'Paper 1', sourceLabel: 'JEE' }
+  const pyq = pendingQuestionToPyqItem(paper, gridCard(19), 18)
+  const bank = pyqItemToBankQuestion(paper, pyq, 18)
+  for (const row of [pyq, bank]) {
+    assert.equal(row.questionType, 'matrix_match')
+    assert.equal(row.matrixResponseMode, 'grid')
+    assert.equal(row.matrixRows.length, 4)
+    assert.equal(row.matrixCols.length, 5)
+    assert.deepEqual(row.matrixAnswerKey, gridCard(19).matrixAnswerKey)
+    assert.deepEqual(row.matrixAnswerAlternates, { 0: [[2, 4]] })
+    assert.equal(row.matrixMarking.correct, 2)
+  }
+  assert.equal(pendingQuestionToPyqItem(paper, gridItems2015[0], 0).matrixResponseMode, undefined, 'other cards get no grid fields')
+})
+
+const { enrichMatchListsFromOcr } = await import('../src/utils/restoreMatchListsOcr.js')
+const cdn2015 = (n, q) => `https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-${n}.jpg?${q}`
+const crop2015 = (page, hash) => `\\includegraphics{/api/official-pyq/original/crops/opyq-1794028461503-yqxs5uq-p${page}-${hash}.png?page=${page}&x0=0.1552&y0=0.3547&x1=0.2607&y1=0.4682}`
+const at2015 = (n) => gridItems2015.find((q) => Number(q.printedNumber) === n)
+
+test('2015 P1 Q35: "blister copper" is not a List question; heal adds no List-I from Q36', () => {
+  const q35 = at2015(35)
+  assert.doesNotMatch(q35.text, /List-I/)
+  assert.equal(enrichMatchListsFromOcr(q35, grid2015).text, q35.text)
+  assert.doesNotMatch(healUploadQuestionCard(q35, grid2015).text, /List-I|ONE OR MORE|H\}_\{2\} \\mathrm\{O\}_\{2\}/)
+})
+
+test('2015 P1 Q35: an auto-fix carrying other questions\' scan pictures gives way to the fresh parse', () => {
+  const q35 = at2015(35)
+  const stray = `${q35.text}\n![](${cdn2015(15, 'height=196&width=633&top_left_y=1442&top_left_x=825')})\n![](${cdn2015(16, 'height=131&width=590&top_left_y=384&top_left_x=331')})`
+  const prev = gridItems2015.map((q) => (q === q35 ? { ...q, text: stray, adminEdited: true, editSource: 'auto_compare', adminEditedAt: 1 } : q))
+  const next = keepAdminEditedCards(gridItems2015, prev)
+  assert.doesNotMatch(next[gridItems2015.indexOf(q35)].text, /cdn\.mathpix/)
+  const cropFix = gridItems2015.map((q) => (q === q35 ? { ...q, text: `${q35.text}\n${crop2015(16, 'be231a9cf3b0f40f')}`, adminEdited: true, editSource: 'auto_compare', adminEditedAt: 1 } : q))
+  assert.match(keepAdminEditedCards(gridItems2015, cropFix)[gridItems2015.indexOf(q35)].text, /original\/crops/, 'own crop fix stays')
+})
+
+test('2015 P1 Q37: four unlabelled graphs after "is represented by" become the options; "H<0$$ ... T_2>T_1" draws', () => {
+  const q37 = at2015(37)
+  assert.equal(q37.options.length, 4)
+  for (const o of q37.options) assert.match(o, /cdn\.mathpix\.com/)
+  assert.match(q37.text, /is represented by\s*$/)
+  const stem = 'in the reaction\n$$\\mathrm{N}_{2}(g)+3 \\mathrm{H}_{2}(g) \\rightleftharpoons 2 \\mathrm{NH}_{3}(g), \\Delta \\mathrm{H}<0$$\nat $\\left(P, T_{1}\\right)$ is given below. If conducted with $T_{2}>T_{1}$, the yield is'
+  assert.equal(mathDrawFailure(stem), '')
+  assert.equal(mathDrawFailure('Text with <span>raw</span> HTML'), 'raw HTML')
+})
+
+test('2015 P1 Q32/Q33: crop-picture links are not invented words; Q35/Q37 pass the local check', () => {
+  const q32 = at2015(32)
+  const q33 = at2015(33)
+  const questions = gridItems2015.map((q) => {
+    if (q === q32) return { ...q, text: `The structure of D-(+)-glucose is\n${crop2015(16, 'be231a9cf3b0f40f')}\nThe structure of L-(-)-glucose is`, options: [1, 2, 3, 4].map((k) => crop2015(16, `1c05a6b18bb50e7${k}`)) }
+    if (q === q33) return { ...q, text: `The major product of the reaction is\n${crop2015(17, '4231687ccd86399f')}`, options: [1, 2, 3, 4].map((k) => crop2015(17, `65b57002ba16e74${k}`)) }
+    return q
+  })
+  const run = localOfficialPyqQualityCheck({ id: 'p2015-q', exam: 'jee-advanced', year: 2015, preparedText: grid2015, questions })
+  for (const n of [32, 33, 35, 37]) assert.ok(!(run.failedGoTo || []).includes(n), `Q${n} flagged: ${(run.lines || []).join(' | ')}`)
+})
+
+const { matchOptionCanonical } = await import('../src/utils/applyOptionCanonicals.js')
+const { stemRepeatsOptionPictures } = await import('../src/utils/labelledFigureOptions.js')
+const paper2015 = (questions) => ({ id: 'p2015-r', exam: 'jee-advanced', year: 2015, preparedText: grid2015, questions })
+
+test('2015 P1 Q58: option C "|a×b + c×a| = 48√3" keeps its own text, not another paper\'s box product', () => {
+  const q58 = at2015(58)
+  assert.match(q58.options[2], /48 \\sqrt\{3\}/)
+  assert.equal(matchOptionCanonical(q58.options[2], 'C'), q58.options[2])
+  assert.match(matchOptionCanonical('[a x b  b x c  a] = (a.b)[a b c]', 'C'), /\\left\[\\vec\{a\}\\times/)
+})
+
+test('2015 P1 Q54: the page\'s printed answer table "(A) and (B) …" stays out of option D', () => {
+  const q54 = at2015(54)
+  assert.equal(q54.options[3], '$\\quad y(x)$ has no critical point in the interval (-1, 0)')
+  const glued = { ...q54, options: [...q54.options.slice(0, 3), `${q54.options[3]} (A) and (B); (A) and (D); (A) and (C)`] }
+  const questions = gridItems2015.map((q) => (q === q54 ? glued : q))
+  assert.ok(localOfficialPyqQualityCheck(paper2015(questions)).failedGoTo.includes(54), 'stored glued option is flagged')
+  const repaired = repairOfficialPyqUntilQuality(paper2015(questions))
+  assert.equal(repaired.paper.questions[gridItems2015.indexOf(q54)].options[3], q54.options[3])
+  assert.ok(!repaired.quality.failedGoTo.includes(54))
+})
+
+test('2015 P1 Q18: "Identify the correct variation(s)" graphs become the options; filled crops drop the stem copies', () => {
+  const q18 = at2015(18)
+  assert.match(q18.text, /with \$\\lambda\$ and \$1 \/ \\lambda\$\.$/)
+  for (const o of q18.options) assert.match(o, /cdn\.mathpix\.com/)
+  const doubled = {
+    ...q18,
+    text: `${q18.text}\n${q18.options.join('\n')}`,
+    options: [1, 2, 3, 4].map((k) => crop2015(10, `997408ab3f3f8c1${k}`)),
+    adminEdited: true,
+    editSource: 'auto_compare',
+  }
+  assert.equal(stemRepeatsOptionPictures(doubled), q18.text)
+  const questions = gridItems2015.map((q) => (q === q18 ? doubled : q))
+  assert.ok(localOfficialPyqQualityCheck(paper2015(questions)).failedGoTo.includes(18), 'stem copies are flagged')
+  const repaired = repairOfficialPyqUntilQuality(paper2015(questions))
+  const fixed = repaired.paper.questions[gridItems2015.indexOf(q18)]
+  assert.equal(fixed.text, q18.text)
+  assert.deepEqual(fixed.options, doubled.options)
+  assert.ok(!repaired.quality.failedGoTo.includes(18))
+})
 if (failed) {
   console.error(`\n${failed} recurrence test(s) failed`)
   process.exit(1)

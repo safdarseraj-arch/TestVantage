@@ -5,6 +5,8 @@
  * Read that key, then cut the boxes out so they never land in a stem or an option.
  */
 
+import { isMatrixGridCard, parseMatrixGridAnswer } from './matrixGridPyq.js'
+
 // Two boxes can share a line ("Ans for Q.3: (D) Ans for Q.4: (A)"), and a box can accept
 // either of two answers ("Ans for Q.14: \{(C)\} or \{(C) and (D)\}") — both 2017 P2.
 const EITHER = String.raw`\\\{[^{}\n]*?\\\}`
@@ -44,9 +46,48 @@ export function stripAwardedToAllNotes(raw) {
     .replace(new RegExp(String.raw`^[ \t]*${EITHER}(?:\s*or\s*${EITHER})+[ \t]*$`, 'gim'), '')
 }
 
+const TABULAR_TOKEN_RE = /\\(begin|end)\{tabular\}/g
+const OPTION_COMBO_CELLS_RE =
+  /^(?:\(\s*[A-D]\s*\)(?:\s*(?:,|and|or|&)\s*\(\s*[A-D]\s*\))*\s*)+$/i
+
+/**
+ * Answer-key copies print a small table of option letters ("(A) and (C)") under each page's
+ * questions; inside a nested option list it would otherwise stick to the last option.
+ * @param {string} text
+ */
+function stripOptionLetterTables(text) {
+  let out = ''
+  let from = 0
+  let depth = 0
+  let start = -1
+  for (const m of String(text).matchAll(TABULAR_TOKEN_RE)) {
+    if (m[1] === 'begin') {
+      if (depth === 0) start = m.index
+      depth += 1
+      continue
+    }
+    if (depth === 0) continue
+    depth -= 1
+    if (depth > 0) continue
+    const end = m.index + m[0].length
+    const cells = text
+      .slice(start, end)
+      .replace(/\\(?:begin|end)\{tabular\}(?:\[[a-z]\])?(?:\{[^{}]*\})?/g, ' ')
+      .replace(/\\multicolumn\{[^{}]*\}\{[^{}]*\}\{([^{}]*)\}/g, ' $1 ')
+      .replace(/\\hline|\\\\|&/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (cells && OPTION_COMBO_CELLS_RE.test(cells)) {
+      out += text.slice(from, start)
+      from = end
+    }
+  }
+  return out + text.slice(from)
+}
+
 /** @param {unknown} raw */
 export function stripPrintedAnswerBoxes(raw) {
-  let t = stripAwardedToAllNotes(raw)
+  let t = stripOptionLetterTables(stripAwardedToAllNotes(raw))
   if (!/\bAns\s+for\s+Q\s*\.?\s*\d/i.test(t) && !new RegExp(HEADING, 'i').test(t)) return t
   t = t
     .replace(ENTRY_RE, '')
@@ -111,6 +152,11 @@ export function applyPrintedAnswerKey(questions, key) {
   if (new Set(nums).size !== nums.length) return questions
   return questions.map((q) => {
     const n = printed(q)
+    if (isMatrixGridCard(q)) {
+      // A grid key ("(A) Matches to (P) and (S)") is read with the grid itself; letters are no grid answer.
+      const grid = key.has(n) ? parseMatrixGridAnswer(key.get(n), q) : null
+      return grid ? { ...q, matrixAnswerKey: grid, answerSource: 'from_paper' } : q
+    }
     const fields = key.has(n) ? printedAnswerFields(key.get(n), String(q?.questionType ?? '')) : null
     const next = { ...q }
     delete next.correctIndex

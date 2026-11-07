@@ -23,6 +23,7 @@ import {
 } from './extendTruncatedStem.js'
 import { unwrapReactionStepTables } from './latexTabularDisplay.js'
 import { enrichMatchListsFromOcr } from './restoreMatchListsOcr.js'
+import { isMatrixGridCard } from './matrixGridPyq.js'
 import { repairScanStructureCodes } from './smilesDisplay.js'
 import { restoreStructureLabels } from './structureLabels.js'
 import {
@@ -117,6 +118,7 @@ function mathBreakWindow(stem, source) {
  * @param {unknown} source
  */
 export function applyStoredOcrCardFixes(q, source) {
+  if (isMatrixGridCard(q)) return q
   const window = questionScanWindow(q?.text, source)
   const optionWindow = optionRowsWindow(q?.text, source)
   const scanText = repairScanStructureCodes(

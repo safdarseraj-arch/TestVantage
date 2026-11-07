@@ -3,12 +3,15 @@ import {
   FACT_SUBJECTS,
   FACT_TYPES,
   adminFactsMatchingScan,
+  defaultListSizesFor,
   defaultOptionsFor,
   draftAdminFacts,
   emptyFactRow,
   subjectLabel,
+  typeHasNoOptions,
   validateAdminFacts,
 } from '../utils/officialPyqAdminFacts.js'
+import { MATRIX_GRID_FACT_TYPE } from '../utils/matrixGridPyq.js'
 import {
   getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
@@ -66,15 +69,15 @@ function SectionRows({ block, title, onChange, disabled }) {
             <th>To Q</th>
             <th>Type</th>
             <th>Options</th>
-            <th>List-I items</th>
-            <th>List-II items</th>
+            <th>List-I / Column I items</th>
+            <th>List-II / Column II items</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {rows.map((r, i) => {
-            const noOptions = r.type === 'integer' || r.type === 'numerical'
-            const isMatch = r.type === 'matrix_match'
+            const noOptions = typeHasNoOptions(r.type)
+            const isMatch = r.type === 'matrix_match' || r.type === MATRIX_GRID_FACT_TYPE
             return (
               <tr key={i}>
                 <td>{i + 1}</td>
@@ -99,9 +102,16 @@ function SectionRows({ block, title, onChange, disabled }) {
                 <td>
                   <select
                     value={r.type}
-                    onChange={(e) =>
-                      setRow(i, { type: e.target.value, options: defaultOptionsFor(e.target.value) })
-                    }
+                    onChange={(e) => {
+                      const type = e.target.value
+                      const sizes = defaultListSizesFor(type)
+                      setRow(i, {
+                        type,
+                        options: defaultOptionsFor(type),
+                        listI: sizes.listI || r.listI,
+                        listII: sizes.listII || r.listII,
+                      })
+                    }}
                     aria-label={`Section ${i + 1} type`}
                   >
                     {FACT_TYPES.map((t) => (

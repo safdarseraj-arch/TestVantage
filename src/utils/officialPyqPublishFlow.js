@@ -12,6 +12,7 @@
 import { classifiedIdPrefix, nextClassifiedSequence } from './classifiedQuestionId.js'
 import { pyqExamLetter, pyqId, pyqYearDigits } from './questionId.js'
 import { loadImportedPyqs, saveImportedPyqs } from './pyqStore.js'
+import { isMatrixGridCard } from './matrixGridPyq.js'
 import { loadQuestionBank, saveQuestionBank } from './questionBank.js'
 import {
   officialPyqPublishSittingKey,
@@ -234,6 +235,7 @@ export function pickOfficialPyqFinalId(paper, card, index, ctx) {
 
 /** @param {any} q */
 function hasAnswer(q) {
+  if (isMatrixGridCard(q)) return Boolean(q.matrixAnswerKey && Object.keys(q.matrixAnswerKey).length)
   if (Array.isArray(q?.correctIndices) && q.correctIndices.length) return true
   return [q?.correctIndex, q?.correctInteger, q?.correctNumerical].some((v) => v != null && v !== '')
 }

@@ -11,6 +11,7 @@ import { HYBRID_FILL_PART_SIZE, fillPaperQuestionByQuestion } from './officialPy
 import { getOfficialPyqPendingPaper, officialPyqCardIsAdminEdited } from './officialPyqPendingStore.js'
 import { applyOfficialPyqPublishedMeta } from './officialPyqPublishedMeta.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
+import { gridColLabels, isMatrixGridCard } from './matrixGridPyq.js'
 
 export const HYBRID_FILL_NEEDS_APPROVAL =
   'Hybrid AI fills tags, answers, and solutions only on an Approved paper. Approve it first; if it is published, Unpublish it first.'
@@ -18,8 +19,23 @@ export const HYBRID_FILL_NEEDS_APPROVAL =
 /** Answers and solutions Hybrid AI must leave alone: printed on the paper or typed by an admin. */
 const KEPT_SOURCES = new Set(['from_paper', 'manual'])
 
-/** Stored answer as Hybrid AI reads it: letter(s) or the number. */
+/** "A-R; B-P,S" for a grid card's key ('' when a row is blank). @param {any} question @param {unknown} [key] */
+export function gridAnswerText(question, key = question?.matrixAnswerKey) {
+  const rows = Array.isArray(question?.matrixRows) ? question.matrixRows.length : 0
+  const labels = gridColLabels(question)
+  const map = key && typeof key === 'object' ? /** @type {Record<string, unknown>} */ (key) : {}
+  const parts = []
+  for (let r = 0; r < rows; r += 1) {
+    const cols = (Array.isArray(map[r]) ? map[r] : []).map(Number).filter(Number.isInteger)
+    if (!cols.length) return ''
+    parts.push(`${String.fromCharCode(65 + r)}-${[...new Set(cols)].sort((a, b) => a - b).map((c) => labels[c]).join(',')}`)
+  }
+  return parts.join('; ')
+}
+
+/** Stored answer as Hybrid AI reads it: letter(s), the number, or a grid "A-R; B-P,S". */
 export function currentAnswerText(question) {
+  if (isMatrixGridCard(question)) return gridAnswerText(question)
   if (Array.isArray(question?.correctIndices) && question.correctIndices.length) {
     return question.correctIndices.map((n) => String.fromCharCode(65 + Number(n))).join(',')
   }
@@ -31,21 +47,37 @@ export function currentAnswerText(question) {
   return ''
 }
 
+/** Stem plus both lists, so the model sees what each row and column says. @param {any} question */
+function gridQuestionText(question) {
+  const labels = gridColLabels(question)
+  const rows = (question.matrixRows || []).map((r, i) => `(${String.fromCharCode(65 + i)}) ${String(r ?? '')}`)
+  const cols = (question.matrixCols || []).map((c, j) => `(${labels[j]}) ${String(c ?? '')}`)
+  return [
+    String(question?.text ?? question?.stem ?? ''),
+    'Column I:',
+    ...rows,
+    'Column II:',
+    ...cols,
+    'Each Column I row matches ONE OR MORE Column II entries.',
+  ].join('\n')
+}
+
 /**
  * The /official-pyq/fill-tags body for one card.
  * @param {any} question @param {string} [paperExam]
  */
 export function hybridFillRequestForQuestion(question, paperExam = '') {
   const examId = Array.isArray(question?.examIds) && question.examIds.length ? question.examIds[0] : paperExam
+  const grid = isMatrixGridCard(question)
   return {
-    question_text: String(question?.text ?? question?.stem ?? ''),
-    options: (Array.isArray(question?.options) ? question.options : []).map((opt) => String(opt ?? '')),
+    question_text: grid ? gridQuestionText(question) : String(question?.text ?? question?.stem ?? ''),
+    options: grid ? [] : (Array.isArray(question?.options) ? question.options : []).map((opt) => String(opt ?? '')),
     subject: question?.subject ? mapSubjectSlugToHybridLabel(question.subject, question.chapter || question.section) : '',
     unit: String(question?.section || question?.unit || ''),
     section: String(question?.section || question?.unit || ''),
     chapter: String(question?.chapter || ''),
     topic: question?.topic ? String(question.topic) : '',
-    question_type: question?.questionType ? String(question.questionType) : '',
+    question_type: grid ? 'matrix_match_grid' : question?.questionType ? String(question.questionType) : '',
     exam: examId ? mapExamSlugToHybridLabel(examId) : '',
     toughness_level: question?.toughnessLevel != null ? String(question.toughnessLevel) : '',
     source: question?.source ? String(question.source) : '',
@@ -80,7 +112,15 @@ export function applyHybridPatchToCard(card, patch) {
   }
   if (Array.isArray(patch.examIds) && patch.examIds.length) next.examIds = patch.examIds
   const handEdited = officialPyqCardIsAdminEdited(card)
-  const answer = currentAnswerText(patch)
+  if (isMatrixGridCard(card)) {
+    const answer = patch.matrixAnswerKey ? gridAnswerText(card, patch.matrixAnswerKey) : ''
+    if (!handEdited && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
+      next.matrixAnswerKey = patch.matrixAnswerKey
+      delete next.matrixAnswerAlternates
+      next.answerSource = 'hybrid_ai'
+    }
+  }
+  const answer = isMatrixGridCard(card) ? '' : currentAnswerText(patch)
   if (!handEdited && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
     next.correctIndex = patch.correctIndex
     next.correctIndices = patch.correctIndices
@@ -113,6 +153,9 @@ function publishedPatchFromCard(card) {
     correctIndices: card.correctIndices,
     correctInteger: card.correctInteger,
     correctNumerical: card.correctNumerical,
+    ...(isMatrixGridCard(card)
+      ? { matrixAnswerKey: card.matrixAnswerKey, matrixAnswerAlternates: card.matrixAnswerAlternates }
+      : {}),
     answerSource: card.answerSource,
     solutionSource: card.solutionSource,
   }

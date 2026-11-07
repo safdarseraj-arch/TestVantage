@@ -14,6 +14,7 @@
  */
 
 import { findFirstOptionsBlockStart } from './mcqOptionMarkers.js'
+import { isMatrixGridCard, keepMatrixGridCards } from './matrixGridPyq.js'
 import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
 import { extractLatexItemizeMcq, extractLatexTabularMcq } from './mathpixQuestionSplit.js'
 import { hasOriginalPageCrop, isOriginalCropUrl, restoreMissingOptionGridGraphs } from './mathpixMedia.js'
@@ -2134,7 +2135,7 @@ function cardNeedsFullHeal(q, text, passage, options, source, map) {
  * @param {unknown} source
  */
 export function healUploadQuestionCard(q, source, map) {
-  if (!q || typeof q !== 'object' || q.placeholder === true) return q
+  if (!q || typeof q !== 'object' || q.placeholder === true || isMatrixGridCard(q)) return q
   q = restoreLabelledFigureOptions(q, source)
   const textFixed = repairScanStructureCodes(restoreDroppedMsOnGivenLine(String(q.text ?? '')))
   const passageFixed = restoreDroppedMsOnGivenLine(String(q.passageText ?? ''))
@@ -2932,11 +2933,13 @@ export function prepareOfficialPyqHealContext(paper, opts = {}) {
     rebuilt,
     qs,
     workingQs,
+    gridCards: (rebuilt || workingQs).filter(isMatrixGridCard),
   }
 }
 
 /** One card: restore List-I, wrap math, recover options. Never invents rows. */
 export function extendOfficialPyqHealCard(q, source) {
+  if (isMatrixGridCard(q)) return q
   let text = restoreMissingListIFromSource(
     stripPageBreakAndSectionGlue(extendStemFromSource(q.text, source)),
     q.options,
@@ -3000,9 +3003,10 @@ export function finalizeOfficialPyqHealCards(extended, ctx, opts = {}) {
     ctx.pickTarget,
     ctx.minKeep,
   )
-  const healed = opts.skipGuards
+  const guarded = opts.skipGuards
     ? assignUniqueOfficialPyqNumbers(picked || final)
     : applyUploadQualityGuards(picked || final, ctx.source)
+  const healed = keepMatrixGridCards(ctx.gridCards, guarded)
   if (!ctx.reserved.length) return healed
   return mergeReservedOfficialPyqSlots(ctx.reserved, healed)
 }

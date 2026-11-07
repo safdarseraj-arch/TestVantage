@@ -19,6 +19,7 @@ import {
 import { officialPyqCardAsShown } from './officialPyqCardAsShown.js'
 import { ORIGINAL_CROP_URL_PREFIX, consumeIncludeGraphics, isOriginalCropUrl } from './mathpixMedia.js'
 import { paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
+import { gridColLabels, gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.js'
 
 export const OFFICIAL_PYQ_CARD_CHANGED_EVENT = 'testvantage:official-pyq-card-changed'
 
@@ -37,6 +38,10 @@ const SNAPSHOT_FIELDS = [
   'correctIndices',
   'correctInteger',
   'correctNumerical',
+  'matrixRows',
+  'matrixCols',
+  'matrixAnswerKey',
+  'matrixAnswerAlternates',
   'answerSource',
   'questionImage',
   'adminEdited',
@@ -208,13 +213,45 @@ export function officialPyqCompareHasSuggestion(compare) {
 
 /** @param {any} card */
 export function officialPyqDraftFromCard(card) {
-  return {
+  const draft = {
     text: String(card?.text ?? card?.stem ?? ''),
     passageText: String(card?.passageText ?? ''),
     options: Array.isArray(card?.options) ? card.options.map((o) => String(o ?? '')) : [],
     answerKey: formatOfficialPyqAnswerKey(card),
     removeFigure: false,
   }
+  if (!isMatrixGridCard(card)) return draft
+  return {
+    ...draft,
+    options: [],
+    grid: true,
+    matrixRows: (card.matrixRows || []).map((r) => String(r ?? '')),
+    matrixCols: (card.matrixCols || []).map((c) => String(c ?? '')),
+    matrixAnswerKey: gridKeyCopy(card.matrixAnswerKey),
+  }
+}
+
+/** @param {unknown} key */
+function gridKeyCopy(key) {
+  /** @type {Record<number, number[]>} */
+  const out = {}
+  if (!key || typeof key !== 'object') return out
+  for (const [row, cols] of Object.entries(key)) {
+    const list = (Array.isArray(cols) ? cols : [cols]).map(Number).filter(Number.isInteger)
+    if (list.length) out[Number(row)] = [...new Set(list)].sort((a, b) => a - b)
+  }
+  return out
+}
+
+/** "A-R; B-P,S" for a grid key. @param {any} q @param {unknown} key */
+function gridKeyText(q, key) {
+  const labels = gridColLabels(q)
+  const map = gridKeyCopy(key)
+  return Object.keys(map)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((r) => `${String.fromCharCode(65 + r)}-${map[r].map((c) => labels[c] ?? String(c + 1)).join(',')}`)
+    .join('; ')
 }
 
 /** A text-only correction must not lose a picture the card already shows. */
@@ -293,6 +330,7 @@ export function officialPyqDraftFromSuggestion(card, compare) {
 /** @param {any} q */
 export function officialPyqCardHasAnswerKey(q) {
   if (!q || typeof q !== 'object') return false
+  if (isMatrixGridCard(q)) return Object.keys(gridKeyCopy(q.matrixAnswerKey)).length > 0
   if (Array.isArray(q.correctIndices) && q.correctIndices.length) return true
   return [q.correctIndex, q.correctInteger, q.correctNumerical].some(
     (v) => v != null && String(v).trim() !== '' && Number.isFinite(Number(v)),
@@ -302,6 +340,7 @@ export function officialPyqCardHasAnswerKey(q) {
 /** @param {any} q */
 export function formatOfficialPyqAnswerKey(q) {
   if (!q || typeof q !== 'object') return ''
+  if (isMatrixGridCard(q)) return gridKeyText(q, q.matrixAnswerKey)
   if (Array.isArray(q.correctIndices) && q.correctIndices.length) {
     return q.correctIndices.map((i) => LETTERS[Number(i)] ?? String(i)).join(', ')
   }
@@ -377,6 +416,15 @@ export function applyOfficialPyqCardDraft(card, draft) {
   const next = { ...base, text: String(draft.text ?? '') }
   if (Object.prototype.hasOwnProperty.call(base, 'stem')) next.stem = next.text
   if (Array.isArray(draft.options)) next.options = draft.options.map((o) => String(o ?? ''))
+  if (draft.grid && isMatrixGridCard(base)) {
+    next.options = []
+    if (Array.isArray(draft.matrixRows)) next.matrixRows = draft.matrixRows.map((r) => String(r ?? ''))
+    if (Array.isArray(draft.matrixCols)) {
+      next.matrixCols = draft.matrixCols.map((c) => String(c ?? ''))
+      next.matrixColCount = next.matrixCols.length
+    }
+    if (draft.matrixAnswerKey) next.matrixAnswerKey = gridKeyCopy(draft.matrixAnswerKey)
+  }
   if (draft.removeFigure) delete next.questionImage
   if (typeof draft.passageText === 'string') {
     const passage = draft.passageText.trim()
@@ -426,7 +474,16 @@ export function saveOfficialPyqCardEdit(paperId, index, draft) {
     }
   }
   let next = dropBlankNumericOptions(applyOfficialPyqCardDraft(card, draft))
-  if (officialPyqCardHasAnswerKey(card) || String(draft.answerKey ?? '').trim()) {
+  if (isMatrixGridCard(card)) {
+    const rows = (next.matrixRows || []).filter((r) => String(r ?? '').trim()).length
+    const cols = (next.matrixCols || []).filter((c) => String(c ?? '').trim()).length
+    if (!rows || !cols) return { ok: false, error: 'Column I and Column II each need at least one row.' }
+    if (gridKeyText(next, next.matrixAnswerKey) !== gridKeyText(card, card.matrixAnswerKey)) {
+      next.answerSource = 'admin_edit'
+      next.matrixAnswerAlternates = undefined
+      if (!Object.keys(next.matrixAnswerKey || {}).length) next.matrixAnswerKey = undefined
+    }
+  } else if (officialPyqCardHasAnswerKey(card) || String(draft.answerKey ?? '').trim()) {
     const parsed = parseOfficialPyqAnswerKey(draft.answerKey ?? '', card)
     if (!parsed.ok) return parsed
     next = { ...next, ...parsed.patch }
@@ -663,7 +720,10 @@ export function restoreOfficialPyqCardFromScan(paperId, index) {
     ...card,
     text: String(item.text),
     options: Array.isArray(item.options) ? item.options.map((o) => String(o ?? '')) : [],
+    ...(isMatrixGridCard(item) || isMatrixGridCard(card) ? gridFieldsOf(item) : {}),
   })
+  if (isMatrixGridCard(card) && !isMatrixGridCard(item)) delete next.matrixResponseMode
+  for (const field of Object.keys(next)) if (next[field] === undefined) delete next[field]
   if (Object.prototype.hasOwnProperty.call(card, 'stem')) next.stem = next.text
   if (card.passageSource === 'admin_edit') {
     if (String(item.passageText ?? '').trim()) next.passageText = String(item.passageText)

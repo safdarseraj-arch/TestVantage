@@ -23,12 +23,24 @@ import { givenLineDroppedUnit, inlineSingleSymbolDisplayMath, restoreDroppedMsOn
 import { officialPyqContentReviewMessages, officialPyqMissingListMessage } from './officialPyqReviewFlags.js'
 import { reviewOfficialPyqCards } from './officialPyqUnifiedCheck.js'
 import { enforceAdminFactsOnQuestions, factsForPaper } from './officialPyqAdminFacts.js'
-import { SCRAP_OPTION_RE, restoreLabelledFigureOptions } from './labelledFigureOptions.js'
+import {
+  SCRAP_OPTION_RE,
+  restoreLabelledFigureOptions,
+  stemRepeatsOptionPictures,
+  trimOptionLetterTail,
+} from './labelledFigureOptions.js'
+import { isMatrixGridCard } from './matrixGridPyq.js'
 
-/** The preview shows the saved options, so a saved "," / "and" option fails even when the cleaned view looks right. */
+/**
+ * The preview shows the saved card, so saved junk fails even when the cleaned view looks right:
+ * a "," / "and" option, printed answer letters glued to an option, or the option pictures repeated in the stem.
+ */
 function hasScrapOption(q) {
-  return (Array.isArray(q?.options) ? q.options : []).some(
-    (opt) => String(opt ?? '').trim() && SCRAP_OPTION_RE.test(String(opt)),
+  const options = Array.isArray(q?.options) ? q.options : []
+  return (
+    options.some((opt) => String(opt ?? '').trim() && SCRAP_OPTION_RE.test(String(opt))) ||
+    options.some((opt) => trimOptionLetterTail(opt) !== String(opt ?? '')) ||
+    Boolean(stemRepeatsOptionPictures(q))
   )
 }
 
@@ -72,9 +84,13 @@ export function localQualityListMark(quality) {
 
 function proseWords(text) {
   return String(text ?? '')
+    .replace(/<smiles\b[\s\S]*?<\/smiles>/gi, ' ')
+    .replace(/\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/(?:https?:\/\/|\/api\/)[^\s)}"']+/gi, ' ')
     .replace(/\$\$[\s\S]*?\$\$/g, ' ')
     .replace(/\$[^$\n]*\$/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<\/?[a-zA-Z][^<>]*>/g, ' ')
     .replace(/\\[a-zA-Z]+/g, ' ')
     .replace(/[^A-Za-z0-9 ]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -130,6 +146,14 @@ function cardFailsLocalQuality(card, ocr) {
   return false
 }
 
+/** A grid card has no options and keeps its lists in matrixRows / matrixCols, not in the stem. */
+function gridCardFailsLocalQuality(card) {
+  const parts = [card?.text, ...(card?.matrixRows || []), ...(card?.matrixCols || [])].map((p) => String(p ?? ''))
+  if (parts.some((part) => CHECKER_NOTE.test(part))) return true
+  if (parts.some((part) => visibleLatexSourceHits(part).length > 0)) return true
+  return stemLooksIncompleteOnDisplay(String(card?.text ?? ''), [])
+}
+
 /** The per-card display checks and the unified check both count; neither result is dropped. */
 function mergeQualityResults(localFailed, review) {
   const extra = localFailed.filter((n) => !review.failedGoTo.includes(n))
@@ -150,6 +174,10 @@ export function localOfficialPyqQualityCheck(paper) {
   const failedGoTo = []
   questions.forEach((q, index) => {
     if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
+    if (isMatrixGridCard(q)) {
+      if (gridCardFailsLocalQuality(q)) failedGoTo.push(index + 1)
+      return
+    }
     const rawBits = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])]
     if (rawBits.some((part) => CHECKER_NOTE.test(String(part ?? ''))) || hasScrapOption(q)) {
       failedGoTo.push(index + 1)
@@ -210,7 +238,7 @@ function cardSignature(q) {
 }
 
 function repairFailingCard(q, ocr) {
-  if (q?.adminEdited === true) return q
+  if (q?.adminEdited === true || isMatrixGridCard(q)) return q
   let next = { ...applyStoredOcrCardFixes(q, ocr) }
   const peeled = peelPrintedAnswerFromStem(stripCheckerSentences(String(q?.text ?? '')))
   if (peeled !== String(q?.text ?? '')) next.text = peeled
@@ -324,6 +352,7 @@ function cleanCard(q, ocr) {
 }
 
 function adoptKnownFixes(q, shown, ocr) {
+  if (isMatrixGridCard(q)) return q
   let next = q
   const unwrapped = String(q?.text ?? '').replace(/\$\$\s*(?=\\includegraphics\b)/g, '')
   if (unwrapped !== String(q?.text ?? '')) next = { ...next, text: unwrapped }
@@ -341,6 +370,9 @@ function adoptKnownFixes(q, shown, ocr) {
     !inventedProse(shown.options.join('\n'), ocr)
   ) {
     next = { ...next, options: shown.options.map((opt) => String(opt ?? '')) }
+  }
+  if (Array.isArray(next.options) && next.options.some((opt) => trimOptionLetterTail(opt) !== String(opt ?? ''))) {
+    next = { ...next, options: next.options.map(trimOptionLetterTail) }
   }
   const figured = restoreLabelledFigureOptions(next, ocr)
   const fixed = applyStoredOcrCardFixes(figured, ocr)
@@ -390,6 +422,10 @@ export function repairOfficialPyqUntilQuality(paper) {
     const failed = []
     questions.forEach((q, index) => {
       if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
+      if (isMatrixGridCard(q)) {
+        if (gridCardFailsLocalQuality(q)) failed.push(index + 1)
+        return
+      }
       const rawBits = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])]
       if (rawBits.some((part) => CHECKER_NOTE.test(String(part ?? '')))) {
         failed.push(index + 1)

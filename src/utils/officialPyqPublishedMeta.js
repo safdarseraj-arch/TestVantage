@@ -39,10 +39,10 @@ const BODY_KEYS = [
   'imported',
   'matrixRows',
   'matrixCols',
-  'matrixAnswerKey',
   'matrixColLabels',
   'matrixColCount',
   'matrixResponseMode',
+  'matrixMarking',
 ]
 
 /** @param {unknown} id */
@@ -94,6 +94,14 @@ function applyAnswer(next, patch) {
   const solution = String(patch.solution ?? '')
   if (solution.trim()) next.solution = solution
   else delete next.solution
+
+  // A patch without the grid fields (tags form) leaves the stored grid answer as it is.
+  for (const field of ['matrixAnswerKey', 'matrixAnswerAlternates']) {
+    if (!Object.prototype.hasOwnProperty.call(patch, field)) continue
+    const value = patch[field]
+    if (value && typeof value === 'object' && Object.keys(value).length) next[field] = value
+    else delete next[field]
+  }
 }
 
 /**

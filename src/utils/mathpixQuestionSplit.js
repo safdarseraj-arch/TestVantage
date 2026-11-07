@@ -35,6 +35,7 @@ import {
 import { stripTrailingPyqSectionHeader } from './bulkExtractClean.js'
 import { shapeOfficialPyqDrafts } from './officialPyqPaperFacts.js'
 import { stripAwardedToAllNotes, stripPrintedAnswerBoxes } from './printedAnswerKey.js'
+import { applyMatrixGridQuestions } from './matrixGridPyq.js'
 
 function guessQuestionType(text, optionsFound) {
   if ((optionsFound ?? 0) >= 2) return 'single_correct'
@@ -1734,7 +1735,7 @@ export function paperItemsFromMathpixOcr(raw, opts = {}) {
     ? opts.sectionMap
     : parsePaperSectionMap(text)
   const { drafts } = mathpixSplitToBankDrafts(text, { ...opts, sectionMap })
-  return dedupePaperItemsByNumber(drafts)
+  return applyMatrixGridQuestions(dedupePaperItemsByNumber(drafts), text)
 }
 
 /**

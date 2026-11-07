@@ -4,6 +4,13 @@ import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import { looksLikeMatchingListStem, parseMatchingListForDisplay } from './parseMatchingListDisplay.js'
 import { missingStructureLabels } from './structureLabels.js'
 import { SCRAP_OPTION_RE } from './labelledFigureOptions.js'
+import {
+  MATRIX_GRID_DEFAULT_COLS,
+  MATRIX_GRID_DEFAULT_ROWS,
+  MATRIX_GRID_FACT_TYPE,
+  factTypeOfCard,
+  isMatrixGridCard,
+} from './matrixGridPyq.js'
 
 const OPENING = /^Then\b/
 
@@ -27,7 +34,40 @@ function optionKey(text) {
 }
 
 function cardBlob(q) {
-  return [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])].join('\n')
+  return [
+    q?.text,
+    q?.passageText,
+    ...(Array.isArray(q?.options) ? q.options : []),
+    ...(Array.isArray(q?.matrixRows) ? q.matrixRows : []),
+    ...(Array.isArray(q?.matrixCols) ? q.matrixCols : []),
+  ].join('\n')
+}
+
+/**
+ * A grid card needs both lists at the size the facts give (Column I 4, Column II 5 by
+ * default) and no options: its answer is a grid of ticks.
+ */
+function matrixGridReasons(q, size) {
+  const reasons = []
+  const rows = (Array.isArray(q?.matrixRows) ? q.matrixRows : []).filter((r) => String(r ?? '').trim()).length
+  const cols = (Array.isArray(q?.matrixCols) ? q.matrixCols : []).filter((c) => String(c ?? '').trim()).length
+  if (!rows || !cols) reasons.push('Column I or Column II is missing')
+  else if (rows !== size.rows || cols !== size.cols) {
+    reasons.push(`Column I should have ${size.rows} rows and Column II ${size.cols} rows`)
+  }
+  if (filled(q?.options).length) reasons.push('A grid question should have no options')
+  return reasons
+}
+
+function gridSizeFromFacts(factCard, slot) {
+  if (slot?.type === MATRIX_GRID_FACT_TYPE && slot.listI > 0 && slot.listII > 0) {
+    return { rows: slot.listI, cols: slot.listII }
+  }
+  const read = (factCard?.sections || []).find((s) => s.type === MATRIX_GRID_FACT_TYPE && s.listI > 0)
+  return {
+    rows: read?.listI || MATRIX_GRID_DEFAULT_ROWS,
+    cols: read?.listII || MATRIX_GRID_DEFAULT_COLS,
+  }
 }
 
 /** An image, a saved question image, or a diagram the display draws from the text. */
@@ -133,7 +173,7 @@ function adminFactReasons(q, slot) {
   if (slot.subject && String(q?.subject || '') !== slot.subject) {
     reasons.push('The subject does not match the paper facts')
   }
-  if (slot.type && String(q?.questionType || '') !== slot.type) {
+  if (slot.type && factTypeOfCard(q) !== slot.type) {
     reasons.push('The question type does not match the paper facts')
   }
   if (MCQ_TYPES.has(slot.type) && slot.options > 0 && opts.length !== slot.options) {
@@ -222,6 +262,20 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     const opts = filled(q.options)
     const type = String(q.questionType || '')
     const reasons = []
+    const slot = slotsLineUp ? adminSlots[index] : null
+    if (isMatrixGridCard(q)) {
+      for (const part of [text, passage, ...(q.matrixRows || []), ...(q.matrixCols || [])]) {
+        const draw = mathDrawFailure(String(part ?? ''))
+        if (draw) {
+          reasons.push(draw === 'draw failure' ? 'The math did not draw' : draw === 'leftover TeX' ? 'TeX is still showing after drawing' : draw)
+          break
+        }
+      }
+      reasons.push(...matrixGridReasons(q, gridSizeFromFacts(factCard, slot)))
+      if (adminSlots) reasons.push(...adminFactReasons(q, slot))
+      if (reasons.length) fails.push({ n, reason: reasons[0] })
+      return
+    }
     for (const part of [text, passage, ...opts]) {
       const draw = mathDrawFailure(part)
       if (draw) {
@@ -255,7 +309,7 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     }
     const answer = answerNotInOptions(q)
     if (answer) reasons.push(answer)
-    if (adminSlots) reasons.push(...adminFactReasons(q, slotsLineUp ? adminSlots[index] : null))
+    if (adminSlots) reasons.push(...adminFactReasons(q, slot))
     if (reasons.length) fails.push({ n, reason: reasons[0] })
   })
   const messages = cardsOnly ? [] : paperLevelMessages(list, factCard, adminSlots)

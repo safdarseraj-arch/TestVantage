@@ -3,6 +3,22 @@
  */
 import { CANONICAL_MSQ } from './polishMcqExtract.js'
 
+const VEC = (l) => `(?:\\\\vec\\{${l}\\}|\\b${l}\\b)`
+const CROSS = '\\s*(?:\\\\times|×|\\bx\\b)\\s*'
+const B_CROSS_C = new RegExp(`${VEC('b')}${CROSS}${VEC('c')}`, 'i')
+const A_DOT_B = new RegExp(`${VEC('a')}\\s*(?:\\\\cdot|·|\\.)\\s*${VEC('b')}`, 'i')
+
+/**
+ * Only the "[a×b b×c a] = (a·b)[a b c]" option: a box product with b×c and a dot product.
+ * @param {string} b
+ */
+function isScalarTripleIdentity(b) {
+  const boxed = /\[\s*a\s*x\s*b\s*b\s*x\s*c\s*a\s*\]/i.test(b)
+  return (
+    (/\[/.test(b) || /scalar triple/i.test(b)) && (boxed || B_CROSS_C.test(b)) && A_DOT_B.test(b)
+  )
+}
+
 /** @param {string} body @param {string} letter */
 export function matchOptionCanonical(body, letter) {
   const b = String(body ?? '').trim()
@@ -19,11 +35,7 @@ export function matchOptionCanonical(body, letter) {
   ) {
     return CANONICAL_MSQ.parallelogramB
   }
-  if (
-    L === 'C' &&
-    (/\\vec\{a\}.*\\times|scalar triple|\[.*\\times|×|\bx\s+b\b/i.test(b) &&
-      /\\vec\{b\}|\\vec\{c\}|\[.*\]/i.test(b))
-  ) {
+  if (L === 'C' && isScalarTripleIdentity(b)) {
     return CANONICAL_MSQ.scalarTripleC
   }
   if (L === 'D' && /projection/i.test(b) && (/\\frac\{1\}\{3\}|113|1\/3/i.test(b))) {

@@ -18,7 +18,8 @@ export function mathDrawFailure(text) {
   try {
     raw = prepareTextForMathTextDisplay(raw)
       .replace(/<annotation\b[\s\S]*?<\/annotation>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
+      // Real tags only: "H<0$$ ... $T_2>T_1$" is math, and eating it removed the $ signs.
+      .replace(/<\/?[a-zA-Z][^<>]*>/g, ' ')
   } catch {
     /* judge the stored text */
   }

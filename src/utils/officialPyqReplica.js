@@ -12,6 +12,7 @@ import { findDuplicateQuestions, normalizeStemForDuplicate } from './detectDupli
 import { assignAiSimilarChildId, parseSimilarVariantIndex } from './questionFamily.js'
 import { hasStableOfficialPyqQuestionId } from './officialPyqPublishedMeta.js'
 import { loadQuestionBank } from './questionBank.js'
+import { isMatrixGridCard, parseMatrixGridAnswer } from './matrixGridPyq.js'
 
 /** Default similar-paper run: easier, same, then the two harder papers. */
 export const REPLICA_DIFFICULTY_ORDER = [-1, 0, 1, 2]
@@ -212,6 +213,27 @@ export function publishedMetaPatchFromHybridFill(question, filled) {
   const toughnessLevel = keptText(f.toughness_level, q.toughnessLevel)
   const source = keptText(f.source, q.source)
   const solution = String(f.step_by_step_solution || '').trim() || String(q.solution || '')
+  if (isMatrixGridCard(q)) {
+    const key = String(f.correct_answer || '').trim() ? parseMatrixGridAnswer(f.correct_answer, q) : null
+    return {
+      questionId: q.id,
+      expectText: String(q.text ?? q.stem ?? ''),
+      subject,
+      section,
+      chapter,
+      topic,
+      questionType: String(q.questionType || ''),
+      examIds,
+      toughnessLevel,
+      source,
+      solution,
+      correctIndex: '',
+      correctIndices: [],
+      correctInteger: '',
+      correctNumerical: '',
+      ...(key ? { matrixAnswerKey: key } : {}),
+    }
+  }
   const mapped = String(f.correct_answer || '').trim() ? answerFieldsFromHybrid(f.correct_answer) : null
   let correctIndex = q.correctIndex ?? ''
   let correctIndices = Array.isArray(q.correctIndices) ? q.correctIndices : []

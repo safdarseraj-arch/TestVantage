@@ -1,0 +1,699 @@
+\section*{JEE (ADVANCED) 2015}
+
+Answer Keys for Paper 1
+(After considering feedback from public)
+
+\section*{PART I : PHYSICS}
+
+SECTION 1 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If the bubble corresponding to the answer is darkened
+\item[0] In all other cases
+\end{itemize}
+\item[Q.] 1 An infinitely long uniform line charge distribution of charge per unit length $\lambda$ lies parallel to the $y$-axis in the $y-z$ plane at $z=\frac{\sqrt{3}}{2} a$ (see figure). If the magnitude of the flux of the electric field through the rectangular surface $A B C D$ lying in the $x-y$ plane with its centre at the origin is $\frac{\lambda L}{n \varepsilon_{0}}\left(\varepsilon_{0}=\right.$ permittivity of free space), then the value of $n$ is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-02.jpg?height=654&width=772&top_left_y=1211&top_left_x=673)
+\item[Q.] 2 Consider a hydrogen atom with its electron in the $n^{\text {th }}$ orbital. An electromagnetic radiation of wavelength 90 nm is used to ionize the atom. If the kinetic energy of the ejected electron is 10.4 eV , then the value of $n$ is $(h c=1242 \mathrm{eV} \mathrm{nm})$
+\item[Q.] 3 A bullet is fired vertically upwards with velocity $v$ from the surface of a spherical planet. When it reaches its maximum height, its acceleration due to the planet's gravity is $1 / 4^{\text {th }}$ of its value at the surface of the planet. If the escape velocity from the planet is $v_{\text {esc }}=v \sqrt{N}$, then the value of $N$ is (ignore energy loss due to atmosphere)
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 4 Two identical uniform discs roll without slipping on two different surfaces $A B$ and $C D$ (see figure) starting at $A$ and $C$ with linear speeds $v_{1}$ and $v_{2}$, respectively, and always remain in contact with the surfaces. If they reach $B$ and $D$ with the same linear speed and $v_{1}=3 \mathrm{~m} / \mathrm{s}$, then $v_{2}$ in m/s is $\left(g=10 \mathrm{~m} / \mathrm{s}^{2}\right)$
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-03.jpg?height=825&width=1067&top_left_y=607&top_left_x=512)
+\item[Q.] 5 Two spherical stars $A$ and $B$ emit blackbody radiation. The radius of $A$ is 400 times that of $B$ and $A$ emits $10^{4}$ times the power emitted from $B$. The ratio $\left(\frac{\lambda_{A}}{\lambda_{B}}\right)$ of their wavelengths $\lambda_{A}$ and $\lambda_{B}$ at which the peaks occur in their respective radiation curves is
+\item[Q.] 6 A nuclear power plant supplying electrical power to a village uses a radioactive material of half life $T$ years as the fuel. The amount of fuel at the beginning is such that the total power requirement of the village is 12.5\% of the electrical power available from the plant at that time. If the plant is able to meet the total power needs of the village for a maximum period of $n T$ years, then the value of $n$ is
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 7 A Young's double slit interference arrangement with slits $S_{1}$ and $S_{2}$ is immersed in water (refractive index $=4 / 3$ ) as shown in the figure. The positions of maxima on the surface of water are given by $x^{2}=p^{2} m^{2} \lambda^{2}-d^{2}$, where $\lambda$ is the wavelength of light in air (refractive index $=1), 2 d$ is the separation between the slits and $m$ is an integer. The value of $p$ is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-04.jpg?height=600&width=1130&top_left_y=517&top_left_x=593)
+\item[Q.] 8 Consider a concave mirror and a convex lens (refractive index = 1.5) of focal length 10 cm each, separated by a distance of 50 cm in air (refractive index $=1$ ) as shown in the figure. An object is placed at a distance of 15 cm from the mirror. Its erect image formed by this combination has magnification $M_{1}$. When the set-up is kept in a medium of refractive index 7/6, the magnification becomes $M_{2}$. The magnitude $\left|\frac{M_{2}}{M_{1}}\right|$ is
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-04.jpg?height=355&width=1113&top_left_y=1448&top_left_x=430}
+
+\end{figure}
+
+\end{itemize}
+
+\section*{SECTION 2 (Maximum Marks: 40)}
+\begin{itemize}
+\item[-] This section contains TEN questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\item[Q.] 9 Consider a Vernier callipers in which each 1 cm on the main scale is divided into 8 equal divisions and a screw gauge with 100 divisions on its circular scale. In the Vernier callipers, 5 divisions of the Vernier scale coincide with 4 divisions on the main scale and in the screw gauge, one complete rotation of the circular scale moves it by two divisions on the linear scale. Then:
+\begin{itemize}
+\item[(A)] If the pitch of the screw gauge is twice the least count of the Vernier callipers, the least count of the screw gauge is 0.01 mm.
+\item[(B)] If the pitch of the screw gauge is twice the least count of the Vernier callipers, the least count of the screw gauge is 0.005 mm.
+\item[(C)] If the least count of the linear scale of the screw gauge is twice the least count of the Vernier callipers, the least count of the screw gauge is 0.01 mm.
+\item[(D)] If the least count of the linear scale of the screw gauge is twice the least count of the Vernier callipers, the least count of the screw gauge is 0.005 mm.
+\end{itemize}
+\item[Q.] 10 Planck's constant $h$, speed of light $c$ and gravitational constant $G$ are used to form a unit of length $L$ and a unit of mass $M$. Then the correct option(s) is(are)
+(A) $M \propto \sqrt{c}$
+(B) $M \propto \sqrt{G}$
+(C) $L \propto \sqrt{h}$
+(D) $L \propto \sqrt{G}$
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 11 Two independent harmonic oscillators of equal mass are oscillating about the origin with angular frequencies $\omega_{1}$ and $\omega_{2}$ and have total energies $E_{1}$ and $E_{2}$, respectively. The variations of their momenta $p$ with positions $x$ are shown in the figures. If $\frac{a}{b}=n^{2}$ and $\frac{a}{R}=n$, then the correct equation(s) is(are)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-06.jpg?height=410&width=522&top_left_y=635&top_left_x=485)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-06.jpg?height=409&width=521&top_left_y=634&top_left_x=1097)
+(A) $E_{1} \omega_{1}=E_{2} \omega_{2}$
+(B) $\frac{\omega_{2}}{\omega_{1}}=n^{2}$
+(C) $\omega_{1} \omega_{2}=n^{2}$
+(D) $\frac{E_{1}}{\omega_{1}}=\frac{E_{2}}{\omega_{2}}$
+\end{itemize}
+
+\section*{PHYSICS}
+\begin{itemize}
+\item[Q.] 12 A ring of mass $M$ and radius $R$ is rotating with angular speed $\omega$ about a fixed vertical axis passing through its centre O with two point masses each of mass $\frac{M}{8}$ at rest at O. These masses can move radially outwards along two massless rods fixed on the ring as shown in the figure. At some instant the angular speed of the system is $\frac{8}{9} \omega$ and one of the masses is at a distance of $\frac{3}{5} R$ from O. At this instant the distance of the other mass from O is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-07.jpg?height=489&width=355&top_left_y=707&top_left_x=908)
+(A) $\frac{2}{3} R$
+(B) $\frac{1}{3} R$
+(C) $\frac{3}{5} R$
+(D) $\frac{4}{5} R$
+\end{itemize}
+
+\section*{}
+\begin{itemize}
+\item[Q.] 13 The figures below depict two situations in which two infinitely long static line charges of constant positive line charge density $\lambda$ are kept parallel to each other. In their resulting electric field, point charges $q$ and $-q$ are kept in equilibrium between them. The point charges are confined to move in the $x$ direction only. If they are given a small displacement about their equilibrium positions, then the correct statement(s) is(are)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-08.jpg?height=447&width=442&top_left_y=555&top_left_x=489)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-08.jpg?height=445&width=440&top_left_y=556&top_left_x=1129)
+\begin{itemize}
+\item[(A)] Both charges execute simple harmonic motion.
+\item[(B)] Both charges will continue moving in the direction of their displacement.
+\item[(C)] Charge $+q$ executes simple harmonic motion while charge $-q$ continues moving in the direction of its displacement.
+\item[(D)] Charge $-q$ executes simple harmonic motion while charge $+q$ continues moving in the direction of its displacement.
+\end{itemize}
+\item[Q.] 14 Two identical glass rods $S_{1}$ and $S_{2}$ (refractive index $=1.5$ ) have one convex end of radius of curvature 10 cm. They are placed with the curved surfaces at a distance $d$ as shown in the figure, with their axes (shown by the dashed line) aligned. When a point source of light $P$ is placed inside rod $S_{1}$ on its axis at a distance of 50 cm from the curved face, the light rays emanating from it are found to be parallel to the axis inside $S_{2}$. The distance $d$ is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-08.jpg?height=196&width=1261&top_left_y=1680&top_left_x=496)
+(A) 60 cm
+(B) 70 cm
+(C) 80 cm
+(D) 90 cm
+\end{itemize}
+
+\section*{PHYSICS}
+\begin{itemize}
+\item[Q.] 15 A conductor (shown in the figure) carrying constant current $I$ is kept in the $x-y$ plane in a uniform magnetic field $\vec{B}$. If $F$ is the magnitude of the total magnetic force acting on the conductor, then the correct statement(s) is(are)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-09.jpg?height=191&width=956&top_left_y=526&top_left_x=501)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-09.jpg?height=167&width=210&top_left_y=527&top_left_x=1529)
+(A) If $\vec{B}$ is along $\hat{z}, F \propto(L+R)$
+(B) If $\vec{B}$ is along $\hat{x}, F=0$
+(C) If $\vec{B}$ is along $\hat{y}, F \propto(L+R)$
+(D) If $\vec{B}$ is along $\hat{z}, F=0$
+\item[Q.] 16 A container of fixed volume has a mixture of one mole of hydrogen and one mole of helium in equilibrium at temperature $T$. Assuming the gases are ideal, the correct statement(s) is(are)
+\begin{itemize}
+\item[(A)] The average energy per mole of the gas mixture is $2 R T$.
+\item[(B)] The ratio of speed of sound in the gas mixture to that in helium gas is $\sqrt{6 / 5}$.
+\item[(C)] The ratio of the rms speed of helium atoms to that of hydrogen molecules is 1/2.
+\item[(D)] The ratio of the rms speed of helium atoms to that of hydrogen molecules is $1 / \sqrt{2}$.
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 17 In an aluminum (Al) bar of square cross section, a square hole is drilled and is filled with iron (Fe) as shown in the figure. The electrical resistivities of Al and Fe are $2.7 \times 10^{-8} \Omega \mathrm{~m}$ and $1.0 \times 10^{-7} \Omega \mathrm{~m}$, respectively. The electrical resistance between the two faces P and Q of the composite bar is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-10.jpg?height=706&width=628&top_left_y=542&top_left_x=715)
+(A) $\frac{2475}{64} \mu \Omega$
+(B) $\frac{1875}{64} \mu \Omega$
+(C) $\frac{1875}{49} \mu \Omega$
+(D) $\frac{2475}{132} \mu \Omega$
+\item[Q.] 18 For photo-electric effect with incident photon wavelength $\lambda$, the stopping potential is $V_{0}$. Identify the correct variation(s) of $V_{0}$ with $\lambda$ and $1 / \lambda$.
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-10.jpg?height=290&width=354&top_left_y=1579&top_left_x=400)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-10.jpg?height=286&width=350&top_left_y=1570&top_left_x=1183)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-10.jpg?height=293&width=388&top_left_y=1920&top_left_x=401)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-10.jpg?height=291&width=387&top_left_y=1921&top_left_x=1187)
+
+\end{itemize}
+
+\section*{SECTION 3 (Maximum Marks: 16)}
+\begin{itemize}
+\item[-] This section contains TWO questions
+\item[-] Each question contains two columns, Column I and Column II
+\item[-] Column I has four entries (A), (B), (C) and (D)
+\item[-] Column II has five entries (P), (Q), (R), (S) and (T)
+\item[-] Match the entries in Column I with the entries in Column II
+\item[-] One or more entries in Column I may match with one or more entries in Column II
+\item[-] The ORS contains a 4 × 5 matrix whose layout will be similar to the one shown below:
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|l|l|l|}
+\hline (A) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (B) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (C) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (D) & (P) & (Q) & (R) & (S) & (T) \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[-] For each entry in Column I, darken the bubbles of all the matching entries. For example, if entry (A) in Column I matches with entries (Q), (R) and (T), then darken these three bubbles in the ORS. Similarly, for entries (B), (C) and (D).
+\item[-] Marking scheme:
+For each entry in Column I.
+\begin{itemize}
+\item[] +2 If only the bubble(s) corresponding to all the correct match(es) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -1 In all other cases
+\end{itemize}
+\end{itemize}
+Q. 19 Match the nuclear processes given in column I with the appropriate option(s) in column II.
+
+Column I
+\begin{itemize}
+\item[(A)] Nuclear fusion
+\item[(B)] Fission in a nuclear reactor
+\item[(C)] $\beta$-decay
+\item[(D)] $\gamma$-ray emission
+\end{itemize}
+
+Column II
+\begin{itemize}
+\item[(P)] Absorption of thermal neutrons by ${ }_{92}^{235} \mathrm{U}$
+\item[(Q)] ${ }_{27}^{60} \mathrm{Co}$ nucleus
+\item[(R)] Energy production in stars via hydrogen conversion to helium
+\item[(S)] Heavy water
+\item[(T)] Neutrino emission
+\end{itemize}
+
+(A) Matches to (R) OR (R) and (T)
+(B) Matches to (P) and (S)
+(C) Matches to (Q) and (T)
+(D) Matches to (R)
+\begin{itemize}
+\item[Q.] 20 A particle of unit mass is moving along the $x$-axis under the influence of a force and its total energy is conserved. Four possible forms of the potential energy of the particle are given in column I ( $a$ and $U_{0}$ are constants). Match the potential energies in column I to the corresponding statement(s) in column II.
+\end{itemize}
+
+Column I
+\begin{itemize}
+\item[(A)] $\quad U_{1}(x)=\frac{U_{0}}{2}\left[1-\left(\frac{x}{a}\right)^{2}\right]^{2}$
+\item[(B)] $U_{2}(x)=\frac{U_{0}}{2}\left(\frac{x}{a}\right)^{2}$
+\item[(C)] $U_{3}(x)=\frac{U_{0}}{2}\left(\frac{x}{a}\right)^{2} \exp \left[-\left(\frac{x}{a}\right)^{2}\right]$
+\item[(D)] $U_{4}(x)=\frac{U_{0}}{2}\left[\frac{x}{a}-\frac{1}{3}\left(\frac{x}{a}\right)^{3}\right]$
+\end{itemize}
+
+Column II
+\begin{itemize}
+\item[(P)] The force acting on the particle is zero at $x=a$.
+\item[(Q)] The force acting on the particle is zero at $x=0$.
+\item[(R)] The force acting on the particle is zero at $x=-a$.
+\item[(S)] The particle experiences an attractive force towards $x=0$ in the region $|x|<a$.
+\item[(T)] The particle with total energy $\frac{U_{0}}{4}$ can oscillate about the point $x=-a$.
+\end{itemize}
+
+END OF PART I : PHYSICS
+
+(A) Matches to (P), (Q), (R) and (T)
+(B) Matches to (Q) and (S)
+(C) Matches to (P), (Q), (R) and (S)
+(D) Matches to (P), (R) and (T)
+
+\section*{PART II : CHEMISTRY}
+
+SECTION 1 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If the bubble corresponding to the answer is darkened
+\item[0] In all other cases
+\end{itemize}
+\item[Q.] 21 The total number of stereoisomers that can exist for $\mathbf{M}$ is
+<smiles>C=C1C(=O)CC2CC1C2(C)C</smiles>
+\item[Q.] 22 The number of resonance structures for N is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-13.jpg?height=139&width=535&top_left_y=1311&top_left_x=327)
+\item[Q.] 23 The total number of lone pairs of electrons in $\mathrm{N}_{2} \mathrm{O}_{3}$ is
+\item[Q.] 24 For the octahedral complexes of $\mathrm{Fe}^{3+}$ in $\mathrm{SCN}^{-}$(thiocyanato-S) and in $\mathrm{CN}^{-}$ligand environments, the difference between the spin-only magnetic moments in Bohr magnetons (when approximated to the nearest integer) is
+[Atomic number of $\mathrm{Fe}=26$ ]
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 25 Among the triatomic molecules/ions, $\mathrm{BeCl}_{2}, \mathrm{~N}_{3}^{-}, \mathrm{N}_{2} \mathrm{O}, \mathrm{NO}_{2}^{+}, \mathrm{O}_{3}, \mathrm{SCl}_{2}, \mathrm{ICl}_{2}^{-}, \mathrm{I}_{3}^{-}$and $\mathrm{XeF}_{2}$, the total number of linear molecule(s)/ion(s) where the hybridization of the central atom does not have contribution from the $d$-orbital(s) is
+[Atomic number : $\mathrm{S}=16, \mathrm{Cl}=17, \mathrm{I}=53$ and $\mathrm{Xe}=54$ ]
+\item[Q.] 26 Not considering the electronic spin, the degeneracy of the second excited state $(n=3)$ of
+H atom is 9, while the degeneracy of the second excited state of $\mathrm{H}^{-}$is
+\item[Q.] 27 All the energy released from the reaction $\mathbf{X} \rightarrow \mathbf{Y}, \Delta_{r} G^{0}=-193 \mathrm{~kJ} \mathrm{~mol}^{-1}$
+is used for oxidizing $\mathbf{M}^{+}$as $\mathbf{M}^{+} \rightarrow \mathbf{M}^{3+}+2 \mathrm{e}^{-}, E^{0}=-0.25 V$.
+Under standard conditions, the number of moles of $\mathbf{M}^{+}$oxidized when one mole of X is converted to $\mathbf{Y}$ is
+$$\left[F=96500 \mathrm{C} \mathrm{~mol}^{-1}\right]$$
+\item[Q.] 28 If the freezing point of a 0.01 molal aqueous solution of a cobalt(III) chloride-ammonia complex (which behaves as a strong electrolyte) is -0.0558 °C, the number of chloride(s) in the coordination sphere of the complex is
+$\left[\mathrm{K}_{\mathrm{f}}\right.$ of water $\left.=1.86 \mathrm{~K} \mathrm{~kg} \mathrm{~mol}^{-1}\right]$
+\end{itemize}
+
+\section*{SECTION 2 (Maximum Marks: 40)}
+\begin{itemize}
+\item[-] This section contains TEN questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\item[Q.] 29 Compound(s) that on hydrogenation produce(s) optically inactive compound(s) is(are)
+<smiles>CC=C[C@H](C)Br</smiles>
+<smiles>C=C[C@H](Br)CC</smiles>
+<smiles>C=C(C)[C@@H](C)Br</smiles>
+<smiles>C=C[C@H](Br)CC</smiles>
+\item[Q.] 30 The major product of the following reaction is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-15.jpg?height=196&width=633&top_left_y=1442&top_left_x=825)
+<smiles>CC1=C2CCCCC2CCC1=O</smiles>
+<smiles>CC1C(=O)CCC2=C1CCCC2</smiles>
+<smiles>CC=C1CC[C@]12CCCCC2=O</smiles>
+<smiles>CCC(=O)C1=C2CCCCC2C1</smiles>
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 31 In the following reaction, the major product is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-16.jpg?height=131&width=590&top_left_y=384&top_left_x=331)
+<smiles>C=C(C)C(C)Br</smiles>
+<smiles>C=CC(C)(C)Br</smiles>
+<smiles>C=C(C)CCBr</smiles>
+<smiles>CC(C)=CCBr</smiles>
+\item[Q.] 32 The structure of D-(+)-glucose is
+<smiles>O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO</smiles>
+The structure of L-(-)-glucose is
+<smiles>O=CC(O)C(O)C(O)C(O)CO</smiles>
+<smiles>O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO</smiles>
+<smiles>O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO</smiles>
+<smiles>O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO</smiles>
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 33 The major product of the reaction is
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-17.jpg?height=142&width=721&top_left_y=399&top_left_x=301)
+<smiles>CC(C)CC(N)O</smiles>
+<smiles>CC(C)C[C@H](O)C(=O)O</smiles>
+<smiles>CC(C)CC(O)C(=O)O</smiles>
+<smiles>CC(C)CC(N)O</smiles>
+\item[Q.] 34 The correct statement(s) about $\mathrm{Cr}^{2+}$ and $\mathrm{Mn}^{3+}$ is(are)
+[Atomic numbers of $\mathrm{Cr}=24$ and $\mathrm{Mn}=25$ ]
+\begin{itemize}
+\item[(A)] $\mathrm{Cr}^{2+}$ is a reducing agent
+\item[(B)] $\mathrm{Mn}^{3+}$ is an oxidizing agent
+\item[(C)] Both $\mathrm{Cr}^{2+}$ and $\mathrm{Mn}^{3+}$ exhibit $d^{4}$ electronic configuration
+\item[(D)] When $\mathrm{Cr}^{2+}$ is used as a reducing agent, the chromium ion attains $d^{5}$ electronic configuration
+\end{itemize}
+\item[Q.] 35 Copper is purified by electrolytic refining of blister copper. The correct statement(s) about this process is (are)
+\begin{itemize}
+\item[(A)] Impure Cu strip is used as cathode
+\item[(B)] Acidified aqueous $\mathrm{CuSO}_{4}$ is used as electrolyte
+\item[(C)] Pure Cu deposits at cathode
+\item[(D)] Impurities settle as anode-mud
+\end{itemize}
+\item[Q.] 36 $ \mathrm{Fe}^{3+}$ is reduced to $\mathrm{Fe}^{2+}$ by using
+(A) $\mathrm{H}_{2} \mathrm{O}_{2}$ in presence of NaOH
+(B) $\mathrm{Na}_{2} \mathrm{O}_{2}$ in water
+(C) $\mathrm{H}_{2} \mathrm{O}_{2}$ in presence of $\mathrm{H}_{2} \mathrm{SO}_{4}$
+(D) $\mathrm{Na}_{2} \mathrm{O}_{2}$ in presence of $\mathrm{H}_{2} \mathrm{SO}_{4}$
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 37 The \%yield of ammonia as a function of time in the reaction
+$$\mathrm{N}_{2}(g)+3 \mathrm{H}_{2}(g) \rightleftharpoons 2 \mathrm{NH}_{3}(g), \Delta \mathrm{H}<0$$
+at $\left(P, T_{1}\right)$ is given below.
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-18.jpg?height=397&width=532&top_left_y=527&top_left_x=816)
+If this reaction is conducted at $\left(P, T_{2}\right)$, with $T_{2}>T_{1}$, the \%yield of ammonia as a function of time is represented by
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-18.jpg?height=393&width=526&top_left_y=1081&top_left_x=455)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-18.jpg?height=387&width=523&top_left_y=1085&top_left_x=1213)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-18.jpg?height=393&width=525&top_left_y=1532&top_left_x=455)
+![](https://cdn.mathpix.com/cropped/e4888a30-a2eb-4f01-a864-703b29a4faf1-18.jpg?height=421&width=530&top_left_y=1501&top_left_x=1212)
+\item[Q.] 38 If the unit cell of a mineral has cubic close packed (ccp) array of oxygen atoms with $\boldsymbol{m}$ fraction of octahedral holes occupied by aluminium ions and $\boldsymbol{n}$ fraction of tetrahedral holes occupied by magnesium ions, $\boldsymbol{m}$ and $\boldsymbol{n}$, respectively, are
+(A) $\frac{1}{2}, \frac{1}{8}$
+(B) $1, \frac{1}{4}$
+(C) $\frac{1}{2}, \frac{1}{2}$
+(D) $\frac{1}{4}, \frac{1}{8}$
+\end{itemize}
+
+\section*{SECTION 3 (Maximum Marks: 16)}
+\begin{itemize}
+\item[-] This section contains TWO questions
+\item[-] Each question contains two columns, Column I and Column II
+\item[-] Column I has four entries (A), (B), (C) and (D)
+\item[-] Column II has five entries (P), (Q), (R), (S) and (T)
+\item[-] Match the entries in Column I with the entries in Column II
+\item[-] One or more entries in Column I may match with one or more entries in Column II
+\item[-] The ORS contains a 4 × 5 matrix whose layout will be similar to the one shown below:
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|l|l|l|}
+\hline (A) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (B) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (C) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (D) & (P) & (Q) & (R) & (S) & (T) \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[-] For each entry in Column I, darken the bubbles of all the matching entries. For example, if entry (A) in Column I matches with entries (Q), (R) and (T), then darken these three bubbles in the ORS. Similarly, for entries (B), (C) and (D).
+\item[-] Marking scheme:
+For each entry in Column I.
+\begin{itemize}
+\item[] +2 If only the bubble(s) corresponding to all the correct match(es) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -1 In all other cases
+\end{itemize}
+\item[Q.] 39 Match the anionic species given in Column I that are present in the ore(s) given in Column II.
+\end{itemize}
+
+Column I
+\begin{itemize}
+\item[(A)] Carbonate
+\item[(B)] Sulphide
+\item[(C)] Hydroxide
+\item[(D)] Oxide
+\end{itemize}
+
+Column II
+\begin{itemize}
+\item[(P)] Siderite
+\item[(Q)] Malachite
+\item[(R)] Bauxite
+\item[(S)] Calamine
+\item[(T)] Argentite
+\end{itemize}
+
+(A) Matches to (P), (Q) and (S)
+(B) Matches to (T)
+(C) Matches to (Q) and (R)
+(D) Matches to (R)
+\begin{itemize}
+\item[Q.] 40 Match the thermodynamic processes given under Column I with the expressions given under Column II.
+\end{itemize}
+
+Column I
+\begin{itemize}
+\item[(A)] Freezing of water at 273 K and 1 atm
+\item[(B)] Expansion of 1 mol of an ideal gas into a vacuum under isolated conditions
+\item[(C)] Mixing of equal volumes of two ideal gases at constant temperature and pressure in an isolated container
+\item[(D)] Reversible heating of $\mathrm{H}_{2}(g)$ at 1 atm from 300 K to 600 K, followed by reversible cooling to 300 K at 1 atm
+\end{itemize}
+
+Column II
+\begin{itemize}
+\item[(P)] $q=0$
+\item[(Q)] $\quad w=0$
+\item[(R)] $\quad \Delta S_{\text {sys }}<0$
+\item[(S)] $\Delta U=0$
+\item[(T)] $\Delta G=0$
+\end{itemize}
+
+END OF PART II : CHEMISTRY
+
+\begin{itemize}
+\item[(A)] Matches to (R) and (T)
+\item[(B)] Matches to (P), (Q) and (S)
+\item[(C)] Matches to (P), (Q) and (S)
+\item[(D)] Matches to (P), (Q), (S) and (T)
+\end{itemize}
+
+\section*{PART III : MATHEMATICS}
+
+SECTION 1 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If the bubble corresponding to the answer is darkened
+\item[0] In all other cases
+\end{itemize}
+\item[Q.] 41 The number of distinct solutions of the equation
+$$\frac{5}{4} \cos ^{2} 2 x+\cos ^{4} x+\sin ^{4} x+\cos ^{6} x+\sin ^{6} x=2$$
+in the interval $[0,2 \pi]$ is
+\item[Q.] 42 Let the curve $C$ be the mirror image of the parabola $y^{2}=4 x$ with respect to the line $x+y+4=0$. If $A$ and $B$ are the points of intersection of $C$ with the line $y=-5$, then the distance between $A$ and $B$ is
+\item[Q.] 43 The minimum number of times a fair coin needs to be tossed, so that the probability of getting at least two heads is at least 0.96, is
+\item[Q.] 44 Let $n$ be the number of ways in which 5 boys and 5 girls can stand in a queue in such a way that all the girls stand consecutively in the queue. Let $m$ be the number of ways in which 5 boys and 5 girls can stand in a queue in such a way that exactly four girls stand consecutively in the queue. Then the value of $\frac{m}{n}$ is
+\item[Q.] 45 If the normals of the parabola $y^{2}=4 x$ drawn at the end points of its latus rectum are tangents to the circle $(x-3)^{2}+(y+2)^{2}=r^{2}$, then the value of $r^{2}$ is
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|}
+\hline & & \\
+\hline & \multicolumn{2}{|c|}{} \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[Q.] 46 Let $f: \mathbb{R} \rightarrow \mathbb{R}$ be a function defined by $f(x)=\left\{\begin{array}{ll}{[x],} & x \leq 2 \\ 0, & x>2\end{array}\right.$, where $[x]$ is the greatest integer less than or equal to $x$. If $I=\int_{-1}^{2} \frac{x f\left(x^{2}\right)}{2+f(x+1)} d x$, then the value of $(4 I-1)$ is
+\item[Q.] 47 A cylindrical container is to be made from certain solid material with the following constraints: It has a fixed inner volume of $V \mathrm{~mm}^{3}$, has a 2 mm thick solid wall and is open at the top. The bottom of the container is a solid circular disc of thickness 2 mm and is of radius equal to the outer radius of the container.
+If the volume of the material used to make the container is minimum when the inner radius of the container is 10 mm, then the value of $\frac{V}{250 \pi}$ is
+\item[Q.] 48 Let $F(x)=\int_{x}^{x^{2}+\frac{\pi}{6}} 2 \cos ^{2} t d t$ for all $x \in \mathbb{R}$ and $f:\left[0, \frac{1}{2}\right] \rightarrow[0, \infty)$ be a continuous function. For $a \in\left[0, \frac{1}{2}\right]$, if $F^{\prime}(a)+2$ is the area of the region bounded by $x=0, y=0, y=f(x)$ and $x=a$, then $f(0)$ is
+\end{itemize}
+
+SECTION 2 (Maximum Marks: 40)
+\begin{itemize}
+\item[-] This section contains TEN questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\item[Q.] 49 Let ${ }^{\bullet} X$ and $Y$ be two arbitrary, 3×3, non-zero, skew-symmetric matrices and $Z$ be an arbitrary 3×3, non-zero, symmetric matrix. Then which of the following matrices is (are) skew symmetric?
+(A) $Y^{3} Z^{4}-Z^{4} Y^{3}$
+(B) $X^{44}+Y^{44}$
+(C) $X^{4} Z^{3}-Z^{3} X^{4}$
+(D) $X^{23}+Y^{23}$
+\item[Q.] 50 Which of the following values of $\alpha$ satisfy the equation
+$$\left|\begin{array}{lll}
+(1+\alpha)^{2} & (1+2 \alpha)^{2} & (1+3 \alpha)^{2} \\
+(2+\alpha)^{2} & (2+2 \alpha)^{2} & (2+3 \alpha)^{2} \\
+(3+\alpha)^{2} & (3+2 \alpha)^{2} & (3+3 \alpha)^{2}
+\end{array}\right|=-648 \alpha ?$$
+(A) -4
+(B) 9
+(C) -9
+(D) 4
+\item[Q.] 51 In $\mathbb{R}^{3}$, consider the planes $P_{1}: y=0$ and $P_{2}: x+z=1$. Let $P_{3}$ be a plane, different from $P_{1}$ and $P_{2}$, which passes through the intersection of $P_{1}$ and $P_{2}$. If the distance of the point $(0,1,0)$ from $P_{3}$ is 1 and the distance of a point $(\alpha, \beta, \gamma)$ from $P_{3}$ is 2, then which of the following relations is (are) true?
+(A) $2 \alpha+\beta+2 \gamma+2=0$
+(B) $2 \alpha-\beta+2 \gamma+4=0$
+(C) $2 \alpha+\beta-2 \gamma-10=0$
+(D) $2 \alpha-\beta+2 \gamma-8=0$
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|}
+\hline
+\begin{tabular}[t]{l}
+\\
+(C) and (D)
+\end{tabular} &
+\begin{tabular}[t]{l}
+\\
+(B) and (C)
+\end{tabular} &
+\begin{tabular}[t]{l}
+\\
+(B) and (D)
+\end{tabular} \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[Q.] 52 In $\mathbb{R}^{3}$, let $L$ be a straight line passing through the origin. Suppose that all the points on $L$ are at a constant distance from the two planes $P_{1}: x+2 y-z+1=0$ and $P_{2}: 2 x-y+z-1=0$. Let $M$ be the locus of the feet of the perpendiculars drawn from the points on $L$ to the plane $P_{1}$. Which of the following points lie(s) on $M$ ?
+(A) $\left(0,-\frac{5}{6},-\frac{2}{3}\right)$
+(B) $\left(-\frac{1}{6},-\frac{1}{3}, \frac{1}{6}\right)$
+(C) $\left(-\frac{5}{6}, 0, \frac{1}{6}\right)$
+(D) $\left(-\frac{1}{3}, 0, \frac{2}{3}\right)$
+\item[Q.] 53 Let $P$ and $Q$ be distinct points on the parabola $y^{2}=2 x$ such that a circle with $P Q$ as diameter passes through the vertex $O$ of the parabola. If $P$ lies in the first quadrant and the area of the triangle $\triangle O P Q$ is $3 \sqrt{2}$, then which of the following is (are) the coordinates of $P$ ?
+(A) $(4,2 \sqrt{2})$
+(B) $(9,3 \sqrt{2})$
+(C) $\left(\frac{1}{4}, \frac{1}{\sqrt{2}}\right)$
+(D) $(1, \sqrt{2})$
+\item[Q.] 54 Let $y(x)$ be a solution of the differential equation $\left(1+e^{x}\right) y^{\prime}+y e^{x}=1$. If $y(0)=2$, then which of the following statements is (are) true?
+\begin{itemize}
+\item[(A)] $y(-4)=0$
+\item[(B)] $y(-2)=0$
+\item[(C)] $y(x)$ has a critical point in the interval (-1, 0)
+\item[(D)] $\quad y(x)$ has no critical point in the interval (-1, 0)
+\end{itemize}
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|}
+\hline
+\begin{tabular}[t]{l}
+\\
+(A) and (B)
+\end{tabular} &
+\begin{tabular}[t]{l}
+\\
+(A) and (D)
+\end{tabular} &
+\begin{tabular}[t]{l}
+\\
+(A) and (C)
+\end{tabular} \\
+\hline
+\end{tabular}
+
+MATHEMATICS
+\begin{itemize}
+\item[Q.] 55 Consider the family of all circles whose centers lie on the straight line $y=x$. If this family of circles is represented by the differential equation $P y^{\prime \prime}+Q y^{\prime}+1=0$, where $P, Q$ are functions of $x, y$ and $y^{\prime}$ (here $y^{\prime}=\frac{d y}{d x}, y^{\prime \prime}=\frac{d^{2} y}{d x^{2}}$ ), then which of the following statements is (are) true?
+(A) $P=y+x$
+(B) $P=y-x$
+(C) $P+Q=1-x+y+y^{\prime}+\left(y^{\prime}\right)^{2}$
+(D) $P-Q=x+y-y^{\prime}-\left(y^{\prime}\right)^{2}$
+\item[Q.] 56 Let $g: \mathbb{R} \rightarrow \mathbb{R}$ be a differentiable function with $g(0)=0, g^{\prime}(0)=0$ and $g^{\prime}(1) \neq 0$. Let
+$$f(x)=\left\{\begin{array}{cc}
+\frac{x}{|x|} g(x), & x \neq 0 \\
+0, & x=0
+\end{array}\right.$$
+and $h(x)=e^{|x|}$ for all $x \in \mathbb{R}$. Let $(f \circ h)(x)$ denote $f(h(x))$ and $(h \circ f)(x)$ denote $h(f(x))$. Then which of the following is (are) true?
+(A) $\quad f$ is differentiable at $x=0$
+(B) $\quad h$ is differentiable at $x=0$
+(C) $f \circ h$ is differentiable at $x=0$
+(D) $h \circ f$ is differentiable at $x=0$
+\end{itemize}
+
+MATHEMATICS
+\begin{itemize}
+\item[Q.] 57 Let $f(x)=\sin \left(\frac{\pi}{6} \sin \left(\frac{\pi}{2} \sin x\right)\right)$ for all $x \in \mathbb{R}$ and $g(x)=\frac{\pi}{2} \sin x$ for all $x \in \mathbb{R}$. Let $(f \circ g)(x)$ denote $f(g(x))$ and $(g \circ f)(x)$ denote $g(f(x))$. Then which of the following is (are) true?
+(A) Range of $f$ is $\left[-\frac{1}{2}, \frac{1}{2}\right]$
+(B) Range of $f \circ g$ is $\left[-\frac{1}{2}, \frac{1}{2}\right]$
+(C) $\lim _{x \rightarrow 0} \frac{f(x)}{g(x)}=\frac{\pi}{6}$
+(D) There is an $x \in \mathbb{R}$ such that $(g \circ f)(x)=1$
+\item[Q.] 58 Let $\triangle P Q R$ be a triangle. Let $\vec{a}=\overrightarrow{Q R}, \vec{b}=\overrightarrow{R P}$ and $\vec{c}=\overrightarrow{P Q}$. If $|\vec{a}|=12,|\vec{b}|=4 \sqrt{3}$ and $\vec{b} \cdot \vec{c}=24$, then which of the following is (are) true?
+(A) $\frac{|\vec{c}|^{2}}{2}-|\vec{a}|=12$
+(B) $\frac{|\vec{c}|^{2}}{2}+|\vec{a}|=30$
+(C) $|\vec{a} \times \vec{b}+\vec{c} \times \vec{a}|=48 \sqrt{3}$
+(D) $\vec{a} . \vec{b}=-72$
+\end{itemize}
+
+\section*{SECTION 3 (Maximum Marks: 16)}
+\begin{itemize}
+\item[-] This section contains TWO questions
+\item[-] Each question contains two columns, Column I and Column II
+\item[-] Column I has four entries (A), (B), (C) and (D)
+\item[-] Column II has five entries (P), (Q), (R), (S) and (T)
+\item[-] Match the entries in Column I with the entries in Column II
+\item[-] One or more entries in Column I may match with one or more entries in Column II
+\item[-] The ORS contains a 4 × 5 matrix whose layout will be similar to the one shown below:
+
+\begin{tabular}[t]{|l|l|l|l|l|l|}
+\hline (A) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (B) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (C) & (P) & (Q) & (R) & (S) & (T) \\
+\hline (D) & (P) & (Q) & (R) & (S) & (T) \\
+\hline
+\end{tabular}
+\item[-] For each entry in Column I, darken the bubbles of all the matching entries. For example, if entry (A) in Column I matches with entries (Q), (R) and (T), then darken these three bubbles in the ORS. Similarly, for entries (B), (C) and (D).
+\item[-] Marking scheme:
+For each entry in Column I.
+\begin{itemize}
+\item[] +2 If only the bubble(s) corresponding to all the correct match(es) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -1 In all other cases
+\end{itemize}
+\end{itemize}
+
+\section*{Space for rough work}
+
+Column I
+\begin{itemize}
+\item[(A)] In $\mathbb{R}^{2}$, if the magnitude of the projection vector of the vector $\alpha \hat{i}+\beta \hat{j}$ on $\sqrt{3} \hat{i}+\hat{j}$ is $\sqrt{3}$ and if $\alpha=2+\sqrt{3} \beta$, then possible value(s) of $|\alpha|$ is (are)
+\item[(B)] Let $a$ and $b$ be real numbers such that the function
+$$f(x)=\left\{\begin{aligned}
+-3 a x^{2}-2, & x<1 \\
+b x+a^{2}, & x \geq 1
+\end{aligned}\right.$$
+is differentiable for all $x \in \mathbb{R}$. Then possible value(s) of $a$ is (are)
+\item[(C)] Let $\omega \neq 1$ be a complex cube root of unity. If $\left(3-3 \omega+2 \omega^{2}\right)^{4 n+3}+$
+$$\left(2+3 \omega-3 \omega^{2}\right)^{4 n+3}+\left(-3+2 \omega+3 \omega^{2}\right)^{4 n+3}=0,$$
+then possible value(s) of $n$ is (are)
+\item[(D)] Let the harmonic mean of two positive real numbers $a$ and $b$ be 4. If $q$ is a positive real number such that $a, 5, q, b$ is an arithmetic progression, then the value(s) of $|q-a|$ is (are)
+\end{itemize}
+
+Column II
+\begin{itemize}
+\item[(P)] 1
+\item[(Q)] 2
+\item[(R)] 3
+\item[(S)] 4
+\item[(T)] 5
+\end{itemize}
+
+(A) Matches to (P) and (Q)
+(B) Matches to (P) and (Q)
+(C) Matches to (P), (Q), (S) and (T)
+(D) Matches to (Q) and (T)
+
+\section*{Column I}
+\begin{itemize}
+\item[(A)] In a triangle $\triangle X Y Z$, let $a, b$ and $c$ be the lengths of the sides opposite to the angles $X, Y$ and $Z$, respectively. If $2\left(a^{2}-b^{2}\right)=c^{2}$ and $\lambda=\frac{\sin (X-Y)}{\sin Z}$, then possible values of $n$ for which $\cos (n \pi \lambda)=0$ is (are)
+\item[(B)] In a triangle $\triangle X Y Z$, let $a, b$ and $c$ be the lengths of the sides opposite to the angles $X, Y$ and $Z$, respectively. If $1+\cos 2 X-2 \cos 2 Y=2 \sin X \sin Y$, then possible value(s) of $\frac{a}{b}$ is (are)
+\item[(C)] In $\mathbb{R}^{2}$, let $\sqrt{3} \hat{i}+\hat{j}, \hat{i}+\sqrt{3} \hat{j}$ and $\beta \hat{i}+(1-\beta) \hat{j}$ be the position vectors of $X, Y$ and $Z$ with respect to the origin $O$, respectively. If the distance of $Z$ from the bisector of the acute angle of $\overrightarrow{O X}$ with $\overrightarrow{O Y}$ is $\frac{3}{\sqrt{2}}$, then possible value(s) of $|\beta|$ is (are)
+\item[(D)] Suppose that $F(\alpha)$ denotes the area of the region bounded by $x=0, x=2, y^{2}=4 x$ and $y=|\alpha x-1|+|\alpha x-2|+\alpha x$, where $\alpha \in\{0,1\}$. Then the value(s) of $F(\alpha)+\frac{8}{3} \sqrt{2}$, when $\alpha=0$ and $\alpha=1$, is (are)
+\end{itemize}
+
+Column II
+\begin{itemize}
+\item[(P)] 1
+\item[(Q)] 2
+\item[(R)] 3
+\item[(S)] 5
+\item[(T)] 6
+\end{itemize}
+
+(A) Matches to (P), (R) and (S)
+(B) Matches to (P)
+(C) Matches to (P) and (Q)
+(D) Matches to (S) and (T)
+
+\section*{Answers for the above questions}
+Ans for Q.1: 6
+Ans for Q.2: 2
+Ans for Q.3: 2
+Ans for Q.4: 7
+Ans for Q.5: 2
+Ans for Q.6: 3
+Ans for Q.7: 3
+Ans for Q.8: 7
+Ans for Q.9: (B) and (C)
+Ans for Q.10: (A), (C) and (D)
+Ans for Q.11: (B) and (D)
+Ans for Q.13: (C)
+Ans for Q.14: (B)
+Ans for Q.15: (A), (B) and (C)
+Ans for Q.16: (A), (B) and (D)
+Ans for Q.17: (B)
+Ans for Q.18: (A) and (C)
+Ans for Q.21: 2
+Ans for Q.22: 9
+Ans for Q.23: 8
+Ans for Q.24: 4
+Ans for Q.25: 4
+Ans for Q.26: 3
+Ans for Q.27: 4
+Ans for Q.28: 1
+Ans for Q.29: (B) and (D)
+Ans for Q.30: (A)
+Ans for Q.31: (D)
+Ans for Q.32: (A)
+Ans for Q.33: (C)
+Ans for Q.34: (A), (B) and (C)
+Ans for Q.35: (B), (C) and (D)
+Ans for Q.36: (A) and (B)
+Ans for Q.37: (B)
+Ans for Q.38: (A)
+Ans for Q.41: 8
+Ans for Q.42: 4
+Ans for Q.43: 8
+Ans for Q.44: 5
+Ans for Q.45: 2
+Ans for Q.46: 0
+Ans for Q.47: 4
+Ans for Q.48: 3
+Ans for Q.55: (B) and (C)
+Ans for Q.56: (A) and (D)
+Ans for Q.57: (A), (B) and (C)
+Ans for Q.58: (A), (C) and (D)

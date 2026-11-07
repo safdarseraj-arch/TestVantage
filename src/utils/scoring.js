@@ -6,6 +6,7 @@ import { isAnswerAttempted } from './answers.js'
 import { formatCorrectAnswer, formatUserAnswer } from './formatAnswer.js'
 import { getAnswerableQuestions } from './passage.js'
 import { matrixAnswersEqual } from './matrixMatch.js'
+import { gridFieldsOf, isMatrixGridCard, scoreMatrixGridRows } from './matrixGridPyq.js'
 import { DEFAULT_MSQ_MARKING, scoreMsqAnswer } from './msqMarking.js'
 import { passageQuestionUsesNumerical } from './passageSubAnswer.js'
 
@@ -88,6 +89,11 @@ function gradeQuestion(q, answer, pattern) {
     }
 
     case 'matrix_match': {
+      if (gridMarkedPerRow(q)) {
+        const r = scoreMatrixGridRows(answer, q, q.matrixMarking)
+        if (r.rowsRight === r.rows) return { grade: 'correct', marks: r.marks }
+        return { grade: r.rowsRight > 0 ? 'partial' : 'wrong', marks: r.marks }
+      }
       const m = getMarking(q, pattern)
       return matrixAnswersEqual(answer, q)
         ? { grade: 'correct', marks: m.correct }
@@ -99,9 +105,17 @@ function gradeQuestion(q, answer, pattern) {
   }
 }
 
+/** A grid card whose paper marks each Column I row on its own. */
+function gridMarkedPerRow(q) {
+  return isMatrixGridCard(q) && q.matrixMarking?.perRow === true && Number.isFinite(q.matrixMarking.correct)
+}
+
 function getMaxMarks(q, pattern) {
   if (q.questionType === 'multiple_correct' && q.msqMarking) {
     return q.msqMarking.full
+  }
+  if (gridMarkedPerRow(q)) {
+    return (Array.isArray(q.matrixRows) ? q.matrixRows.length : 0) * q.matrixMarking.correct
   }
   return getMarking(q, pattern).correct
 }
@@ -199,6 +213,7 @@ export function evaluateTest(test, answers, options = {}) {
       userAnswerLabel: formatUserAnswer(q, answers[q.id]),
       correctAnswerLabel: formatCorrectAnswer(q),
       marked: markedSet.has(q.id),
+      ...(isMatrixGridCard(q) ? gridFieldsOf(q) : {}),
     })
 
     score += marks

@@ -17,6 +17,17 @@ const LETTERS = ['A', 'B', 'C', 'D']
 /** "," / "and" left in an option slot when a printed key "(B), (C) and (D)" was split as options. */
 export const SCRAP_OPTION_RE = /^[\s,;.]*(?:and|or)?[\s,;.]*$/i
 
+const LETTER_PAIR = String.raw`\(\s*[A-D]\s*\)\s+(?:and|or)\s+\(\s*[A-D]\s*\)`
+/** A page's printed answers "(A) and (B); (A) and (D); (A) and (C)" glued after the last option. */
+const OPTION_LETTER_TAIL_RE = new RegExp(String.raw`\s+${LETTER_PAIR}(?:\s*;\s*${LETTER_PAIR})+\s*$`, 'i')
+
+/** @param {unknown} opt */
+export function trimOptionLetterTail(opt) {
+  const s = String(opt ?? '')
+  const trimmed = s.replace(OPTION_LETTER_TAIL_RE, '')
+  return trimmed.trim() ? trimmed : s
+}
+
 /** @param {string} figure */
 function asOptionFigure(figure) {
   return figure.replace(/^\\includegraphics\[[^\]]*\]/, '\\includegraphics')
@@ -91,7 +102,7 @@ function restoreFromScan(q, source) {
 
 const FIGURE_RE = /\\includegraphics(?:\[[^\]]*\])?\{([^}\s]+)\}|!\[[^\]]*\]\(([^)\s]+)\)/g
 const ASKS_FOR_A_PICTURE_RE =
-  /\bwill\s+(?:look\s+like|be)\b|\b(?:which\s+(?:one\s+)?of|among)\s+the\s+following\b|\bcorrect\s+(?:shape|plot|graph|figure|option)|\bis\s*\(\s*are\s*\)\s+correct\b|\brepresents?\b/i
+  /\bwill\s+(?:look\s+like|be)\b|\b(?:which\s+(?:one\s+)?of|among)\s+the\s+following\b|\bcorrect\s+(?:shape|plot|graph|figure|option|variation)|\bis\s*\(\s*are\s*\)\s+correct\b|\brepresent(?:s|ed\s+by)?\b/i
 
 function cropBox(url) {
   const num = (key) => Number((String(url).match(new RegExp(`[?&]${key}=(\\d+)`)) || [])[1])
@@ -137,6 +148,21 @@ function trailingFigureOptions(text) {
   }
 }
 
+const PICTURE_ONLY_RE = /^\s*(?:\\includegraphics(?:\[[^\]]*\])?\{[^}\s]+\}|!\[[^\]]*\]\([^)\s]+\))\s*$/
+
+/**
+ * Four picture options are already filled (e.g. page crops) but the stem still ends with
+ * the same four pictures from the scan.
+ * @param {Record<string, any>} q
+ */
+export function stemRepeatsOptionPictures(q) {
+  if (!/single_correct|multiple_correct/.test(String(q?.questionType ?? ''))) return null
+  const options = (Array.isArray(q.options) ? q.options : []).map((o) => String(o ?? ''))
+  if (options.length !== LETTERS.length || !options.every((o) => PICTURE_ONLY_RE.test(o))) return null
+  const trailing = trailingFigureOptions(String(q.text ?? ''))
+  return trailing && trailing.stem.length >= 20 ? trailing.stem : null
+}
+
 /**
  * @template {Record<string, any>} T
  * @param {T} q
@@ -150,7 +176,10 @@ export function restoreLabelledFigureOptions(q, source = '') {
   const bare = (Array.isArray(q.options) ? q.options : [])
     .map((o) => String(o ?? ''))
     .filter((o) => !SCRAP_OPTION_RE.test(o))
-  if (bare.length >= LETTERS.length) return q
+  if (bare.length >= LETTERS.length) {
+    const stem = stemRepeatsOptionPictures(q)
+    return stem ? { ...q, text: stem } : q
+  }
   const matches = [...text.matchAll(LABELLED_FIGURE)]
   if (!matches.length && !bare.length) {
     const trailing = trailingFigureOptions(text)

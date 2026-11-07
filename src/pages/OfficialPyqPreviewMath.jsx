@@ -8,6 +8,8 @@ import { QuestionStem, OptionBody } from '../components/QuestionMediaLite.jsx'
 import { matchOptionsFoldedIntoLists } from '../utils/parseMatchingListDisplay.js'
 import { looksLikeParagraphPropertyOptions } from '../utils/passage.js'
 import { officialPyqCardAsShown } from '../utils/officialPyqCardAsShown.js'
+import { isMatrixGridCard } from '../utils/matrixGridPyq.js'
+import MatrixGridView from '../components/MatrixGridView.jsx'
 
 export default function OfficialPyqPreviewMath({ q, sourceText = '', sourceTick = 0 }) {
   const { text, options, passage, questionImage, healError } = useMemo(
@@ -16,8 +18,10 @@ export default function OfficialPyqPreviewMath({ q, sourceText = '', sourceTick 
     [q, sourceText, sourceTick],
   )
   const flagProblems = q?.adminApproved !== true
+  const grid = isMatrixGridCard(q)
   const hidePassageProps = looksLikeParagraphPropertyOptions(options, passage)
   const showOptions =
+    !grid &&
     !hidePassageProps &&
     options.some((o) => String(o ?? '').trim()) &&
     !matchOptionsFoldedIntoLists(text, options)
@@ -59,6 +63,7 @@ export default function OfficialPyqPreviewMath({ q, sourceText = '', sourceTick 
           })}
         </ol>
       ) : null}
+      {grid ? <MatrixGridView question={q} showKey highlightProblems={flagProblems} /> : null}
     </>
   )
 }

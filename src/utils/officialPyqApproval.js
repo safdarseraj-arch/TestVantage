@@ -33,6 +33,7 @@ import {
   prepareOfficialPyqHealContext,
 } from './extendTruncatedStem.js'
 import { enrichMatchListsFromOcr } from './restoreMatchListsOcr.js'
+import { gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.js'
 import { addImportedPyqs } from './pyqStore.js'
 import {
   OFFICIAL_PYQ_ALREADY_PUBLISHED_MESSAGE,
@@ -123,6 +124,14 @@ const REPARSE_API_DOWN_HINT =
 /** @typedef {import('./officialPyqPendingStore').OfficialPyqPendingPaper} OfficialPyqPendingPaper */
 /** @typedef {import('./officialPyqPendingStore').OfficialPyqPendingQuestion} OfficialPyqPendingQuestion */
 
+/** Lists, grid key and marking of a grid card; nothing for other cards. @param {any} q */
+function gridFieldsForPublish(q) {
+  if (!isMatrixGridCard(q)) return {}
+  const out = gridFieldsOf(q)
+  for (const field of Object.keys(out)) if (out[field] === undefined) delete out[field]
+  return out
+}
+
 /**
  * @param {OfficialPyqPendingPaper} paper
  * @param {OfficialPyqPendingQuestion} q
@@ -148,6 +157,7 @@ export function pendingQuestionToPyqItem(paper, q, index) {
     correctIndices: q.correctIndices,
     correctInteger: q.correctInteger,
     correctNumerical: q.correctNumerical,
+    ...gridFieldsForPublish(q),
     solution,
     subject: String(q.subject || 'physics'),
     chapter: String(q.chapter || 'General'),
@@ -199,6 +209,7 @@ export function pyqItemToBankQuestion(paper, pyq, index) {
     correctIndices: pyq.correctIndices,
     correctInteger: pyq.correctInteger,
     correctNumerical: pyq.correctNumerical,
+    ...gridFieldsForPublish(pyq),
     solution: pyq.solution,
     subject: pyq.subject,
     chapter: pyq.chapter,

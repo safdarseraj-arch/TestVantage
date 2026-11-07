@@ -4,6 +4,7 @@
  */
 
 import { cleanOfficialPyqPassageBody } from './passage.js'
+import { MATRIX_GRID_FACT_TYPE, isMatrixGridCard, matrixGridSectionFacts, withFactType } from './matrixGridPyq.js'
 
 const WORD = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -38,6 +39,7 @@ function fixZeroInCountWords(text) {
 
 function sectionType(window) {
   const t = String(window || '')
+  if (matrixGridSectionFacts(t)) return MATRIX_GRID_FACT_TYPE
   if (/matching\s+list|match\s+list|list[-\s]match|match\s+the\s+following/i.test(t)) return 'matrix_match'
   if (/one\s+or\s+more/i.test(t)) return 'multiple_correct'
   if (/only\s+one/i.test(t)) return 'single_correct'
@@ -113,6 +115,7 @@ export function buildPaperFacts(raw) {
     }
     const type = sectionType(window)
     if (!type) notes.push(`OCR does not name the question type for “${m[0].replace(/\s+/g, ' ')}”.`)
+    const grid = type === MATRIX_GRID_FACT_TYPE ? matrixGridSectionFacts(window) : null
     sections.push({
       subject,
       part,
@@ -122,6 +125,7 @@ export function buildPaperFacts(raw) {
       type,
       kind,
       source,
+      ...(grid ? { listI: grid.rows, listII: grid.cols } : {}),
     })
   }
   if (!sections.length) {
@@ -312,9 +316,8 @@ function stampFromAdminFacts(questions, facts) {
   return questions.map((q, i) => {
     const slot = slots[i]
     return {
-      ...q,
+      ...withFactType(q, slot.type),
       subject: slot.subject,
-      questionType: slot.type,
       paperPart: slot.part,
       printedNumber: slot.printed,
       questionNumber: i + 1,
@@ -340,7 +343,10 @@ function stampFromFacts(questions, facts) {
         q.paperPart = section.part
         if (section.subject) q.subject = section.subject
         else if (section.headingMissing) q.subject = ''
-        if (section.type) q.questionType = section.type
+        // A grid card is read from the same instructions, so the OCR facts leave it alone.
+        if (section.type && section.type !== MATRIX_GRID_FACT_TYPE && !isMatrixGridCard(q)) {
+          q.questionType = section.type
+        }
         if (section.type === 'numerical' || section.type === 'integer') q.options = []
       }
       cursor += 1

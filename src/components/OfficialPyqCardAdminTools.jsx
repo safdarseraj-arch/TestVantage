@@ -33,6 +33,9 @@ import {
   undoOfficialPyqCardEdit,
 } from '../utils/officialPyqCardEdit.js'
 
+import MatrixGridView from './MatrixGridView.jsx'
+import { gridColLabels } from '../utils/matrixGridPyq.js'
+
 const OfficialPyqPreviewMath = lazy(() => import('../pages/OfficialPyqPreviewMath.jsx'))
 
 const FIELD_STYLE = { display: 'block', margin: '0.5rem 0' }
@@ -397,6 +400,40 @@ function cardSyncKey(q) {
 }
 
 const draftFromCard = officialPyqDraftFromCard
+
+/** Column I / Column II rows and the answer grid of a matrix-match grid card. */
+function GridDraftFields({ draft, setDraft, card }) {
+  const setItem = (field, at, value) =>
+    setDraft((d) => {
+      const list = (d[field] || []).slice()
+      list[at] = value
+      return { ...d, [field]: list }
+    })
+  const labels = gridColLabels({ ...card, matrixCols: draft.matrixCols })
+  return (
+    <div data-testid="official-pyq-edit-grid">
+      {(draft.matrixRows || []).map((row, i) => (
+        <label key={`r${i}`} className="official-pyq-edit-field" style={FIELD_STYLE}>
+          Column I ({String.fromCharCode(65 + i)})
+          <textarea rows={2} style={INPUT_STYLE} value={row} onChange={(e) => setItem('matrixRows', i, e.target.value)} />
+        </label>
+      ))}
+      {(draft.matrixCols || []).map((col, j) => (
+        <label key={`c${j}`} className="official-pyq-edit-field" style={FIELD_STYLE}>
+          Column II ({labels[j]})
+          <textarea rows={2} style={INPUT_STYLE} value={col} onChange={(e) => setItem('matrixCols', j, e.target.value)} />
+        </label>
+      ))}
+      <p className="form-hint" style={{ marginBottom: 0 }}>
+        Answer: tick every Column II box that matches each Column I row (one or more per row).
+      </p>
+      <MatrixGridView
+        question={{ ...card, matrixRows: draft.matrixRows, matrixCols: draft.matrixCols, matrixAnswerKey: draft.matrixAnswerKey }}
+        onChange={(key) => setDraft((d) => ({ ...d, matrixAnswerKey: key }))}
+      />
+    </div>
+  )
+}
 const draftFromSuggestion = officialPyqDraftFromSuggestion
 
 const FIGURE_THUMB_STYLE = {
@@ -910,7 +947,10 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
               />
             </label>
           ))}
-          {hasAnswer ? (
+          {draft.grid ? (
+            <GridDraftFields draft={draft} setDraft={setDraft} card={card} />
+          ) : null}
+          {hasAnswer && !draft.grid ? (
             <label className="official-pyq-edit-field" style={FIELD_STYLE}>
               Answer key (A, or A, C for more than one, or a number)
               <input

@@ -30,21 +30,50 @@ import {
   trimOptionLetterTail,
 } from './labelledFigureOptions.js'
 import { isMatrixGridCard } from './matrixGridPyq.js'
+import { stripAnswerBoxTables } from './printedAnswerKey.js'
+
+const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
+
+/**
+ * Page leftovers saved on a card: the answer-letter / empty answer-box table under a page,
+ * or the next page's running head ("PHYSICS") glued to the last option.
+ * @template {Record<string, any>} T
+ * @param {T} q
+ * @returns {T}
+ */
+function withoutPageLeftovers(q) {
+  let next = q
+  for (const key of ['text', 'passageText']) {
+    const raw = q?.[key]
+    if (typeof raw !== 'string' || !/\\begin\{tabular\}/.test(raw)) continue
+    const cleaned = stripAnswerBoxTables(raw).replace(/\n{3,}/g, '\n\n').trim()
+    if (cleaned && cleaned !== raw.trim()) next = { ...next, [key]: cleaned }
+  }
+  if (Array.isArray(q?.options)) {
+    const options = q.options.map((opt) => {
+      const s = String(opt ?? '')
+      const cleaned = trimOptionLetterTail(s).replace(RUNNING_HEAD_TAIL_RE, '')
+      return cleaned.trim() ? cleaned : s
+    })
+    if (options.some((opt, i) => opt !== String(q.options[i] ?? ''))) next = { ...next, options }
+  }
+  return next
+}
 
 /**
  * The preview shows the saved card, so saved junk fails even when the cleaned view looks right:
- * a "," / "and" option, printed answer letters glued to an option, or the option pictures repeated in the stem.
+ * a "," / "and" option, page leftovers, or the option pictures repeated in the stem.
  */
 function hasScrapOption(q) {
   const options = Array.isArray(q?.options) ? q.options : []
   return (
     options.some((opt) => String(opt ?? '').trim() && SCRAP_OPTION_RE.test(String(opt))) ||
-    options.some((opt) => trimOptionLetterTail(opt) !== String(opt ?? '')) ||
+    withoutPageLeftovers(q) !== q ||
     Boolean(stemRepeatsOptionPictures(q))
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 7
+export const LOCAL_QUALITY_REVISION = 8
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -371,9 +400,7 @@ function adoptKnownFixes(q, shown, ocr) {
   ) {
     next = { ...next, options: shown.options.map((opt) => String(opt ?? '')) }
   }
-  if (Array.isArray(next.options) && next.options.some((opt) => trimOptionLetterTail(opt) !== String(opt ?? ''))) {
-    next = { ...next, options: next.options.map(trimOptionLetterTail) }
-  }
+  next = withoutPageLeftovers(next)
   const figured = restoreLabelledFigureOptions(next, ocr)
   const fixed = applyStoredOcrCardFixes(figured, ocr)
   return fixed === next ? next : fixed

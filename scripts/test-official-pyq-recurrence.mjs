@@ -1723,6 +1723,53 @@ test('2015 P1 Q18: "Identify the correct variation(s)" graphs become the options
   assert.deepEqual(fixed.options, doubled.options)
   assert.ok(!repaired.quality.failedGoTo.includes(18))
 })
+
+test('2015 P1 Q14/Q45: next page\'s "PHYSICS" head and the empty answer-box table stay off the cards; saved copies are flagged and fixed', () => {
+  const q14 = at2015(14)
+  const q45 = at2015(45)
+  assert.equal(q14.options[3], '90 cm')
+  assert.doesNotMatch(q45.text, /tabular/)
+  const emptyTable = '\n\n\\begin{tabular}[t]{|l|l|l|}\n\\hline & & \\\\\n\\hline & \\\\\n\\hline\n\\end{tabular}'
+  const questions = gridItems2015.map((q) => {
+    if (q === q14) return { ...q, options: [...q.options.slice(0, 3), '90 cm PHYSICS'] }
+    if (q === q45) return { ...q, text: `${q.text}${emptyTable}` }
+    return q
+  })
+  const run = localOfficialPyqQualityCheck(paper2015(questions))
+  for (const n of [14, 45]) assert.ok(run.failedGoTo.includes(n), `saved Q${n} is flagged`)
+  const repaired = repairOfficialPyqUntilQuality(paper2015(questions))
+  assert.equal(repaired.paper.questions[gridItems2015.indexOf(q14)].options[3], '90 cm')
+  assert.equal(repaired.paper.questions[gridItems2015.indexOf(q45)].text, q45.text)
+  for (const n of [14, 45]) assert.ok(!repaired.quality.failedGoTo.includes(n), `Q${n} passes after repair`)
+})
+
+test('every sample paper: no card keeps page leftovers (running heads, answer tables, empty tables, list/section code, instructions)', () => {
+  const dir = new URL('./fixtures/', import.meta.url)
+  const papers = fs.readdirSync(dir).filter((f) => /^jee-advanced-.*-mathpix\.txt$/.test(f))
+  assert.ok(papers.length >= 5)
+  const problems = []
+  for (const file of papers) {
+    const raw = fs.readFileSync(new URL(file, dir), 'utf8')
+    for (const card of paperItemsFromMathpixOcr(raw)) {
+      const q = healUploadQuestionCard(card, raw)
+      const parts = [['text', q.text], ['passage', q.passageText], ...(q.options || []).map((o, i) => [`option ${'ABCD'[i]}`, o])]
+      for (const [where, value] of parts) {
+        const s = String(value ?? '')
+        if (!s) continue
+        const cells = s.replace(/\\(?:begin|end)\{tabular\}(?:\[[a-z]\])?(?:\{[^{}]*\})?|\\hline|\\multicolumn\{[^{}]*\}\{[^{}]*\}\{\s*\}|\\\\|&|\s/g, '')
+        const found = [
+          /\s(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY|END OF PART[^a-z]*)\s*$/.test(s) && 'page heading',
+          /\\begin\{tabular\}/.test(s) && !cells && 'empty table',
+          /\(\s*[A-D]\s*\)\s+(?:and|or)\s+\(\s*[A-D]\s*\)\s*;/.test(s) && 'answer letters',
+          /\\section|\\end\{itemize\}|\\item\b/.test(s) && 'list/section code',
+          /Marking scheme|This section contains|darken the bubble/i.test(s) && 'instructions',
+        ].filter(Boolean)
+        if (found.length) problems.push(`${file} Q${q.printedNumber} ${where}: ${found.join(', ')}`)
+      }
+    }
+  }
+  assert.deepEqual(problems, [])
+})
 if (failed) {
   console.error(`\n${failed} recurrence test(s) failed`)
   process.exit(1)

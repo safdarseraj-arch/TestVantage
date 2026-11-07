@@ -121,6 +121,8 @@ export function sanitizeMathpixOcrText(raw) {
       stripPrintedAnswerBoxes(String(raw ?? ''))
         // A \begin{table} left before the next group's caption sticks to the last option.
         .replace(/\\(?:begin|end)\{table\}|\\captionsetup\{[^{}]*\}/g, '')
+        // A page's running head "\section*{PHYSICS}" otherwise sticks to the last option of the page before.
+        .replace(/^[ \t]*\\section\*?\{\s*(PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*\}[ \t]*$/gm, '$1')
         .replace(/^\uFEFF/, '')
         .replace(/\uFFFD+/g, '')
         .replace(/\u0000/g, '')

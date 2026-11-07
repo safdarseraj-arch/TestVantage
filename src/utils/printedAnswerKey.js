@@ -51,11 +51,12 @@ const OPTION_COMBO_CELLS_RE =
   /^(?:\(\s*[A-D]\s*\)(?:\s*(?:,|and|or|&)\s*\(\s*[A-D]\s*\))*\s*)+$/i
 
 /**
- * Answer-key copies print a small table of option letters ("(A) and (C)") under each page's
- * questions; inside a nested option list it would otherwise stick to the last option.
- * @param {string} text
+ * Answer-key copies print a small table of option letters ("(A) and (C)") or empty answer boxes
+ * under each page's questions; otherwise it sticks to the last option or stem as a raw table.
+ * @param {unknown} text
  */
-function stripOptionLetterTables(text) {
+export function stripAnswerBoxTables(text) {
+  text = String(text ?? '')
   let out = ''
   let from = 0
   let depth = 0
@@ -77,7 +78,7 @@ function stripOptionLetterTables(text) {
       .replace(/\\hline|\\\\|&/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-    if (cells && OPTION_COMBO_CELLS_RE.test(cells)) {
+    if (!cells || OPTION_COMBO_CELLS_RE.test(cells)) {
       out += text.slice(from, start)
       from = end
     }
@@ -87,7 +88,7 @@ function stripOptionLetterTables(text) {
 
 /** @param {unknown} raw */
 export function stripPrintedAnswerBoxes(raw) {
-  let t = stripOptionLetterTables(stripAwardedToAllNotes(raw))
+  let t = stripAnswerBoxTables(stripAwardedToAllNotes(raw))
   if (!/\bAns\s+for\s+Q\s*\.?\s*\d/i.test(t) && !new RegExp(HEADING, 'i').test(t)) return t
   t = t
     .replace(ENTRY_RE, '')

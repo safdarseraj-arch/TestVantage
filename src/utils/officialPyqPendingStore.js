@@ -146,6 +146,7 @@ export const OFFICIAL_PYQ_ADMIN_EDIT_FIELDS = [
   'correctIndices',
   'correctInteger',
   'correctNumerical',
+  'numericalTolerance',
   'matrixRows',
   'matrixCols',
   'matrixColLabels',

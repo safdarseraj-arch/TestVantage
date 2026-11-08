@@ -70,7 +70,10 @@ function lettersToAnswer(key) {
  * }}
  */
 export function detectAnswerFromPaper(block) {
-  const text = String(block ?? '').replace(/\r\n/g, '\n')
+  /** Mathpix prints some keys as headings: "\section*{Answer: [2.2 to 2.3]}" (2025 P1 Q9/Q41/Q42). */
+  const text = String(block ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\\section\*?\{\s*((?:(?:Official\s+)?Ans(?:wer)?s?\.?|Key)\s*[:.\-=][^{}\n]*)\}/gi, '$1')
   if (!text.trim()) {
     return { answerSource: 'unknown', answerConfidence: 0 }
   }
@@ -148,13 +151,15 @@ export function detectAnswerFromPaper(block) {
 
 /**
  * Read a printed key that sits at the end of the question, including a range.
- * Does not invent a number when the key is a band such as [0.7 to 0.8].
+ * A band such as [0.7 to 0.8] becomes 0.75 ± 0.05, so exactly the printed band is marked correct.
  * @param {string} text
  */
 function printedAnswerTail(text) {
   const m = String(text ?? '').match(PRINTED_ANSWER_TAIL)
   if (!m) return null
-  const value = String(m[2] ?? '').trim().replace(/\.$/, '')
+  let value = String(m[2] ?? '').trim()
+  if (!value.includes('{')) value = value.replace(/\}+$/, '').trim()
+  value = value.replace(/\.$/, '')
   if (!value || /^(?:a|an|the)\b/i.test(value)) return null
   const letter = value.match(/^\(?([A-D])\)?$/i)
   if (letter) {
@@ -185,7 +190,19 @@ function printedAnswerTail(text) {
     }
   }
   if (!/^(?:-?\d|\[[\d.+\-])/.test(value)) return null
+  const band = value.match(/^\[?\s*(-?\d+(?:\.\d+)?)\s*(?:to|–|—)\s*(-?\d+(?:\.\d+)?)\s*\]?$/i)
+  const low = band ? Number(band[1]) : NaN
+  const high = band ? Number(band[2]) : NaN
+  /** "[0.27 to 0.33]" is the band itself: its middle with half its width accepts exactly that band. */
+  const bandAnswer =
+    Number.isFinite(low) && Number.isFinite(high) && high > low
+      ? {
+          correctNumerical: Number(((low + high) / 2).toFixed(6)),
+          numericalTolerance: Number(((high - low) / 2).toFixed(6)),
+        }
+      : {}
   return {
+    ...bandAnswer,
     answerSource: 'from_paper',
     answerConfidence: 90,
     solution: m[1].trim(),
@@ -242,13 +259,18 @@ const PRINTED_ANSWER_LINE =
 export function stripAnswerMetaLines(block) {
   return String(block ?? '')
     .split('\n')
-    .filter((line) => {
+    .flatMap((line) => {
       const t = line.trim()
-      if (!t) return true
-      if (ANSWER_LINE.test(t) || INTEGER_ANS.test(t) || SOLUTION_LINE.test(t)) return false
-      if (PRINTED_ANSWER_LINE.test(t) || PRINTED_ANSWER_TAIL.test(t)) return false
-      if (ANSWER_PAREN.test(t) && t.length < 40) return false
-      return true
+      if (!t) return [line]
+      if (ANSWER_LINE.test(t) || INTEGER_ANS.test(t) || SOLUTION_LINE.test(t)) return []
+      if (PRINTED_ANSWER_LINE.test(t)) return []
+      if (PRINTED_ANSWER_TAIL.test(t)) {
+        // 2025 P2: "Then the value of $r$ is \_\_\_\_. Answer: 6" — the question sentence stays.
+        const kept = line.replace(PRINTED_ANSWER_TAIL, '').trimEnd()
+        return kept.trim() ? [kept] : []
+      }
+      if (ANSWER_PAREN.test(t) && t.length < 40) return []
+      return [line]
     })
     .join('\n')
     .trim()

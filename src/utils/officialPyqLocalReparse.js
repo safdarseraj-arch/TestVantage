@@ -458,6 +458,7 @@ export function keepAdminEditedCards(next, prev) {
       correctIndices: old.correctIndices,
       correctInteger: old.correctInteger,
       correctNumerical: old.correctNumerical,
+      numericalTolerance: old.numericalTolerance,
       ...gridFieldsOf(old),
       solution: old.solution,
       adminEdited: true,
@@ -510,13 +511,20 @@ export function copyAnswersOntoCanonical(canonical, prev) {
         solutionSource: old.solutionSource || q.solutionSource,
       }
     }
+    /** A key printed in the scan replaces the old answer whole; mixing kept a stale "A" beside "A, C" (2025 P2). */
+    const printed =
+      q.answerSource === 'from_paper' &&
+      old.answerSource !== 'admin_edit' &&
+      ([q.correctIndex, q.correctInteger, q.correctNumerical].some((v) => v != null) ||
+        (Array.isArray(q.correctIndices) && q.correctIndices.length > 0))
     return {
       ...q,
       id: q.id || old.id,
-      correctIndex: q.correctIndex ?? old.correctIndex,
-      correctIndices: q.correctIndices || old.correctIndices,
-      correctInteger: q.correctInteger ?? old.correctInteger,
-      correctNumerical: q.correctNumerical ?? old.correctNumerical,
+      correctIndex: printed ? q.correctIndex : q.correctIndex ?? old.correctIndex,
+      correctIndices: printed ? q.correctIndices : q.correctIndices || old.correctIndices,
+      correctInteger: printed ? q.correctInteger : q.correctInteger ?? old.correctInteger,
+      correctNumerical: printed ? q.correctNumerical : q.correctNumerical ?? old.correctNumerical,
+      numericalTolerance: printed || q.correctNumerical != null ? q.numericalTolerance : old.numericalTolerance,
       solution: stripEmptyFigureShells(
         stripEmptyImageMarkdown(
           String(old.solution ?? '').trim() ? old.solution : q.solution || '',

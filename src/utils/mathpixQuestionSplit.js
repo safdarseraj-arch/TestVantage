@@ -1210,6 +1210,28 @@ export function geminiStructureFailedSplit(structuredCount, raw) {
  * @param {unknown} raw
  * @returns {{ instructionText: string, blocks: string[] }}
  */
+/**
+ * Mathpix sometimes drops the "Q. 5" label of a section's first question, so the
+ * question runs on after the marking-scheme list (2025 P2 Q5). Split it back off.
+ * @param {string} chunk
+ */
+function unnumberedQuestionAfterInstructions(chunk) {
+  const ends = [...chunk.matchAll(/\\end\{itemize\}/gi)]
+  const last = ends[ends.length - 1]
+  if (!last) return null
+  const question = chunk.slice(last.index + last[0].length).trim()
+  if (question.length < 40) return null
+  if (/^(?:\\section|\\begin\{itemize\}|\\item\s*\[\s*-|SECTION\b|PARAGRAPH\b|Paragraph\s+for\b|Answer\s+the\s+following\b)/i.test(question)) {
+    return null
+  }
+  if (/\b(?:Full|Partial|Zero|Negative)\s+Marks\b|this\s+section\s+contains/i.test(question)) return null
+  const hasOptions = /\(\s*A\s*\)[\s\S]*\(\s*B\s*\)/.test(question)
+  const hasKeyOrBlank = /(?:^|\n)\s*(?:\\section\*?\{\s*)?Answer\s*:|\\_\\_\\_/i.test(question)
+  if (!hasOptions && !hasKeyOrBlank) return null
+  if (looksLikeInstructionOnly(question)) return null
+  return { instructions: chunk.slice(0, last.index + last[0].length).trim(), question }
+}
+
 export function splitMathpixQuestionBlocks(raw) {
   const text = normalizeMathpixQuestionMarkers(raw)
   if (!text) return { instructionText: '', blocks: [] }
@@ -1239,7 +1261,13 @@ export function splitMathpixQuestionBlocks(raw) {
     if (chunk.length < 8) continue
     if (chunk.length < 12 && cuts[i].kind !== 'q') continue
     if (cuts[i].kind === 'sec') {
-      instructionParts.push(chunk)
+      const tail = unnumberedQuestionAfterInstructions(chunk)
+      if (tail && keepMathpixQuestionBlock(tail.question)) {
+        instructionParts.push(tail.instructions)
+        blocks.push(tail.question)
+      } else {
+        instructionParts.push(chunk)
+      }
       continue
     }
     if (cuts[i].kind === 'para') {
@@ -1451,9 +1479,18 @@ function blockToMathpixDraft(block, i, attached, paper) {
     }
   }
   while (options.length < 4) options.push('')
-  const printed = detectAnswerFromPaper(text)
+  let printed = detectAnswerFromPaper(text)
+  if (printed.answerSource !== 'from_paper') {
+    /** "Answer: A" printed under the option table left the stem with the table (2025 P2 Q23). */
+    const keyLines = body
+      .split('\n')
+      .filter((line) => /^\s*(?:Ans(?:wer)?s?|Key)\s*[:.\-=]/i.test(line))
+      .join('\n')
+    if (keyLines) printed = detectAnswerFromPaper(keyLines)
+  }
   text = cleanMathpixCardText(text)
-  options = options.map((o) => cleanMathpixCardText(o))
+  /** A table row's "\\" stays out of the option; wrapped as math it shows as "$\$$\$$". */
+  options = options.map((o) => cleanMathpixCardText(String(o ?? '').replace(/(?:\s*\\\\)+\s*$/, '')))
   text = wrapCardMath(text)
   options = options.map((o) => wrapCardMath(o))
   text = stripLeakedOptionsFromStem(text, options)
@@ -1476,6 +1513,7 @@ function blockToMathpixDraft(block, i, attached, paper) {
           correctIndices: printed.correctIndices,
           correctInteger: printed.correctInteger,
           correctNumerical: printed.correctNumerical,
+          ...(printed.numericalTolerance != null ? { numericalTolerance: printed.numericalTolerance } : {}),
           answerSource: 'from_paper',
           ...(printed.solution
             ? { solution: printed.solution, solutionSource: printed.solutionSource || 'from_paper' }

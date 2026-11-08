@@ -43,7 +43,7 @@ function gradeQuestion(q, answer, pattern) {
         const n = parseFloat(String(answer))
         if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
         const tol = q.numericalTolerance ?? 0.01
-        return Math.abs(n - (q.correctNumerical ?? 0)) <= tol
+        return Math.abs(n - (q.correctNumerical ?? 0)) <= tol + 1e-9
           ? { grade: 'correct', marks: m.correct }
           : { grade: 'wrong', marks: m.wrong }
       }
@@ -82,8 +82,9 @@ function gradeQuestion(q, answer, pattern) {
       const n = parseFloat(String(answer))
       const m = getMarking(q, pattern)
       if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
+      /** Band edges: 0.33 - 0.30 is a hair above 0.03 in floating point. */
       const tol = q.numericalTolerance ?? 0.01
-      return Math.abs(n - (q.correctNumerical ?? 0)) <= tol
+      return Math.abs(n - (q.correctNumerical ?? 0)) <= tol + 1e-9
         ? { grade: 'correct', marks: m.correct }
         : { grade: 'wrong', marks: m.wrong }
     }

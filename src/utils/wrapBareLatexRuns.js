@@ -170,6 +170,8 @@ function mathRunEnd(text, start) {
       if (DISPLAY_MATRIX_ENV.test(text.slice(i))) hasDisplayMatrix = true
       // LaTeX row break `\\` belongs in aligned/array, not inline $…$.
       if (cmd === '\\\\') break
+      // A picture or page command after a blank ("is \_\_\_\_" then the figure) is not math (2025 P2 Q27).
+      if (i > start && /^\\(?:includegraphics|section|item|caption|begin\{figure)/.test(text.slice(i))) break
       sawCommand = true
       i = cmdEnd
       // \left / \right take a following delimiter (optionally backslash-escaped)

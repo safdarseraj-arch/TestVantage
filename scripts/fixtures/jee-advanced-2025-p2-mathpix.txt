@@ -1,0 +1,581 @@
+\section*{Final Answer Key Paper 2}
+
+\section*{SECTION 1 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains FOUR (04) questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is the correct answer.
+\item[-] For each question, choose the option corresponding to the correct answer.
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+Full Marks : +3 If ONLY the correct option is chosen;
+Zero Marks : 0 If none of the options is chosen (i.e. the question is unanswered);
+Negative Marks : -1 In all other cases.
+\item[Q.] 1 Let $x_{0}$ be the real number such that $e^{x_{0}}+x_{0}=0$. For a given real number $\alpha$, define
+$$g(x)=\frac{3 x e^{x}+3 x-\alpha e^{x}-\alpha x}{3\left(e^{x}+1\right)}$$
+for all real numbers $x$.
+Then which one of the following statements is TRUE?
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & For $\alpha=2, \lim _{x \rightarrow x_{0}}\left|\frac{g(x)+e^{x_{0}}}{x-x_{0}}\right|=0$ \\
+\hline (B) & For $\alpha=2, \lim _{x \rightarrow x_{0}}\left|\frac{g(x)+e^{x_{0}}}{x-x_{0}}\right|=1$ \\
+\hline (C) & For $\alpha=3, \lim _{x \rightarrow x_{0}}\left|\frac{g(x)+e^{x_{0}}}{x-x_{0}}\right|=0$ \\
+\hline (D) & For $\alpha=3, \lim _{x \rightarrow x_{0}}\left|\frac{g(x)+e^{x_{0}}}{x-x_{0}}\right|=\frac{2}{3}$ \\
+\hline
+\end{tabular}
+
+Answer: C
+\begin{itemize}
+\item[Q.] 2 Let $\mathbb{R}$ denote the set of all real numbers. Then the area of the region
+$$\left\{(x, y) \in \mathbb{R} \times \mathbb{R}: x>0, y>\frac{1}{x}, 5 x-4 y-1>0,4 x+4 y-17<0\right\}$$
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline (A) & $\frac{17}{16}-\log _{e} 4$ & (B) & $\frac{33}{8}-\log _{e} 4$ \\
+\hline (C) & $\frac{57}{8}-\log _{e} 4$ & (D) & $\frac{17}{2}-\log _{e} 4$ \\
+\hline
+\end{tabular}
+Answer: B
+\end{itemize}
+\begin{itemize}
+\item[Q.] 3 The total number of real solutions of the equation
+$$\theta=\tan ^{-1}(2 \tan \theta)-\frac{1}{2} \sin ^{-1}\left(\frac{6 \tan \theta}{9+\tan ^{2} \theta}\right)$$
+(Here, the inverse trigonometric functions $\sin ^{-1} x$ and $\tan ^{-1} x$ assume values in $\left[-\frac{\pi}{2}, \frac{\pi}{2}\right]$ and $\left(-\frac{\pi}{2}, \frac{\pi}{2}\right)$, respectively.)
+
+\begin{tabular}[t]{|l|l|l|l|l|l|l|l|}
+\hline (A) & 1 & (B) & 2 & (C) & 3 & (D) & 5 \\
+\hline
+\end{tabular}
+Answer: C
+\item[Q.] 4 Let $S$ denote the locus of the point of intersection of the pair of lines
+$$\begin{aligned}
+& 4 x-3 y=12 \alpha \\
+& 4 \alpha x+3 \alpha y=12
+\end{aligned}$$
+where $\alpha$ varies over the set of non-zero real numbers. Let $T$ be the tangent to $S$ passing through the points $(p, 0)$ and $(0, q), q>0$, and parallel to the line $4 x-\frac{3}{\sqrt{2}} y=0$.
+Then the value of $p q$ is
+
+\begin{tabular}[t]{|l|l|l|l|l|l|l|l|}
+\hline (A) & $-6 \sqrt{2}$ & (B) & $-3 \sqrt{2}$ & (C) & $-9 \sqrt{2}$ & (D) & $-12 \sqrt{2}$ \\
+\hline
+\end{tabular}
+Answer: A
+\end{itemize}
+
+\section*{SECTION 2 (Maximum Marks: 16)}
+\begin{itemize}
+\item[-] This section contains FOUR (04) questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct answer(s).
+\item[-] For each question, choose the option(s) corresponding to (all) the correct answer(s).
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+
+\begin{tabular}[t]{|l|l|}
+\hline Full Marks & : +4 ONLY if (all) the correct option(s) is(are) chosen; \\
+\hline Partial Marks & : +3 If all the four options are correct but ONLY three options are chosen; \\
+\hline Partial Marks & : +2 If three or more options are correct but ONLY two options are chosen, both of which are correct; \\
+\hline Partial Marks & : +1 If two or more options are correct but ONLY one option is chosen and it is a correct option; \\
+\hline Zero Marks & : 0 If none of the options is chosen (i.e. the question is unanswered); \\
+\hline Negative Marks & -2 In all other cases. \\
+\hline
+\end{tabular}
+\item[-] For example, in a question, if (A), (B) and (D) are the ONLY three options corresponding to correct answers, then
+choosing ONLY (A), (B) and (D) will get + 4 marks;
+choosing ONLY (A) and (B) will get +2 marks;
+choosing ONLY (A) and (D) will get +2 marks;
+choosing ONLY (B) and (D) will get +2 marks;
+choosing ONLY (A) will get +1 mark;
+choosing ONLY (B) will get +1 mark;
+choosing ONLY (D) will get +1 mark;
+choosing no option (i.e. the question is unanswered) will get 0 marks; and
+choosing any other combination of options will get -2 marks.
+\end{itemize}
+Q. 5 Let $I=\left(\begin{array}{ll}1 & 0 \\ 0 & 1\end{array}\right)$ and $P=\left(\begin{array}{ll}2 & 0 \\ 0 & 3\end{array}\right)$. Let $Q=\left(\begin{array}{ll} x & y \\ z & 4\end{array}\right)$ for some non-zero real numbers $x, y$, and $z$, for which there is a 2 × 2 matrix $R$ with all entries being non-zero real numbers, such that $Q R=R P$.
+
+Then which of the following statements is (are) TRUE?
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & The determinant of $Q-2 I$ is zero \\
+\hline (B) & The determinant of $Q-6 I$ is 12 \\
+\hline (C) & The determinant of $Q-3 I$ is 15 \\
+\hline (D) & $y z=2$ \\
+\hline
+\end{tabular}
+
+Answer: A, B
+\begin{itemize}
+\item[Q.] 6 Let $S$ denote the locus of the mid-points of those chords of the parabola $y^{2}=x$, such that the area of the region enclosed between the parabola and the chord is $\frac{4}{3}$. Let $\mathcal{R}$ denote the region lying in the first quadrant, enclosed by the parabola $y^{2}=x$, the curve $S$, and the lines $x=1$ and $x=4$.
+Then which of the following statements is (are) TRUE?
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & $(4, \sqrt{3}) \in S$ \\
+\hline (B) & $(5, \sqrt{2}) \in S$ \\
+\hline (C) & Area of $\mathcal{R}$ is $\frac{14}{3}-2 \sqrt{3}$ \\
+\hline (D) & Area of $\mathcal{R}$ is $\frac{14}{3}-\sqrt{3}$ \\
+\hline
+\end{tabular}
+
+Answer: A, C
+\begin{itemize}
+\item[Q.] 7 Let $P\left(x_{1}, y_{1}\right)$ and $Q\left(x_{2}, y_{2}\right)$ be two distinct points on the ellipse
+$$\frac{x^{2}}{9}+\frac{y^{2}}{4}=1$$
+such that $y_{1}>0$, and $y_{2}>0$. Let $C$ denote the circle $x^{2}+y^{2}=9$, and $M$ be the point (3, 0).
+Suppose the line $x=x_{1}$ intersects $C$ at $R$, and the line $x=x_{2}$ intersects C at $S$, such that the $y$-coordinates of $R$ and $S$ are positive. Let $\angle R O M=\frac{\pi}{6}$ and $\angle S O M=\frac{\pi}{3}$, where $O$ denotes the origin ( 0,0 ). Let $|X Y|$ denote the length of the line segment $X Y$.
+Then which of the following statements is (are) TRUE?
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & The equation of the line joining $P$ and $Q$ is $2 x+3 y=3(1+\sqrt{3})$ \\
+\hline (B) & The equation of the line joining $P$ and $Q$ is $2 x+y=3(1+\sqrt{3})$ \\
+\hline (C) & If $N_{2}=\left(x_{2}, 0\right)$, then $3\left|N_{2} Q\right|=2\left|N_{2} S\right|$ \\
+\hline (D) & If $N_{1}=\left(x_{1}, 0\right)$, then $9\left|N_{1} P\right|=4\left|N_{1} R\right|$ \\
+\hline
+\end{tabular}
+\end{itemize}
+
+Answer: A, C
+\begin{itemize}
+\item[Q.] 8 Let $\mathbb{R}$ denote the set of all real numbers. Let $f: \mathbb{R} \rightarrow \mathbb{R}$ be defined by
+$$f(x)= \begin{cases}\frac{6 x+\sin x}{2 x+\sin x} & \text { if } x \neq 0 \\ \frac{7}{3} & \text { if } x=0\end{cases}$$
+Then which of the following statements is (are) TRUE?
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & The point $x=0$ is a point of local maxima of $f$ \\
+\hline (B) & The point $x=0$ is a point of local minima of $f$ \\
+\hline (C) & Number of points of local maxima of $f$ in the interval $[\pi, 6 \pi]$ is 3 \\
+\hline (D) & Number of points of local minima of $f$ in the interval $[2 \pi, 4 \pi]$ is 1 \\
+\hline
+\end{tabular}
+\end{itemize}
+
+Answer: B, C, D
+
+\section*{SECTION 3 (Maximum Marks: 32)}
+\begin{itemize}
+\item[-] This section contains EIGHT (08) questions.
+\item[-] The answer to each question is a NUMERICAL VALUE.
+\item[-] For each question, enter the correct numerical value of the answer using the mouse and the on-screen virtual numeric keypad in the place designated to enter the answer.
+\item[-] If the numerical value has more than two decimal places, truncate/round-off the value to TWO decimal places.
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+Full Marks : +4 If ONLY the correct numerical value is entered in the designated place;
+Zero Marks : 0 In all other cases.
+\item[Q.] 9 Let $y(x)$ be the solution of the differential equation
+$$x^{2} \frac{d y}{d x}+x y=x^{2}+y^{2}, \quad x>\frac{1}{e},$$
+satisfying $y(1)=0$. Then the value of $2 \frac{(y(e))^{2}}{y\left(e^{2}\right)}$ is \_\_\_\_.
+Answer: [0.7 to 0.8]
+\item[Q.] 10 Let $a_{0}, a_{1}, \ldots, a_{23}$ be real numbers such that
+$$\left(1+\frac{2}{5} x\right)^{23}=\sum_{i=0}^{23} a_{i} x^{i}$$
+for every real number $x$. Let $a_{r}$ be the largest among the numbers $a_{j}$ for $0 \leq j \leq 23$.
+Then the value of $r$ is \_\_\_\_. Answer: 6
+\item[Q.] 11 A factory has a total of three manufacturing units, $M_{1}, M_{2}$, and $M_{3}$, which produce bulbs independent of each other. The units $M_{1}, M_{2}$, and $M_{3}$ produce bulbs in the proportions of 2: 2: 1, respectively. It is known that 20\% of the bulbs produced in the factory are defective. It is also known that, of all the bulbs produced by $M_{1}$, 15\% are defective. Suppose that, if a randomly chosen bulb produced in the factory is found to be defective, the probability that it was produced by $M_{2}$ is $\frac{2}{5}$.
+If a bulb is chosen randomly from the bulbs produced by $M_{3}$, then the probability that it is defective is \_\_\_\_. Answer: [0.27 to 0.33]
+\item[Q.] 12 Consider the vectors
+$$\vec{x}=\hat{\imath}+2 \hat{\jmath}+3 \hat{k}, \quad \vec{y}=2 \hat{\imath}+3 \hat{\jmath}+\hat{k}, \quad \text { and } \quad \vec{z}=3 \hat{\imath}+\hat{\jmath}+2 \hat{k} .$$
+For two distinct positive real numbers $\alpha$ and $\beta$, define
+$$\vec{X}=\alpha \vec{x}+\beta \vec{y}-\vec{z}, \quad \vec{Y}=\alpha \vec{y}+\beta \vec{z}-\vec{x}, \quad \text { and } \quad \vec{Z}=\alpha \vec{z}+\beta \vec{x}-\vec{y} .$$
+If the vectors $\vec{X}, \vec{Y}$, and $\vec{Z}$ lie in a plane, then the value of $\alpha+\beta-3$ is \_\_\_\_ Answer: -2
+\end{itemize}
+\begin{itemize}
+\item[Q.] 13 For a non-zero complex number $z$, let $\arg (z)$ denote the principal argument of $z$, with $-\pi<\arg (z) \leq \pi$. Let $\omega$ be the cube root of unity for which $0<\arg (\omega)<\pi$. Let
+$$\alpha=\arg \left(\sum_{n=1}^{2025}(-\omega)^{n}\right) .$$
+Then the value of $\frac{3 \alpha}{\pi}$ is \_\_\_\_.
+Answer: -2
+\item[Q.] 14 Let $\mathbb{R}$ denote the set of all real numbers. Let $f: \mathbb{R} \rightarrow \mathbb{R}$ and $g: \mathbb{R} \rightarrow(0,4)$ be functions defined by
+$$f(x)=\log _{e}\left(x^{2}+2 x+4\right), \text { and } g(x)=\frac{4}{1+e^{-2 x}} .$$
+Define the composite function $f \circ g^{-1}$ by $\left(f \circ g^{-1}\right)(x)=f\left(g^{-1}(x)\right)$, where $g^{-1}$ is the inverse of the function $g$.
+Then the value of the derivative of the composite function $f \circ g^{-1}$ at $x=2$ is \_\_\_\_.
+Answer: [0.2 to 0.3]
+\item[Q.] 15 Let
+$$\alpha=\frac{1}{\sin 60^{\circ} \sin 61^{\circ}}+\frac{1}{\sin 62^{\circ} \sin 63^{\circ}}+\cdots+\frac{1}{\sin 118^{\circ} \sin 119^{\circ}} .$$
+Then the value of
+$$\left(\frac{\operatorname{cosec} 1^{\circ}}{\alpha}\right)^{2}$$
+is \_\_\_\_.
+\end{itemize}
+
+Answer: 3
+\begin{itemize}
+\item[Q.] 16 If
+$$\alpha=\int_{\frac{1}{2}}^{2} \frac{\tan ^{-1} x}{2 x^{2}-3 x+2} d x$$
+then the value of $\sqrt{7} \tan \left(\frac{2 \alpha \sqrt{7}}{\pi}\right)$ is \_\_\_\_.
+(Here, the inverse trigonometric function $\tan ^{-1} x$ assumes values in $\left(-\frac{\pi}{2}, \frac{\pi}{2}\right)$.)
+\end{itemize}
+
+Answer: 21
+
+\section*{SECTION 1 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains FOUR (04) questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is the correct answer.
+\item[-] For each question, choose the option corresponding to the correct answer.
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+Full Marks : +3 If ONLY the correct option is chosen;
+Zero Marks : 0 If none of the options is chosen (i.e. the question is unanswered);
+Negative Marks : -1 In all other cases.
+\end{itemize}
+\begin{itemize}
+\item[Q.] 1 A temperature difference can generate e.m.f. in some materials. Let $S$ be the e.m.f. produced per unit temperature difference between the ends of a wire, $\sigma$ the electrical conductivity and $\kappa$ the thermal conductivity of the material of the wire. Taking $M, L, T, I$ and $K$ as dimensions of mass, length, time, current and temperature, respectively, the dimensional formula of the quantity $Z=\frac{S^{2} \sigma}{\kappa}$ is:
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline (A) & $\left[M^{0} L^{0} T^{0} I^{0} K^{0}\right]$ & (B) & $\left[M^{0} L^{0} T^{0} I^{0} K^{-1}\right]$ \\
+\hline (C) & $\left[M^{1} L^{2} T^{-2} I^{-1} K^{-1}\right]$ & (D) & $\left[M^{1} L^{2} T^{-4} I^{-1} K^{-1}\right]$ \\
+\hline
+\end{tabular}
+
+Answer: B
+\begin{itemize}
+\item[Q.] 2 Two co-axial conducting cylinders of same length $\ell$ with radii $\sqrt{2} R$ and $2 R$ are kept, as shown in Fig. 1. The charge on the inner cylinder is $Q$ and the outer cylinder is grounded. The annular region between the cylinders is filled with a material of dielectric constant $\kappa=5$. Consider an imaginary plane of the same length $\ell$ at a distance $R$ from the common axis of the cylinders. This plane is parallel to the axis of the cylinders. The cross-sectional view of this arrangement is shown in Fig. 2. Ignoring edge effects, the flux of the electric field through the plane is ( $\epsilon_{0}$ is the permittivity of free space):
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-08.jpg?height=531&width=424&top_left_y=1060&top_left_x=669}
+
+\caption{Fig. 1}
+\end{figure}
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-08.jpg?height=526&width=426&top_left_y=1060&top_left_x=1131}
+
+\caption{Fig. 2}
+\end{figure}
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|l|l|l|l|l|}
+\hline (A) & $\frac{Q}{30 \epsilon_{0}}$ & (B) & $\frac{Q}{15 \epsilon_{0}}$ & (C) & $\frac{Q}{60 \epsilon_{0}}$ & (D) & $\frac{Q}{120 \epsilon_{0}}$ \\
+\hline
+\end{tabular}
+
+Answer: C
+\begin{itemize}
+\item[Q.] 3 As shown in the figures, a uniform rod $O O^{\prime}$ of length $l$ is hinged at the point $O$ and held in place vertically between two walls using two massless springs of same spring constant. The springs are connected at the midpoint and at the top-end $\left(O^{\prime}\right)$ of the rod, as shown in Fig. 1 and the rod is made to oscillate by a small angular displacement. The frequency of oscillation of the rod is $f_{1}$. On the other hand, if both the springs are connected at the midpoint of the rod, as shown in Fig. 2 and the rod is made to oscillate by a small angular displacement, then the frequency of oscillation is $f_{2}$. Ignoring gravity and assuming motion only in the plane of the diagram, the value of $\frac{f_{1}}{f_{2}}$ is:
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-09.jpg?height=246&width=406&top_left_y=589&top_left_x=633}
+
+\caption{Fig. 1}
+\end{figure}
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-09.jpg?height=243&width=404&top_left_y=592&top_left_x=1180}
+
+\caption{Fig. 2}
+\end{figure}
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|l|l|l|l|l|l|}
+\hline (A) & 2 & (B) & $\sqrt{2}$ & (C) & $\sqrt{\frac{5}{2}}$ & (D) & $\sqrt{\frac{2}{5}}$ \\
+\hline
+\end{tabular}
+
+Answer: C
+\begin{itemize}
+\item[Q.] 4 Consider a star of mass $m_{2} \mathrm{~kg}$ revolving in a circular orbit around another star of mass $m_{1} \mathrm{~kg}$ with $m_{1} \gg m_{2}$. The heavier star slowly acquires mass from the lighter star at a constant rate of $\gamma \mathrm{kg} / \mathrm{s}$. In this transfer process, there is no other loss of mass. If the separation between the centers of the stars is $r$, then its relative rate of change $\frac{1}{r} \frac{d r}{d t}\left(\right.$ in s $\left.^{-1}\right)$ is given by:
+
+\begin{tabular}[t]{|l|l|l|l|l|l|l|l|}
+\hline (A) & $-\frac{3 \gamma}{2 m_{2}}$ & (B) & $-\frac{2 \gamma}{m_{2}}$ & (C) & $-\frac{2 \gamma}{m_{1}}$ & (D) & $-\frac{3 \gamma}{2 m_{1}}$ \\
+\hline
+\end{tabular}
+MARKS TO ALL
+\end{itemize}
+
+\section*{SECTION 2 (Maximum Marks: 16)}
+\begin{itemize}
+\item[-] This section contains FOUR (04) questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct answer(s).
+\item[-] For each question, choose the option(s) corresponding to (all) the correct answer(s).
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+
+\begin{tabular}[t]{|l|l|}
+\hline Full Marks & : +4 ONLY if (all) the correct option(s) is(are) chosen; \\
+\hline Partial Marks & : +3 If all the four options are correct but ONLY three options are chosen; \\
+\hline Partial Marks & : +2 If three or more options are correct but ONLY two options are chosen, both of which are correct; \\
+\hline Partial Marks & : +1 If two or more options are correct but ONLY one option is chosen and it is a correct option; \\
+\hline Zero Marks & : 0 If none of the options is chosen (i.e. the question is unanswered); \\
+\hline Negative Marks & -2 In all other cases. \\
+\hline
+\end{tabular}
+\item[-] For example, in a question, if (A), (B) and (D) are the ONLY three options corresponding to correct answers, then
+choosing ONLY (A), (B) and (D) will get + 4 marks;
+choosing ONLY (A) and (B) will get +2 marks;
+choosing ONLY (A) and (D) will get +2 marks;
+choosing ONLY (B) and (D) will get +2 marks;
+choosing ONLY (A) will get +1 mark;
+choosing ONLY (B) will get +1 mark;
+choosing ONLY (D) will get +1 mark;
+choosing no option (i.e. the question is unanswered) will get 0 marks; and
+choosing any other combination of options will get -2 marks.
+\item[Q.] 5 A positive point charge of $10^{-8} \mathrm{C}$ is kept at a distance of 20 cm from the center of a neutral conducting sphere of radius 10 cm. The sphere is then grounded and the charge on the sphere is measured. The grounding is then removed and subsequently the point charge is moved by a distance of 10 cm further away from the center of the sphere along the radial direction. Taking $\frac{1}{4 \pi \epsilon_{0}}=9 \times 10^{9} \mathrm{Nm}^{2} / \mathrm{C}^{2}$ (where $\epsilon_{0}$ is the permittivity of free space), which of the following statements is/are correct:
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & Before the grounding, the electrostatic potential of the sphere is 450 V. \\
+\hline (B) & Charge flowing from the sphere to the ground because of grounding is $5 \times 10^{-9} \mathrm{C}$. \\
+\hline (C) & After the grounding is removed, the charge on the sphere is $-5 \times 10^{-9} \mathrm{C}$. \\
+\hline (D) & The final electrostatic potential of the sphere is 300 V. \\
+\hline
+\end{tabular}
+Answer: A, B, C
+\end{itemize}
+\begin{itemize}
+\item[Q.] 6 Two identical concave mirrors each of focal length $f$ are facing each other as shown in the schematic diagram. The focal length $f$ is much larger than the size of the mirrors. A glass slab of thickness $t$ and refractive index $n_{0}$ is kept equidistant from the mirrors and perpendicular to their common principal axis. A monochromatic point light source $S$ is embedded at the center of the slab on the principal axis, as shown in the schematic diagram. For the image to be formed on $S$ itself, which of the following distances between the two mirrors is/are correct:
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-11.jpg?height=417&width=596&top_left_y=499&top_left_x=809)
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline (A) & $4 f+\left(1-\frac{1}{n_{0}}\right) t$ & (B) & $2 f+\left(1-\frac{1}{n_{0}}\right) t$ \\
+\hline (C) & $4 f+\left(n_{0}-1\right) t$ & (D) & $2 f+\left(n_{0}-1\right) t$ \\
+\hline
+\end{tabular}
+Answer: A, B
+\item[Q.] 7 Six infinitely large and thin non-conducting sheets are fixed in configurations I and II. As shown in the figure, the sheets carry uniform surface charge densities which are indicated in terms of $\sigma_{0}$. The separation between any two consecutive sheets is $1 \mu \mathrm{~m}$. The various regions between the sheets are denoted as $1,2,3,4$ and 5 . If $\sigma_{0}=9 \mu \mathrm{C} / \mathrm{m}^{2}$, then which of the following statements is/are correct: (Take permittivity of free space $\epsilon_{0}=9 \times 10^{-12} \mathrm{~F} / \mathrm{m}$ )
+$+\sigma_{0} \quad-\sigma_{0} \quad+\sigma_{0} \quad-\sigma_{0} \quad+\sigma_{0} \quad-\sigma_{0}$
+\begin{tabular}{|l|l|l|l|l|}
+& & & & \\
+1 & 2 & 3 & 4 & 5
+\end{tabular}
+Configuration I
+$+\frac{\sigma_{0}}{2} \quad-\sigma_{0} \quad+\sigma_{0} \quad-\sigma_{0} \quad+\sigma_{0} \quad \frac{-\sigma_{0}}{2}$
+\begin{tabular}{|l|l|l|l|l|}
+& & & & \\
+1 & 2 & 3 & 4 & 5
+\end{tabular}
+Configuration II
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & In region 4 of the configuration I, the magnitude of the electric field is zero. \\
+\hline (B) & In region 3 of the configuration II, the magnitude of the electric field is $\frac{\sigma_{0}}{\epsilon_{0}}$. \\
+\hline (C) & Potential difference between the first and the last sheets of the configuration I is 5 V. \\
+\hline (D) & Potential difference between the first and the last sheets of the configuration II is zero. \\
+\hline
+\end{tabular}
+Answer: A
+\end{itemize}
+Q. 8 The efficiency of a Carnot engine operating with a hot reservoir kept at a temperature of 1000 K is 0.4. It extracts 150 J of heat per cycle from the hot reservoir. The work extracted from this engine is being fully used to run a heat pump which has a coefficient of performance 10. The hot reservoir of the heat pump is at a temperature of 300 K . Which of the following statements is/are correct:
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & Work extracted from the Carnot engine in one cycle is 60 J. \\
+\hline (B) & Temperature of the cold reservoir of the Carnot engine is 600 K. \\
+\hline (C) & Temperature of the cold reservoir of the heat pump is 270 K. \\
+\hline (D) & Heat supplied to the hot reservoir of the heat pump in one cycle is 540 J. \\
+\hline
+\end{tabular}
+
+Answer: A, B, C
+
+\section*{SECTION 3 (Maximum Marks: 32)}
+\begin{itemize}
+\item[-] This section contains EIGHT (08) questions.
+\item[-] The answer to each question is a NUMERICAL VALUE.
+\item[-] For each question, enter the correct numerical value of the answer using the mouse and the onscreen virtual numeric keypad in the place designated to enter the answer.
+\item[-] If the numerical value has more than two decimal places, truncate/round-off the value to TWO decimal places.
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+
+\begin{tabular}[t]{|l|l|}
+\hline Full Marks & : +4 If ONLY the correct numerical value is entered in the designated place; \\
+\hline Zero Marks & : 0 In all other cases. \\
+\hline
+\end{tabular}
+\item[Q.] 9 A conducting solid sphere of radius $R$ and mass $M$ carries a charge $Q$. The sphere is rotating about an axis passing through its center with a uniform angular speed $\omega$. The ratio of the magnitudes of the magnetic dipole moment to the angular momentum about the same axis is given as $\alpha \frac{Q}{2 M}$. The value of $\alpha$ is \_\_\_\_
+Answer: [1.65 to 1.67]
+\item[Q.] 10 A hydrogen atom, initially at rest in its ground state, absorbs a photon of frequency $v_{1}$ and ejects the electron with a kinetic energy of 10 eV. The electron then combines with a positron at rest to form a positronium atom in its ground state and simultaneously emits a photon of frequency $v_{2}$. The center of mass of the resulting positronium atom moves with a kinetic energy of 5 eV. It is given that positron has the same mass as that of electron and the positronium atom can be considered as a Bohr atom, in which the electron and the positron orbit around their center of mass. Considering no other energy loss during the whole process, the difference between the two photon energies (in eV) is \_\_\_\_
+Answer: [11.7 to 11.9]
+\end{itemize}
+\begin{itemize}
+\item[Q.] 11 An ideal monatomic gas of $n$ moles is taken through a cycle $W X Y Z W$ consisting of consecutive adiabatic and isobaric quasi-static processes, as shown in the schematic $V-T$ diagram. The volume of the gas at $W, X$ and $Y$ points are, $64 \mathrm{~cm}^{3}, 125 \mathrm{~cm}^{3}$ and $250 \mathrm{~cm}^{3}$, respectively. If the absolute temperature of the gas $T_{W}$ at the point $W$ is such that $n R T_{W}=1 \mathrm{~J}$ ( $R$ is the universal gas constant), then the amount of heat absorbed (in J ) by the gas along the path $X Y$ is \_\_\_\_
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-14.jpg?height=551&width=458&top_left_y=461&top_left_x=879)
+Answer: 1.6
+\item[Q.] 12 A geostationary satellite above the equator is orbiting around the earth at a fixed distance $r_{1}$ from the center of the earth. A second satellite is orbiting in the equatorial plane in the opposite direction to the earth's rotation, at a distance $r_{2}$ from the center of the earth, such that $r_{1}=1.21 r_{2}$. The time period of the second satellite as measured from the geostationary satellite is $\frac{24}{p}$ hours. The value of $p$ is \_\_\_\_
+\end{itemize}
+
+Answer: [2.3 to 2.4]
+\begin{itemize}
+\item[Q.] 13 The left and right compartments of a thermally isolated container of length $L$ are separated by a thermally conducting, movable piston of area $A$. The left and right compartments are filled with $\frac{3}{2}$ and 1 moles of an ideal gas, respectively. In the left compartment the piston is attached by a spring with spring constant $k$ and natural length $\frac{2 L}{5}$. In thermodynamic equilibrium, the piston is at a distance $\frac{L}{2}$ from the left and right edges of the container as shown in the figure. Under the above conditions, if the pressure in the right compartment is $P=\frac{k L}{A} \alpha$, then the value of $\alpha$ is \_\_\_\_
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-14.jpg?height=283&width=593&top_left_y=2145&top_left_x=813)
+Answer: 0.2
+\end{itemize}
+\begin{itemize}
+\item[Q.] 14 In a Young's double slit experiment, a combination of two glass wedges $A$ and $B$, having refractive indices 1.7 and 1.5, respectively, are placed in front of the slits, as shown in the figure. The separation between the slits is $d=2 \mathrm{~mm}$ and the shortest distance between the slits and the screen is $D=2 \mathrm{~m}$. Thickness of the combination of the wedges is $t=12 \mu \mathrm{~m}$. The value of $l$ as shown in the figure is 1 mm. Neglect any refraction effect at the slanted interface of the wedges. Due to the combination of the wedges, the central maximum shifts (in mm) with respect to 0 by \_\_\_\_
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-15.jpg?height=501&width=800&top_left_y=735&top_left_x=707)
+Answer: 1.2
+\item[Q.] 15 A projectile of mass 200 g is launched in a viscous medium at an angle 60° with the horizontal, with an initial velocity of 270 m/s. It experiences a viscous drag force $\vec{F}=-c \vec{v}$ where the drag coefficient $c=0.1 \mathrm{~kg} / \mathrm{s}$ and $\vec{v}$ is the instantaneous velocity of the projectile. The projectile hits a vertical wall after 2 s. Taking $e=2.7$, the horizontal distance of the wall from the point of projection (in m) is
+\_\_\_\_
+\end{itemize}
+
+Answer: [167 to 171]
+\begin{itemize}
+\item[Q.] 16 An audio transmitter (T) and a receiver (R) are hung vertically from two identical massless strings of length 8 m with their pivots well separated along the $X$ axis. They are pulled from the equilibrium position in opposite directions along the $X$ axis by a small angular amplitude $\theta_{0}=\cos ^{-1}(0.9)$ and released simultaneously. If the natural frequency of the transmitter is 660 Hz and the speed of sound in air is 330 m/s, the maximum variation in the frequency (in Hz) as measured by the receiver (Take the acceleration due to gravity $g=10 \mathrm{~m} / \mathrm{s}^{2}$ ) is \_\_\_\_
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-15.jpg?height=356&width=894&top_left_y=2120&top_left_x=663)
+Answer: [26 to 33]
+\end{itemize}
+
+\section*{SECTION 1 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains FOUR (04) questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is the correct answer.
+\item[-] For each question, choose the option corresponding to the correct answer.
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+Full Marks : +3 If ONLY the correct option is chosen;
+Zero Marks : 0 If none of the options is chosen (i.e. the question is unanswered);
+Negative Marks : -1 In all other cases.
+\item[Q.] 1 During sodium nitroprusside test of sulphide ion in an aqueous solution, one of the ligands coordinated to the metal ion is converted to
+
+\begin{tabular}[t]{|l|l|l|l|l|l|l|l|}
+\hline (A) & $\mathrm{NOS}^{-}$ & (B) & $\mathrm{SCN}^{-}$ & (C) & $\mathrm{SNO}^{-}$ & (D) & $\mathrm{NCS}^{-}$ \\
+\hline
+\end{tabular}
+Answer: A
+\item[Q.] 2 The complete hydrolysis of $\mathrm{ICl}, \mathrm{ClF}_{3}$ and $\mathrm{BrF}_{5}$, respectively, gives
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & $\mathrm{IO}^{-}, \mathrm{ClO}_{2}{ }^{-}$and $\mathrm{BrO}_{3}{ }^{-}$ \\
+\hline (B) & $\mathrm{IO}_{3}{ }^{-}, \mathrm{ClO}_{2}{ }^{-}$and $\mathrm{BrO}_{3}{ }^{-}$ \\
+\hline (C) & $\mathrm{IO}^{-}, \mathrm{ClO}^{-}$and $\mathrm{BrO}_{2}{ }^{-}$ \\
+\hline (D) & $\mathrm{IO}_{3}{ }^{-}, \mathrm{ClO}_{4}{ }^{-}$and $\mathrm{BrO}_{2}{ }^{-}$ \\
+\hline
+\end{tabular}
+Answer: A
+\end{itemize}
+Q. 3
+
+Monocyclic compounds $\mathbf{P}, \mathbf{Q}, \mathbf{R}$ and $\mathbf{S}$ are the major products formed in the reaction sequences given below.
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-17.jpg?height=154&width=826&top_left_y=322&top_left_x=341)
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-17.jpg?height=130&width=795&top_left_y=560&top_left_x=343)
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-17.jpg?height=213&width=602&top_left_y=775&top_left_x=343)
+\begin{itemize}
+\begin{itemize}
+\item[(i)] $\mathrm{O}_{3}, \mathrm{Zn}-\mathrm{H}_{2} \mathrm{O}$
+\item[(ii)] $\mathrm{CH}_{3} \mathrm{MgBr}$ (2 equiv.)
+\end{itemize}
+\end{itemize}
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-17.jpg?height=113&width=716&top_left_y=1154&top_left_x=344)
+The product having the highest number of unsaturated carbon atom(s) is
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline (A) & P & (B) & Q \\
+\hline (C) & R & (D) & S \\
+\hline
+\end{tabular}
+
+Answer: D
+Q. 4
+
+The correct reaction/reaction sequence that would produce a dicarboxylic acid as the major product is
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & ![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-17.jpg?height=204&width=484&top_left_y=1856&top_left_x=451) \\
+\hline (B) & ![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-17.jpg?height=151&width=433&top_left_y=2084&top_left_x=454) \\
+\hline (C) & ![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-17.jpg?height=121&width=526&top_left_y=2279&top_left_x=447) \\
+\hline (D) & ![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-17.jpg?height=148&width=501&top_left_y=2423&top_left_x=450) \\
+\hline
+\end{tabular}
+
+Answer: C
+
+\section*{SECTION 2 (Maximum Marks: 16)}
+\begin{itemize}
+\item[-] This section contains FOUR (04) questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct answer(s).
+\item[-] For each question, choose the option(s) corresponding to (all) the correct answer(s).
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+
+\begin{tabular}[t]{|l|l|}
+\hline Full Marks & : +4 ONLY if (all) the correct option(s) is(are) chosen; \\
+\hline Partial Marks & : +3 If all the four options are correct but ONLY three options are chosen; \\
+\hline Partial Marks & : +2 If three or more options are correct but ONLY two options are chosen, both of which are correct; \\
+\hline Partial Marks & : +1 If two or more options are correct but ONLY one option is chosen and it is a correct option; \\
+\hline Zero Marks & : 0 If none of the options is chosen (i.e. the question is unanswered); \\
+\hline Negative Marks & -2 In all other cases. \\
+\hline
+\end{tabular}
+\item[-] For example, in a question, if (A), (B) and (D) are the ONLY three options corresponding to correct answers, then choosing ONLY (A), (B) and (D) will get + 4 marks; choosing ONLY (A) and (B) will get +2 marks; choosing ONLY (A) and (D) will get +2 marks; choosing ONLY (B) and (D) will get +2 marks; choosing ONLY (A) will get +1 mark; choosing ONLY (B) will get +1 mark; choosing ONLY (D) will get +1 mark; choosing no option (i.e. the question is unanswered) will get 0 marks; and choosing any other combination of options will get -2 marks.
+\item[Q.] 5 The correct statement(s) about intermolecular forces is(are)
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & The potential energy between two point charges approaches zero more rapidly than the potential energy between a point dipole and a point charge as the distance between them approaches infinity. \\
+\hline (B) & The average potential energy of two rotating polar molecules that are separated by a distance $r$ has $1 / r^{3}$ dependence. \\
+\hline (C) & The dipole-induced dipole average interaction energy is independent of temperature. \\
+\hline (D) & Nonpolar molecules attract one another even though neither has a permanent dipole moment. \\
+\hline
+\end{tabular}
+Answer: C, D
+\item[Q.] 6 The compound(s) with P-H bond(s) is(are)
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & $\mathrm{H}_{3} \mathrm{PO}_{4}$ \\
+\hline (B) & $\mathrm{H}_{3} \mathrm{PO}_{3}$ \\
+\hline (C) & $\mathrm{H}_{4} \mathrm{P}_{2} \mathrm{O}_{7}$ \\
+\hline (D) & $\mathrm{H}_{3} \mathrm{PO}_{2}$ \\
+\hline
+\end{tabular}
+Answer: B, D
+\end{itemize}
+\begin{itemize}
+\item[Q.] 7
+For the reaction sequence given below, the correct statement(s) is(are)
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-19.jpg?height=172&width=1532&top_left_y=340&top_left_x=341)
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & Both $\mathbf{X}$ and $\mathbf{Y}$ are oxygen containing compounds. \\
+\hline (B) & Y on heating with $\mathrm{CHCl}_{3} / \mathrm{KOH}$ forms isocyanide. \\
+\hline (C) & $\mathbf{Z}$ reacts with Hinsberg's reagent. \\
+\hline (D) & Z is an aromatic primary amine. \\
+\hline
+\end{tabular}
+Answer: A, C
+\item[Q.] 8
+For the reaction sequence given below, the correct statement(s) is(are)
+![](https://cdn.mathpix.com/cropped/6f1bd82b-d701-48ff-92e8-6260b4069190-19.jpg?height=354&width=1268&top_left_y=1081&top_left_x=330)
+
+\begin{tabular}[t]{|l|l|}
+\hline (A) & P is optically active. \\
+\hline (B) & S gives Bayer's test. \\
+\hline (C) & Q gives effervescence with aq. $\mathrm{NaHCO}_{3}$. \\
+\hline (D) & R is an alkyne. \\
+\hline
+\end{tabular}
+Answer: B, C
+\end{itemize}
+
+\section*{SECTION 3 (Maximum Marks: 32)}
+\begin{itemize}
+\item[-] This section contains EIGHT (08) questions.
+\item[-] The answer to each question is a NUMERICAL VALUE.
+\item[-] For each question, enter the correct numerical value of the answer using the mouse and the on-screen virtual numeric keypad in the place designated to enter the answer.
+\item[-] If the numerical value has more than two decimal places, truncate/round-off the value to TWO decimal places.
+\item[-] Answer to each question will be evaluated according to the following marking scheme:
+Full Marks : +4 If ONLY the correct numerical value is entered in the designated place;
+Zero Marks : 0 In all other cases.
+\item[Q.] 9 The density (in $\mathrm{g} \mathrm{cm}^{-3}$ ) of the metal which forms a cubic close packed (ccp) lattice with an axial distance (edge length) equal to 400 pm is \_\_\_\_.
+Use: Atomic mass of metal $=105.6$ amu and Avogadro's constant $=6 \times 10^{23} \mathrm{~mol}^{-1}$
+\end{itemize}
+
+Answer: [10.85 to 11.1]
+\begin{itemize}
+\item[Q.] 10 The solubility of barium iodate in an aqueous solution prepared by mixing 200 mL of 0.010 M barium nitrate with 100 mL of 0.10 M sodium iodate is $\boldsymbol{X} \times 10^{-6} \mathrm{~mol} \mathrm{dm}^{-3}$. The value of $\boldsymbol{X}$ is
+\_\_\_\_.
+Use: Solubility product constant $\left(K_{\mathrm{sp}}\right)$ of barium iodate $=1.58 \times 10^{-9}$
+\end{itemize}
+
+Answer: [3.85 to 4.15]
+\begin{itemize}
+\item[Q.] 11 Adsorption of phenol from its aqueous solution on to fly ash obeys Freundlich isotherm. At a given temperature, from $10 \mathrm{mg} \mathrm{g}^{-1}$ and $16 \mathrm{mg} \mathrm{g}^{-1}$ aqueous phenol solutions, the concentrations of adsorbed phenol are measured to be $4 \mathrm{mg} \mathrm{g}^{-1}$ and $10 \mathrm{mg} \mathrm{g}^{-1}$, respectively. At this temperature, the concentration (in $\mathrm{mg} \mathrm{g}^{-1}$ ) of adsorbed phenol from $20 \mathrm{mg} \mathrm{g}^{-1}$ aqueous solution of phenol will be
+\_\_\_\_.
+Use: $\log _{10} 2=0.3$
+\end{itemize}
+
+Answer: [15.5 to 16.5]
+\begin{itemize}
+\item[Q.] 12 Consider a reaction $A+R \rightarrow$ Product. The rate of this reaction is measured to be $k[A][R]$. At the start of the reaction, the concentration of $R,[R]_{0}$, is 10-times the concentration of $A,[A]_{0}$. The reaction can be considered to be a pseudo first order reaction with assumption that $k[R]=k^{\prime}$ is constant. Due to this assumption, the relative error (in \%) in the rate when this reaction is 40 \% complete, is \_\_\_\_.
+[ $k$ and $k^{\prime}$ represent corresponding rate constants]
+\end{itemize}
+
+Answer: [4 to 4.25]
+\begin{itemize}
+\item[Q.] 13 At 300 K, an ideal dilute solution of a macromolecule exerts osmotic pressure that is expressed in terms of the height (h) of the solution (density $=1.00 \mathrm{~g} \mathrm{~cm}^{-3}$ ) where h is equal to 2.00 cm . If the concentration of the dilute solution of the macromolecule is $2.00 \mathrm{~g} \mathrm{dm}^{-3}$, the molar mass of the macromolecule is calculated to be $\boldsymbol{X} \times 10^{4} \mathrm{~g} \mathrm{~mol}^{-1}$. The value of $\boldsymbol{X}$ is \_\_\_\_.
+Use: Universal gas constant $(\mathrm{R})=8.3 \mathrm{~J} \mathrm{~K}^{-1} \mathrm{~mol}^{-1}$ and acceleration due to gravity $(g)=10 \mathrm{~m} \mathrm{~s}^{-2}$
+Answer: [2.4 to 2.55]
+\item[Q.] 14 An electrochemical cell is fueled by the combustion of butane at 1 bar and 298 K. Its cell potential is $\frac{\boldsymbol{X}}{F} \times 10^{3}$ volts, where $F$ is the Faraday constant. The value of $\boldsymbol{X}$ is \_\_\_\_.
+Use: Standard Gibbs energies of formation at 298 K are: $\Delta_{f} G_{\mathrm{CO}_{2}}^{o}=-394 \mathrm{~kJ} \mathrm{~mol}^{-1} ; \Delta_{f} G_{\text {water }}^{o}=$ $-237 \mathrm{~kJ} \mathrm{~mol}^{-1} ; \Delta_{f} G_{\text {butane }}^{o}=-18 \mathrm{~kJ} \mathrm{~mol}^{-1}$
+Answer: [105.4 to 105.6]
+\item[Q.] 15 The sum of the spin only magnetic moment values (in B.M.) of $\left[\mathrm{Mn}(\mathrm{Br})_{6}\right]^{3-}$ and $\left[\mathrm{Mn}(\mathrm{CN})_{6}\right]^{3-}$ is
+\_\_\_\_.
+Answer: [7.5 to 7.8]
+\item[Q.] 16 A linear octasaccharide (molar mass $=1024 \mathrm{~g} \mathrm{~mol}^{-1}$ ) on complete hydrolysis produces three monosaccharides: ribose, 2-deoxyribose and glucose. The amount of 2-deoxyribose formed is 58.26 \% (w/w) of the total amount of the monosaccharides produced in the hydrolyzed products. The number of ribose unit(s) present in one molecule of octasaccharide is \_\_\_\_.
+Use: Molar mass (in $\mathrm{g} \mathrm{mol}^{-1}$ ): ribose = 150, 2-deoxyribose = 134, glucose = 180;
+Atomic mass (in amu): $\mathrm{H}=1, \mathrm{O}=16$
+Answer: 2
+\end{itemize}

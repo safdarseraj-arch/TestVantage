@@ -126,6 +126,7 @@ export function applyHybridPatchToCard(card, patch) {
     next.correctIndices = patch.correctIndices
     next.correctInteger = patch.correctInteger
     next.correctNumerical = patch.correctNumerical
+    delete next.numericalTolerance
     next.answerSource = 'hybrid_ai'
   }
   if (!handEdited && !KEPT_SOURCES.has(card.solutionSource) && has(patch.solution) && patch.solution !== card.solution) {

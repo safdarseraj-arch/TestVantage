@@ -38,6 +38,7 @@ const SNAPSHOT_FIELDS = [
   'correctIndices',
   'correctInteger',
   'correctNumerical',
+  'numericalTolerance',
   'matrixRows',
   'matrixCols',
   'matrixAnswerKey',
@@ -347,7 +348,14 @@ export function formatOfficialPyqAnswerKey(q) {
   if (q.correctIndex != null && Number.isFinite(Number(q.correctIndex))) {
     return LETTERS[Number(q.correctIndex)] ?? String(q.correctIndex)
   }
-  if (q.correctNumerical != null && String(q.correctNumerical).trim() !== '') return String(q.correctNumerical)
+  if (q.correctNumerical != null && String(q.correctNumerical).trim() !== '') {
+    const mid = Number(q.correctNumerical)
+    const tol = Number(q.numericalTolerance)
+    if (Number.isFinite(mid) && Number.isFinite(tol) && tol > 0) {
+      return `${Number((mid - tol).toFixed(6))} to ${Number((mid + tol).toFixed(6))}`
+    }
+    return String(q.correctNumerical)
+  }
   if (q.correctInteger != null && String(q.correctInteger).trim() !== '') return String(q.correctInteger)
   return ''
 }
@@ -365,8 +373,22 @@ export function parseOfficialPyqAnswerKey(raw, card) {
     correctIndices: undefined,
     correctInteger: undefined,
     correctNumerical: undefined,
+    numericalTolerance: undefined,
   }
   if (!text) return { ok: true, patch: cleared }
+  const band = text.match(/^\[?\s*(-?\d+(?:\.\d+)?)\s*(?:to|–|—)\s*(-?\d+(?:\.\d+)?)\s*\]?$/i)
+  if (band && Number(band[2]) > Number(band[1])) {
+    const low = Number(band[1])
+    const high = Number(band[2])
+    return {
+      ok: true,
+      patch: {
+        ...cleared,
+        correctNumerical: Number(((low + high) / 2).toFixed(6)),
+        numericalTolerance: Number(((high - low) / 2).toFixed(6)),
+      },
+    }
+  }
   const letters = text.toUpperCase().match(/^[A-H](?:\s*[,/&\s]\s*[A-H])*$/)
   if (letters) {
     const idx = Array.from(new Set(text.toUpperCase().match(/[A-H]/g) || [])).map((l) => LETTERS.indexOf(l))
@@ -388,7 +410,7 @@ export function parseOfficialPyqAnswerKey(raw, card) {
         : { ...cleared, correctNumerical: num },
     }
   }
-  return { ok: false, error: 'Answer key: use option letters (A or A, C) or a number.' }
+  return { ok: false, error: 'Answer key: use option letters (A or A, C), a number, or a range (0.27 to 0.33).' }
 }
 
 /** An integer / numerical card has no options; all-blank option boxes only trip the quality check. @param {any} card */
@@ -801,10 +823,12 @@ export function recheckOfficialPyqCardQuality(paperId, index) {
   const lines = (Array.isArray(prior.lines) ? prior.lines : [])
     .map((line) => (stillFails ? line : dropGoToFromLine(String(line ?? ''), go)))
     .filter(Boolean)
+  /** A paper-wide line ("This paper has 47. Do not approve.") is not cleared by fixing one card. */
+  const paperLevelProblem = lines.some((line) => !/^Go to Q\b/.test(String(line)))
   return updateOfficialPyqPendingPaper(full.id, {
     localQuality: {
       ...prior,
-      passed: failedGoTo.length === 0 && questions.length > 0,
+      passed: failedGoTo.length === 0 && questions.length > 0 && !paperLevelProblem,
       failedGoTo,
       lines,
       checkedAt: Date.now(),

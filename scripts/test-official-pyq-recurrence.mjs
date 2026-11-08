@@ -1895,6 +1895,151 @@ test('2015 P2 Q29/Q30: structures draw with alternating double bonds like the pa
   }
   assert.deepEqual(broken, [])
 })
+
+const { stripAnswerMetaLines } = await import('../src/utils/answerProvenance.js')
+const { wrapBareLatexRuns } = await import('../src/utils/wrapBareLatexRuns.js')
+const { missingBracketedGivenLine } = await import('../src/utils/mathpixCleanPipeline.js')
+const { trimQuestionLeakFromOption } = await import('../src/utils/optionStemLeak.js')
+const { parseOfficialPyqAnswerKey } = await import('../src/utils/officialPyqCardEdit.js')
+
+test('2025 P2 ("Answer:" printed under each question): question sentence, keys and ranges are read; a picture after a blank is not math', () => {
+  const p2 = fs.readFileSync(new URL('./fixtures/jee-advanced-2025-p2-mathpix.txt', import.meta.url), 'utf8')
+  const items = paperItemsFromMathpixOcr(p2)
+  assert.equal(items.length, 48)
+  const q = (n) => items[n - 1]
+  assert.match(q(10).text, /\nThen the value of \$r\$ is \$\\_\\_\\_\\_\$\.$/)
+  assert.equal(q(10).correctInteger, 6)
+  assert.match(q(11).text, /then the probability that it is defective is \$\\_\\_\\_\\_\$\.$/)
+  assert.deepEqual([q(11).correctNumerical, q(11).numericalTolerance], [0.3, 0.03])
+  assert.match(q(12).text, /the value of \$\\alpha\+\\beta-3\$ is \$\\_\\_\\_\\_\$$/)
+  assert.equal(q(12).correctInteger, -2)
+  assert.equal(q(1).correctIndex, 2, 'key printed under the option table')
+  assert.deepEqual(q(5).correctIndices, [0, 1])
+  assert.equal(q(23).correctIndex, 0)
+  for (const n of [27, 29, 30, 32]) assert.match(q(n).text, /\$\\_\\_\\_\\_\$\n\\includegraphics\{[^}]+\}$/, `Q${n}`)
+  assert.ok(q(23).options.every((o) => !/\\\\\s*$|\$\\\$/.test(o)), JSON.stringify(q(23).options))
+
+  assert.equal(stripAnswerMetaLines('Then the value of $r$ is \\_\\_\\_\\_. Answer: 6'), 'Then the value of $r$ is \\_\\_\\_\\_.')
+  assert.equal(stripAnswerMetaLines('Stem\nAnswer: B'), 'Stem')
+  assert.equal(wrapBareLatexRuns('is \\_\\_\\_\\_\n\\includegraphics{https://x/y.jpg}'), 'is $\\_\\_\\_\\_$\n\\includegraphics{https://x/y.jpg}')
+  assert.equal(trimQuestionLeakFromOption('In region 4 the field is zero. \\\\'), 'In region 4 the field is zero.')
+  const window = 'Q. 11 A sample of U-238 decays. The value of P is.\n[Given: Half-life of U-238 is $4.5 \\times 10^{9}$ years]\n\\item[Q.] 12 Among $X$ and $P_4$ the total number of species with tetrahedral geometry is $\\_\\_\\_\\_$.'
+  assert.equal(missingBracketedGivenLine('Among $X$ and $P_4$ the total number of species with tetrahedral geometry is $____$.', window), '', 'the previous question\'s Given line stays there (2024 P2 Q46)')
+  assert.match(missingBracketedGivenLine('A sample of U-238 decays. The value of P is.', window), /Half-life of U-238/)
+  const band = parseOfficialPyqAnswerKey('0.27 to 0.33', { correctNumerical: 1 })
+  assert.deepEqual([band.patch.correctNumerical, band.patch.numericalTolerance], [0.3, 0.03])
+  assert.equal(formatOfficialPyqAnswerKey({ correctNumerical: 0.3, numericalTolerance: 0.03 }), '0.27 to 0.33')
+  assert.equal(parseOfficialPyqAnswerKey('7', { correctNumerical: 0.3, numericalTolerance: 0.03 }).patch.numericalTolerance, undefined)
+})
+
+test('2025 P2 saved damage is flagged and repaired: lost question line, wrong keys, picture in math, doubled figures, "\\\\" options', () => {
+  const p2 = fs.readFileSync(new URL('./fixtures/jee-advanced-2025-p2-mathpix.txt', import.meta.url), 'utf8')
+  const items = paperItemsFromMathpixOcr(p2)
+  const stored = items.map((c) => ({ ...c }))
+  const cut = (i, re) => {
+    const text = stored[i].text.replace(re, '')
+    assert.notEqual(text, stored[i].text)
+    stored[i] = { ...stored[i], text }
+  }
+  cut(9, /\nThen the value[^\n]*$/)
+  cut(10, /\nIf a bulb is chosen[^\n]*$/)
+  stored[26] = { ...stored[26], text: stored[26].text.replace(/\$\\_\\_\\_\\_\$\n(\\includegraphics\{[^}]*\})/, (m, img) => `$\\_\\_\\_\\_\n$${img}$`) }
+  assert.match(stored[26].text, /\n\$\\includegraphics/)
+  const crops = [
+    '\\includegraphics{/api/official-pyq/original/crops/t-p9-a.png?page=9&x0=0.2964&y0=0.1909&x1=0.5276&y1=0.3092}',
+    '\\includegraphics{/api/official-pyq/original/crops/t-p9-b.png?page=9&x0=0.5636&y0=0.1988&x1=0.8052&y1=0.3062}',
+  ]
+  stored[18] = { ...stored[18], text: `${stored[18].text}\n${crops.join('\n')}`, adminEdited: true }
+  stored[22] = { ...stored[22], options: stored[22].options.map((o, i) => (i === 1 ? o : `${o} \\\\`)), adminEdited: true }
+  stored[0] = { ...stored[0], correctIndex: 0 }
+  stored[4] = { ...stored[4], correctIndex: 0, correctIndices: undefined }
+  stored[10] = { ...stored[10], correctNumerical: undefined, numericalTolerance: undefined }
+  stored[1] = { ...stored[1], correctIndex: 3, answerSource: 'admin_edit' }
+  const paper = { id: 'p2-2025-test', officialPyq: true, preparedText: p2, questions: stored }
+  const before = localOfficialPyqQualityCheck(paper).failedGoTo
+  for (const n of [1, 5, 10, 11, 19, 23, 27]) assert.ok(before.includes(n), `Q${n} flagged: ${before.join(',')}`)
+  assert.ok(!before.includes(2), 'an answer the admin typed is not flagged')
+  const r = repairOfficialPyqUntilQuality(paper)
+  const fixed = r.paper.questions
+  assert.match(fixed[9].text, /\nThen the value of \$r\$ is \$\\_\\_\\_\\_\$\.$/)
+  assert.match(fixed[10].text, /\nIf a bulb is chosen randomly[^\n]*defective is \$\\_\\_\\_\\_\$\.$/)
+  assert.match(fixed[26].text, /\$\\_\\_\\_\\_\$\n\\includegraphics\{[^}]+\}$/)
+  assert.doesNotMatch(fixed[18].text, /cdn\.mathpix\.com/)
+  for (const crop of crops) assert.ok(fixed[18].text.includes(crop))
+  assert.ok(fixed[22].options.every((o) => !/\\\\\s*$/.test(o)), JSON.stringify(fixed[22].options))
+  assert.equal(fixed[0].correctIndex, 2)
+  assert.deepEqual([fixed[4].correctIndex, fixed[4].correctIndices], [undefined, [0, 1]])
+  assert.deepEqual([fixed[10].correctNumerical, fixed[10].numericalTolerance], [0.3, 0.03])
+  assert.equal(fixed[1].correctIndex, 3)
+  assert.deepEqual(localOfficialPyqQualityCheck(r.paper).failedGoTo.filter((n) => [1, 5, 10, 11, 19, 23, 27].includes(n)), [])
+})
+
+const { detectAnswerFromPaper: readKey } = await import('../src/utils/answerProvenance.js')
+test('2025 P1: a key printed as a heading "\\section*{Answer: [2.2 to 2.3]}" is read, range included', () => {
+  const pick = (r) => [r.correctIndex, r.correctInteger, r.correctNumerical, r.numericalTolerance, r.answerSource]
+  assert.deepEqual(pick(readKey('The pH is \\_\\_\\_\\_.\n\\section*{Answer: [2.2 to 2.3]}')), [undefined, undefined, 2.25, 0.05, 'from_paper'])
+  assert.deepEqual(pick(readKey('The value is \\_\\_\\_\\_.\n\\section*{Answer: [-7.2 to -7]}')), [undefined, undefined, -7.1, 0.1, 'from_paper'])
+  assert.deepEqual(pick(readKey('The value is \\_\\_\\_\\_.\n\\section*{Answer: 100}')), [undefined, 100, undefined, undefined, 'from_paper'])
+  assert.deepEqual(pick(readKey('Pick one.\n\\section*{Answer: B}')), [1, undefined, undefined, undefined, 'from_paper'])
+  assert.deepEqual(pick(readKey('x\nAnswer: [1.15 to 1.25]}')), [undefined, undefined, 1.2, 0.05, 'from_paper'])
+  const either = readKey('x\n\\section*{Answer: [-29.95 to -29.8] OR [29.8 to 29.95]}')
+  assert.equal(either.correctNumerical, undefined, 'two accepted answers are not squeezed into one range')
+})
+
+const pendingStore = await import('../src/utils/officialPyqPendingStore.js')
+const { persistOfficialPyqQualityRun } = await import('../src/utils/officialPyqLocalQuality.js')
+const { recheckOfficialPyqCardQuality } = await import('../src/utils/officialPyqCardEdit.js')
+test('2025 P2 re-upload: Q5 without its "Q. 5" label is still a question; auto-fix restores it and keeps hand edits', () => {
+  const p2 = fs.readFileSync(new URL('./fixtures/jee-advanced-2025-p2-mathpix.txt', import.meta.url), 'utf8')
+  const unlabelled = p2.replace('\\end{itemize}\nQ. 5 Let $I=', '\\end{itemize}\n\nLet $I=')
+  assert.notEqual(unlabelled, p2)
+  const items = paperItemsFromMathpixOcr(unlabelled)
+  assert.equal(items.length, 48)
+  assert.match(items[4].text, /^Let \$I=/)
+  assert.deepEqual(items[4].correctIndices, [0, 1])
+  assert.match(items[3].text, /Then the value of \$p q\$ is$/, 'Q4 does not swallow Q5')
+
+  localStorage.clear()
+  const meta = { exam: 'JEE Advanced', year: 2025, session: 'Paper 2', sourceLabel: 'test' }
+  const stored = items.filter((_, i) => i !== 4).map((q) => ({ ...q }))
+  const paper = importQuestionsToOfficialPyqPending({ ...meta, preparedText: unlabelled, questions: stored })
+  assert.equal(paper.questions.length, 47)
+  const rod = paper.questions.findIndex((q) => /uniform rod/.test(q.text))
+  const editedText = `${paper.questions[rod].text} (edited)`
+  const cards = paper.questions.map((q, i) => (i === rod ? { ...q, text: editedText, adminEdited: true, adminEditedAt: Date.now() } : q))
+  const draft = draftAdminFacts(unlabelled, items)
+  const row = draft.pattern.rows[0]
+  const facts = {
+    ...draft,
+    samePattern: true,
+    numbering: 'per_subject',
+    subjectOrder: ['mathematics', 'physics', 'chemistry'],
+    pattern: {
+      ...draft.pattern,
+      rows: [
+        { ...row, from: 1, to: 4, type: 'single_correct', options: 4 },
+        { ...row, from: 5, to: 8, type: 'multiple_correct', options: 4 },
+        { ...row, from: 9, to: 16, type: 'numerical', options: 0 },
+      ],
+    },
+  }
+  assert.deepEqual(validateAdminFacts(facts).errors, [])
+  pendingStore.updateOfficialPyqPendingPaper(paper.id, { questions: cards, adminFacts: { ...facts, confirmedAt: Date.now(), confirmedBy: 'test' } })
+
+  const before = localOfficialPyqQualityCheck({ ...pendingStore.getOfficialPyqPendingPaper(paper.id), preparedText: unlabelled })
+  assert.equal(before.passed, false, 'a lost question blocks the paper')
+  recheckOfficialPyqCardQuality(paper.id, rod)
+  assert.equal(pendingStore.getOfficialPyqPendingPaper(paper.id).localQuality.passed, false, 'saving one card does not hide a lost question')
+
+  const saved = persistOfficialPyqQualityRun(pendingStore.getOfficialPyqPendingPaper(paper.id))
+  assert.equal(saved.questions.length, 48)
+  assert.match(saved.questions[4].text, /^Let \$I=/)
+  const kept = saved.questions.find((q) => /uniform rod/.test(q.text))
+  assert.equal(kept.text, editedText, 'the hand edit follows its question')
+  assert.equal(saved.questions.indexOf(kept), rod + 1)
+  assert.ok(!saved.localQuality.lines.some((l) => /This paper has/.test(l)), saved.localQuality.lines.join(' | '))
+  localStorage.clear()
+})
 if (failed) {
   console.error(`\n${failed} recurrence test(s) failed`)
   process.exit(1)

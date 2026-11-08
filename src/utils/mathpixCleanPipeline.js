@@ -325,17 +325,15 @@ export function missingBracketedGivenLine(stem, ocrWindow) {
   if (/\[\s*Given\s*:/i.test(String(stem ?? ''))) return ''
   const window = String(ocrWindow ?? '')
   if (!window) return ''
-  const head = String(stem ?? '')
-    .split('$')[0]
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 48)
-  let region = window
-  if (head.length >= 12) {
-    const at = window.toLowerCase().indexOf(head.toLowerCase())
-    if (at < 0) return ''
-    region = window.slice(at)
-  }
+  const plainBits = String(stem ?? '')
+    .split(/\\[a-zA-Z]+|\$+/)
+    .map((bit) => bit.replace(/\s+/g, ' ').trim())
+  /** A stem opening with math ("Among $[Co(CN)_4]$ …") anchors on its first plain run, never on the window start (the previous question's Given line — 2024 P2 Q46). */
+  const head = (plainBits[0].length >= 12 ? plainBits[0] : plainBits.find((bit) => bit.length >= 16) || '').slice(0, 48)
+  if (!head) return ''
+  const at = window.toLowerCase().indexOf(head.toLowerCase())
+  if (at < 0) return ''
+  let region = window.slice(at)
   const cut = region.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d|Q\.\s*\d+)/)
   if (cut > 40) region = region.slice(0, cut)
   const match = region.match(/\[\s*Given\s*:[\s\S]*?\]/)

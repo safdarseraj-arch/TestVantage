@@ -7,6 +7,7 @@
 import { peelPrintedAnswerFromStem } from './answerProvenance.js'
 import { closedChemReactionDisplays } from './healTruncatedLatex.js'
 import { healUploadQuestionCard, ocrQuestionBodyForCard, storedMatchOptionsAreCutOff } from './extendTruncatedStem.js'
+import { paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
 import { healUploadQuestionCard as healPreviewCard, applyStoredOcrCardFixes, storedCardMissesOcrFix } from './uploadQualityGuards.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
 import {
@@ -31,10 +32,83 @@ import {
 import { isMatrixGridCard } from './matrixGridPyq.js'
 import { stripAnswerBoxTables } from './printedAnswerKey.js'
 import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
+import { reExtractOfficialPyqPendingPaperLocal } from './officialPyqLocalReparse.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
 const BARE_FRACTION_RE = /^\s*(-?\d{1,4})\s*\/\s*(\d{1,4})\s*$/
+const TRAILING_LINE_BREAK_RE = /(?:\s*\\\\)+\s*$/
+
+const MATHPIX_FIGURE_RE =
+  /\\includegraphics(?:\[[^\]]*\])?\{https:\/\/cdn\.mathpix\.com\/cropped\/[^}]*?-(\d{2,3})\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)[^}]*\}|!\[[^\]]*\]\(https:\/\/cdn\.mathpix\.com\/cropped\/[^)]*?-(\d{2,3})\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)[^)]*\)/g
+const PAGE_CROP_RE = /\/api\/official-pyq\/original\/crops\/[^}\s)?]*\?page=(\d+)&x0=([\d.]+)&y0=([\d.]+)&x1=([\d.]+)&y1=([\d.]+)/g
+/** Mathpix renders a paper page about 2066 × 2922 px; crops of the original PDF use page fractions. */
+const MATHPIX_PAGE_W = 2066
+const MATHPIX_PAGE_H = 2922
+
+/**
+ * A scan picture saved next to a crop of the same spot on the original page shows the figure twice
+ * (2025 P2 Q19). The crop is the cleaner copy, so the scan picture goes.
+ * @param {string} text
+ */
+function withoutDuplicateFigures(text) {
+  const crops = [...String(text).matchAll(PAGE_CROP_RE)].map((m) => ({
+    page: Number(m[1]),
+    x0: Number(m[2]),
+    y0: Number(m[3]),
+    x1: Number(m[4]),
+    y1: Number(m[5]),
+  }))
+  if (!crops.length) return text
+  const out = String(text).replace(MATHPIX_FIGURE_RE, (token, ...g) => {
+    const [page, h, w, top, left] = (g[0] != null ? g.slice(0, 5) : g.slice(5, 10)).map(Number)
+    const cx = (left + w / 2) / MATHPIX_PAGE_W
+    const cy = (top + h / 2) / MATHPIX_PAGE_H
+    const area = (w * h) / (MATHPIX_PAGE_W * MATHPIX_PAGE_H)
+    const covered = crops.some((c) => {
+      const cropArea = (c.x1 - c.x0) * (c.y1 - c.y0)
+      return c.page === page && cx >= c.x0 && cx <= c.x1 && cy >= c.y0 && cy <= c.y1 && area / cropArea > 0.35 && area / cropArea < 2.5
+    })
+    return covered ? '' : token
+  })
+  return out === text ? text : out.replace(/\n{3,}/g, '\n\n').trim()
+}
+
+const FIGURE_TOKEN = String.raw`\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}`
+
+/** Single `$` delimiters, skipping `$$…$$` blocks and escaped `\$`. */
+function singleDollarPositions(text) {
+  const at = []
+  for (const m of String(text).matchAll(/\$\$[\s\S]*?\$\$|\\\$|\$/g)) if (m[0] === '$') at.push(m.index)
+  return at
+}
+
+/**
+ * A picture wrapped into the blank's math: "is $\_\_\_\_\n\includegraphics{…}$", or after an
+ * earlier half-fix "is $\_\_\_\_\n$\includegraphics{…}$" (2025 P2 Q27). The picture is not math.
+ * @param {string} text
+ */
+function withoutFiguresInMath(text) {
+  let out = String(text)
+  if (singleDollarPositions(out).length % 2 === 1) {
+    out = out.replace(new RegExp(String.raw`(\S)[ \t]*\n\$(${FIGURE_TOKEN})\$`, 'g'), '$1$\n$2')
+  }
+  const at = singleDollarPositions(out)
+  let rebuilt = ''
+  let last = 0
+  for (let k = 0; k + 1 < at.length; k += 2) {
+    const inner = out.slice(at[k] + 1, at[k + 1])
+    if (!new RegExp(FIGURE_TOKEN).test(inner)) continue
+    const pieces = inner
+      .split(new RegExp(`(${FIGURE_TOKEN})`))
+      .map((piece) => piece.trim())
+      .filter(Boolean)
+      .map((piece) => (new RegExp(`^${FIGURE_TOKEN}$`).test(piece) ? piece : `$${piece}$`))
+    rebuilt += out.slice(last, at[k]) + pieces.join('\n')
+    last = at[k + 1] + 1
+  }
+  return last ? rebuilt + out.slice(last) : out
+}
 
 /**
  * Page leftovers saved on a card: the answer-letter / empty answer-box table under a page,
@@ -48,14 +122,18 @@ function withoutPageLeftovers(q) {
   let next = q
   for (const key of ['text', 'passageText']) {
     const raw = q?.[key]
-    if (typeof raw !== 'string' || !/\\begin\{tabular\}/.test(raw)) continue
-    const cleaned = stripAnswerBoxTables(raw).replace(/\n{3,}/g, '\n\n').trim()
-    if (cleaned && cleaned !== raw.trim()) next = { ...next, [key]: cleaned }
+    if (typeof raw !== 'string') continue
+    let cleaned = withoutFiguresInMath(withoutDuplicateFigures(raw))
+    if (/\\begin\{tabular\}/.test(cleaned)) cleaned = stripAnswerBoxTables(cleaned).replace(/\n{3,}/g, '\n\n').trim()
+    if (cleaned && cleaned !== raw && cleaned !== raw.trim()) next = { ...next, [key]: cleaned }
   }
   if (Array.isArray(q?.options)) {
     const options = q.options.map((opt) => {
       const s = String(opt ?? '')
-      const cleaned = trimOptionLetterTail(s).replace(LIST_TAIL_RE, '').replace(RUNNING_HEAD_TAIL_RE, '')
+      const cleaned = trimOptionLetterTail(s)
+        .replace(LIST_TAIL_RE, '')
+        .replace(RUNNING_HEAD_TAIL_RE, '')
+        .replace(TRAILING_LINE_BREAK_RE, '')
       const frac = cleaned.match(BARE_FRACTION_RE)
       if (frac) return `$\\frac{${frac[1]}}{${frac[2]}}$`
       return cleaned.trim() ? cleaned : s
@@ -95,7 +173,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 12
+export const LOCAL_QUALITY_REVISION = 15
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -157,6 +235,122 @@ function stemMissingFromOcr(text, ocr) {
   if (words.length < 8) return false
   const found = words.filter((word) => sourceWords.has(word.toLowerCase())).length
   return found < 4
+}
+
+let freshSplit = { ocr: '', items: /** @type {any[]} */ ([]) }
+
+/** The stored scan split again with today's splitter, one paper at a time. */
+function freshCardsFromOcr(ocr) {
+  if (freshSplit.ocr !== ocr) {
+    let items = []
+    try {
+      items = paperItemsFromMathpixOcr(ocr)
+    } catch {
+      items = []
+    }
+    freshSplit = { ocr, items: Array.isArray(items) ? items : [] }
+  }
+  return freshSplit.items
+}
+
+function wordRun(text) {
+  return ` ${proseWords(text).join(' ').toLowerCase()} `
+}
+
+/**
+ * The stored paper has fewer cards than its facts while a fresh split of the same OCR has
+ * exactly the right count: a question was lost by an older split (2025 P2 Q5, no "Q. 5" label).
+ */
+function questionsMissingFromStoredSplit(paper, ocr) {
+  const facts = factsForPaper(paper)
+  const expected = facts?.known ? Number(facts.expectedQuestionCount) || 0 : 0
+  const stored = (Array.isArray(paper?.questions) ? paper.questions : []).filter((q) => q && !isOfficialPyqPlaceholder(q))
+  if (!expected || !ocr || stored.length >= expected) return false
+  return freshCardsFromOcr(ocr).length === expected
+}
+
+/** Same card in a fresh split: same card count and the stem opens with the same words. */
+function freshCardFor(questions, index, ocr) {
+  const items = freshCardsFromOcr(ocr)
+  if (!items.length || items.length !== questions.length) return null
+  const fresh = items[index]
+  const opening = proseWords(fresh?.text).slice(0, 4)
+  if (opening.length < 3) return null
+  return wordRun(questions[index]?.text).includes(` ${opening.join(' ').toLowerCase()} `) ? fresh : null
+}
+
+/**
+ * Closing question lines of the fresh card that the stored card lacks, in order
+ * ("Then the value of $r$ is \_\_\_\_." — 2025 P2 Q10, Q11). Words must appear in order:
+ * the setup often reuses the same words, so loose words would hide the loss.
+ */
+function lostClosingLines(card, fresh) {
+  const have = wordRun(`${card?.passageText ?? ''} ${card?.text ?? ''} ${(card?.options || []).join(' ')}`)
+  const lines = String(fresh?.text ?? '').split('\n')
+  const lost = []
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const words = proseWords(lines[i])
+    if (words.length < 2) {
+      if (lost.length || !lines[i].trim()) continue
+      return []
+    }
+    /** An earlier fresh line found on the card anchors the loss to the end; a reworded one-line stem has no anchor. */
+    if (have.includes(` ${words.join(' ').toLowerCase()} `)) return lost
+    lost.unshift(lines[i])
+  }
+  return []
+}
+
+function stemLostOcrQuestion(q, fresh) {
+  if (!fresh || q?.adminEdited === true || q?.adminApproved === true || isMatrixGridCard(q)) return false
+  return lostClosingLines(q, fresh).length > 0
+}
+
+/** The scan-based fix would still change this saved card (labels I–IV under drawings — 2019 P1 Q22). */
+function storedCardLacksOcrFix(q, ocr) {
+  if (q?.adminEdited === true || q?.adminApproved === true || isMatrixGridCard(q)) return false
+  return cardSignature(applyStoredOcrCardFixes(q, ocr)) !== cardSignature(q)
+}
+
+const ANSWER_FIELDS = ['correctIndex', 'correctIndices', 'correctInteger', 'correctNumerical', 'numericalTolerance']
+
+function answerKeyOf(q) {
+  const letters = Array.isArray(q?.correctIndices) && q.correctIndices.length
+    ? [...q.correctIndices].map(Number).sort((a, b) => a - b)
+    : q?.correctIndex != null && q.correctIndex !== ''
+      ? [Number(q.correctIndex)]
+      : null
+  const value = q?.correctInteger ?? q?.correctNumerical
+  const number = value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null
+  const tol = q?.numericalTolerance != null && q.numericalTolerance !== '' ? Number(q.numericalTolerance) : null
+  return { letters, number, tol, has: Boolean(letters || number != null) }
+}
+
+/**
+ * The saved answer is not the one printed for this question (2025 P2: every option card saved
+ * as "A", every range answer missing). An answer the admin typed is never overridden.
+ */
+function answerDiffersFromPrintedKey(q, fresh) {
+  if (!fresh || fresh.answerSource !== 'from_paper') return false
+  if (q?.answerSource === 'admin_edit' || q?.adminApproved === true || isMatrixGridCard(q)) return false
+  const printed = answerKeyOf(fresh)
+  if (!printed.has) return false
+  const saved = answerKeyOf(q)
+  return JSON.stringify([saved.letters, saved.number, saved.tol]) !== JSON.stringify([printed.letters, printed.number, printed.tol])
+}
+
+function withPrintedKey(q, fresh) {
+  const next = { ...q, answerSource: 'from_paper' }
+  for (const field of ANSWER_FIELDS) {
+    if (fresh[field] != null && fresh[field] !== '') next[field] = fresh[field]
+    else delete next[field]
+  }
+  return next
+}
+
+function withClosingLinesRestored(q, fresh) {
+  const lost = lostClosingLines(q, fresh)
+  return lost.length ? { ...q, text: `${String(q?.text ?? '').trimEnd()}\n${lost.join('\n')}` } : q
 }
 
 function inventedProse(text, ocr) {
@@ -234,7 +428,14 @@ export function localOfficialPyqQualityCheck(paper) {
       return
     }
     const rawBits = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])]
-    if (rawBits.some((part) => CHECKER_NOTE.test(String(part ?? ''))) || hasScrapOption(q)) {
+    const fresh = freshCardFor(questions, index, ocr)
+    if (
+      rawBits.some((part) => CHECKER_NOTE.test(String(part ?? ''))) ||
+      hasScrapOption(q) ||
+      stemLostOcrQuestion(q, fresh) ||
+      answerDiffersFromPrintedKey(q, fresh) ||
+      storedCardLacksOcrFix(q, ocr)
+    ) {
       failedGoTo.push(index + 1)
       return
     }
@@ -469,6 +670,15 @@ export function repairOfficialPyqUntilQuality(paper) {
 
   function prepare(index) {
     if (cleaned.has(index)) return shown[index]
+    const fresh = freshCardFor(questions, index, ocr)
+    if (stemLostOcrQuestion(questions[index], fresh)) {
+      questions[index] = withClosingLinesRestored(questions[index], fresh)
+      questionsChanged = true
+    }
+    if (answerDiffersFromPrintedKey(questions[index], fresh)) {
+      questions[index] = withPrintedKey(questions[index], fresh)
+      questionsChanged = true
+    }
     const view = cleanCard(questions[index], ocr)
     const adopted =
       questions[index]?.adminApproved === true ? adoptLeftoverFixes(questions[index]) : adoptKnownFixes(questions[index], view, ocr)
@@ -511,6 +721,9 @@ export function repairOfficialPyqUntilQuality(paper) {
         storedMatchOptionsAreCutOff(current?.options) ||
         storedCardMissesOcrFix(current, ocr) ||
         hasScrapOption(current) ||
+        stemLostOcrQuestion(current, freshCardFor(questions, index, ocr)) ||
+        answerDiffersFromPrintedKey(current, freshCardFor(questions, index, ocr)) ||
+        storedCardLacksOcrFix(current, ocr) ||
         officialPyqContentReviewMessages([shown]).length ||
         officialPyqMissingListMessage([shown]) ||
         cardFailsLocalQuality(shown, ocr)
@@ -568,9 +781,16 @@ export function repairOfficialPyqUntilQuality(paper) {
  */
 export function persistOfficialPyqQualityRun(paper) {
   if (!paper?.id) return null
-  const full = getOfficialPyqPendingPaper(paper.id) || paper
+  let full = getOfficialPyqPendingPaper(paper.id) || paper
   const ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
   const status = String(full?.status ?? '')
+  if (status === 'pending_review' && questionsMissingFromStoredSplit(full, ocr)) {
+    try {
+      if (reExtractOfficialPyqPendingPaperLocal(full)?.ok) full = getOfficialPyqPendingPaper(paper.id) || full
+    } catch {
+      /* keep the stored cards; the count line still blocks approval */
+    }
+  }
   if (status === 'published') {
     let quality
     try {
@@ -610,9 +830,14 @@ export function persistOfficialPyqQualityRun(paper) {
     }
     if (next.length !== stored.length || next.some((q, i) => JSON.stringify(q) !== JSON.stringify(stored[i]))) {
       updates.questions = next
-      /** Leftover fixes also reach cards the admin edited — junk is never an admin choice. */
+      /** Leftover fixes and the printed answer also reach cards the admin edited — junk and a wrong key are never an admin choice. */
       updates.releaseAdminEditIndexes = next
-        .map((q, i) => (stored[i] && hasScrapOption(stored[i]) && !hasScrapOption(q) ? i : -1))
+        .map((q, i) => {
+          if (!stored[i]) return -1
+          if (hasScrapOption(stored[i]) && !hasScrapOption(q)) return i
+          const fresh = freshCardFor(stored, i, ocr || String(full?.preparedText ?? ''))
+          return answerDiffersFromPrintedKey(stored[i], fresh) && !answerDiffersFromPrintedKey(q, fresh) ? i : -1
+        })
         .filter((i) => i >= 0)
       questionsChanged = true
     }

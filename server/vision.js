@@ -971,7 +971,8 @@ Return ONLY valid JSON:
       "marking": { "correct": 4, "wrong": -1, "unattempted": 0 },
       "instructions": "section instructions that apply to THIS question only",
       "passageText": null,
-      "answerKeyVisible": false
+      "answerKeyVisible": false,
+      "solutionPrinted": false
     }
   ]
 }
@@ -982,6 +983,7 @@ Hard rules:
 - Keep COMPLETE stems including displayed math after Then / is equal to. Stem stops before (A). Put LaTeX in $...$ so it can render.
 - Exactly 4 option strings for SCQ/MSQ when printed. Integer/numerical may use empty options.
 - Fill answer + solution from the OCR when possible. If a printed key is in the text, set answerKeyVisible true. Otherwise solve and fill, and still return a real solution.
+- If a solution / explanation / hint is printed for a question (right after it, or in an end-of-paper Solutions section), copy it word for word into solution and set solutionPrinted true. Never put Ans./Sol. text inside text or options. solutionPrinted is false when you wrote the solution yourself.
 - Fill subject, section (unit), chapter, topic, examIds, year/paper, toughness 1-10, marks/marking.
 - Never invent extra questions that are only instructions.
 - Keep JSON compact: omit null/empty optional fields. Solutions: brief key steps only (~300 chars each) unless a proof truly needs more.
@@ -1085,7 +1087,7 @@ export async function structureOcrWithGemini(body = {}) {
   for (let i = 0; i < chunks.length; i++) {
     if (Date.now() > deadline) break
     const extra = official
-      ? 'Official PYQ paper: split EVERY \\item[Q.] / Q.n into its own question. Instructions stay instructions, not extra questions. Returning 1 blob for a multi-question paper is wrong. Keep paper identity from context. Split only: set chapter, topic, toughness, and solution to null, and give an answer only when the answer key is printed on the paper (answerKeyVisible true). Tags, answers, and solutions are filled later, after the paper is approved.'
+      ? 'Official PYQ paper: split EVERY \\item[Q.] / Q.n into its own question. Instructions stay instructions, not extra questions. Returning 1 blob for a multi-question paper is wrong. Keep paper identity from context. Split only: set chapter, topic, and toughness to null, and give an answer only when the answer key is printed on the paper (answerKeyVisible true). If the paper prints a solution for a question (after the question or in an end Solutions section), copy it word for word into solution and set solutionPrinted true; otherwise set solution to null and solutionPrinted false. Never write your own solution. Tags, missing answers, and missing solutions are filled later, after the paper is approved.'
       : deferSolutions
         ? 'Question-bank verify step: split every question with stem + options + questionType. Do NOT write solutions — set solution to null on every row. User will approve split first, then ask for solutions later.'
         : 'Question-bank upload: fill every field you can.'

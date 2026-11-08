@@ -14,6 +14,7 @@ import {
 import {
   LOCAL_QUALITY_REVISION,
   localOfficialPyqQualityCheck,
+  officialPyqCardDamageReason,
   persistOfficialPyqQualityRun,
 } from './officialPyqLocalQuality.js'
 import { officialPyqCardAsShown } from './officialPyqCardAsShown.js'
@@ -826,7 +827,10 @@ export function recheckOfficialPyqCardQuality(paperId, index) {
     const q = questions[i]
     if (!q) return false
     const ocr = officialPyqCardIsAdminEdited(q) ? '' : paperOcr
-    return localOfficialPyqQualityCheck({ questions: [q], preparedText: ocr }).failedGoTo.length > 0
+    return (
+      localOfficialPyqQualityCheck({ questions: [q], preparedText: ocr }).failedGoTo.length > 0 ||
+      Boolean(officialPyqCardDamageReason({ ...full, preparedText: paperOcr }, i))
+    )
   }
   let prior = full.localQuality
   // A check made on a different card list (a question lost or added since) cannot be patched one card at a time.

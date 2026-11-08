@@ -6,6 +6,7 @@
 import { cleanOfficialPyqPassageBody } from './passage.js'
 import { MATRIX_GRID_FACT_TYPE, isMatrixGridCard, matrixGridSectionFacts, withFactType } from './matrixGridPyq.js'
 import { stripHindiOcr } from './stripHindiOcr.js'
+import { stripEndAnswerSection } from './printedEndSolutions.js'
 
 const WORD = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -49,6 +50,9 @@ function sectionType(window) {
   return ''
 }
 
+const PRINTED_Q_LABEL_RE =
+  /\\item\s*\[\s*Q\.?\s*\]\s*(\d{1,3})(?!\d)|\\item\s*\[\s*Q\.?\s*(\d{1,3})\s*\]|(?<![A-Za-z\\])Q\s*\.\s*(\d{1,3})(?!\d)/g
+
 /**
  * Read part headings and "This section contains …" lines.
  * expectedQuestionCount is the sum of those printed counts.
@@ -56,7 +60,7 @@ function sectionType(window) {
  * @param {unknown} raw
  */
 export function buildPaperFacts(raw) {
-  const text = fixZeroInCountWords(stripHindiOcr(raw).replace(/\r\n/g, '\n'))
+  const text = fixZeroInCountWords(stripEndAnswerSection(stripHindiOcr(raw)).replace(/\r\n/g, '\n'))
   const sections = []
   const notes = []
   // 2026: "This section contains TWO (02) questions corresponding to each question stem" is the
@@ -112,7 +116,9 @@ export function buildPaperFacts(raw) {
         // 2017: "Based on each paragraph, there are TWO questions" (no "(02)"); 2015: "there will be TWO questions".
         window.match(
           /\beach\s+(?:paragraph|passage|question\s+stem|stem)\b[^.\n]{0,40}?\bthere\s+(?:are|is|will\s+be)\s+([A-Za-z]+|\d+)()\s+(?:multiple\s+choice\s+)?questions?/i,
-        )
+        ) ||
+        // 2014: "Six questions relate to the three paragraphs with two questions on each paragraph".
+        window.match(/\b([A-Za-z]+|\d+)()\s+questions?\s+on\s+each\s+(?:paragraph|passage|question\s+stem|stem)\b/i)
       const k = each ? wordNumber(each[1], each[2]) : 0
       count = k ? n * k : 0
       if (!k) notes.push(`OCR does not say how many questions sit under “${m[0].replace(/\s+/g, ' ')}”.`)
@@ -151,8 +157,20 @@ export function buildPaperFacts(raw) {
       `OCR shows ${[...perSubject].map(([sub, n]) => `${n} section(s) for ${sub}`).join(', ')}. A section instruction is missing, so the facts card is unknown.`,
     )
   }
-  const known = !uneven && sections.length > 0 && sections.every((s) => s.count > 0 && s.type)
-  const expectedQuestionCount = known ? sections.reduce((n, s) => n + s.count, 0) : null
+  let known = !uneven && sections.length > 0 && sections.every((s) => s.count > 0 && s.type)
+  let expectedQuestionCount = known ? sections.reduce((n, s) => n + s.count, 0) : null
+  // Restart numbering never prints a label above the total, so a higher label means a lost instruction.
+  const highestLabel = Math.max(
+    0,
+    ...[...text.matchAll(PRINTED_Q_LABEL_RE)].map((l) => Number(l[1] || l[2] || l[3]) || 0),
+  )
+  if (known && highestLabel > expectedQuestionCount) {
+    notes.push(
+      `OCR prints Q. ${highestLabel}, and its section instructions add up to only ${expectedQuestionCount} questions. A section instruction is missing, so the facts card is unknown.`,
+    )
+    known = false
+    expectedQuestionCount = null
+  }
   return {
     known,
     expectedQuestionCount,

@@ -13,6 +13,7 @@ import { applyOfficialPyqPublishedMeta } from './officialPyqPublishedMeta.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
 import { gridColLabels, isMatrixGridCard } from './matrixGridPyq.js'
 import { formatNumericChoice, numericalAlternativesOf } from './answerAlternatives.js'
+import { solutionIsOnlyPrintedKeyLine } from './printedAnswerKey.js'
 
 export const HYBRID_FILL_NEEDS_APPROVAL =
   'Hybrid AI fills tags, answers, and solutions only on an Approved paper. Approve it first; if it is published, Unpublish it first.'
@@ -69,13 +70,40 @@ function gridQuestionText(question) {
   ].join('\n')
 }
 
+/** The card's answer was printed on the paper or set by an admin, so Hybrid AI never answers it. @param {any} card */
+export function officialPyqCardAnswerIsKept(card) {
+  const kept = KEPT_SOURCES.has(card?.answerSource) || card?.answerSource === 'admin_edit' || officialPyqCardIsAdminEdited(card)
+  return Boolean(kept && (card?.bonusMarksToAll === true || currentAnswerText(card)))
+}
+
+/** The card's solution was printed on the paper or typed by hand (a bare "Answer: …" key line is no solution). @param {any} card */
+export function officialPyqCardSolutionIsKept(card) {
+  const solution = String(card?.solution ?? '').trim()
+  return Boolean(KEPT_SOURCES.has(card?.solutionSource) && solution && !solutionIsOnlyPrintedKeyLine(solution))
+}
+
 /**
- * The /official-pyq/fill-tags body for one card.
- * @param {any} question @param {string} [paperExam]
+ * Hybrid AI fills the metatags only: the paper printed this card's answer and solution, or the
+ * admin set "Paper has printed answers and solutions" on the paper.
+ * @param {any} card @param {any} [paper]
  */
-export function hybridFillRequestForQuestion(question, paperExam = '') {
+export function officialPyqCardTagsOnly(card, paper) {
+  if (paper?.printedAnswersAndSolutions === true) return true
+  return officialPyqCardAnswerIsKept(card) && officialPyqCardSolutionIsKept(card)
+}
+
+/**
+ * The /official-pyq/fill-tags body for one card. `tagsOnly` asks for metatags only: no answer and
+ * no solution are sent or asked for.
+ * @param {any} question @param {string} [paperExam] @param {{ tagsOnly?: boolean }} [opts]
+ */
+export function hybridFillRequestForQuestion(question, paperExam = '', opts = {}) {
   const examId = Array.isArray(question?.examIds) && question.examIds.length ? question.examIds[0] : paperExam
   const grid = isMatrixGridCard(question)
+  if (opts.tagsOnly) {
+    const { answer: _answer, solution: _solution, ...tags } = hybridFillRequestForQuestion(question, paperExam)
+    return { ...tags, tags_only: true }
+  }
   return {
     question_text: grid ? gridQuestionText(question) : String(question?.text ?? question?.stem ?? ''),
     options: grid ? [] : (Array.isArray(question?.options) ? question.options : []).map((opt) => String(opt ?? '')),
@@ -93,10 +121,26 @@ export function hybridFillRequestForQuestion(question, paperExam = '') {
   }
 }
 
-/** True when the card already has a real chapter (not "General"), an answer, and a solution. */
-export function officialPyqCardIsFilled(q) {
+/**
+ * True when the card already has a real chapter (not "General"), an answer, and a solution.
+ * On a paper marked "printed answers and solutions" a real chapter is enough: its answer is never AI-filled.
+ * @param {any} q @param {any} [paper]
+ */
+export function officialPyqCardIsFilled(q, paper) {
   const chapter = String(q?.chapter || '').trim()
-  return Boolean(chapter && !/^general$/i.test(chapter) && currentAnswerText(q) && String(q?.solution || '').trim())
+  if (!chapter || /^general$/i.test(chapter)) return false
+  if (paper?.printedAnswersAndSolutions === true) return true
+  return Boolean(currentAnswerText(q) && String(q?.solution || '').trim())
+}
+
+/** Hybrid AI's answer matches the stored one (a number inside the printed band counts). */
+function answersAgree(card, aiAnswer) {
+  const stored = currentAnswerText(card)
+  if (!stored || !aiAnswer || stored === aiAnswer) return true
+  const a = Number(aiAnswer)
+  const b = Number(card?.correctNumerical ?? card?.correctInteger)
+  if (Number.isFinite(a) && Number.isFinite(b)) return Math.abs(a - b) <= (Number(card?.numericalTolerance) || 1e-9)
+  return false
 }
 
 function has(value) {
@@ -138,6 +182,12 @@ export function applyHybridPatchToCard(card, patch) {
     delete next.numericalAlternatives
     next.answerSource = 'hybrid_ai'
   }
+  if (answer && !printedBonus && answer !== currentAnswerText(card) && (handEdited || KEPT_SOURCES.has(card.answerSource))) {
+    // The kept answer stays; the quality check asks for a look.
+    if (!answersAgree(card, answer)) next.hybridAnswerDisagrees = answer
+  } else if (answer) {
+    delete next.hybridAnswerDisagrees
+  }
   if (!handEdited && !KEPT_SOURCES.has(card.solutionSource) && has(patch.solution) && patch.solution !== card.solution) {
     next.solution = patch.solution
     next.solutionSource = 'hybrid_ai'
@@ -168,6 +218,20 @@ function publishedPatchFromCard(card) {
       : {}),
     answerSource: card.answerSource,
     solutionSource: card.solutionSource,
+    hybridAnswerDisagrees: card.hybridAnswerDisagrees,
+  }
+}
+
+/** A tags-only reply never changes the answer or the solution. */
+function tagsOnlyPatch(patch, card) {
+  return {
+    ...patch,
+    solution: card.solution,
+    correctIndex: card.correctIndex,
+    correctIndices: card.correctIndices,
+    correctInteger: card.correctInteger,
+    correctNumerical: card.correctNumerical,
+    matrixAnswerKey: undefined,
   }
 }
 
@@ -175,6 +239,9 @@ function publishedPatchFromCard(card) {
  * Fill an Approved paper part by part and save after every part. The paper stays
  * Approved (students do not see it until Publish); the save goes through the
  * Approved-paper tag path, so the question wording cannot change.
+ * A card whose answer and solution are printed (or every card, when the paper is marked
+ * "printed answers and solutions") gets metatags only. On such a paper a card with no printed
+ * answer is listed in `noPrintedAnswer` instead of being answered by AI.
  * @param {string} paperId
  * @param {{ redoAll?: boolean, signal?: AbortSignal, onProgress?: (info: { from: number, to: number, total: number, filled: number, needsLook: number[] }) => void, isFatal?: (err: Error) => boolean }} [opts]
  */
@@ -186,14 +253,23 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
   let filled = 0
   /** @type {number[]} */
   const needsLook = []
+  /** @type {number[]} */
+  const noPrintedAnswer =
+    paper.printedAnswersAndSolutions === true
+      ? questions
+          .map((q, i) => (!isOfficialPyqPlaceholder(q) && String(q?.text ?? q?.stem ?? '').trim() && !officialPyqCardAnswerIsKept(q) ? i + 1 : 0))
+          .filter(Boolean)
+      : []
+  const tagsOnly = (q) => officialPyqCardTagsOnly(q, paper)
   const rows = await fillPaperQuestionByQuestion(
     questions,
-    (question) => fillOfficialPyqTags(hybridFillRequestForQuestion(question, paper.exam)),
+    (question) => fillOfficialPyqTags(hybridFillRequestForQuestion(question, paper.exam, { tagsOnly: tagsOnly(question) })),
     {
       concurrency: HYBRID_FILL_PART_SIZE,
       signal: opts.signal,
       isFatal: opts.isFatal,
-      skip: (q) => isOfficialPyqPlaceholder(q) || (!opts.redoAll && officialPyqCardIsFilled(q)),
+      tagsOnly,
+      skip: (q) => isOfficialPyqPlaceholder(q) || (!opts.redoAll && officialPyqCardIsFilled(q, paper)),
       onProgress: (index) => {
         const from = index - (index % HYBRID_FILL_PART_SIZE) + 1
         opts.onProgress?.({ from, to: Math.min(from + HYBRID_FILL_PART_SIZE - 1, total), total, filled, needsLook })
@@ -207,7 +283,11 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
         const card = latest.questions?.[row.index]
         if (!card || String(card.text ?? card.stem ?? '') !== row.patch.expectText) return
         // A solution that still reads like a hint or an essay is not saved.
-        const patch = row.problem ? { ...row.patch, solution: card.solution } : row.patch
+        const patch = row.tagsOnly
+          ? tagsOnlyPatch(row.patch, card)
+          : row.problem
+            ? { ...row.patch, solution: card.solution }
+            : row.patch
         const result = applyOfficialPyqPublishedMeta(paperId, row.index, publishedPatchFromCard(applyHybridPatchToCard(card, patch)))
         if (!result.ok) throw new Error(result.error || `Could not save question ${row.index + 1}.`)
         filled += 1
@@ -219,6 +299,8 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
     asked: rows.filter((row) => !row.skipped).length,
     filled,
     needsLook,
+    tagsOnly: rows.filter((row) => row.tagsOnly).length,
+    noPrintedAnswer,
     stopped: Boolean(opts.signal?.aborted),
   }
 }

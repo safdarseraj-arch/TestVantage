@@ -330,9 +330,10 @@ export const HYBRID_FILL_PART_SIZE = 2
  * one request per question, so no request carries a whole paper and times out.
  * A failed question is tried up to 2 more times, then marked for a look.
  * Each finished part is handed to `onApplied` before the next part starts.
+ * A `tagsOnly` question asks for metatags only, so its solution is never judged or retried.
  * @param {object[]} questions
  * @param {(question: object, index: number, attempt: number) => Promise<object>} fillOne
- * @param {{ onProgress?: Function, onApplied?: Function, isFatal?: (err: Error) => boolean, concurrency?: number, signal?: AbortSignal, skip?: (question: object, index: number) => boolean }} [hooks]
+ * @param {{ onProgress?: Function, onApplied?: Function, isFatal?: (err: Error) => boolean, concurrency?: number, signal?: AbortSignal, skip?: (question: object, index: number) => boolean, tagsOnly?: (question: object, index: number) => boolean }} [hooks]
  */
 export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}) {
   const list = Array.isArray(questions) ? questions : []
@@ -342,6 +343,7 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
   const onApplied = hooks.onApplied
   const isFatal = typeof hooks.isFatal === 'function' ? hooks.isFatal : () => false
   const skip = typeof hooks.skip === 'function' ? hooks.skip : () => false
+  const tagsOnlyFor = typeof hooks.tagsOnly === 'function' ? hooks.tagsOnly : () => false
   const size = Math.max(1, Math.min(HYBRID_FILL_PART_SIZE, Number(hooks.concurrency) || 1))
 
   async function fillAt(index) {
@@ -349,6 +351,7 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
     if (!String(question?.text || question?.stem || '').trim() || skip(question, index)) {
       return { index, skipped: true, question }
     }
+    const tagsOnly = Boolean(tagsOnlyFor(question, index))
     let filled = null
     let problem = ''
     let error = ''
@@ -357,7 +360,7 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
       if (onProgress) onProgress(index, total, attempt)
       try {
         const next = await fillOne(question, index, attempt)
-        const nextProblem = officialPyqSolutionProblem(next?.step_by_step_solution)
+        const nextProblem = tagsOnly ? '' : officialPyqSolutionProblem(next?.step_by_step_solution)
         if (!filled || !nextProblem) {
           filled = next
           problem = nextProblem
@@ -369,9 +372,9 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
         if (isFatal(err)) throw err
       }
     }
-    if (!filled) return { index, skipped: false, needsLook: true, question, error: error || 'Stopped.', patch: null }
+    if (!filled) return { index, skipped: false, needsLook: true, question, error: error || 'Stopped.', patch: null, tagsOnly }
     const patch = publishedMetaPatchFromHybridFill(question, filled)
-    return { index, skipped: false, needsLook: Boolean(problem), problem, question, filled, patch }
+    return { index, skipped: false, needsLook: Boolean(problem), problem, question, filled, patch, tagsOnly }
   }
 
   for (let start = 0; start < list.length; start += size) {

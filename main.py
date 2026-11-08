@@ -272,6 +272,10 @@ class OfficialPyqFillRequest(BaseModel):
     source: str | None = None
     answer: str | None = None
     solution: str | None = None
+    tags_only: bool = Field(
+        default=False,
+        description="Answer and solution are printed on the paper: fill metatags only, no answer or solution.",
+    )
 
 
 class OfficialPyqReplicaQuestionRequest(BaseModel):
@@ -1105,7 +1109,7 @@ async def ingest_pdf(
 
 @app.post("/api/official-pyq/fill-tags", tags=["Official PYQ"])
 async def official_pyq_fill_tags(body: OfficialPyqFillRequest) -> dict[str, Any]:
-    """Return suggested tags, answer, and solution. Does not save or change the stem."""
+    """Return suggested tags, answer, and solution (tags only when tags_only). Does not save or change the stem."""
     options = [str(opt or "") for opt in (body.options or [])]
     options_text = "\n".join(f"{chr(65 + i)}) {opt}" for i, opt in enumerate(options))
     params = {
@@ -1120,8 +1124,9 @@ async def official_pyq_fill_tags(body: OfficialPyqFillRequest) -> dict[str, Any]
         "exam": body.exam,
         "toughness_level": body.toughness_level,
         "source": body.source,
-        "answer": body.answer,
-        "solution": body.solution,
+        "answer": "" if body.tags_only else body.answer,
+        "solution": "" if body.tags_only else body.solution,
+        "tags_only": body.tags_only,
     }
     try:
         filled = await ai_generator.fill_published_pyq(params)

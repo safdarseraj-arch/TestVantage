@@ -71,6 +71,7 @@ import {
   readPrintedAnswerKey,
   stripPrintedAnswerBoxes,
 } from './printedAnswerKey.js'
+import { applyEndAnswerSection, readEndAnswerSection } from './printedEndSolutions.js'
 
 export const PYQ_GEMINI_JSON_SCHEMA_HINT = `Return ONLY this JSON (no markdown fences, no extra commentary):
 {
@@ -859,6 +860,17 @@ export function officialPyqPaperDefaults(paperMeta) {
  */
 export function questionsFromOfficialPyqExtract(extracted, paperMeta, opts = {}) {
   const raw = coercePyqExtractPayload(extracted).text
+  /** Answers / solutions printed after the last question: split without them, then put them on the cards. */
+  const end = readEndAnswerSection(raw)
+  if (end) {
+    const input = typeof extracted === 'string' ? end.questionText : { ...extracted, text: end.questionText, raw: undefined }
+    const built = questionsFromOfficialPyqExtract(input, paperMeta, opts)
+    return {
+      ...built,
+      questions: applyEndAnswerSection(built.questions ?? [], end, { fillOnly: true }),
+      preparedText: `${String(built.preparedText ?? '').trimEnd()}\n\n${end.sectionText}\n`,
+    }
+  }
   const fromText = readPrintedAnswerKey(raw)
   const given = [opts.printedAnswerKey, extracted?.printedAnswerKey].find((k) => k instanceof Map && k.size)
   const printedKey = fromText.size ? fromText : given || fromText
@@ -917,7 +929,10 @@ function questionsFromOfficialPyqExtractText(extracted, paperMeta, opts = {}) {
             correctNumerical: v.item.correctNumerical,
           }
         : {}),
-      ...(raw?.solutionSource === 'from_paper' && v.item.solution ? { solution: v.item.solution } : {}),
+      ...((raw?.solutionSource === 'from_paper' || raw?.solutionPrinted === true || raw?.solution_printed === true) &&
+      v.item.solution
+        ? { solution: v.item.solution, solutionSource: 'from_paper' }
+        : {}),
       subject: v.item.subject || defaults.subject || 'physics',
       chapter: defaults.chapter || 'General',
       questionType: v.item.questionType || 'single_correct',

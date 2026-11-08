@@ -18,7 +18,8 @@ import {
   normalizeMatchAnswerKey,
   rewriteLatexItemLabels,
 } from './parseMatchingListDisplay.js'
-import { detectAnswerFromPaper } from './answerProvenance.js'
+import { cutPrintedSolutionTail, detectAnswerFromPaper, readPrintedAnswerAndSolution } from './answerProvenance.js'
+import { applyEndAnswerSection, readEndAnswerSection } from './printedEndSolutions.js'
 import { annotateMathpixCleanStatus, cleanMathpixCardText, preCleanMathpixOcr } from './mathpixCleanPipeline.js'
 import { stripLeakedOptionsFromStem } from './stripLeakedOptionsFromStem.js'
 import {
@@ -140,8 +141,9 @@ export function sanitizeMathpixOcrText(raw) {
 
 /**
  * The scan glues the next question number to the stem: `\item[Q.] $8 \mathrm{H}_2S$`
- * (Q.8 inside the formula) or `Q. 1250 mL` (Q.12 then "50 mL"). The number that
- * follows the previous marker is split back out; other numbers are left alone.
+ * (Q.8 inside the formula), `Q. 1250 mL` (Q.12 then "50 mL") or `Q. 12 mol` at a
+ * subject restart (Q.1 then "2 mol"). The number that follows the previous marker, or
+ * that comes before the next one, is split back out; other numbers are left alone.
  * @param {string} text
  */
 export function restoreGluedQuestionNumbers(text) {
@@ -168,6 +170,11 @@ export function restoreGluedQuestionNumbers(text) {
       if (prev > 0 && nextN === prev + 2 && digits.length > want.length && digits.startsWith(want)) {
         prev += 1
         return `${marker}${want} ${dollar ?? ''}${digits.slice(want.length)}`
+      }
+      // A new subject restarts at Q.1: "Q.1" + "2 mol" reads "Q. 12 mol" before "Q. 2" (2022 P1 Chemistry).
+      if (nextN === 2 && digits.length > 1 && digits.startsWith('1')) {
+        prev = 1
+        return `${marker}1 ${dollar ?? ''}${digits.slice(1)}`
       }
       if (!dollar) prev = Number(digits)
       return whole
@@ -277,10 +284,16 @@ export function stripOwnOptionLabel(opt, index) {
 /** "Answer: A", "\section*{Answer: (A), (B)}", "Answer (C) and (D)" (no colon, 2014). */
 const PRINTED_KEY_LINE_RE = /^\s*(?:\\section\*?\{\s*)?(?:Ans(?:wer)?s?|Key)\s*(?:[:.\-=]|\(\s*[A-D]\s*\))/i
 
+/** "(D) 4 Ans. (B) Sol. …": the printed answer and solution after an option are not the option. */
+export const OPTION_SOLUTION_TAIL_RE =
+  /\s+(?:(?:Ans(?:wer)?s?|ANS(?:WER)?S?)\s*[.:\-=]|(?:Sol(?:ution)?|SOL(?:UTION)?|Explanation|EXPLANATION|Hints?|HINTS?)\s*[.:\-\u2013])\s*\S[\s\S]*$/
+
 function stripKeyLeak(opt) {
   return String(opt ?? '')
     .replace(/\(\s*key\s*\)/gi, '')
-    .replace(/\s+(?:\\section\*?\{\s*)?Answer\s*(?:[:\-=]\s*)?\(\s*[A-D]\s*\)(?:\s*(?:,|and|&|or)\s*\(\s*[A-D]\s*\))*[^\n]*$/i, '')
+    .replace(OPTION_SOLUTION_TAIL_RE, '')
+    .replace(/\s+(?:\\section\*?)?\{?\s*Answer\s*(?:[:\-=]\s*)?\(\s*[A-D]\s*\)(?:\s*(?:,|and|&|or)\s*\(\s*[A-D]\s*\))*[^\n]*$/i, '')
+    .replace(/\s+(?:\\section\*?)?\{\s*Answers?\s*$/i, '')
     .replace(/^\s*&+\s*/g, '')
     .replace(/\s*&+\s*$/g, '')
     .replace(/\$\$\s*\\?\s*\\hline\s*\$*/gi, ' ')
@@ -1423,11 +1436,17 @@ function peelMatchMappingOptions(body) {
   const src = String(body ?? '')
   const re =
     /\\item\s*\[\s*\(?\s*([A-D])\s*\)?\s*\]([\s\S]*?)(?=\\item\s*\[|\\end\{itemize\}|\n\s*(?:\\section\*?\{\s*)?(?:List|LIST|Column)\s*[-–]?\s*I|\n\s*\n|$)/g
-  let hits = [...src.matchAll(re)].filter((m) => /→|\\rightarrow|->/.test(m[2]))
+  /** "P→2, Q→3", the older "P-1, Q-2, R-3, S-4", or "3142" under a "P Q R S" header. */
+  const pqrsHeader = /(?:^|\n)[ \t]*P\s*Q\s*R\s*S[ \t]*(?:\n|$)/.test(src)
+  const isMapping = (s) =>
+    /→|\\rightarrow|->/.test(s) ||
+    /\bP\s*[-–]\s*\d[\s\S]{0,12}?\bQ\s*[-–]\s*\d/.test(s) ||
+    (pqrsHeader && /^\s*[1-5](?:\s*&?\s*[1-5]){3}\s*$/.test(s))
+  let hits = [...src.matchAll(re)].filter((m) => isMapping(m[2]))
   if (!/^ABCD$|^ABC$/.test(hits.map((m) => m[1].toUpperCase()).join(''))) {
     // Plain lines "(A) P→2, Q→3, R→2, S→2" after the two lists.
     hits = [...src.matchAll(/(?:^|\n)[ \t]*\(\s*([A-D])\s*\)[ \t]*([^\n]+)/g)].filter((m) =>
-      /→|\\rightarrow|->/.test(m[2]),
+      isMapping(m[2]),
     )
   }
   const letters = hits.map((m) => m[1].toUpperCase()).join('')
@@ -1441,9 +1460,39 @@ function peelMatchMappingOptions(body) {
   return { body: rest, options }
 }
 
+/**
+ * "Which of the following sketches…" printed as four pictures with no (A)–(D)
+ * labels: the four pictures at the end of the stem are the options, in order.
+ * @returns {{ text: string, options: string[] } | null}
+ */
+function peelUnlabelledFigureOptions(text, options) {
+  if ((options || []).some((o) => String(o ?? '').trim())) return null
+  const t = String(text ?? '')
+  const KIND = String.raw`(?:sketch(?:es)?|graphs?|figures?|plots?|curves?|diagrams?)`
+  if (!new RegExp(String.raw`\bfollowing\s+${KIND}\b`, 'i').test(t)) return null
+  const IMG = String.raw`(?:!\[[^\]]*\]\([^)\s]+\)|\\includegraphics\s*(?:\[[^\]]*\])?\s*\{[^}]+\})`
+  const KEY = String.raw`(?:\s*(?:\\section\*?\{\s*)?Answer\s*[:\-]?\s*\(\s*[A-D]\s*\)\s*\}?)?`
+  const m = t.match(new RegExp(String.raw`((?:\s*${IMG}){4})(${KEY}\s*)$`))
+  if (!m || m.index < 40) return null
+  const before = t.slice(0, m.index)
+  if (new RegExp(String.raw`${IMG}\s*$`).test(before)) return null
+  const imgs = m[1].match(new RegExp(IMG, 'g')) || []
+  if (imgs.length !== 4) return null
+  return { text: `${before.trim()}${m[2] || ''}`, options: imgs }
+}
+
 function blockToMathpixDraft(block, i, attached, paper) {
   const num = extractMathpixQuestionNumber(block) || i + 1
-  const body = stripMathpixQuestionMarker(block)
+  const whole = stripMathpixQuestionMarker(block)
+  /** "Ans. (B)" + "Sol. …" printed under the question: options and stem come from the part above it. */
+  const printedTail = cutPrintedSolutionTail(whole)
+  const body = printedTail ? printedTail.head : whole
+  const inline = printedTail ? readPrintedAnswerAndSolution(printedTail.tail) : null
+  const inlineSolution = inline?.solution
+    ? stripTrailingPyqSectionHeader(inline.solution)
+        .replace(/\n+[ \t]*(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)[ \t]*$/, '')
+        .trim()
+    : ''
   const isMatch = looksLikeMatchingListStem(body)
   const rec = recoverOptionsFromStem(body, [])
   const parsed = parseQuestionText(rec.stem || body)
@@ -1486,8 +1535,15 @@ function blockToMathpixDraft(block, i, attached, paper) {
       }
     }
   }
+  if (!isMatch) {
+    const figs = peelUnlabelledFigureOptions(text, options)
+    if (figs) {
+      text = figs.text
+      options = figs.options
+    }
+  }
   while (options.length < 4) options.push('')
-  let printed = detectAnswerFromPaper(text)
+  let printed = inline?.answer?.answerSource === 'from_paper' ? inline.answer : detectAnswerFromPaper(text)
   if (printed.answerSource !== 'from_paper') {
     /** "Answer: A" printed under the option table left the stem with the table (2025 P2 Q23). */
     const keyLines = body
@@ -1496,7 +1552,7 @@ function blockToMathpixDraft(block, i, attached, paper) {
       .join('\n')
     if (keyLines) printed = detectAnswerFromPaper(keyLines)
   }
-  text = cleanMathpixCardText(text)
+  text = cleanMathpixCardText(text).replace(/(?:^|\n)[ \t]*(?:Choices|Codes?)[ \t]*:[ \t]*(?=\n|$)/gi, '')
   /** A table row's "\\" stays out of the option; wrapped as math it shows as "$\$$\$$". */
   options = options.map((o) => cleanMathpixCardText(String(o ?? '').replace(/(?:\s*\\\\)+\s*$/, '')))
   text = wrapCardMath(text)
@@ -1525,11 +1581,9 @@ function blockToMathpixDraft(block, i, attached, paper) {
           ...(printed.numericalAlternatives?.length ? { numericalAlternatives: printed.numericalAlternatives } : {}),
           ...(printed.bonusMarksToAll ? { bonusMarksToAll: true } : {}),
           answerSource: 'from_paper',
-          ...(printed.solution
-            ? { solution: printed.solution, solutionSource: printed.solutionSource || 'from_paper' }
-            : {}),
         }
       : { answerSource: 'unknown' }),
+    ...(inlineSolution ? { solution: inlineSolution, solutionSource: 'from_paper' } : {}),
     instructions: attached || undefined,
     ocrEngine: 'mathpix',
     examPatternId: paper.exam || paper.examPatternId || undefined,
@@ -1781,12 +1835,13 @@ export function mathpixSplitToBankDrafts(raw, opts = {}) {
  */
 export function paperItemsFromMathpixOcr(raw, opts = {}) {
   if (ocrIsHindiOnly(raw)) return []
+  const endSection = readEndAnswerSection(stripHindiOcr(raw))
   const text = restoreDroppedMathpixMatchPieces(labelNumberedQuestions(stripHindiOcr(raw)))
   const sectionMap = opts.sectionMap && Array.isArray(opts.sectionMap.ranges)
     ? opts.sectionMap
     : parsePaperSectionMap(text)
   const { drafts } = mathpixSplitToBankDrafts(text, { ...opts, sectionMap })
-  return applyMatrixGridQuestions(dedupePaperItemsByNumber(drafts), text)
+  return applyEndAnswerSection(applyMatrixGridQuestions(dedupePaperItemsByNumber(drafts), text), endSection)
 }
 
 /**

@@ -246,7 +246,8 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
     setErrors([])
     setNote('Saving the paper facts and checking every question…')
     try {
-      const { confirmOfficialPyqPaperFacts } = await import('../utils/officialPyqAdminFactsApply.js')
+      const [{ confirmOfficialPyqPaperFacts }, { OFFICIAL_PYQ_FACTS_CONFIRMED_EVENT, autoFixAfterOfficialPyqFactsConfirmed }] =
+        await Promise.all([import('../utils/officialPyqAdminFactsApply.js'), import('../utils/officialPyqFactsAutoFix.js')])
       const out = confirmOfficialPyqPaperFacts(paperId, draft)
       if (!out.ok) {
         setErrors(out.errors)
@@ -256,14 +257,26 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
       const q = out.quality
       const goTo = Array.isArray(q?.failedGoTo) ? q.failedGoTo : []
       const lines = Array.isArray(q?.lines) ? q.lines : []
-      setNote(
-        `Saved. Questions: ${out.before} → ${out.after} (paper facts say ${out.expected}). ` +
-          (q?.passed
-            ? 'Quality check passed.'
-            : `Quality check not passed.${goTo.length ? ` Go to Q ${goTo.slice(0, 24).join(', ')}.` : ''} ${lines[0] || ''}`),
-      )
+      const after = getOfficialPyqPendingPaper(paperId)?.questions?.length ?? out.after
+      const saved =
+        `Saved. Questions: ${out.before} → ${after} (paper facts say ${out.expected}). ` +
+        (q?.passed
+          ? 'Quality check passed.'
+          : `Quality check not passed.${goTo.length ? ` Go to Q ${goTo.slice(0, 24).join(', ')}.` : ''} ${lines[0] || ''}`)
+      setNote(saved)
       setDraft(loadDraft(paperId))
       onChanged?.()
+      const detail = { paperId, before: out.before, handled: false }
+      window.dispatchEvent(new CustomEvent(OFFICIAL_PYQ_FACTS_CONFIRMED_EVENT, { detail }))
+      if (detail.handled) {
+        setNote(`${saved} Facts confirmed — auto-fix started (see Compare with original paper below).`)
+      } else {
+        const fix = await autoFixAfterOfficialPyqFactsConfirmed(paperId, { before: out.before })
+        const left = fix.todo?.length ? ` Still flagged: Q ${fix.todo.join(', ')} — use Auto-fix flagged questions.` : ''
+        setNote(`${saved} Facts confirmed — free auto-fix ran, nothing was sent to Gemini.${left}`)
+        setDraft(loadDraft(paperId))
+        onChanged?.()
+      }
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Could not save the paper facts.'])
       setNote('')

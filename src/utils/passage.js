@@ -589,6 +589,18 @@ function printedNumberInPassageRange(n, source, map) {
   return officialPyqPassageRanges(source, map).some((r) => n >= r.from && n <= r.to)
 }
 
+/** True when the paper itself prints "Paragraph for Questions X and Y" covering n. */
+function passageHeadingNamesNumber(n, source) {
+  if (!n) return false
+  const re = /Paragraph\s+for\s+Q(?:uestions?|\.)?\s*(?:Nos?\.?\s*)?(\d{1,3})\s*(?:and|&|\\&|,|to|-|–)\s*(?:Q\.?\s*)?(\d{1,3})/gi
+  for (const m of String(source ?? '').matchAll(re)) {
+    const from = Number(m[1])
+    const to = Number(m[2])
+    if (to >= from && to - from <= 3 && n >= from && n <= to) return true
+  }
+  return false
+}
+
 /**
  * True when a long MCQ reused a comprehension slot number (must not keep a paragraph).
  * Short child stems ("Value of…", "If n(X)…", fill-blanks) stay eligible.
@@ -624,6 +636,7 @@ export function officialPyqCardAllowsPassage(q, source = '', map) {
   const n = officialPyqPrintedNumber(q)
   if (!n) return false
   if (!printedNumberInPassageRange(n, source, map)) return false
+  if (passageHeadingNamesNumber(n, source)) return true
   if (looksLikeStandaloneMcqOnChildSlot(q.text ?? q.stem, q.options)) return false
   return true
 }

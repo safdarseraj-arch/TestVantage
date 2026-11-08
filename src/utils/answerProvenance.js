@@ -78,7 +78,7 @@ export function detectAnswerFromPaper(block) {
   /** Mathpix prints some keys as headings: "\section*{Answer: [2.2 to 2.3]}" (2025 P1 Q9/Q41/Q42). */
   const text = String(block ?? '')
     .replace(/\r\n/g, '\n')
-    .replace(/\\section\*?\{\s*((?:(?:Official\s+)?Ans(?:wer)?s?\.?|Key)\s*[:.\-=][^{}\n]*)\}/gi, '$1')
+    .replace(/\\section\*?\{\s*((?:(?:Official\s+)?Ans(?:wer)?s?\.?|Key)\s*(?:[:.\-=]|(?=\(\s*[A-D]\s*\)))[^{}\n]*)\}/gi, '$1')
     .replace(BRACKETED_LETTER_KEY, (_, head, list) => `${head.replace(/[\s:\-=]*$/, '')}: ${[...list.matchAll(/\(\s*([A-D])\s*\)/gi)].map((m) => m[1]).join(', ')} `)
   if (!text.trim()) {
     return { answerSource: 'unknown', answerConfidence: 0 }
@@ -224,10 +224,77 @@ function printedAnswerTail(text) {
     ...bandAnswer,
     answerSource: 'from_paper',
     answerConfidence: 90,
-    solution: m[1].trim(),
-    solutionSource: 'from_paper',
     matchedLine: m[1].trim(),
   }
+}
+
+const ANS_MARK_SRC = String.raw`(?:Ans(?:wer)?s?|ANS(?:WER)?S?)\s*(?:[.:\-=]|\(\s*[A-D]\s*\))`
+const SOL_MARK_SRC = String.raw`(?:Sol(?:ution)?|SOL(?:UTION)?|Explanation|EXPLANATION|Hints?|HINTS?)\s*[.:\-\u2013]`
+/** "Solution" / "\section*{Explanation}" alone on its line also opens a printed solution. */
+const SOL_LINE_ALONE_SRC = String.raw`(?:\\section\*?\{\s*)?(?:Sol(?:ution)?|SOL(?:UTION)?|Explanation|EXPLANATION|Hints?|HINTS?)\s*\}?[ \t]*(?=\n|$)`
+const TAIL_START_RE = new RegExp(String.raw`(^|[ \t]+|\n[ \t]*)(?=${ANS_MARK_SRC}|${SOL_MARK_SRC}|${SOL_LINE_ALONE_SRC})`, 'g')
+const SOL_START_RE = new RegExp(String.raw`(?:^|[ \t]|\n[ \t]*)(?:${SOL_MARK_SRC}|${SOL_LINE_ALONE_SRC})`)
+const ANS_START_LINE_RE = new RegExp(String.raw`^(?:\\section\*?\{\s*)?${ANS_MARK_SRC}`)
+const SOL_START_LINE_RE = new RegExp(String.raw`^(?:${SOL_MARK_SRC}|${SOL_LINE_ALONE_SRC})`)
+
+/**
+ * A printed answer + solution under the question ("Ans. (B)" then "Sol. …"): the part before it is
+ * the question, the part from it on is the paper's own answer and solution. Only when a solution
+ * marker is printed; a lone "Answer: C" key is left to the key readers.
+ * @param {unknown} block
+ * @returns {{ head: string, tail: string } | null}
+ */
+export function cutPrintedSolutionTail(block) {
+  const text = String(block ?? '').replace(/\r\n/g, '\n')
+  for (const m of text.matchAll(TAIL_START_RE)) {
+    const at = m.index + m[1].length
+    if (!SOL_START_RE.test(text.slice(at - (at > 0 ? 1 : 0)))) return null
+    if (at === 0) continue
+    return { head: text.slice(0, at).trimEnd(), tail: text.slice(at).trim() }
+  }
+  return null
+}
+
+/**
+ * Answer and solution from the printed tail of one question.
+ * @param {unknown} tail
+ * @returns {{ answer: ReturnType<typeof detectAnswerFromPaper>, solution: string }}
+ */
+export function readPrintedAnswerAndSolution(tail) {
+  const lines = String(tail ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(new RegExp(String.raw`[ \t]+(?=${SOL_MARK_SRC}|${ANS_MARK_SRC})`, 'g'), '\n')
+    .split('\n')
+  const answerLines = []
+  const solutionLines = []
+  let inSolution = false
+  for (const line of lines) {
+    const t = line.trim()
+    if (ANS_START_LINE_RE.test(t)) {
+      answerLines.push(
+        t
+          .replace(/^(?:\\section\*?\{\s*)?(?:Ans(?:wer)?s?|ANS(?:WER)?S?)\s*[.:\-=]?\s*/, 'Answer: ')
+          .replace(/\}\s*$/, ''),
+      )
+      continue
+    }
+    if (SOL_START_LINE_RE.test(t)) {
+      inSolution = true
+      const rest = t.replace(
+        /^(?:\\section\*?\{\s*)?(?:Sol(?:ution)?|SOL(?:UTION)?|Explanation|EXPLANATION|Hints?|HINTS?)\s*[.:\-\u2013]?\s*\}?\s*/,
+        '',
+      )
+      if (rest) solutionLines.push(rest)
+      continue
+    }
+    if (inSolution) solutionLines.push(line.trimEnd())
+  }
+  const solution = solutionLines
+    .join('\n')
+    .replace(/\\(?:begin|end)\{(?:itemize|enumerate)\}/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return { answer: detectAnswerFromPaper(answerLines.join('\n')), solution }
 }
 
 /**

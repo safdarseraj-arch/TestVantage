@@ -44,6 +44,7 @@ import {
   shouldRebuildFromMathpixOcr,
   officialPyqCardsNeedMathpixRebuild,
 } from './mathpixQuestionSplit.js'
+import { storedEndAnswerSectionText } from './printedEndSolutions.js'
 import {
   expectedPyqTargetFromOcrLite,
   quickOcrQuestionCount,
@@ -112,13 +113,15 @@ export function officialPyqStoredOcrTextLocal(paper) {
   const rawNotes = extractPreparedTextFromPaperNotes(paper?.notes)
   const dedicated = sanitizeMathpixOcrText(rawDedicated)
   const fromNotes = sanitizeMathpixOcrText(rawNotes)
+  // The clean cuts the answers / solutions printed after the paper; the split reads them again.
+  const endSection = storedEndAnswerSectionText(rawDedicated) || storedEndAnswerSectionText(rawNotes)
   // preparedText is a cleaned copy. If that clean ate figure URLs, the notes
   // copy still has them. Prefer the copy that still has the drawings.
   if (fromNotes.length >= 80 && mathpixFigureHits(rawNotes) > mathpixFigureHits(rawDedicated)) {
-    return fromNotes
+    return fromNotes + endSection
   }
-  if (dedicated.length >= 80) return dedicated
-  return fromNotes
+  if (dedicated.length >= 80) return dedicated + endSection
+  return fromNotes + endSection
 }
 
 /** @param {'jee-main' | 'jee-advanced' | 'neet'} exam */
@@ -349,7 +352,11 @@ function placeAdminEditedCards(cards, prior, admins) {
   const printedUnique = new Set(cards.map(printedOf).filter((n) => n > 0)).size === cards.length
   const scored = []
   admins.forEach((a, ai) => {
-    const history = Array.isArray(a.editHistory) ? a.editHistory : []
+    // A machine fix can rewrite a slot into another question; its old wording names the slot it
+    // was wrongly made in, so its current wording places it whenever that wording finds a card.
+    const current = cardWordPairs(a)
+    const currentFinds = isMachineFix(a) && nextPairs.some((pairs) => pairOverlap(current, pairs) >= SAME_CARD_MIN_OVERLAP)
+    const history = Array.isArray(a.editHistory) && !currentFinds ? a.editHistory : []
     const versions = [a, ...history.map((h) => h?.card).filter(Boolean)].map(cardWordPairs)
     nextPairs.forEach((pairs, qi) => {
       const subject = String(cards[qi]?.subject || '')
@@ -422,6 +429,24 @@ function lostScanDrawing(old, fresh) {
 function autoFixLostToFreshParse(old, fresh, paper) {
   if (!isMachineFix(old) || !fresh) return false
   if (isMatrixGridCard(fresh) && !isMatrixGridCard(old)) return true
+  /** "58." above the lists or "31. The product X is": the fix kept the printed question number. */
+  const ownNumber = (q) => {
+    const m = String(q?.text ?? '').match(/^\s*(\d{1,3})\s*[.)](?:[ \t]*(?:\n|$)|[ \t]+(?=[A-Za-z$\\]))/)
+    return Boolean(m) && (/\n|^\s*\d{1,3}\s*[.)]\s*$/.test(m[0]) || Number(m[1]) === Number(fresh?.printedNumber ?? q?.printedNumber))
+  }
+  if (ownNumber(old) && !ownNumber(fresh)) return true
+  /** List-I pictures the scan prints in the stem sit on the fix's A–D. */
+  const stemPics = scanPicturesOf({ text: fresh?.text, passageText: fresh?.passageText })
+  const freshOptPics = scanPicturesOf({ options: fresh?.options })
+  if (
+    (Array.isArray(old?.options) ? old.options : []).some((o) =>
+      (String(o ?? '').match(SCAN_PICTURE_RE) || []).some((u) => stemPics.has(u) && !freshOptPics.has(u)),
+    )
+  ) {
+    return true
+  }
+  /** The fix kept the section instructions as its paragraph. */
+  if (/This section contains/i.test(String(old?.passageText ?? '')) && !/This section contains/i.test(String(fresh?.passageText ?? ''))) return true
   if (optionShapeDisagrees(old, fresh)) return true
   if (lostScanDrawing(old, fresh)) return true
   if (carriesOtherQuestionsScanPicture(old, fresh, paper)) return true
@@ -463,8 +488,17 @@ function releasedAutoFixIndexes(prev, next) {
     if (!now) return
     if (now.adminEdited !== true && autoFixLostToFreshParse(old, now, fresh)) out.push(i)
     else if (old.adminApproved !== true && carriesOtherQuestionsScanPicture(old, now, fresh)) out.push(i)
+    // A machine fix saved without any answer must not wipe the printed key now on the card.
+    else if (isMachineFix(old) && now.answerSource === 'from_paper' && !hasAnyAnswer(old) && hasAnyAnswer(now)) out.push(i)
   })
   return out
+}
+
+function hasAnyAnswer(q) {
+  return (
+    [q?.correctIndex, q?.correctInteger, q?.correctNumerical].some((v) => v != null && v !== '') ||
+    (Array.isArray(q?.correctIndices) && q.correctIndices.length > 0)
+  )
 }
 
 export function keepAdminEditedCards(next, prev) {
@@ -516,8 +550,19 @@ export function copyAnswersOntoCanonical(canonical, prev) {
     if (!placed && old?.adminEdited === true) old = null
     if (!old) return q
     if (old.adminEdited === true && !autoFixLostToFreshParse(old, q, canonical)) {
+      const printedKey =
+        isMachineFix(old) && q.answerSource === 'from_paper'
+          ? {
+              correctIndex: q.correctIndex,
+              correctIndices: q.correctIndices,
+              correctInteger: q.correctInteger,
+              correctNumerical: q.correctNumerical,
+              answerSource: 'from_paper',
+            }
+          : {}
       return {
         ...old,
+        ...printedKey,
         questionNumber: q.questionNumber,
         pyqSlot: q.pyqSlot ?? q.questionNumber,
         printedNumber: q.printedNumber ?? old.printedNumber,
@@ -659,7 +704,7 @@ export function reExtractOfficialPyqPendingPaperLocal(paper, opts = {}) {
     .map((q, i) => ({
       ...q,
       answerSource: q.answerSource || (q.correctIndex != null ? 'from_paper' : 'unknown'),
-      solutionSource: q.solutionSource || (q.solution ? 'from_paper' : undefined),
+      solutionSource: q.solutionSource || (q.solution ? 'unknown' : undefined),
       provenance:
         q.provenance ||
         `${paper.sourceLabel}${paper.sourceUrl ? ` · ${paper.sourceUrl}` : ''}`,
@@ -888,7 +933,7 @@ export async function reExtractOfficialPyqPendingPaperLocalAsync(paper, { yieldF
     .map((q, i) => ({
       ...q,
       answerSource: q.answerSource || (q.correctIndex != null ? 'from_paper' : 'unknown'),
-      solutionSource: q.solutionSource || (q.solution ? 'from_paper' : undefined),
+      solutionSource: q.solutionSource || (q.solution ? 'unknown' : undefined),
       provenance:
         q.provenance ||
         `${paper.sourceLabel}${paper.sourceUrl ? ` · ${paper.sourceUrl}` : ''}`,

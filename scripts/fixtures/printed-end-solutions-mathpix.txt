@@ -1,0 +1,63 @@
+\section*{PHYSICS}
+
+\section*{SECTION 1 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains THREE (03) questions.
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is the correct answer.
+\end{itemize}
+\begin{itemize}
+\item[Q.] 1 A block of mass $2 \mathrm{~kg}$ rests on a smooth horizontal floor. A horizontal force of $10 \mathrm{~N}$ acts on the block. The acceleration of the block is
+\end{itemize}
+(A) $2 \mathrm{~m} / \mathrm{s}^{2}$
+(B) $5 \mathrm{~m} / \mathrm{s}^{2}$
+(C) $10 \mathrm{~m} / \mathrm{s}^{2}$
+(D) $20 \mathrm{~m} / \mathrm{s}^{2}$
+\begin{itemize}
+\item[Q.] 2 A ball is thrown vertically upward with a speed of $20 \mathrm{~m} / \mathrm{s}$. Taking $g=10 \mathrm{~m} / \mathrm{s}^{2}$, the maximum height reached by the ball is
+\end{itemize}
+(A) $10 \mathrm{~m}$
+(B) $20 \mathrm{~m}$
+(C) $40 \mathrm{~m}$
+(D) $80 \mathrm{~m}$
+\begin{itemize}
+\item[Q.] 3 Two resistors of $3 \Omega$ and $6 \Omega$ are joined in parallel across an ideal cell. The equivalent resistance in ohm is
+\end{itemize}
+
+\section*{CHEMISTRY}
+
+\begin{itemize}
+\item[Q.] 4 The number of moles of oxygen atoms present in one mole of calcium carbonate is
+\end{itemize}
+(A) 1
+(B) 2
+(C) 3
+(D) 4
+\begin{itemize}
+\item[Q.] 5 Which one of the following gases turns lime water milky?
+\end{itemize}
+(A) Oxygen
+(B) Nitrogen
+(C) Carbon dioxide
+(D) Hydrogen
+\begin{itemize}
+\item[Q.] 6 The pH of a $0.001 \mathrm{M}$ solution of hydrochloric acid at $25^{\circ} \mathrm{C}$ is
+\end{itemize}
+
+\section*{ANSWER KEY}
+
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline 1 & 2 & 3 & 4 & 5 & 6 \\
+\hline B & B & 2 & C & C & 3 \\
+\hline
+\end{tabular}
+
+\section*{HINTS \& SOLUTIONS}
+
+PHYSICS
+1. By Newton's second law the acceleration is $a=F / m=10 / 2=5 \mathrm{~m} / \mathrm{s}^{2}$.
+2. At the top the speed is zero, so $h=u^{2} / 2 g=400 / 20=20 \mathrm{~m}$.
+3. For resistors in parallel $\frac{1}{R}=\frac{1}{3}+\frac{1}{6}=\frac{1}{2}$, hence $R=2 \Omega$.
+CHEMISTRY
+4. Each formula unit $\mathrm{CaCO}_{3}$ contains three oxygen atoms, so one mole holds 3 moles of oxygen atoms.
+5. Carbon dioxide forms insoluble calcium carbonate with lime water.
+6. The acid is fully ionised, so $\left[\mathrm{H}^{+}\right]=10^{-3}$ and $\mathrm{pH}=3$.

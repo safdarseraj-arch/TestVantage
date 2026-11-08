@@ -10,7 +10,11 @@
  */
 
 import { answerSourceBadgeLabel } from './answerProvenance.js'
-import { persistOfficialPyqQualityRun } from './officialPyqLocalQuality.js'
+import {
+  LOCAL_QUALITY_REVISION,
+  localOfficialPyqQualityCheck,
+  persistOfficialPyqQualityRun,
+} from './officialPyqLocalQuality.js'
 import { enforceAdminFactsOnQuestions, factsForPaper } from './officialPyqAdminFacts.js'
 import { numericalAlternativesOf } from './answerAlternatives.js'
 import {
@@ -79,6 +83,7 @@ import {
 } from './pyqGeminiExtract.js'
 import { sanitizeMathpixOcrText } from './mathpixQuestionSplit.js'
 import { formatStoredPrintedAnswerKey, readPrintedAnswerKey } from './printedAnswerKey.js'
+import { storedEndAnswerSectionText } from './printedEndSolutions.js'
 import { raceStepTimeout } from './ocrTimeout.js'
 import { getOfficialPyqExamLabel } from '../data/officialPyqSources.js'
 import {
@@ -599,17 +604,35 @@ export function validateOfficialPyqForPublish(paper) {
   return { ok: errors.length === 0, errors }
 }
 
+const FACTS_UNKNOWN_LINE = /facts card is unknown/i
+
 /**
- * The saved quality check failed, or the card count is not the count the admin confirmed
+ * The quality check failed (re-run when the saved mark is from an older check), or the card count is not the count the admin confirmed
  * (a question lost by the split renumbers the rest, so no slot looks empty — 2025 P2 Q5).
  * @param {OfficialPyqPendingPaper} paper
  * @param {number} filled
  */
 function paperWideQualityBlockers(paper, filled) {
   const errors = []
-  if (paper?.localQuality?.passed === false) {
-    const nums = Array.isArray(paper.localQuality.failedGoTo) ? paper.localQuality.failedGoTo.slice(0, 24).join(', ') : ''
-    errors.push(`The quality check has not passed.${nums ? ` Go to Q ${nums}.` : ''} Fix it before continuing.`)
+  let quality = paper?.localQuality
+  if (quality && quality.revision !== LOCAL_QUALITY_REVISION) {
+    try {
+      const ocr = String(paper.preparedText ?? '').trim() || getOfficialPyqPendingOcrText(paper.id)
+      quality = localOfficialPyqQualityCheck({ ...paper, preparedText: ocr })
+    } catch {
+      quality = null
+    }
+  }
+  if (quality?.passed === false) {
+    const failed = Array.isArray(quality.failedGoTo) ? quality.failedGoTo : []
+    // Confirmed facts stand in for a scan whose instructions give no section counts.
+    const lines = (Array.isArray(quality.lines) ? quality.lines : []).filter(
+      (line) => !(paper.adminFacts?.confirmedAt && FACTS_UNKNOWN_LINE.test(String(line))),
+    )
+    if (failed.length || lines.length) {
+      const nums = failed.slice(0, 24).join(', ')
+      errors.push(`The quality check has not passed.${nums ? ` Go to Q ${nums}.` : ` ${lines[0]}`} Fix it before continuing.`)
+    }
   }
   const facts = paper?.adminFacts?.confirmedAt ? factsForPaper(paper) : null
   const expected = facts?.known && facts.source === 'admin' ? Number(facts.expectedQuestionCount) || 0 : 0
@@ -1125,9 +1148,14 @@ export function reExtractOfficialPyqPendingPaper(paper, extractOverride) {
   const printedAnswerKey = readPrintedAnswerKey(
     [extractOverride?.text, paper.preparedText, extractPreparedTextFromPaperNotes(paper.notes)].join('\n'),
   )
+  const endSection =
+    [extractOverride?.text, paper.preparedText, extractPreparedTextFromPaperNotes(paper.notes)]
+      .map(storedEndAnswerSectionText)
+      .find(Boolean) || ''
   const preparedText =
     sanitizeMathpixOcrText(extractOverride?.text || officialPyqStoredOcrText(paper)) +
-    formatStoredPrintedAnswerKey(printedAnswerKey)
+    formatStoredPrintedAnswerKey(printedAnswerKey) +
+    endSection
   if (!preparedText || preparedText.length < 80) {
     return {
       ok: false,
@@ -1157,7 +1185,7 @@ export function reExtractOfficialPyqPendingPaper(paper, extractOverride) {
   let questions = (built.questions ?? []).map((q, i) => ({
     ...q,
     answerSource: q.answerSource || (q.correctIndex != null ? 'from_paper' : 'unknown'),
-    solutionSource: q.solutionSource || (q.solution ? 'from_paper' : undefined),
+    solutionSource: q.solutionSource || (q.solution ? 'unknown' : undefined),
     provenance:
       q.provenance ||
       `${paper.sourceLabel}${paper.sourceUrl ? ` · ${paper.sourceUrl}` : ''}`,
@@ -1171,7 +1199,7 @@ export function reExtractOfficialPyqPendingPaper(paper, extractOverride) {
       questions = healedOnly.map((q, i) => ({
         ...q,
         answerSource: q.answerSource || (q.correctIndex != null ? 'from_paper' : 'unknown'),
-        solutionSource: q.solutionSource || (q.solution ? 'from_paper' : undefined),
+        solutionSource: q.solutionSource || (q.solution ? 'unknown' : undefined),
         provenance:
           q.provenance ||
           `${paper.sourceLabel}${paper.sourceUrl ? ` · ${paper.sourceUrl}` : ''}`,

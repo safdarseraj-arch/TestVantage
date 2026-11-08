@@ -149,6 +149,8 @@ export function overlayOfficialPyqPublishedMeta(prev, patch) {
   applyAnswer(next, patch || {})
   if (patch?.answerSource) next.answerSource = String(patch.answerSource)
   if (patch?.solutionSource) next.solutionSource = String(patch.solutionSource)
+  if (patch?.hybridAnswerDisagrees) next.hybridAnswerDisagrees = String(patch.hybridAnswerDisagrees)
+  else if (patch && Object.prototype.hasOwnProperty.call(patch, 'hybridAnswerDisagrees')) delete next.hybridAnswerDisagrees
   restoreBody(next, prev && typeof prev === 'object' ? prev : {})
   return next
 }

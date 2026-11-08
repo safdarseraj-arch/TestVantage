@@ -118,6 +118,17 @@ export function formatStoredPrintedAnswerKey(key) {
 }
 
 /**
+ * An older split saved the printed key line ("Answer: [0.7 to 0.8]") as the solution.
+ * True only when the whole solution is that one key line.
+ * @param {unknown} solution
+ */
+export function solutionIsOnlyPrintedKeyLine(solution) {
+  const t = String(solution ?? '').trim().replace(/\}+$/, '').trim()
+  if (!t || t.includes('\n') || t.length > 100) return false
+  return /^(?:(?:Official\s+)?(?:Ans(?:wer)?s?\.?|Key)|Correct\s+(?:option|answer))\s*[:.\-=]\s*(?:is\s+)?(?:\(?[A-D]\)?(?:\s*(?:,|and|&)\s*\(?[A-D]\)?)*|\[?\s*-?\d+(?:\.\d+)?\s*(?:(?:to|\u2013|\u2014)\s*-?\d+(?:\.\d+)?\s*)?\]?(?:\s+OR\s+\[?\s*-?\d+(?:\.\d+)?\s*(?:(?:to|\u2013|\u2014)\s*-?\d+(?:\.\d+)?\s*)?\]?)*)\.?$/i.test(t)
+}
+
+/**
  * Answer fields for one card from a printed value such as "(A), (B), and (D)" or "(6)".
  * @param {string} value
  * @param {string} questionType

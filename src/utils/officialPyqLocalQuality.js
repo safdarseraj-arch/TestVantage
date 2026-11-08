@@ -4,10 +4,10 @@
  * Does not approve, publish, or invent missing text.
  */
 
-import { peelPrintedAnswerFromStem } from './answerProvenance.js'
+import { cutPrintedSolutionTail, peelPrintedAnswerFromStem, readPrintedAnswerAndSolution } from './answerProvenance.js'
 import { closedChemReactionDisplays } from './healTruncatedLatex.js'
 import { healUploadQuestionCard, ocrQuestionBodyForCard, storedMatchOptionsAreCutOff } from './extendTruncatedStem.js'
-import { paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
+import { OPTION_SOLUTION_TAIL_RE, paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
 import { healUploadQuestionCard as healPreviewCard, applyStoredOcrCardFixes, storedCardMissesOcrFix } from './uploadQualityGuards.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
 import {
@@ -22,7 +22,8 @@ import { visibleLatexSourceHits } from './visibleLatexSource.js'
 import { givenLineDroppedUnit, inlineSingleSymbolDisplayMath, restoreDroppedMsOnGivenLine } from './mathpixCleanPipeline.js'
 import { officialPyqContentReviewMessages, officialPyqMissingListMessage } from './officialPyqReviewFlags.js'
 import { reviewOfficialPyqCards } from './officialPyqUnifiedCheck.js'
-import { enforceAdminFactsOnQuestions, factsForPaper } from './officialPyqAdminFacts.js'
+import { adminFactsDisagreeWithScan, enforceAdminFactsOnQuestions, factsForPaper } from './officialPyqAdminFacts.js'
+import { officialPyqStructureDamage } from './officialPyqCardStructure.js'
 import {
   SCRAP_OPTION_RE,
   restoreLabelledFigureOptions,
@@ -30,7 +31,7 @@ import {
   trimOptionLetterTail,
 } from './labelledFigureOptions.js'
 import { isMatrixGridCard } from './matrixGridPyq.js'
-import { stripAnswerBoxTables } from './printedAnswerKey.js'
+import { solutionIsOnlyPrintedKeyLine, stripAnswerBoxTables } from './printedAnswerKey.js'
 import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import { reExtractOfficialPyqPendingPaperLocal } from './officialPyqLocalReparse.js'
 import { numericalAlternativesOf } from './answerAlternatives.js'
@@ -177,7 +178,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 17
+export const LOCAL_QUALITY_REVISION = 20
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -275,6 +276,20 @@ function countOffFacts(paper, ocr) {
   return expected && stored.length !== expected ? expected : 0
 }
 
+/**
+ * The facts count when a pending paper must be rebuilt from the scan: the count is off, or the
+ * count is right and a card is another card's duplicate, carries another question's text or
+ * a stray printed number (an older split shifted the questions). 0 otherwise.
+ */
+function rebuildTarget(paper, ocr) {
+  const off = countOffFacts(paper, ocr)
+  if (off || !ocr) return off
+  const facts = factsForPaper(paper) || buildPaperFacts(ocr)
+  const expected = facts?.known ? Number(facts.expectedQuestionCount) || 0 : 0
+  if (!expected) return 0
+  return officialPyqStructureDamage(paper?.questions, ocr).size ? expected : 0
+}
+
 /** A rebuild that missed the facts count is not retried until the cards, facts or scan change. */
 const countRepairTried = new Set()
 
@@ -320,6 +335,357 @@ function lostClosingLines(card, fresh) {
 function stemLostOcrQuestion(q, fresh) {
   if (!fresh || q?.adminEdited === true || q?.adminApproved === true || isMatrixGridCard(q)) return false
   return lostClosingLines(q, fresh).length > 0
+}
+
+/** A question never opens in lower case; the scan dropped its first letter or number. */
+const STEM_START_RE = /^(\s*)([a-z]{2,10})(?=\s+[a-z$(\\])/
+const LOWER_CASE_OPENINGS = new Set([
+  'cis',
+  'trans',
+  'tert',
+  'sec',
+  'iso',
+  'meso',
+  'ortho',
+  'meta',
+  'para',
+  'let',
+  'if',
+  'for',
+  'in',
+  'the',
+  'an',
+  'find',
+  'then',
+  'which',
+  'what',
+  'consider',
+  'given',
+  'suppose',
+  'assume',
+])
+/** Only words whose lost capital is certain; anything else is flagged for the PDF comparison. */
+const LOST_FIRST_LETTER = new Map([
+  ['he', 'The'],
+  ['hen', 'Then'],
+  ['his', 'This'],
+  ['hese', 'These'],
+  ['here', 'There'],
+  ['hich', 'Which'],
+  ['hat', 'What'],
+  ['et', 'Let'],
+  ['onsider', 'Consider'],
+  ['ind', 'Find'],
+  ['iven', 'Given'],
+  ['ssume', 'Assume'],
+  ['uppose', 'Suppose'],
+  ['mong', 'Among'],
+  ['ach', 'Each'],
+])
+
+function stemStartCutOff(text) {
+  const m = String(text ?? '').match(STEM_START_RE)
+  return m && !LOWER_CASE_OPENINGS.has(m[2]) ? m[2] : ''
+}
+
+/** "he reactivity of compound Z" → "The reactivity of compound Z" (2014 P1 Q22). */
+function withRestoredStemStart(text) {
+  const s = String(text ?? '')
+  const m = s.match(STEM_START_RE)
+  const word = m ? LOST_FIRST_LETTER.get(m[2]) : ''
+  return word ? `${m[1]}${word}${s.slice(m[0].length)}` : s
+}
+
+const PROSE_TOKEN = /^[A-Za-z0-9][A-Za-z0-9'’,.;:?!()-]*$/
+const KEY_OR_HEAD_RUN = /^(?:(?:Answer|Ans|Key)\s*[:.\-=]?\s*\(?[A-D0-9]|(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY|SECTION|PART)\b|Q\s*\.?\s*\d)/
+const LOST_WORDS_ANCHOR = 3
+
+/**
+ * The card text with words put back that the fresh split of the scan has between two runs of
+ * the card's own words ("he gives the correct Assume" for "… correct answer. Assume" — 2024 P1 Q2;
+ * "mol of Hg" for "2 mol of Hg" — 2022 P1). '' when nothing plain-worded was lost. Other
+ * differences are heals and are skipped, never copied.
+ */
+function textWithLostWords(card, fresh) {
+  if (!fresh || card?.adminEdited === true || card?.adminApproved === true || isMatrixGridCard(card)) return ''
+  const have = String(card?.text ?? '')
+  const tokens = [...have.matchAll(/\S+/g)]
+  const a = tokens.map((m) => m[0])
+  const b = String(fresh?.text ?? '').split(/\s+/).filter(Boolean)
+  if (a.length < 8 || b.length < 8) return ''
+  const same = (ai, bj, n) => {
+    for (let k = 0; k < n; k += 1) if (a[ai + k] !== b[bj + k]) return false
+    return true
+  }
+  /** @type {Array<[number, string[]]>} */
+  const inserts = []
+  let i = 0
+  let j = 0
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i += 1
+      j += 1
+      continue
+    }
+    const n = Math.min(LOST_WORDS_ANCHOR, a.length - i)
+    let skip = 0
+    for (let k = 1; k <= 6 && j + k + n <= b.length; k += 1) {
+      if (same(i, j + k, n)) {
+        skip = k
+        break
+      }
+    }
+    if (skip && n >= Math.min(LOST_WORDS_ANCHOR, a.length)) {
+      const run = b.slice(j, j + skip)
+      const opening = i === 0 && !stemStartCutOff(have)
+      if (!opening && run.every((t) => PROSE_TOKEN.test(t)) && !KEY_OR_HEAD_RUN.test(run.join(' '))) inserts.push([i, run])
+      j += skip
+      continue
+    }
+    let synced = false
+    for (let di = 0; di <= 40 && !synced && i + di + LOST_WORDS_ANCHOR <= a.length; di += 1) {
+      for (let dj = 0; dj <= 40 && j + dj + LOST_WORDS_ANCHOR <= b.length; dj += 1) {
+        if ((di || dj) && same(i + di, j + dj, LOST_WORDS_ANCHOR)) {
+          i += di
+          j += dj
+          synced = true
+          break
+        }
+      }
+    }
+    if (!synced) break
+  }
+  if (!inserts.length || inserts.length > 3 || inserts.reduce((n, [, run]) => n + run.length, 0) > 12) return ''
+  let out = have
+  for (const [at, run] of [...inserts].reverse()) {
+    const pos = tokens[at].index ?? 0
+    out = `${out.slice(0, pos)}${run.join(' ')} ${out.slice(pos)}`
+  }
+  return out
+}
+
+const FIGURE_IN_TEXT_RE = /\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]*\)/
+
+function passageKey(q) {
+  return String(q?.passageId || q?.passageGroup || '').trim()
+}
+
+/**
+ * Each question under a paragraph carries its own copy of it. A copy that lost the paragraph's
+ * figure (2023 P2 Q14, 2024 P2 Q14 and Q16) takes the copy of a sibling with the same words.
+ * @returns {Map<number, string>} card index → the sibling's passage with the figure
+ */
+function passagesMissingSiblingFigure(questions) {
+  /** @type {Map<string, number[]>} */
+  const groups = new Map()
+  questions.forEach((q, i) => {
+    const key = passageKey(q)
+    if (!key || !String(q?.passageText ?? '').trim()) return
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)?.push(i)
+  })
+  const out = new Map()
+  for (const idx of groups.values()) {
+    const withFigure = idx.find((i) => FIGURE_IN_TEXT_RE.test(String(questions[i].passageText)))
+    if (withFigure == null) continue
+    const best = String(questions[withFigure].passageText)
+    for (const i of idx) {
+      const q = questions[i]
+      const own = [q.passageText, q.text, ...(Array.isArray(q.options) ? q.options : [])].join('\n')
+      if (FIGURE_IN_TEXT_RE.test(own) || String(q.questionImage ?? '').trim()) continue
+      if (wordRun(q.passageText) === wordRun(best)) out.set(i, best)
+    }
+  }
+  return out
+}
+
+const ANSWER_CLAIMS = { from_paper: 'answer from the paper', manual: 'answer typed by hand', ai_generated: 'AI answer', hybrid_ai: 'AI answer' }
+
+/** The card is labelled with an answer source and has no answer, so the fill step skips it and students see none. */
+function answerLabelWithoutAnswer(q) {
+  if (!Object.prototype.hasOwnProperty.call(ANSWER_CLAIMS, String(q?.answerSource ?? ''))) return false
+  if (answerKeyOf(q).has || q?.bonusMarksToAll === true || numericalAlternativesOf(q).length) return false
+  const grid = q?.matrixAnswerKey
+  if (grid && typeof grid === 'object' && Object.values(grid).some((row) => (Array.isArray(row) ? row.length : row != null && row !== ''))) {
+    return false
+  }
+  return true
+}
+
+const HAND_SOLUTION_SOURCES = new Set(['manual', 'admin_edit'])
+const SOLUTION_CUE_RE = /\\therefore|\b(?:Hence|Therefore|Thus|we get|we have)\b/
+const LONG_OPTION_CHARS = 350
+
+function solutionIsHandWritten(q) {
+  return q?.adminEdited === true || HAND_SOLUTION_SOURCES.has(String(q?.solutionSource ?? ''))
+}
+
+const squashSpace = (text) => String(text ?? '').replace(/\s+/g, ' ').trim()
+
+/** "… Ans. (B) Sol. …" saved inside the stem: the question part and the printed answer / solution. */
+function printedSolutionInStem(q) {
+  if (q?.adminEdited === true || isMatrixGridCard(q)) return null
+  const cut = cutPrintedSolutionTail(q?.text)
+  if (!cut?.head.trim()) return null
+  const read = readPrintedAnswerAndSolution(cut.tail)
+  return read.solution || read.answer?.answerSource === 'from_paper' ? { head: cut.head, ...read } : null
+}
+
+function optionsWithoutSolutionText(q) {
+  if (q?.adminEdited === true || !Array.isArray(q?.options)) return null
+  let changed = false
+  const options = q.options.map((opt) => {
+    const text = String(opt ?? '')
+    const cut = text.replace(OPTION_SOLUTION_TAIL_RE, '').trimEnd()
+    if (cut === text.trimEnd() || !cut.trim()) return opt
+    changed = true
+    return cut
+  })
+  return changed ? options : null
+}
+
+function optionReadsLikeSolution(q) {
+  return (Array.isArray(q?.options) ? q.options : []).some((opt) => {
+    const text = String(opt ?? '')
+    return text.length > LONG_OPTION_CHARS && SOLUTION_CUE_RE.test(text)
+  })
+}
+
+function printedSolutionWasChanged(q, fresh) {
+  if (!fresh || fresh.solutionSource !== 'from_paper' || !String(fresh.solution ?? '').trim()) return false
+  if (solutionIsHandWritten(q) || q?.adminApproved === true) return false
+  return squashSpace(q?.solution) !== squashSpace(fresh.solution)
+}
+
+function keyLineSavedAsSolution(q) {
+  return !solutionIsHandWritten(q) && solutionIsOnlyPrintedKeyLine(q?.solution)
+}
+
+/** Printed answer / solution text in the wrong place, or a printed solution that was replaced. */
+function printedSolutionReason(q, fresh) {
+  if (keyLineSavedAsSolution(q)) return 'The saved solution is only the printed answer line; it is cleared so Hybrid AI can write a solution'
+  if (printedSolutionInStem(q)) return 'Printed answer or solution text is inside the question; it is moved to the solution'
+  if (optionsWithoutSolutionText(q)) return 'An option holds printed answer or solution text; it is removed from the option'
+  if (printedSolutionWasChanged(q, fresh)) return 'The solution printed on the paper was changed; it is put back'
+  if (optionReadsLikeSolution(q)) return 'An option is very long and reads like a solution. Check the options against the paper'
+  return ''
+}
+
+function withPrintedSolutionRepaired(q, fresh) {
+  let next = q
+  if (keyLineSavedAsSolution(next)) {
+    const { solution: _solution, solutionSource: _source, ...rest } = next
+    next = rest
+  }
+  const inStem = printedSolutionInStem(next)
+  if (inStem) {
+    next = { ...next, text: inStem.head }
+    if (inStem.solution && !solutionIsHandWritten(next) && next.solutionSource !== 'from_paper') {
+      next = { ...next, solution: inStem.solution, solutionSource: 'from_paper' }
+    }
+    if (inStem.answer?.answerSource === 'from_paper' && !answerKeyOf(next).has) next = withPrintedKey(next, inStem.answer)
+  }
+  const options = optionsWithoutSolutionText(next)
+  if (options) next = { ...next, options }
+  if (printedSolutionWasChanged(next, fresh)) next = { ...next, solution: fresh.solution, solutionSource: 'from_paper' }
+  return next
+}
+
+/** Hybrid AI answered differently from the printed key; the printed answer stays, the admin is told. */
+/** Confirmed facts stamp every card's type, so a type the scan contradicts fails the paper. */
+function withAdminFactsScanNote(result, paper, ocr) {
+  const lines = adminFactsDisagreeWithScan(paper?.adminFacts, ocr)
+  if (!lines.length) return result
+  return { ...result, passed: false, lines: [...result.lines, ...lines] }
+}
+
+function withAnswerDisagreementNote(result, questions) {
+  const nums = questions
+    .map((q, i) => (q && !isOfficialPyqPlaceholder(q) && q.hybridAnswerDisagrees ? i + 1 : 0))
+    .filter(Boolean)
+  if (!nums.length) return result
+  const line = `Go to Q ${nums.join(', ')}. Hybrid AI got a different answer from the printed key; the printed answer is kept. Please check.`
+  return { ...result, lines: [...result.lines, line] }
+}
+
+function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true) {
+  if (answerLabelWithoutAnswer(q)) {
+    return `The card is marked “${ANSWER_CLAIMS[q.answerSource]}”, and no answer is saved`
+  }
+  const printed = solutionRules ? printedSolutionReason(q, fresh) : ''
+  if (printed) return printed
+  if (isMatrixGridCard(q)) return ''
+  const cut = stemStartCutOff(q?.text) || stemStartCutOff(q?.passageText)
+  if (cut) return `The first word looks cut off (“${cut}”)`
+  if (passageLostFigure) return 'The paragraph lost its figure; the other question under it has the figure'
+  if (textWithLostWords(q, fresh)) return 'Words printed in the scan are missing from the card'
+  return ''
+}
+
+/**
+ * Card damage the scan or a sibling card settles: index → reason. A card the admin approved
+ * as shown is left alone.
+ */
+function cardDamageReasons(questions, ocr, solutionRules = true) {
+  const siblings = passagesMissingSiblingFigure(questions)
+  const structure = officialPyqStructureDamage(questions, ocr)
+  const out = new Map()
+  questions.forEach((q, i) => {
+    if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
+    const reason =
+      cardDamageReason(q, freshCardFor(questions, i, ocr), siblings.has(i), solutionRules) || structure.get(i)
+    if (reason) out.set(i, reason)
+  })
+  return out
+}
+
+/**
+ * Damage reason for one card of the paper ('' when none). A check of that card alone cannot see
+ * its sibling passages or the fresh split of the scan.
+ * @param {any} paper with preparedText
+ * @param {number} index 0-based card index
+ */
+export function officialPyqCardDamageReason(paper, index) {
+  const questions = Array.isArray(paper?.questions) ? paper.questions : []
+  const q = questions[index]
+  if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return ''
+  const ocr = stripHindiOcr(paper?.preparedText)
+  return cardDamageReason(
+    q,
+    freshCardFor(questions, index, ocr),
+    passagesMissingSiblingFigure(questions).has(index),
+    paper?.status !== 'published',
+  )
+}
+
+function withDamageRepaired(q, fresh, siblingPassage) {
+  let next = q
+  if (answerLabelWithoutAnswer(next)) {
+    const { answerConfidence: _confidence, ...rest } = next
+    next = { ...rest, answerSource: 'unknown' }
+  }
+  next = withPrintedSolutionRepaired(next, fresh)
+  if (isMatrixGridCard(next)) return next
+  const found = textWithLostWords(next, fresh)
+  if (found) next = { ...next, text: found }
+  for (const key of ['text', 'passageText']) {
+    if (typeof next[key] !== 'string') continue
+    const restored = withRestoredStemStart(next[key])
+    if (restored !== next[key]) next = { ...next, [key]: restored }
+  }
+  if (siblingPassage && !FIGURE_IN_TEXT_RE.test(String(next.passageText ?? ''))) next = { ...next, passageText: siblingPassage }
+  return next
+}
+
+/** Scan damage repaired on a card an admin edited: a cut first word or a paragraph figure is never an admin choice. */
+function scanDamageRepaired(before, after) {
+  if (stemStartCutOff(before?.text) && !stemStartCutOff(after?.text)) return true
+  if (stemStartCutOff(before?.passageText) && !stemStartCutOff(after?.passageText)) return true
+  return (
+    !FIGURE_IN_TEXT_RE.test(String(before?.passageText ?? '')) &&
+    FIGURE_IN_TEXT_RE.test(String(after?.passageText ?? '')) &&
+    wordRun(before?.passageText) === wordRun(after?.passageText)
+  )
 }
 
 /** The scan-based fix would still change this saved card (labels I–IV under drawings — 2019 P1 Q22). */
@@ -427,13 +793,23 @@ function gridCardFailsLocalQuality(card) {
 }
 
 /** The per-card display checks and the unified check both count; neither result is dropped. */
-function mergeQualityResults(localFailed, review) {
+function mergeQualityResults(localFailed, review, damage = new Map()) {
   const extra = localFailed.filter((n) => !review.failedGoTo.includes(n))
   const failedGoTo = [...new Set([...review.failedGoTo, ...localFailed])].sort((a, b) => a - b)
-  const lines = extra.length
-    ? [...review.messages, `Go to Q ${extra.join(', ')}. The local display check found a problem on this card.`]
-    : review.messages
-  return { passed: review.passed && extra.length === 0, failedGoTo, lines }
+  /** @type {Map<string, number[]>} */
+  const byReason = new Map()
+  for (const [index, reason] of damage) {
+    if (!byReason.has(reason)) byReason.set(reason, [])
+    byReason.get(reason)?.push(index + 1)
+  }
+  const named = new Set([...damage.keys()].map((i) => i + 1))
+  const plain = extra.filter((n) => !named.has(n))
+  const lines = [
+    ...review.messages,
+    ...[...byReason].map(([reason, nums]) => `Go to Q ${nums.sort((a, b) => a - b).join(', ')}. ${reason}.`),
+    ...(plain.length ? [`Go to Q ${plain.join(', ')}. The local display check found a problem on this card.`] : []),
+  ]
+  return { passed: review.passed && extra.length === 0 && damage.size === 0, failedGoTo, lines }
 }
 
 /**
@@ -444,10 +820,15 @@ export function localOfficialPyqQualityCheck(paper) {
   const ocr = stripHindiOcr(paper?.preparedText)
   /** @type {number[]} */
   const failedGoTo = []
+  const damage = cardDamageReasons(questions, ocr, paper?.status !== 'published')
   questions.forEach((q, index) => {
     if (!q || isOfficialPyqPlaceholder(q)) return
     if (q.adminApproved === true) {
       if (!isMatrixGridCard(q) && hasScrapOption(q)) failedGoTo.push(index + 1)
+      return
+    }
+    if (damage.has(index)) {
+      failedGoTo.push(index + 1)
       return
     }
     if (isMatrixGridCard(q)) {
@@ -503,7 +884,11 @@ export function localOfficialPyqQualityCheck(paper) {
     { cardsOnly: paper?.officialPyq === false },
   )
   return {
-    ...withHindiOnlyFlag(mergeQualityResults(failedGoTo, review), ocr),
+    ...withAdminFactsScanNote(
+      withAnswerDisagreementNote(withHindiOnlyFlag(mergeQualityResults(failedGoTo, review, damage), ocr), questions),
+      paper,
+      ocr,
+    ),
     revision: LOCAL_QUALITY_REVISION,
     checkedAt: Date.now(),
     by: 'local',
@@ -706,6 +1091,13 @@ export function repairOfficialPyqUntilQuality(paper) {
       questions[index] = withPrintedKey(questions[index], fresh)
       questionsChanged = true
     }
+    if (questions[index]?.adminApproved !== true) {
+      const mended = withDamageRepaired(questions[index], fresh, passagesMissingSiblingFigure(questions).get(index))
+      if (mended !== questions[index]) {
+        questions[index] = mended
+        questionsChanged = true
+      }
+    }
     const view = cleanCard(questions[index], ocr)
     const adopted =
       questions[index]?.adminApproved === true ? adoptLeftoverFixes(questions[index]) : adoptKnownFixes(questions[index], view, ocr)
@@ -723,12 +1115,17 @@ export function repairOfficialPyqUntilQuality(paper) {
   function failedNow() {
     /** @type {number[]} */
     const failed = []
+    questions.forEach((_, index) => prepare(index))
+    const damage = cardDamageReasons(questions, ocr)
     questions.forEach((q, index) => {
       if (!q || isOfficialPyqPlaceholder(q)) return
       if (q.adminApproved === true) {
         if (isMatrixGridCard(q)) return
-        prepare(index)
         if (hasScrapOption(questions[index])) failed.push(index + 1)
+        return
+      }
+      if (damage.has(index)) {
+        failed.push(index + 1)
         return
       }
       if (isMatrixGridCard(q)) {
@@ -787,7 +1184,14 @@ export function repairOfficialPyqUntilQuality(paper) {
   return {
     paper: { ...paper, questions },
     quality: {
-      ...withHindiOnlyFlag(mergeQualityResults(failedGoTo, review), ocr),
+      ...withAdminFactsScanNote(
+        withAnswerDisagreementNote(
+          withHindiOnlyFlag(mergeQualityResults(failedGoTo, review, cardDamageReasons(questions, ocr)), ocr),
+          questions,
+        ),
+        paper,
+        ocr,
+      ),
       revision: LOCAL_QUALITY_REVISION,
       checkedAt: Date.now(),
       by: 'local',
@@ -813,7 +1217,8 @@ export function persistOfficialPyqQualityRun(paper) {
   let full = getOfficialPyqPendingPaper(paper.id) || paper
   let ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
   const status = String(full?.status ?? '')
-  const requireCount = status === 'pending_review' ? countOffFacts(full, stripHindiOcr(ocr)) : 0
+  const countOff = status === 'pending_review' ? countOffFacts(full, stripHindiOcr(ocr)) : 0
+  const requireCount = status === 'pending_review' ? rebuildTarget(full, stripHindiOcr(ocr)) : 0
   const attempt = `${full.id}|${requireCount}|${full.questions?.length ?? 0}|${ocr.length}`
   if (requireCount && !countRepairTried.has(attempt)) {
     let rebuilt = false
@@ -827,7 +1232,8 @@ export function persistOfficialPyqQualityRun(paper) {
       /* keep the stored cards; the count line still blocks approval */
     }
     // Only a miss is remembered: the same broken cards uploaded again must be rebuilt again.
-    if (!rebuilt) countRepairTried.add(attempt)
+    // A rebuild for duplicate / leaked cards (count already right) runs once per card set.
+    if (!rebuilt || !countOff) countRepairTried.add(attempt)
   }
   if (status === 'published') {
     let quality
@@ -868,11 +1274,12 @@ export function persistOfficialPyqQualityRun(paper) {
     }
     if (next.length !== stored.length || next.some((q, i) => JSON.stringify(q) !== JSON.stringify(stored[i]))) {
       updates.questions = next
-      /** Leftover fixes and the printed answer also reach cards the admin edited — junk and a wrong key are never an admin choice. */
+      /** Leftover fixes, scan damage and the printed answer also reach cards the admin edited — junk and a wrong key are never an admin choice. */
       updates.releaseAdminEditIndexes = next
         .map((q, i) => {
           if (!stored[i]) return -1
           if (hasScrapOption(stored[i]) && !hasScrapOption(q)) return i
+          if (scanDamageRepaired(stored[i], q)) return i
           const fresh = freshCardFor(stored, i, ocr || String(full?.preparedText ?? ''))
           return answerDiffersFromPrintedKey(stored[i], fresh) && !answerDiffersFromPrintedKey(q, fresh) ? i : -1
         })
@@ -912,7 +1319,7 @@ export function officialPyqCountRepairNeeded(paper) {
   if (!paper?.id || String(paper.status ?? '') !== 'pending_review') return 0
   const full = getOfficialPyqPendingPaper(paper.id) || paper
   const ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
-  return countOffFacts(full, stripHindiOcr(ocr))
+  return rebuildTarget(full, stripHindiOcr(ocr))
 }
 
 /**

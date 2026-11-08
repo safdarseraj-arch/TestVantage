@@ -223,6 +223,19 @@ class PublishedPyqFillOutput(BaseModel):
     step_by_step_solution: str = ""
 
 
+class PublishedPyqTagsOutput(BaseModel):
+    """Metatags only, for an Official PYQ whose answer and solution are printed on the paper."""
+
+    subject: str = ""
+    unit: str = ""
+    chapter: str = ""
+    topic: str = ""
+    question_type: str = ""
+    exam: str = ""
+    toughness_level: str = ""
+    source: str = ""
+
+
 @dataclass
 class DraftPipelineResult:
     draft: QuestionOutput
@@ -930,8 +943,34 @@ def _fill_metatags_sync(draft: QuestionOutput, params: dict[str, Any], units: li
     }
 
 
+def _published_tags_prompt(params: dict[str, Any]) -> str:
+    """Metatags only: the paper prints the answer and solution, so neither is asked for."""
+    return (
+        "Fill only the Question Bank metatags for this past exam question. "
+        "Its answer and solution are printed on the paper: do not solve it and do not write an answer or a solution.\n"
+        "Do not rewrite the question stem. Do not rewrite the options.\n"
+        "Fields: subject, unit, chapter, topic, question_type, exam, toughness_level (1-10), source.\n"
+        "Use the Main-bank unit and chapter names already used for this subject "
+        "(Mathematics units include Algebra, Calculus, Coordinate Geometry, Trigonometry, "
+        "Vectors & 3D, Probability & Statistics).\n"
+        "If you are not sure of a tag, return an empty string for that field.\n"
+        f"Stored subject: {params.get('subject') or ''}\n"
+        f"Stored unit: {params.get('unit') or params.get('section') or ''}\n"
+        f"Stored chapter: {params.get('chapter') or ''}\n"
+        f"Stored topic: {params.get('topic') or ''}\n"
+        f"Stored question type: {params.get('question_type') or ''}\n"
+        f"Stored exam: {params.get('exam') or ''}\n"
+        f"Stored toughness: {params.get('toughness_level') or ''}\n"
+        f"Stored source: {params.get('source') or ''}\n"
+        f"Stem:\n{params.get('question_text') or ''}\n"
+        f"Options:\n{params.get('options_text') or ''}\n"
+    )
+
+
 def _published_fill_prompt(params: dict[str, Any]) -> str:
     """Fill bank metatags, answer, and solution. The stem stays as given."""
+    if params.get("tags_only"):
+        return _published_tags_prompt(params)
     return (
         "Fill the Question Bank metatags, the answer, and the solution for this published question.\n"
         "Do not rewrite the question stem. Do not rewrite the options.\n"
@@ -1042,10 +1081,12 @@ def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
     from hybrid_metadata import hybrid_code_execution_subject
 
     client = _client()
-    code_subject = hybrid_code_execution_subject(params)
+    tags_only = bool(params.get("tags_only"))
+    code_subject = None if tags_only else hybrid_code_execution_subject(params)
     model = published_fill_model(params)
+    schema = PublishedPyqTagsOutput if tags_only else PublishedPyqFillOutput
     config = _generation_config(
-        response_schema=PublishedPyqFillOutput,
+        response_schema=schema,
         subject=code_subject,
         use_code_tools=code_subject is not None,
         max_output_tokens=_MAX_OUTPUT_TOKENS,
@@ -1053,12 +1094,25 @@ def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
     config.http_options = types.HttpOptions(timeout=_PUBLISHED_FILL_TIMEOUT_MS)
     response = client.models.generate_content(
         model=model,
-        contents=[_published_fill_prompt(params), *_published_fill_pictures(params)],
+        contents=[_published_fill_prompt(params), *([] if tags_only else _published_fill_pictures(params))],
         config=config,
     )
-    parsed = _structured_output_from_response(response, PublishedPyqFillOutput)
-    if not isinstance(parsed, PublishedPyqFillOutput):
-        parsed = PublishedPyqFillOutput.model_validate(parsed)
+    parsed = _structured_output_from_response(response, schema)
+    if not isinstance(parsed, schema):
+        parsed = schema.model_validate(parsed)
+    if tags_only:
+        return {
+            "subject": parsed.subject,
+            "unit": parsed.unit,
+            "chapter": parsed.chapter,
+            "topic": parsed.topic,
+            "question_type": parsed.question_type,
+            "exam": parsed.exam,
+            "toughness_level": parsed.toughness_level,
+            "source": parsed.source,
+            "tags_only": True,
+            "model": model,
+        }
     return {
         "subject": parsed.subject,
         "unit": parsed.unit,

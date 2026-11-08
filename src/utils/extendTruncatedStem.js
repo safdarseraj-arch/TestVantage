@@ -129,9 +129,12 @@ function stripIncompleteFracTail(s) {
     .trim()
 }
 
+/** "(P)" or a row that starts its line with "P." / "P)" (older papers). */
 function countListMarkers(text, letters) {
   const t = String(text ?? '')
-  return letters.filter((L) => new RegExp(`\\(\\s*${L}\\s*\\)`).test(t)).length
+  return letters.filter((L) =>
+    new RegExp(`\\(\\s*${L}\\s*\\)|(?:^|\\n)[ \\t]*${L}\\s*[.)][ \\t]+[A-Za-z$\\\\]`).test(t),
+  ).length
 }
 
 function filledMatchRows(text, letters) {

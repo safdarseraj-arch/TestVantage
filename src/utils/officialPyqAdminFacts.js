@@ -334,6 +334,47 @@ export function adminFactsToPaperFacts(admin) {
   }
 }
 
+/**
+ * Confirmed sections whose question type differs from the type the scan prints
+ * in its "This section contains …" lines (Q1–10 confirmed "One or more correct"
+ * on a paper that prints "Only One Option Correct Type"). Confirmed facts are
+ * not changed; the admin is told. Empty when the scan does not settle it.
+ * @param {any} admin
+ * @param {unknown} ocr
+ * @returns {string[]}
+ */
+export function adminFactsDisagreeWithScan(admin, ocr) {
+  if (!admin?.confirmedAt) return []
+  const read = buildPaperFacts(ocr)
+  if (!read.known || !Array.isArray(read.sections)) return []
+  const { errors, slots } = validateAdminFacts(adminFactsMatchingScan(admin, ocr))
+  if (errors.length || slots.length !== read.expectedQuestionCount) return []
+  const scanOrder = [...new Set(read.sections.map((s) => s.subject).filter(Boolean))]
+  const slotOrder = [...new Set(slots.map((s) => s.subject))]
+  if (scanOrder.join('|') !== slotOrder.join('|')) return []
+  /** @type {string[]} */
+  const scanTypes = []
+  for (const s of read.sections) for (let k = 0; k < s.count; k += 1) scanTypes.push(s.type)
+  if (scanTypes.length !== slots.length) return []
+  const label = (id) => FACT_TYPES.find((t) => t.id === id)?.label || id
+  /** @type {Array<{ subject: string, from: number, to: number, mine: string, scan: string }>} */
+  const runs = []
+  slots.forEach((slot, i) => {
+    const scan = scanTypes[i]
+    if (!scan || scan === slot.type) return
+    const last = runs[runs.length - 1]
+    if (last && last.subject === slot.subject && last.mine === slot.type && last.scan === scan && last.to === slot.printed - 1) {
+      last.to = slot.printed
+    } else {
+      runs.push({ subject: slot.subject, from: slot.printed, to: slot.printed, mine: slot.type, scan })
+    }
+  })
+  return runs.map(
+    (r) =>
+      `Paper facts: ${subjectLabel(r.subject)} Q${r.from}–Q${r.to} are confirmed as “${label(r.mine)}”, and the scan prints “${label(r.scan)}” for that section. Please check the facts card.`,
+  )
+}
+
 /** Confirmed admin facts win; otherwise the facts read from the OCR. */
 export function factsForPaper(paper) {
   if (paper?.adminFacts?.confirmedAt) {
@@ -365,6 +406,8 @@ function allMatches(re, src) {
 function cleanPassageBody(body) {
   return String(body ?? '')
     .replace(PASSAGE_HEADER_RE, '\n')
+    // "\section*{1. $\mathrm{NaNH}_{2}$ (excess)}" is a heading inside the paragraph; keep its words.
+    .replace(/\\section\*?\{([^{}]*(?:\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}[^{}]*)*)\}/g, '$1')
     .replace(/\\(?:begin|end)\{itemize\}/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()

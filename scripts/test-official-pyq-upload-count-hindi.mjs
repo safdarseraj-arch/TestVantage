@@ -517,6 +517,197 @@ test('2014 P1: Auto-fix first rebuilds missing questions from the scan, then com
   assert.equal(autoFixCompares, 0, 'no Gemini compare is spent on cards that were only out of place')
 })
 
+const { confirmOfficialPyqPaperFacts } = await import('../src/utils/officialPyqAdminFactsApply.js')
+const { autoFixAfterOfficialPyqFactsConfirmed } = await import('../src/utils/officialPyqFactsAutoFix.js')
+const factsRun = { compares: 0, asked: 0 }
+const countingOpts = (extra = {}) => ({
+  canCompare: true,
+  confirmPaid: () => {
+    factsRun.asked += 1
+    return true
+  },
+  compare: async () => {
+    factsRun.compares += 1
+    return { verdict: 'matches', differences: [] }
+  },
+  ...extra,
+})
+let factsOut = null
+let factsPaper = null
+let factsFlagged = null
+let factsPublished = null
+globalThis.localStorage.clear()
+{
+  const { questions, adminFacts, paperFacts: _facts, ...rest } = p14Stored
+  const added = pendingStore.addOfficialPyqPendingPaper({ ...rest, preparedText: p14, questions })
+  assert.equal(pendingStore.getOfficialPyqPendingPaper(added.id).questions.length, 56)
+  const confirmed = confirmOfficialPyqPaperFacts(added.id, adminFacts)
+  assert.equal(confirmed.ok, true, confirmed.errors.join(' | '))
+  factsOut = await autoFixAfterOfficialPyqFactsConfirmed(added.id, countingOpts({ before: confirmed.before }))
+  factsPaper = pendingStore.getOfficialPyqPendingPaper(added.id)
+  factsOut.calls = { ...factsRun }
+
+  // A card that still shows an alert after the free step: the paid step needs Compare and the admin's yes.
+  pendingStore.updateOfficialPyqPendingPaper(added.id, { localQuality: { ...factsPaper.localQuality, passed: false, failedGoTo: [5] } })
+  const unavailable = await autoFixAfterOfficialPyqFactsConfirmed(added.id, countingOpts({ canCompare: false }))
+  const declined = await autoFixAfterOfficialPyqFactsConfirmed(added.id, countingOpts({ confirmPaid: () => false }))
+  const unasked = await autoFixAfterOfficialPyqFactsConfirmed(added.id, countingOpts({ confirmPaid: undefined }))
+  const comparesBeforeYes = factsRun.compares
+  const agreed = await autoFixAfterOfficialPyqFactsConfirmed(added.id, countingOpts())
+  factsFlagged = { unavailable, declined, unasked, comparesBeforeYes, agreed, compares: factsRun.compares }
+}
+globalThis.localStorage.clear()
+{
+  const { questions, ...rest } = p14Stored
+  const added = pendingStore.addOfficialPyqPendingPaper({ ...rest, preparedText: p14, questions, status: 'published' })
+  const out = await autoFixAfterOfficialPyqFactsConfirmed(added.id, countingOpts())
+  factsPublished = { out, paper: pendingStore.getOfficialPyqPendingPaper(added.id) }
+}
+globalThis.localStorage.clear()
+
+test('2014 P1: confirming facts (60) on 56 stored cards starts auto-fix, rebuilds to 60, no Gemini call', () => {
+  assert.equal(factsOut.ok, true, factsOut.error)
+  assert.equal(factsOut.mode, 'auto_fix')
+  assert.deepEqual(factsOut.rebuilt, { from: 56, to: 60, expected: 60 })
+  assert.deepEqual(factsOut.todo, [])
+  assert.equal(factsOut.paid, false)
+  assert.equal(factsPaper.questions.length, 60)
+  assert.equal(factsPaper.localQuality.passed, true, factsPaper.localQuality.lines.join(' | '))
+  assert.deepEqual(factsOut.calls, { compares: 0, asked: 0 }, 'no cost question and no Gemini request when the free rebuild fixes everything')
+})
+
+test('after confirm, a card still flagged is only sent to Gemini when Compare works and the admin agrees', () => {
+  const { unavailable, declined, unasked, comparesBeforeYes, agreed, compares } = factsFlagged
+  assert.deepEqual(unavailable.todo, [5])
+  assert.equal(unavailable.waiting, 'compare_unavailable')
+  assert.equal(declined.waiting, 'declined')
+  assert.equal(unasked.waiting, 'declined', 'no confirmPaid means no paid call')
+  assert.equal(comparesBeforeYes, 0)
+  assert.equal(agreed.paid, true)
+  assert.equal(compares, 1, 'only the one flagged card is compared')
+})
+
+test('published paper: confirm step only re-checks and flags, never rewrites or calls Gemini', () => {
+  const { out, paper } = factsPublished
+  assert.equal(out.ok, true, out.error)
+  assert.equal(out.mode, 'flag_only')
+  assert.equal(out.paid, false)
+  assert.equal(paper.questions.length, 56)
+  assert.equal(paper.localQuality.passed, false)
+})
+
+const p14b = fs.readFileSync(new URL('./fixtures/jee-advanced-2014-p2-mathpix.txt', import.meta.url), 'utf8')
+const p14bStored = JSON.parse(fs.readFileSync(new URL('./fixtures/jee-advanced-2014-p2-stored-cards.json', import.meta.url), 'utf8'))
+const PASSAGE_CHILDREN_2014_P2 = [11, 12, 13, 14, 15, 16, 31, 32, 33, 34, 35, 36, 51, 52, 53, 54, 55, 56]
+
+test('2014 P2: "1." numbering with List rows "\\item[Q.]" and "58." alone splits into 60 clean cards', () => {
+  const items = paperItemsFromMathpixOcr(p14b)
+  assert.equal(items.length, 60)
+  assert.deepEqual(items.map((q) => q.printedNumber), Array.from({ length: 60 }, (_, i) => i + 1))
+  assert.deepEqual(
+    [...new Set(items.map((q) => q.subject))],
+    ['physics', 'chemistry', 'mathematics'],
+  )
+  const noKey = items.map((q, i) => (answerOf(q) == null ? i + 1 : 0)).filter(Boolean)
+  assert.deepEqual(noKey, [18, 21], 'only Q18 and Q21 have no printed answer')
+  const withPassage = items.map((q, i) => (String(q.passageText ?? '').trim() ? i + 1 : 0)).filter(Boolean)
+  assert.deepEqual(withPassage, PASSAGE_CHILDREN_2014_P2, 'long physics child stems keep their paragraph too')
+  assert.match(items[10].passageText, /^In the figure a container/)
+  assert.match(items[14].passageText, /^The figure shows a circular loop/)
+  // Four pictures printed without (A)–(D) under "Which one of the following sketches".
+  assert.equal(items[0].options.filter((o) => /cdn\.mathpix\.com/.test(o)).length, 4)
+  assert.doesNotMatch(items[0].text, /cdn\.mathpix\.com/)
+  // Match codes "P-1, Q-2" and "3142" under a "P Q R S" header are the options; both lists stay.
+  assert.deepEqual(items[17].options, ['P-1, Q-2, R-3, S-4', 'P-2, Q-4, R-3, S-1', 'P-4, Q-1, R-2, S-3', 'P-2, Q-1, R-3, S-4'])
+  assert.match(items[19].text, /P\. Lift is accelerating vertically up[\s\S]*S\. Lift is falling freely[\s\S]*List II/)
+  assert.deepEqual(items[59].options, ['3142', '1342', '3124', '1324'])
+  for (const [i, q] of items.entries()) {
+    assert.doesNotMatch([q.text, ...q.options].join('\n'), /\{Answer|Answer\s*\(\s*[A-D]\s*\)/, `Q${i + 1} keeps no answer line`)
+    assert.doesNotMatch(q.text, /Choices\s*:\s*$/, `Q${i + 1} stem ends without "Choices:"`)
+  }
+})
+
+test('2014 P2: facts read "two questions on each paragraph" → 60 questions, 10 + 6 + 4 per subject', () => {
+  const facts = buildPaperFacts(p14b)
+  assert.equal(facts.known, true, facts.notes.join(' | '))
+  assert.equal(facts.expectedQuestionCount, 60)
+  assert.deepEqual(facts.sections.slice(0, 3).map((s) => [s.count, s.type]), [[10, 'single_correct'], [6, 'single_correct'], [4, 'matrix_match']])
+})
+
+test('2014 P2: the stored scrambled 63 cards flag duplicates, leaked text and the facts the scan contradicts', () => {
+  const quality = localOfficialPyqQualityCheck({ ...p14bStored, preparedText: p14b })
+  assert.equal(quality.passed, false)
+  const lines = quality.lines.join('\n')
+  assert.match(lines, /Go to Q 13\. The same question is also on Q 12/)
+  assert.match(lines, /Go to Q 53\. The same question is also on Q 42/)
+  assert.match(lines, /Go to Q 36\. Text of printed question 32 is inside this card/)
+  assert.match(lines, /Go to Q 50\. Text of printed question 44 is inside this card/)
+  assert.match(lines, /Go to Q 62\. The card text starts with its printed question number/)
+  assert.match(lines, /Physics Q1–Q10 are confirmed as “One or more correct”, and the scan prints “Only one correct”/)
+  for (const n of [13, 25, 36, 47, 50, 51, 53, 56, 62]) assert.ok(quality.failedGoTo.includes(n), `Q${n} is flagged`)
+})
+
+let p14bRebuilt = null
+globalThis.localStorage.clear()
+{
+  const { questions, adminFacts, paperFacts, localQuality: _old, ...rest } = p14bStored
+  const added = pendingStore.addOfficialPyqPendingPaper({ ...rest, preparedText: p14b, questions })
+  pendingStore.updateOfficialPyqPendingPaper(added.id, { adminFacts, paperFacts })
+  p14bRebuilt = persistOfficialPyqQualityRun(pendingStore.getOfficialPyqPendingPaper(added.id))
+}
+globalThis.localStorage.clear()
+
+test('2014 P2: auto-fix rebuilds 63 scrambled cards to the 60 printed questions, in order', () => {
+  const qs = p14bRebuilt.questions
+  assert.equal(qs.length, 60)
+  assert.deepEqual(qs.map((q) => q.printedNumber), Array.from({ length: 60 }, (_, i) => i + 1))
+  const stems = qs.map((q) => String(q.text).replace(/\s+/g, ' ').slice(0, 60))
+  assert.equal(new Set(stems).size, 60, 'no question appears twice')
+  // A machine fix that rewrote slot Q43 into Q52's question is placed by its current wording.
+  assert.match(qs[42].text, /^Coefficient of \$x\^\{11\}\$/)
+  assert.match(qs[51].text, /^If \$s ?t ?= ?1\$, then the tangent/)
+  assert.equal(qs[45].correctIndex, 3, 'a machine fix without an answer gets the printed key')
+  assert.doesNotMatch(qs[57].text, /^\s*58\./)
+  assert.equal(String(qs[57].passageText ?? ''), '', 'section instructions are not a paragraph')
+  const withPassage = qs.map((q, i) => (String(q.passageText ?? '').trim() ? i + 1 : 0)).filter(Boolean)
+  assert.deepEqual(withPassage, PASSAGE_CHILDREN_2014_P2)
+  assert.doesNotMatch(qs[30].passageText, /\\section/)
+  assert.deepEqual(qs.slice(20, 40).map((q) => q.subject), Array(20).fill('chemistry'))
+})
+
+const p14b60 = JSON.parse(fs.readFileSync(new URL('./fixtures/jee-advanced-2014-p2-stored-cards-60.json', import.meta.url), 'utf8'))
+let p14b60Rebuilt = null
+globalThis.localStorage.clear()
+{
+  const { questions, adminFacts, paperFacts, localQuality: _old, ...rest } = p14b60
+  const added = pendingStore.addOfficialPyqPendingPaper({ ...rest, preparedText: p14b, questions })
+  pendingStore.updateOfficialPyqPendingPaper(added.id, { adminFacts, paperFacts })
+  p14b60Rebuilt = persistOfficialPyqQualityRun(pendingStore.getOfficialPyqPendingPaper(added.id))
+}
+globalThis.localStorage.clear()
+
+test('2014 P2: 60 cards with the right count but a duplicate and stray numbers are rebuilt too', () => {
+  const before = localOfficialPyqQualityCheck({ ...p14b60, preparedText: p14b })
+  assert.match(before.lines.join('\n'), /Go to Q 52\. The same question is also on Q 43/)
+  assert.match(before.lines.join('\n'), /Go to Q 31, 58\. The card text starts with its printed question number/)
+  const qs = p14b60Rebuilt.questions
+  assert.equal(qs.length, 60)
+  assert.match(qs[42].text, /^Coefficient of/)
+  assert.match(qs[30].text, /^The product X is/)
+  assert.doesNotMatch(qs[57].text, /^\s*58\./)
+  assert.doesNotMatch(qs[50].text, /Choices/)
+  // The machine fix of Q18 had List-I pictures on A and C; the scan's card puts them in the stem.
+  assert.ok(qs[17].options.every((o) => !/cdn\.mathpix\.com/.test(o)), JSON.stringify(qs[17].options))
+  assert.deepEqual(p14b60Rebuilt.localQuality.failedGoTo, [31], p14b60Rebuilt.localQuality.lines.join(' | '))
+})
+
+test('2014 P2: after the rebuild only genuine problems stay flagged', () => {
+  const quality = p14bRebuilt.localQuality
+  // Q31: the scan's OCR printed one option twice and lost option D.
+  assert.deepEqual(quality.failedGoTo, [31], quality.lines.join(' | '))
+  assert.ok(quality.lines.some((l) => /scan prints “Only one correct”/.test(l)), 'confirmed facts the scan contradicts stay flagged')
+})
+
 if (failed) {
   console.error(`\n${failed} test(s) failed`)
   process.exit(1)

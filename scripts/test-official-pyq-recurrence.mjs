@@ -2043,6 +2043,7 @@ test('2025 P2 re-upload: Q5 without its "Q. 5" label is still a question; auto-f
   localStorage.clear()
 })
 
+const { LOCAL_QUALITY_REVISION } = await import('../src/utils/officialPyqLocalQuality.js')
 const { printedAnswerFields } = await import('../src/utils/printedAnswerKey.js')
 const { validateOfficialPyqForPublish } = await import('../src/utils/officialPyqApproval.js')
 test('2025 P2 Q20 "MARKS TO ALL" is a bonus; 2025 P1 Q27/Q28/Q43 "a OR b" keep both answers — read, edited, scored, never AI-filled', () => {
@@ -2079,7 +2080,7 @@ test('2025 P2 Q20 "MARKS TO ALL" is a bonus; 2025 P1 Q27/Q28/Q43 "a OR b" keep b
   assert.equal(readPrintedAnswerKey('Ans for Q.9: 0.5 or 0.75').get(9), '0.5 or 0.75')
   assert.equal(readPrintedAnswerKey('Ans for Q.14: \\{(C)\\} or \\{(C) and (D)\\}').has(14), false)
 
-  const pub = validateOfficialPyqForPublish({ id: 'x', status: 'approved', year: 2025, exam: 'jee-advanced', questions: [card], localQuality: { passed: false, failedGoTo: [27] } })
+  const pub = validateOfficialPyqForPublish({ id: 'x', status: 'approved', year: 2025, exam: 'jee-advanced', questions: [card], localQuality: { revision: LOCAL_QUALITY_REVISION, passed: false, failedGoTo: [27] } })
   assert.match(pub.errors.join(' '), /quality check has not passed\. Go to Q 27/)
 })
 

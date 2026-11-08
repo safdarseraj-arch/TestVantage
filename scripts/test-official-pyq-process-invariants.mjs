@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Process invariants: shared sanitize/peel/fold so Paper 1+2 stay clean.
  */
 import assert from 'node:assert/strict'

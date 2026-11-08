@@ -181,6 +181,13 @@ export default function OfficialPyqOriginalComparePanel({ paperId, flaggedGoTo =
       })
       onChanged?.()
       const lines = []
+      if (out.rebuilt) {
+        lines.push(
+          out.rebuilt.to === out.rebuilt.expected
+            ? `Rebuilt the question list from the scan: ${out.rebuilt.from} → ${out.rebuilt.to} questions.`
+            : `The question list has ${out.rebuilt.to} of ${out.rebuilt.expected} questions and the scan could not rebuild it — check the missing numbers.`,
+        )
+      }
       if (out.fixed?.length) lines.push(`Fixed and now passing: Q ${out.fixed.join(', ')}.`)
       if (out.stillFlagged?.length) lines.push(`Corrected but still flagged: Q ${out.stillFlagged.join(', ')}.`)
       if (out.needsAdmin?.length) {

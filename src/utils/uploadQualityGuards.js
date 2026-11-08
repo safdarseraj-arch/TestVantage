@@ -35,11 +35,18 @@ import {
   restoreClosedOptionFraction,
   gluedMatchLettersRemain,
 } from './mathpixCleanPipeline.js'
+import { labelNumberedQuestions } from './numberedQuestionMarkers.js'
 
 export { matchQuestionMissingListI }
 
+/** A scan numbered "12." reads as "Q. 12", so a card's scan window stops at the next question. */
+function scanOf(source) {
+  return typeof source === 'string' ? labelNumberedQuestions(source) : source
+}
+
 /** This question's scan slice. Falls back to a literal sentence the scan still has. */
-export function questionScanWindow(stem, source) {
+export function questionScanWindow(stem, rawSource) {
+  const source = scanOf(rawSource)
   const src = String(source ?? '')
   const direct = ocrQuestionBodyForCard(stem, source)
   const stemText = String(stem ?? '')
@@ -72,7 +79,8 @@ export function questionScanWindow(stem, source) {
 }
 
 /** Option rows sit after List-II. The stem window often stops before them. */
-function optionRowsWindow(stem, source) {
+function optionRowsWindow(stem, rawSource) {
+  const source = scanOf(rawSource)
   const src = String(source ?? '')
   const stemWindow = questionScanWindow(stem, source)
   const plain = String(stem ?? '')
@@ -98,10 +106,10 @@ function optionRowsWindow(stem, source) {
 }
 
 /** A short label such as "Configuration I" still starts this question's scan. */
-function mathBreakWindow(stem, source) {
-  const optionWindow = optionRowsWindow(stem, source)
+function mathBreakWindow(stem, rawSource) {
+  const optionWindow = optionRowsWindow(stem, rawSource)
   if (optionWindow) return optionWindow
-  const src = String(source ?? '')
+  const src = String(scanOf(rawSource) ?? '')
   const head = String(stem ?? '').split('$')[0].replace(/\s+/g, ' ').trim().slice(0, 48)
   if (head.length < 8) return ''
   const at = src.indexOf(head)
@@ -153,21 +161,25 @@ export function storedCardMissesOcrFix(q, source) {
   )
 }
 
-export function healUploadQuestionCard(q, source, map) {
+export function healUploadQuestionCard(q, rawSource, map) {
+  const source = scanOf(rawSource)
   return applyStoredOcrCardFixes(
     enrichMatchListsFromOcr(healBaseCard(q, source, map), source),
     source,
   )
 }
 
-export function applyUploadQualityGuards(questions, source, map) {
+export function applyUploadQualityGuards(questions, rawSource, map) {
+  const source = scanOf(rawSource)
   return applyBaseGuards(questions, source, map).map((q) => enrichMatchListsFromOcr(q, source))
 }
 
-export function applyOfficialPyqQualityGuards(questions, source, map) {
+export function applyOfficialPyqQualityGuards(questions, rawSource, map) {
+  const source = scanOf(rawSource)
   return applyOfficialBase(questions, source, map).map((q) => enrichMatchListsFromOcr(q, source))
 }
 
-export function lightRepairOfficialPyqQuestions(questions, source) {
+export function lightRepairOfficialPyqQuestions(questions, rawSource) {
+  const source = scanOf(rawSource)
   return lightRepairBase(questions, source).map((q) => enrichMatchListsFromOcr(q, source))
 }

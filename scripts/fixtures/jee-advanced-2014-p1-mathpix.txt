@@ -1,0 +1,431 @@
+\section*{Questions with Answers \\ PART - 1 PHYSICS \\ SECTION - 1 (One or More Than One Options Correct Type)}
+
+This section contains 10 multiple choice type questions. Each question has four choices (A), (B), (C) and (D) out of which ONE or MORE THAN ONE are correct.
+1. At time $t=0$, terminal A in the circuit shown in the figure is connected to B by a keyand an alternating current $I(t)=I_{0} \cos (\omega t)$, with $I_{0}=1$ Aand $\omega=500 \mathrm{rad} \mathrm{s}^{-1}$ starts flowing in it with the initial direction shown in the figure. At $t=\frac{7 \pi}{6 \omega}$, the key is switched from B to D. Now onwards only A and D are connected. A total charge $Q$ flows from the battery to charge the capacitor fully. If $C=20 \mu F, R=10 \Omega$ and the battery is ideal with emf of $50 V$, identify the correct statement (s).
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-01.jpg?height=399&width=636&top_left_y=1202&top_left_x=742)
+\begin{itemize}
+\item[(A)] Magnitude of the maximum charge on the capacitor before $t=\frac{7 \pi}{6 \omega}$ is $1 \times 10^{-3} C$.
+\item[(B)] The current in the left part of the circuit just before $t=\frac{7 \pi}{6 \omega}$ is clockwise.
+\item[(C)] Immediately after A is connected to D, the current in $R$ is $10 A$.
+\item[(D)] $Q=2 \times 10^{-3} C$.
+\end{itemize}
+
+Answer (C) and (D)
+2. A light source, which emits two wavelengths $\lambda_{1}=400 n m$ and $\lambda_{2}=600 n m$, is used in a Young's double slit experiment. If recorded fringe widths for $\lambda_{1}$ and $\lambda_{2}$ are $\beta_{1}$ and $\beta_{2}$ © number of fringes for them within a distance $y$ on one side of the central maximum are $m_{1}$ and $m_{2}$, respectively, then
+\begin{itemize}
+\item[(A)] $\beta_{2}>\beta_{1}$
+\item[(B)] $m_{1}>m_{2}$
+\item[(C)] From the central maximum, $3^{\text {rd }}$ maximum of $\lambda_{2}$ overlaps with $5^{\text {th }}$ minimum of $\lambda_{1}$
+\item[(D)] The angular separation of fringes for $\lambda_{1}$ is greater than $\lambda_{2}$
+\end{itemize}
+
+\section*{Answer: (A), (B) and (C)}
+3. One end of a taut string of length $3 m$ along the $x$ axis is fixed at $x=0$. The speed of the waves in the string is $100 m s^{-1}$. The other end of the string is vibrating in the $y$ direction so that stationary waves are set up in the string. The possible waveform(s) of these stationary waves is(are)
+\begin{itemize}
+\item[(A)] $y(t)=A \sin \frac{\pi x}{6} \cos \frac{50 \pi t}{3}$
+\item[(B)] $y(t)=A \sin \frac{\pi x}{3} \cos \frac{100 \pi t}{3}$
+\item[(C)] $y(t)=A \sin \frac{5 \pi x}{6} \cos \frac{250 \pi t}{3}$
+\item[(D)] $y(t)=A \sin \frac{5 \pi x}{2} \cos 250 \pi t$
+\end{itemize}
+
+Answer: (A) , (C) and (D)
+4. A parallel plate capacitor has a dielectric slab of dielectric constant $K$ between its plates that covers 1/3 of the area of its plates, as shown in the figure. The total capacitance of the capacitor is $C$ while that of the portion with dielectric in between is $C_{1}$. When the capacitor is charged, the plate area covered by the dielectric gets charge $Q_{1}$ and the rest of the area gets charge $Q_{2}$. The electric field in the dielectric is $E_{1}$ and that in the other portion is $E_{2}$. Choose the correct option/options, ignoring edge effects.
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-03.jpg?height=325&width=253&top_left_y=664&top_left_x=672)
+\begin{itemize}
+\item[(A)] $\frac{E_{1}}{E_{2}}=1$
+\item[(B)] $\frac{E_{1}}{E_{2}}=\frac{1}{K}$
+\item[(C)] $\frac{Q_{1}}{Q_{2}}=\frac{3}{K}$
+\item[(D)] $\frac{C}{C_{1}}=\frac{2+K}{K}$
+\end{itemize}
+
+\section*{Answer: (A) and (D)}
+5. Let $E_{1}(r), E_{2}(r)$ and $E_{3}(r)$ be the respective electric fields at a distance $r$ from a point charge $Q$, an infinitely long wire with constant linear charge density $\lambda$, and an infinite plane with uniform surface charge density $\sigma$. If $E_{1}\left(r_{0}\right)=E_{2}\left(r_{0}\right)=E_{3}\left(r_{0}\right)$ at a given distance $r_{0}$, then
+\begin{itemize}
+\item[] $(\mathbf{A}) Q=4 \sigma \pi r_{0}^{2}$
+\item[(B)] $r_{0}=\frac{\lambda}{2 \pi \sigma}$
+\item[(C)] $E_{1}\left(r_{0} / 2\right)=2 E_{2}\left(r_{0} / 2\right)$
+\item[(D)] $E_{2}\left(r_{0} / 2\right)=4 E_{3}\left(r_{0} / 2\right)$
+\end{itemize}
+
+\section*{Answer: (C)}
+6. A student is performing an experiment using a resonance column and a tuning fork of frequency $244 s^{-1}$. He is told that the air in the tube has been replaced by another gas (assume that the column remains filled with the gas). If the minimum height at which resonance occurs is $(0.350 \pm 0.005) m$, the gas in the tube is
+(Useful information: $\sqrt{167 R T}=640 J^{1 / 2}$ mole $^{-1 / 2} ; \sqrt{140 R T}=590 J^{1 / 2}$ mole $^{-1 / 2}$.The molar masses Min grams are given in the options. Take the values of $\sqrt{\frac{10}{M}}$ for each gas as given there.)
+\begin{itemize}
+\item[(A)] Neon $\left(M=20, \sqrt{\frac{10}{20}}=\frac{7}{10}\right)$
+\item[(B)] Nitrogen $\left(M=28, \sqrt{\frac{10}{28}}=\frac{3}{5}\right)$
+\item[(C)] Oxygen $\left(M=32, \sqrt{\frac{10}{32}}=\frac{9}{16}\right)$
+\item[(D)] Argon $\left(M=36, \sqrt{\frac{10}{36}}=\frac{17}{32}\right)$
+\end{itemize}
+
+\section*{Answer: (D)}
+7. Heater of an electric kettle is made of a wire of length $L$ and diameter $d$. It takes 4 minutes to raise the temperature of 0.5kgwater by 40K. This heater is replaced by a new heater having two wires of the same material, each of length $L$ and diameter $2 d$.The way these wires are connected is given in the options. How much time in minutes will it take to raise the temperature of the same amount of water by $40 K$ ?
+\begin{itemize}
+\item[(A)] 4 if wires are in parallel
+\item[(B)] 2 if wires are in series
+\item[(C)] 1 if wires are in series
+\item[(D)] 0.5 if wires are in parallel
+\end{itemize}
+
+\section*{Answer : (B) and (D)}
+8. In the figure, a ladder of mass $m$ is shown leaning against a wall. It is in static equilibrium making an angle $\theta$ with the horizontal floor. The coefficient of friction between the wall and the ladder is $\mu_{1}$ and that between the floor and the ladder is $\mu_{2}$. The normal reaction of the wall on the ladder is $N_{1}$ and that of the floor is $N_{2}$. If the ladder is about to slip, then
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-05.jpg?height=305&width=252&top_left_y=464&top_left_x=776)
+\begin{itemize}
+\item[(A)] $\mu_{1}=0 \quad \mu_{2} \neq 0$ and $N_{2} \tan \theta=\frac{m g}{2}$
+\item[(B)] $\mu_{1} \neq 0 \quad \mu_{2}=0 \operatorname{and} N_{1} \tan \theta=\frac{m g}{2}$
+\item[(C)] $\mu_{1} \neq 0 \quad \mu_{2} \neq 0$ and $N_{2}=\frac{m g}{1+\mu_{1} \mu_{2}}$
+\item[(D)] $\mu_{1}=0 \quad \mu_{2} \neq 0$ and $N_{1} \tan \theta=\frac{m g}{2}$
+\end{itemize}
+
+\section*{Answer: (C) and (D)}
+9. A transparent thin film of uniform thickness and refractive index $n_{1}=1.4$ is coated on the convex spherical surface of radius Rat one end of a long solid glass cylinder of refractive index $n_{2}=1.5$, as shown in the figure. Rays of light parallel to the axis of the cylinder traversing through the film from air to glass get focused at distance $f_{1}$ from the film, while rays of light traversing from glass to air get focused at distance $f_{2}$ from the film. Then
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-05.jpg?height=308&width=511&top_left_y=1643&top_left_x=658)
+\begin{itemize}
+\item[(A)] $\left|f_{1}\right|=3 R$
+\item[(B)] $\left|f_{1}\right|=2.8 R$
+\item[(C)] $\left|f_{2}\right|=2 R$
+\item[(D)] $\left|f_{2}\right|=1.4 R$
+\end{itemize}
+
+\section*{Answer: (A) and (C)}
+10. Two ideal batteries of $e m f V_{1}$ and $V_{2}$ and three resistances $R_{1}, R_{2}$ and $R_{3}$ are connected as shown in the figure. The current in resistance $R_{2}$ would be zero if
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-06.jpg?height=454&width=310&top_left_y=360&top_left_x=674)
+\begin{itemize}
+\item[(A)] $V_{1}=V_{2}$ and $R_{1}=R_{2}=R_{3}$
+\item[(B)] $V_{1}=V_{2}$ and $R_{1}=2 R_{2}=R_{3}$
+\item[(C)] $V_{1}=2 V_{2}$ and $2 R_{1}=2 R_{2}=R_{3}$
+\item[(D)] $2 V_{1}=V_{2}$ and $2 R_{1}=R_{2}=R_{3}$
+\end{itemize}
+
+Answer: (A), (B) and (D)
+
+\section*{SECTION - 2 (One Integer Value Correct Type)}
+
+\title{
+This section contains 10 questions. Each question, when worked out will result in one integer from 0 to 9 (both inclusive).
+}
+11. Airplanes A and B are flying with constant velocity in the same vertical plane at angles 30° and $60^{\circ}$ with respect to the horizontal respectively as shown in figure. The speed of A is $100 \sqrt{3} m s^{-1}$. At time $t=0 s$, an observer in A finds B at a distance of $500 m$. This observer sees B moving with a constant velocity perpendicular to the line of motion of A. If at $t=t_{0}, \mathrm{~A}$ just escapes being hit by $\mathrm{B}, t_{0}$ in seconds is
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-07.jpg?height=397&width=811&top_left_y=800&top_left_x=495)
+
+\section*{Answer: 5}
+12. During Searle's experiment, zero of the Vernier scale lies between $3.20 \times 10^{-2} m$ and $3.25 \times 10^{-2} m$ of the main scale. The $20^{\text {th }}$ division of the Vernier scale exactly coincides with one of the main scale divisions. When an additional load of $2 k g$ is applied to the wire, the zero of the Vernier scale still lies between $3.20 \times 10^{-2} m$ and $3.25 \times 10^{-2} m$ of the main scale but now the $45^{\text {th }}$ division of Vernier scale coincides with one of the main scale divisions. The length of the thin metallic wire is $2 m$ and its cross-sectional area is $8 \times 10^{-7} m^{2}$. The least count of the Vernier scale is $1.0 \times 10^{-5} m$. The maximum percentage error in the Young's modulus of the wire is
+
+\section*{Answer: 4}
+13. A uniform circular disc of mass $1.5 k g$ and radius $0.5 m$ is initially at rest on a horizontal frictionless surface. Three forces of equal magnitude $F=0.5 N$ are applied simultaneously along the three sides of an equilateral triangle XYZ with its vertices on the perimeter of the disc (see figure). One second after applying the forces, the angular speed of the disc in $r a d s^{-1}$ is
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-08.jpg?height=412&width=429&top_left_y=656&top_left_x=741)
+
+\section*{Answer: 2}
+14. Two parallel wires in the plane of the paper are distance $X_{0}$ apart. A point charge is moving with speed $u$ between the wires in the same plane at a distance $X_{1}$ from one of the wires. When the wires carry current of magnitude $I$ in the same direction, the radius of curvature of the path of the point charge is $R_{1}$. In contrast, if the currents $I$ in the two wires have directions opposite to each other, the radius of curvature of the path is $R_{2}$. If $\frac{X_{0}}{X_{1}}=3$, the value of $\frac{R_{1}}{R_{2}}$ is
+
+\section*{Answer: 3}
+15. To find the distance $d$ over which a signal can be seen clearly in foggy conditions, a railways engineer uses dimensional analysis and assumes that the distance depends on the mass density $\rho$ of the fog, intensity (power/area) $S$ of the light from the signal and its frequency $f$. The engineer finds that disproportionalto $S^{1 / n}$. The value of $n$ is
+
+\section*{Answer: 3}
+16. A galvanometer gives full scale deflection with $0.006 A$ current. By connecting it to a 4990 $\Omega$ resistance, it can be converted into a voltmeter of range $0-30 V$. If connected to a $\frac{2 n}{249} \Omega$ resistance, it becomes an ammeter of range $0-1.5 A$. The value of $n$ is
+
+\section*{Answer: 5}
+17. Consider an elliptically shaped rail PQ in the vertical plane with $\mathrm{OP}=3 m$ and $\mathrm{OQ}=4 m$. A block of mass 1 kg is pulled along the rail from P to Q with a force of $18 N$, which is always parallel to line PQ (see the figure given). Assuming no frictional losses, the kinetic energy of the block when it reaches Q is $(n \times 10)$ Joules. The value of $n$ is (take acceleration due to gravity = $10 m s^{-2}$ )
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-09.jpg?height=469&width=351&top_left_y=525&top_left_x=601)
+
+\section*{Answer : 5}
+18. A rocket is moving in a gravity free space with a constant acceleration of $2 m s^{-2}$ along $+x$ direction (see figure). The length of a chamber inside the rocket is $4 m$. A ball is thrown from the left end of the chamber in $+x$ direction with a speed of $0.3 m s^{-1}$ relative to the rocket. At the same time, another ball is thrown in $-x$ direction with a speed of $0.2 m s^{-1}$ from its right end relative to the rocket. The time in seconds when the two balls hit each other is
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-09.jpg?height=331&width=858&top_left_y=1675&top_left_x=610)
+
+\section*{Answer : 2 OR 8}
+19. A horizontal circular platform of radius $0.5 m$ and mass $0.45 k g$ is free to rotate about its axis. Two massless spring toy-guns, each carrying a steel ball of mass $0.05 k g$ are attached to the platform at a distance $0.25 m$ from the centre on its either sides along its diameter (see figure). Each gun simultaneously fires the balls horizontally and perpendicular to the diameter in opposite directions. After leaving the platform, the balls have horizontal speed of $9 m s^{-1}$ with respect to the ground. The rotational speed of the platform $\mathrm{in} r a d s^{-1}$ after the balls leave the platform is
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-10.jpg?height=232&width=461&top_left_y=702&top_left_x=701)
+
+\section*{Answer: 4}
+20. A thermodynamic system is taken from an initial state $i$ with internal energy $U_{i}=100 \mathrm{~J}$ to the final state $f$ along two different paths iaf and ibf, as schematically shown in the figure. The work done by the system along the paths $a f, i b$ and $b f$ are $W_{a f}=200 J, W_{i b}=50 J$ and $W_{b f}=$ $100 J$ respectively. The heat supplied to the system along the path iaf, ib and bf are $Q_{i a f}, Q_{i b}$ and $Q_{b f}$ respectively. If the internal energy of the system in the state $b$ is $U_{b}=200 J$ and $Q_{i a f}=$ $500 J$, the ratio $Q_{b f} / Q_{i b}$ is
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-10.jpg?height=483&width=818&top_left_y=1593&top_left_x=572}
+
+\caption{Answer : 2}
+\end{figure}
+
+\section*{PART - 2 CHEMISTRY \\ SECTION - 1 (One or More Than One Options Correct Type)}
+
+This section contains 10 multiple choice type questions. Each question has four choices (A), (B), (C) and (D) out of which ONE or MORE THAN ONE are correct.
+21. The correct combination of names for isomeric alcohols with molecular formula $\mathrm{C}_{4} \mathrm{H}_{10} \mathrm{O}$ is/are
+\begin{itemize}
+\item[(A)] tert-butanol and 2-methylpropan-2-ol
+\item[(B)] tert-butanol and 1, 1-dimethylethan-1-ol
+\item[(C)] $n$-butanol and butan-1-ol
+\item[(D)] isobutyl alcohol and 2-methylpropan-1-ol
+\end{itemize}
+
+Answer: (A), (C) and (D)
+22. he reactivity of compound Z with different halogens under appropriate conditions is given below:
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-11.jpg?height=462&width=1458&top_left_y=1294&top_left_x=247)
+
+The observed pattern of electrophilic substitution can be explained by
+\begin{itemize}
+\item[(A)] the steric effect of the halogen
+\item[(B)] the steric effect of the tert-butyl group
+\item[(C)] the electronic effect of the phenolic group
+\item[(D)] the electronic effect of the tert-butyl group
+\end{itemize}
+
+Answer: (A), (B) and (C)
+23. In the reaction shown below, the major product(s) formed is/are
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=274&width=1160&top_left_y=444&top_left_x=306)
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=298&width=494&top_left_y=751&top_left_x=306)
+\begin{itemize}
+\item[(A)]
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=266&width=539&top_left_y=1093&top_left_x=309)
+\item[(B)]
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=295&width=422&top_left_y=1407&top_left_x=299)
+\item[(C)]
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=303&width=327&top_left_y=1752&top_left_x=309)
+\item[(D)]
+\end{itemize}
+
+Answer : (A)
+24. An ideal gas in a thermally insulated vessel at internal pressure $=P_{1}$, volume $=V_{1}$ and absolute temperature $=T_{1}$ expands irreversibly against zero external pressure, as shown in the diagram. The final internal pressure, volume and absolute temperature of the gas are $P_{2}, V_{2}$ and $T_{2}$, respectively. For this expansion,
+![](https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-13.jpg?height=754&width=1238&top_left_y=530&top_left_x=445)
+\begin{itemize}
+\item[(A)] $q=0$
+\item[(B)] $T_{2}=T_{1}$
+\item[(c)] $P_{2} V_{2}=P_{1} V_{1}$
+\item[(D)] $P_{2} V_{2}{ }^{\gamma}=P_{1} V_{1}^{\gamma}$
+\end{itemize}
+
+Answer (A), (B) and (C)
+25. Hydrogen bonding plays a central role in the following phenomena:
+\begin{itemize}
+\item[(A)] Ice floats in water.
+\item[(B)] Higher Lewis basicity of primary amines than tertiary amines in aqueous solutions.
+\item[(C)] Formic acid is more acidic than acetic acid.
+\item[(D)] Dimerisation of acetic acid in benzene.
+\end{itemize}
+
+Answer : (A), (B) and (D)
+26. In a galvanic cell, the salt bridge
+\begin{itemize}
+\item[(A)] does not participate chemically in the cell reaction.
+\item[(B)] stops the diffusion of ions from one electrode to another.
+\item[(C)] is necessary for the occurrence of the cell reaction.
+\item[(D)] ensures mixing of the two electrolytic solutions.
+\end{itemize}
+
+Answer: (A) and (C) or only (A)
+27. Upon heating with $\mathrm{Cu}_{2} \mathrm{~S}$, the reagent(s) that give copper metal is/are
+\begin{itemize}
+\item[(A)] $\mathrm{CuFeS}_{2}$
+\item[(B)] CuO
+\item[(C)] $\mathrm{Cu}_{2} \mathrm{O}$
+\item[(D)] $\mathrm{CuSO}_{4}$
+\end{itemize}
+
+Answer: (B), (C) and (D)
+28. The correct statement(s) for orthoboric acid is/are
+\begin{itemize}
+\item[(A)] It behaves as a weak acid in water due to self ionization.
+\item[(B)] Acidity of its aqueous solution increases upon addition of ethylene glycol.
+\item[(C)] It has a three dimensional structure due to hydrogen bonding.
+\item[(D)] It is a weak electrolyte in water.
+\end{itemize}
+
+\section*{Answer: (B) and (D)}
+29. For the reaction:
+$$\mathrm{I}^{-}+\mathrm{ClO}_{3}^{-}+\mathrm{H}_{2} \mathrm{SO}_{4} \rightarrow \mathrm{Cl}^{-}+\mathrm{HSO}_{4}^{-}+\mathrm{I}_{2}$$
+The correct statement(s) in the balanced equation is/are:
+\begin{itemize}
+\item[(A)] Stoichiometric coefficient of $\mathrm{HSO}_{4}{ }^{-}$is 6.
+\item[(B)] Iodide is oxidized.
+\item[(C)] Sulphur is reduced.
+\item[(D)] $\mathrm{H}_{2} \mathrm{O}$ is one of the products.
+\end{itemize}
+
+\section*{Answer: (A), (B) and (D) OR (A) and (D)*}
+*- Due to a minor error in option (B) in the Hindi Version, Answer (A) and (D) will also be accepted as correct.
+30. The pair(s) of reagents that yield paramagnetic species is/are
+\begin{itemize}
+\item[(A)] Na and excess of $\mathrm{NH}_{3}$
+\item[(B)] K and excess of $\mathrm{O}_{2}$
+\item[(C)] Cu and dilute $\mathrm{HNO}_{3}$
+\item[(D)] $\mathrm{O}_{2}$ and 2-ethylanthraquinol
+\end{itemize}
+
+\section*{Answer : (A), (B) and (C)}
+31. Consider all possible isomeric ketones, including stereoisomers, of $\mathrm{MW}=100$. All these isomers are independently reacted with $\mathrm{NaBH}_{4}$ (NOTE: stereoisomers are also reacted separately). The total number of ketones that give a racemic product(s) is/are
+
+\section*{Answer: 5}
+32. A list of species having the formula $\mathrm{XZ}_{4}$ is given below.
+$\mathrm{XeF}_{4}, \mathrm{SF}_{4}, \mathrm{SiF}_{4}, \mathrm{BF}_{4}{ }^{-}, \mathrm{BrF}_{4}{ }^{-},\left[\mathrm{Cu}\left(\mathrm{NH}_{3}\right)_{4}\right]^{2+},\left[\mathrm{FeCl}_{4}\right]^{2-},\left[\mathrm{CoCl}_{4}\right]^{2-}$ and $\left[\mathrm{PtCl}_{4}\right]^{2-}$.
+Defining shape on the basis of the location of X and Z atoms, the total number of species having a square planar shape is
+
+\section*{Answer: 4}
+33. Among PbS, CuS, HgS, MnS, $\mathrm{Ag}_{2} \mathrm{~S}, \mathrm{NiS}, \mathrm{CoS}_{2}, \mathrm{Bi}_{2} \mathrm{~S}_{3}$ and $\mathrm{SnS}_{2}$, the total number of BLACK coloured sulfides is
+
+\section*{Answer: 6 OR 7}
+34. The total number(s) of stable conformers with non-zero dipole moment for the following compound is (are)
+<smiles>CC(Cl)(Br)C(C)(Cl)Br</smiles>
+
+\section*{Answer: 3}
+35. Consider the following list of reagents:
+
+Acidified $\mathrm{K}_{2} \mathrm{Cr}_{2} \mathrm{O}_{7}$, alkaline $\mathrm{KMnO}_{4}, \mathrm{CuSO}_{4}, \mathrm{H}_{2} \mathrm{O}_{2}, \mathrm{Cl}_{2}, \mathrm{O}_{3}, \mathrm{FeCl}_{3}, \mathrm{HNO}_{3}$ and $\mathrm{Na}_{2} \mathrm{~S}_{2} \mathrm{O}_{3}$.
+The total number of reagents that can oxidise aqueous iodide to iodine is
+
+\section*{Answer: 7}
+36. The total number of distinct naturally occurring amino acids obtained by complete acidic hydrolysis of the peptide shown below is
+<smiles>CC(C)(C)C(C(=O)N(N)C(C(=O)N(NC(=O)C(CC1CC1)N1CC(=O)NCC1=O)C(C)(C)C)C(C)(C)C)N(N)C(=O)C(CC1CC1)N1CC(=O)NCC1=O</smiles>
+
+\section*{Answer: 1}
+37. In an atom, the total number of electrons having quantum numbers $n=4,\left|m_{l}\right|=$ 1 and $m_{s}=-\frac{1}{2}$ is
+
+\section*{Answer: 6}
+38. If the value of Avogadro number is $6.023 \times 10^{23} \mathrm{~mol}^{-1}$ and the value of Boltzmann constant is $1.380 \times 10^{-23} \mathrm{~J} \mathrm{~K}^{-1}$, then the number of significant digits in the calculated value of the universal gas constant is
+
+\section*{Answer: 4}
+39. A compound $\mathbf{H}_{\mathbf{2}} \mathbf{X}$ with molar weight of $80 g$ is dissolved in a solvent having density of $0.4 g m l^{-1}$. Assuming no change in volume upon dissolution, the molality of a 3.2 molar solution is
+
+\section*{Answer: 8}
+40. $\mathbf{M X}_{\mathbf{2}}$ dissociates into $\mathbf{M}^{\mathbf{2}+}$ and $\mathbf{X}^{-}$ions in an aqueous solution, with a degree of dissociation $(\alpha)$ of 0.5. The ratio of the observed depression of freezing point of the aqueous solution to the value of the depression of freezing point in the absence of ionic dissociation is
+
+\section*{Answer: 2}
+
+\section*{PART - 3 MATHEMATICS \\ SECTION - 1 (One or More Than One Options Correct Type)}
+
+This section contains 10 multiple choice type questions. Each question has four choices (A), (B), (C) and (D) out of which ONE or MORE THAN ONE are correct.
+41. Let $M$ and $N$ be two 3 × 3 matrices such that $M N=N M$. Further, if $M \neq N^{2}$ and $M^{2}=N^{4}$, then
+\begin{itemize}
+\item[(A)] determinant of $\left(M^{2}+M N^{2}\right)$ is 0
+\item[(B)] there is a 3 × 3 non-zero matrix $U$ such that $\left(M^{2}+M N^{2}\right) U$ is the zero matrix
+\item[(C)] determinant of $\left(M^{2}+M N^{2}\right) \geq 1$
+\item[(D)] for a 3 × 3 matrix $U$, if $\left(M^{2}+M N^{2}\right) U$ equals the zero matrix then $U$ is the zero matrix
+\end{itemize}
+
+\section*{Answer: (A), (B)}
+42. For every pair of continuous functions $f, g:[0,1] \rightarrow \mathbb{R}$ such that
+$$\max \{f(x): x \in[0,1]\}=\max \{g(x): x \in[0,1]\},$$
+the correct statement(s) is(are) :
+\begin{itemize}
+\item[(A)] $(f(c))^{2}+3 f(c)=(g(c))^{2}+3 g(c)$ for some $c \in[0,1]$
+\item[(B)] $(f(c))^{2}+f(c)=(g(c))^{2}+3 g(c)$ for some $c \in[0,1]$
+\item[(C)] $(f(c))^{2}+3 f(c)=(g(c))^{2}+g(c)$ for some $c \in[0,1]$
+\item[(D)] $(f(c))^{2}=(g(c))^{2}$ for some $c \in[0,1]$
+\end{itemize}
+
+Answer: (A), (D)
+\begin{itemize}
+\item[43.] Let $f:(0, \infty) \rightarrow \mathbb{R}$ be given by
+$$f(x)=\int_{\frac{1}{x}}^{x} e^{-\left(t+\frac{1}{t}\right)} \frac{d t}{t}$$
+Then
+\begin{itemize}
+\item[(A)] $f(x)$ is monotonically increasing on $[1, \infty)$
+\item[(B)] $f(x)$ is monotonically decreasing on $(0,1)$
+\item[(C)] $f(x)+f\left(\frac{1}{x}\right)=0$, for all $x \in(0, \infty)$
+\item[(D)] $f\left(2^{x}\right)$ is an odd function of $x$ on $\mathbb{R}$
+\end{itemize}
+\end{itemize}
+
+\section*{Answer: (A), (C), (D)}
+\begin{itemize}
+\item[44.] Let $a \in \mathbb{R}$ and let $f: \mathbb{R} \rightarrow \mathbb{R}$ be given by
+$$f(x)=x^{5}-5 x+a .$$
+Then
+\begin{itemize}
+\item[(A)] $f(x)$ has three real roots if $a>4$
+\item[(B)] $f(x)$ has only one real root if $a>4$
+\item[(C)] $f(x)$ has three real roots if $a<-4$
+\item[(D)] $f(x)$ has three real roots if $-4<a<4$
+\end{itemize}
+\end{itemize}
+
+\section*{Answer: (B), (D)}
+45. Let $f:[a, b] \rightarrow[1, \infty)$ be a continuous function and let $g: \mathbb{R} \rightarrow \mathbb{R}$ be defined as
+$$g(x)= \begin{cases}0 & \text { if } x<a, \\ \int_{a}^{x} f(t) d t & \text { if } a \leq x \leq b, \\ \int_{a}^{b} f(t) d t & \text { if } x>b .\end{cases}$$
+Then
+\begin{itemize}
+\item[(A)] $g(x)$ is continuous but not differentiable at $a$
+\item[(B)] $g(x)$ is differentiable on $\mathbb{R}$
+\item[(C)] $g(x)$ is continuous but not differentiable at $b$
+\item[(D)] $g(x)$ is continuous and differentiable at either $a$ or $b$ but not both
+\end{itemize}
+
+\section*{Answer: (A), (C)}
+46. Let $f:\left(-\frac{\pi}{2}, \frac{\pi}{2}\right) \rightarrow \mathbb{R}$ be given by
+$$f(x)=(\log (\sec x+\tan x))^{3} .$$
+Then
+\begin{itemize}
+\item[(A)] $f(x)$ is an odd function
+\item[(B)] $f(x)$ is a one-one function
+\item[(C)] $f(x)$ is an onto function
+\item[(D)] $f(x)$ is an even function
+\end{itemize}
+
+\section*{Answer: (A), (B) and (C)}
+47. From a point $P(\lambda, \lambda, \lambda)$, perpendiculars $P Q$ and $P R$ are drawn respectively on the lines $y=x, z=1$ and $y=-x, z=-1$. If $P$ is such that $\angle Q P R$ is a right angle, then the possible value(s) of $\lambda$ is(are)
+\begin{itemize}
+\item[(A)] $\sqrt{2}$
+\item[(B)] 1
+\item[(C)] -1
+\item[(D)] $-\sqrt{2}$
+\end{itemize}
+
+\section*{Answer: (C)}
+48. Let $\vec{x}, \vec{y}$ and $\vec{z}$ be three vectors each of magnitude $\sqrt{2}$ and the angle between each pair of them is $\frac{\pi}{3}$. If $\vec{a}$ is a nonzero vector perpendicular to $\vec{x}$ and $\vec{y} \times \vec{z}$ and $\vec{b}$ is a nonzero vector perpendicular to $\vec{y}$ and $\vec{z} \times \vec{x}$, then
+\begin{itemize}
+\item[(A)] $\vec{b}=(\vec{b} \cdot \vec{z})(\vec{z}-\vec{x})$
+\item[(B)] $\vec{a}=(\vec{a} \cdot \vec{y})(\vec{y}-\vec{z})$
+\item[(C)] $\vec{a} \cdot \vec{b}=-(\vec{a} \cdot \vec{y})(\vec{b} \cdot \vec{z})$
+\item[(D)] $\vec{a}=(\vec{a} \cdot \vec{y})(\vec{z}-\vec{y})$
+\end{itemize}
+
+\section*{Answer: (A), (B) and (C)}
+49. A circle $S$ passes through the point $(0,1)$ and is orthogonal to the circles $(x-1)^{2}+y^{2}=16$ and $x^{2}+y^{2}=1$. Then
+\begin{itemize}
+\item[(A)] radius of $S$ is 8
+\item[(B)] radius of $S$ is 7
+\item[(C)] centre of $S$ is (-7, 1)
+\item[(D)] centre of $S$ is (-8, 1)
+\end{itemize}
+
+Answer: (B), (C)
+50. Let $M$ be a 2 × 2 symmetric matrix with integer entries. Then $M$ is invertible if
+\begin{itemize}
+\item[(A)] the first column of $M$ is the transpose of the second row of $M$
+\item[(B)] the second row of $M$ is the transpose of the first column of $M$
+\item[(C)] $M$ is a diagonal matrix with nonzero entries in the main diagonal
+\item[(D)] the product of entries in the main diagonal of $M$ is not the square of an integer
+\end{itemize}
+
+\section*{Answer: (C), (D)}
+51. Let $a, b, c$ be positive integers such that $\frac{b}{a}$ is an integer. If $a, b, c$ are in geometric progression and the arithmetic mean of $a, b, c$ is $b+2$, then the value of
+$$\frac{a^{2}+a-14}{a+1}$$
+
+\section*{Answer: 4}
+52. Let $n \geq 2$ be an integer. Take $n$ distinct points on a circle and join each pair of points by a line segment. Colour the line segment joining every pair of adjacent points by blue and the rest by red. If the number of red and blue line segments are equal, then the value of $n$ is
+
+\section*{Answer: 5}
+53. Let $n_{1}<n_{2}<n_{3}<n_{4}<n_{5}$ be positive integers such that $n_{1}+n_{2}+n_{3}+n_{4}+n_{5}=20$. Then the number of such distinct arrangements $\left(n_{1}, n_{2}, n_{3}, n_{4}, n_{5}\right)$ is
+
+\section*{Answer: 7}
+54. Let $f: \mathbb{R} \rightarrow \mathbb{R}$ and $\quad g: \mathbb{R} \rightarrow \mathbb{R}$ be respectively given by $f(x)=|x|+1$ and $g(x)=x^{2}+1$. Define $h: \mathbb{R} \rightarrow \mathbb{R}$ by
+$$h(x)= \begin{cases}\max \{f(x), g(x)\} & \text { if } x \leq 0, \\ \min \{f(x), g(x)\} & \text { if } x>0 .\end{cases}$$
+The number of points at which $h(x)$ is not differentiable is
+
+\section*{Answer: 3}
+55. The value of
+$$\int_{0}^{1} 4 x^{3}\left\{\frac{d^{2}}{d x^{2}}\left(1-x^{2}\right)^{5}\right\} d x$$
+
+\section*{Answer: 2}
+56. The slope of the tangent to the curve $\left(y-x^{5}\right)^{2}=x\left(1+x^{2}\right)^{2}$ at the point $(1,3)$ is
+
+\section*{Answer: 8}
+57. The largest value of the nonnegative integer $a$ for which
+$$\lim _{x \rightarrow 1}\left\{\frac{-a x+\sin (x-1)+a}{x+\sin (x-1)-1}\right\}^{\frac{1-x}{1-\sqrt{x}}}=\frac{1}{4}$$
+
+\section*{Answer: 0 (zero)}
+58. Let $f:[0,4 \pi] \rightarrow[0, \pi]$ be defined by $f(x)=\cos ^{-1}(\cos x)$. The number of points $x \in[0,4 \pi]$ satisfying the equation
+$$f(x)=\frac{10-x}{10}$$
+
+\section*{Answer: 3}
+59. For a point $P$ in the plane, let $d_{1}(P)$ and $d_{2}(P)$ be the distances of the point $P$ from the lines $x-y=0$ and $x+y=0$ respectively. The area of the region $R$ consisting of all points $P$ lying in the first quadrant of the plane and satisfying $2 \leq d_{1}(P)+d_{2}(P) \leq 4$, is
+
+\section*{Answer: 6}
+60. Let $\vec{a}, \vec{b}$, and $\vec{c}$ be three non-coplanar unit vectors such that the angle between every pair of them is $\frac{\pi}{3}$ . If $\vec{a} \times \vec{b}+\vec{b} \times \vec{c}=p \vec{a}+q \vec{b}+r \vec{c}$, where $p, q$ and $r$ are scalars, then the value of $\frac{p^{2}+2 q^{2}+r^{2}}{q^{2}}$ is
+
+\section*{Answer: 4}

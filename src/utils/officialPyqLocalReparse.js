@@ -368,7 +368,9 @@ function placeAdminEditedCards(cards, prior, admins) {
     placed.add(ai)
   }
   admins.forEach((a, ai) => {
-    if (placed.has(ai)) return
+    // A machine fix that matches no question by wording is a duplicate or a mis-split; a number
+    // or position fallback would paste it over a different question.
+    if (placed.has(ai) || isMachineFix(a)) return
     let at = cards.findIndex(
       (q, i) =>
         !byNext.has(i) &&
@@ -397,9 +399,31 @@ function uniqueAdminCards(admins) {
  * An unapproved auto-compare card (a machine fix, not the admin's) that still misses a
  * match list gives way when the fresh parse of the same slot has both lists.
  */
+function isMachineFix(q) {
+  return q?.editSource === 'auto_compare' && q?.adminApproved !== true
+}
+
+const filledOptionCount = (q) => (Array.isArray(q?.options) ? q.options : []).filter((o) => String(o ?? '').trim()).length
+
+/** Options on a number-answer question, or fewer A–D choices than the scan prints. */
+function optionShapeDisagrees(old, fresh) {
+  const had = filledOptionCount(old)
+  const scan = filledOptionCount(fresh)
+  if (!scan && had && /^(?:integer|numerical)$/.test(String(fresh?.questionType || ''))) return true
+  return scan >= 4 && had < scan
+}
+
+/** The scan's card shows a structure or picture in its stem and the machine fix shows none. */
+function lostScanDrawing(old, fresh) {
+  const drawing = /<smiles>|\\includegraphics|!\[[^\]]*\]\(/i
+  return drawing.test(String(fresh?.text ?? '')) && !drawing.test(String(old?.text ?? ''))
+}
+
 function autoFixLostToFreshParse(old, fresh, paper) {
-  if (old?.editSource !== 'auto_compare' || old?.adminApproved === true || !fresh) return false
+  if (!isMachineFix(old) || !fresh) return false
   if (isMatrixGridCard(fresh) && !isMatrixGridCard(old)) return true
+  if (optionShapeDisagrees(old, fresh)) return true
+  if (lostScanDrawing(old, fresh)) return true
   if (carriesOtherQuestionsScanPicture(old, fresh, paper)) return true
   return Boolean(officialPyqMissingListMessage([old])) && !officialPyqMissingListMessage([fresh])
 }
@@ -426,6 +450,12 @@ function releasedAutoFixIndexes(prev, next) {
   const out = []
   ;(Array.isArray(prev) ? prev : []).forEach((old, i) => {
     if (old?.editSource !== 'auto_compare') return
+    // Placement left this machine fix out (it matched no question by wording, or a duplicate
+    // card with the same id won), so the store must not paste it back onto its old slot.
+    if (isMachineFix(old) && !fresh.some((q) => old.id && q?.id === old.id && String(q?.text ?? '') === String(old.text ?? ''))) {
+      out.push(i)
+      return
+    }
     const slot = Number(old?.pyqSlot ?? old?.questionNumber)
     const now =
       fresh.find((q) => old?.id && q?.id === old.id) ||
@@ -459,6 +489,8 @@ export function keepAdminEditedCards(next, prev) {
       correctInteger: old.correctInteger,
       correctNumerical: old.correctNumerical,
       numericalTolerance: old.numericalTolerance,
+      numericalAlternatives: old.numericalAlternatives,
+      bonusMarksToAll: old.bonusMarksToAll,
       ...gridFieldsOf(old),
       solution: old.solution,
       adminEdited: true,
@@ -490,7 +522,7 @@ export function copyAnswersOntoCanonical(canonical, prev) {
         pyqSlot: q.pyqSlot ?? q.questionNumber,
         printedNumber: q.printedNumber ?? old.printedNumber,
         subject: q.subject || old.subject,
-        questionType: old.questionType || q.questionType,
+        questionType: isMachineFix(old) ? q.questionType || old.questionType : old.questionType || q.questionType,
       }
     }
     if (isMatrixGridCard(q)) {
@@ -515,7 +547,8 @@ export function copyAnswersOntoCanonical(canonical, prev) {
     const printed =
       q.answerSource === 'from_paper' &&
       old.answerSource !== 'admin_edit' &&
-      ([q.correctIndex, q.correctInteger, q.correctNumerical].some((v) => v != null) ||
+      (q.bonusMarksToAll === true ||
+        [q.correctIndex, q.correctInteger, q.correctNumerical].some((v) => v != null) ||
         (Array.isArray(q.correctIndices) && q.correctIndices.length > 0))
     return {
       ...q,
@@ -525,6 +558,8 @@ export function copyAnswersOntoCanonical(canonical, prev) {
       correctInteger: printed ? q.correctInteger : q.correctInteger ?? old.correctInteger,
       correctNumerical: printed ? q.correctNumerical : q.correctNumerical ?? old.correctNumerical,
       numericalTolerance: printed || q.correctNumerical != null ? q.numericalTolerance : old.numericalTolerance,
+      numericalAlternatives: printed || q.correctNumerical != null ? q.numericalAlternatives : old.numericalAlternatives,
+      bonusMarksToAll: printed ? q.bonusMarksToAll : q.bonusMarksToAll ?? old.bonusMarksToAll,
       solution: stripEmptyFigureShells(
         stripEmptyImageMarkdown(
           String(old.solution ?? '').trim() ? old.solution : q.solution || '',
@@ -541,9 +576,13 @@ export function copyAnswersOntoCanonical(canonical, prev) {
 
 /**
  * Mathpix-only re-parse from stored OCR — no Gemini import.
+ * `requireCount`: save only when the rebuilt paper has exactly this many questions and keeps
+ * every admin-edited card; otherwise the stored cards stay untouched.
  * @param {import('./officialPyqPendingStore.js').OfficialPyqPendingPaper | null | undefined} paper
+ * @param {{ requireCount?: number }} [opts]
  */
-export function reExtractOfficialPyqPendingPaperLocal(paper) {
+export function reExtractOfficialPyqPendingPaperLocal(paper, opts = {}) {
+  const required = Number(opts?.requireCount) || 0
   if (!paper) {
     return { ok: false, error: 'Paper not found.', questions: [], count: 0, previousCount: 0 }
   }
@@ -605,10 +644,10 @@ export function reExtractOfficialPyqPendingPaperLocal(paper) {
       }
     }
     const healedCanonical = healOfficialPyqPaperQuestionsEnriched({ ...paper, preparedText, questions })
-    const targetCount = markerCount >= minKeep ? markerCount : expected
+    const targetCount = required || (markerCount >= minKeep ? markerCount : expected)
     questions =
       pickQuestionListCloserToExpected(
-        [questions, healedCanonical, canonical],
+        [questions, healedCanonical, canonical, ...(required ? [healOfficialPyqPaperQuestionsEnriched(paper)] : [])],
         targetCount,
         minKeep,
       ) || questions
@@ -671,6 +710,26 @@ export function reExtractOfficialPyqPendingPaperLocal(paper) {
 
   const shaped = shapeWithPaperFacts(paper, questions, preparedText)
   questions = shaped.questions
+  if (required) {
+    const filled = questions.filter((q) => !isOfficialPyqPlaceholder(q)).length
+    const ids = new Set(questions.map((q) => q?.id).filter(Boolean))
+    const sameCard = (q) => JSON.stringify([q?.text ?? '', q?.options ?? []])
+    const kept = new Set(questions.map(sameCard))
+    const adminLost = (paper.questions ?? []).some(
+      (q) => q?.adminEdited === true && !isMachineFix(q) && !(q.id && ids.has(q.id)) && !kept.has(sameCard(q)),
+    )
+    if (filled !== required || adminLost) {
+      return {
+        ok: false,
+        error: adminLost
+          ? 'Re-parse would drop a card you edited; keeping the stored cards.'
+          : `Re-parse found ${filled} question(s), not ${required}; keeping the stored cards.`,
+        questions: paper.questions ?? [],
+        count: existingQuestionCount,
+        previousCount: existingQuestionCount,
+      }
+    }
+  }
   const updated = updateOfficialPyqPendingPaper(paper.id, {
     ...shaped,
     preparedText,

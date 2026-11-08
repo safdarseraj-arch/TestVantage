@@ -1,4 +1,4 @@
-﻿TestVantage - Postgres on your PC (simple steps)
+TestVantage - Postgres on your PC (simple steps)
 ================================================
 
 Already done:

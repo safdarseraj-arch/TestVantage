@@ -14,6 +14,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { isAdminLoggedIn } from '../utils/auth.js'
 import { isOfficialPyqPlaceholder } from '../utils/officialPyqMissingSlots.js'
 import { getOfficialPyqPendingPreviewPaper } from '../utils/officialPyqPendingStore.js'
+import { officialPyqCurrentCompare } from '../utils/officialPyqCompareFreshness.js'
 import {
   OFFICIAL_PYQ_CARD_CHANGED_EVENT,
   applyOfficialPyqCardDraft,
@@ -527,8 +528,15 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
 
   const hasAnswer = officialPyqCardHasAnswerKey(card)
   const hasFigure = Boolean(String(card?.questionImage ?? '').trim())
-  const compare = card?.originalCompare
   const goTo = index + 1
+  const flaggedNow = (() => {
+    try {
+      return (getOfficialPyqPendingPreviewPaper(paperId)?.localQuality?.failedGoTo || []).map(Number).includes(goTo)
+    } catch {
+      return false
+    }
+  })()
+  const compare = officialPyqCurrentCompare(card, { flagged: flaggedNow })
   const hasSuggestion = officialPyqCompareHasSuggestion(compare)
   const suggestedFigures = officialPyqSuggestedFigures(compare?.suggestedFigures)
   const useSuggestion = compare?.verdict === 'differs' && hasSuggestion
@@ -605,14 +613,6 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
   }
 
   const draftFigureProblem = editing ? officialPyqDraftFigureProblem(draft) : ''
-  const flaggedNow = (() => {
-    try {
-      return (getOfficialPyqPendingPreviewPaper(paperId)?.localQuality?.failedGoTo || []).map(Number).includes(goTo)
-    } catch {
-      return false
-    }
-  })()
-
   function onCancel() {
     setEditing(false)
     setDraft(draftFromCard(card))
@@ -750,6 +750,12 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
         <p className="form-hint official-pyq-admin-approved" data-testid="official-pyq-admin-approved">
           <span className="bank-review-badge">Approved by admin</span> This question is saved as shown. Quality
           alarms are off for it, and re-parse, quality fix, and auto-heal will not change it.
+        </p>
+      ) : card.adminEdited && card.editSource === 'auto_compare' ? (
+        <p className="form-hint official-pyq-admin-edited" data-testid="official-pyq-auto-fixed">
+          <span className="bank-review-badge">Fixed by auto-fix</span> Saved from the original paper. A rebuild from
+          the scan can still correct it.{' '}
+          {historyCount ? 'Undo last edit puts back the version before the fix.' : ''}
         </p>
       ) : card.adminEdited ? (
         <p className="form-hint official-pyq-admin-edited" data-testid="official-pyq-admin-edited">

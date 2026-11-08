@@ -1983,7 +1983,7 @@ test('2025 P1: a key printed as a heading "\\section*{Answer: [2.2 to 2.3]}" is 
   assert.deepEqual(pick(readKey('Pick one.\n\\section*{Answer: B}')), [1, undefined, undefined, undefined, 'from_paper'])
   assert.deepEqual(pick(readKey('x\nAnswer: [1.15 to 1.25]}')), [undefined, undefined, 1.2, 0.05, 'from_paper'])
   const either = readKey('x\n\\section*{Answer: [-29.95 to -29.8] OR [29.8 to 29.95]}')
-  assert.equal(either.correctNumerical, undefined, 'two accepted answers are not squeezed into one range')
+  assert.deepEqual([either.correctNumerical, either.numericalAlternatives?.length], [-29.875, 1], 'two accepted answers are both kept, not squeezed into one range')
 })
 
 const pendingStore = await import('../src/utils/officialPyqPendingStore.js')
@@ -2003,10 +2003,12 @@ test('2025 P2 re-upload: Q5 without its "Q. 5" label is still a question; auto-f
   const meta = { exam: 'JEE Advanced', year: 2025, session: 'Paper 2', sourceLabel: 'test' }
   const stored = items.filter((_, i) => i !== 4).map((q) => ({ ...q }))
   const paper = importQuestionsToOfficialPyqPending({ ...meta, preparedText: unlabelled, questions: stored })
-  assert.equal(paper.questions.length, 47)
-  const rod = paper.questions.findIndex((q) => /uniform rod/.test(q.text))
-  const editedText = `${paper.questions[rod].text} (edited)`
-  const cards = paper.questions.map((q, i) => (i === rod ? { ...q, text: editedText, adminEdited: true, adminEditedAt: Date.now() } : q))
+  assert.equal(paper.questions.length, 48, 'a new upload already gets Q5 back from the scan')
+  assert.match(paper.questions[4].text, /^Let \$I=/)
+  const olderSplit = paper.questions.filter((_, i) => i !== 4)
+  const rod = olderSplit.findIndex((q) => /uniform rod/.test(q.text))
+  const editedText = `${olderSplit[rod].text} (edited)`
+  const cards = olderSplit.map((q, i) => (i === rod ? { ...q, text: editedText, adminEdited: true, adminEditedAt: Date.now() } : q))
   const draft = draftAdminFacts(unlabelled, items)
   const row = draft.pattern.rows[0]
   const facts = {
@@ -2040,6 +2042,52 @@ test('2025 P2 re-upload: Q5 without its "Q. 5" label is still a question; auto-f
   assert.ok(!saved.localQuality.lines.some((l) => /This paper has/.test(l)), saved.localQuality.lines.join(' | '))
   localStorage.clear()
 })
+
+const { printedAnswerFields } = await import('../src/utils/printedAnswerKey.js')
+const { validateOfficialPyqForPublish } = await import('../src/utils/officialPyqApproval.js')
+test('2025 P2 Q20 "MARKS TO ALL" is a bonus; 2025 P1 Q27/Q28/Q43 "a OR b" keep both answers — read, edited, scored, never AI-filled', () => {
+  const p2 = fs.readFileSync(new URL('./fixtures/jee-advanced-2025-p2-mathpix.txt', import.meta.url), 'utf8')
+  const q20 = paperItemsFromMathpixOcr(p2)[19]
+  assert.equal(q20.bonusMarksToAll, true)
+  assert.equal(q20.correctIndex, undefined)
+  assert.doesNotMatch(q20.text, /MARKS TO ALL/)
+
+  const either = readKey('x\n\\section*{Answer: [-29.95 to -29.8] OR [29.8 to 29.95]}')
+  assert.deepEqual([either.correctNumerical, either.numericalTolerance, either.numericalAlternatives], [-29.875, 0.075, [{ value: 29.875, tolerance: 0.075 }]])
+  const two = readKey('x\nAnswer: 0.5 OR 0.75')
+  assert.deepEqual([two.correctNumerical, two.numericalAlternatives], [0.5, [{ value: 0.75 }]])
+
+  const card = { id: 'n1', subject: 'physics', questionType: 'numerical', ...numericChoice('[75 to 79] OR [94 to 95]') }
+  assert.equal(formatOfficialPyqAnswerKey(card), '75 to 79 OR 94 to 95')
+  const bonus = { id: 'b1', subject: 'physics', questionType: 'single_correct', options: ['a', 'b', 'c', 'd'], bonusMarksToAll: true }
+  assert.equal(formatOfficialPyqAnswerKey(bonus), 'Bonus (marks to all)')
+  assert.equal(parseOfficialPyqAnswerKey('Bonus', { correctIndex: 0 }).patch.bonusMarksToAll, true)
+  assert.equal(parseOfficialPyqAnswerKey('A', bonus).patch.bonusMarksToAll, undefined)
+
+  const run = (answers) => evaluateTest({ examPatternId: 'jee-advanced', questions: [card, bonus] }, answers)
+  assert.equal(run({ n1: 78 }).perQuestion[0].grade, 'correct')
+  assert.equal(run({ n1: 95 }).perQuestion[0].grade, 'correct', 'the second printed answer scores')
+  assert.equal(run({ n1: 85 }).perQuestion[0].grade, 'wrong')
+  assert.equal(run({}).perQuestion[1].grade, 'correct', 'a bonus gives full marks even unanswered')
+  assert.equal(run({ b1: 2 }).perQuestion[1].marks, run({}).perQuestion[1].maxMarks)
+
+  const patch = { correctIndices: [0, 1, 2] }
+  assert.equal(applyHybridPatchToCard({ ...bonus, answerSource: 'unknown' }, patch).correctIndices, undefined, 'AI fill never answers a bonus')
+  assert.equal(currentAnswerText(card), '75 to 79 OR 94 to 95')
+
+  assert.deepEqual(printedAnswerFields('[0.7 to 0.8]', 'numerical'), { correctNumerical: 0.75, numericalTolerance: 0.05 })
+  assert.equal(readPrintedAnswerKey('Ans for Q.9: 0.5 or 0.75').get(9), '0.5 or 0.75')
+  assert.equal(readPrintedAnswerKey('Ans for Q.14: \\{(C)\\} or \\{(C) and (D)\\}').has(14), false)
+
+  const pub = validateOfficialPyqForPublish({ id: 'x', status: 'approved', year: 2025, exam: 'jee-advanced', questions: [card], localQuality: { passed: false, failedGoTo: [27] } })
+  assert.match(pub.errors.join(' '), /quality check has not passed\. Go to Q 27/)
+})
+
+function numericChoice(text) {
+  const parsed = parseOfficialPyqAnswerKey(text, { correctNumerical: 1 })
+  assert.equal(parsed.ok, true, text)
+  return Object.fromEntries(Object.entries(parsed.patch).filter(([, v]) => v !== undefined))
+}
 if (failed) {
   console.error(`\n${failed} recurrence test(s) failed`)
   process.exit(1)

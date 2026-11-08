@@ -11,7 +11,8 @@
 
 import { answerSourceBadgeLabel } from './answerProvenance.js'
 import { persistOfficialPyqQualityRun } from './officialPyqLocalQuality.js'
-import { enforceAdminFactsOnQuestions } from './officialPyqAdminFacts.js'
+import { enforceAdminFactsOnQuestions, factsForPaper } from './officialPyqAdminFacts.js'
+import { numericalAlternativesOf } from './answerAlternatives.js'
 import {
   looksLikeAnswerKeyMappingBlob,
   looksLikePyqSectionInstructionStem,
@@ -158,6 +159,7 @@ export function pendingQuestionToPyqItem(paper, q, index) {
     correctInteger: q.correctInteger,
     correctNumerical: q.correctNumerical,
     ...(q.numericalTolerance != null ? { numericalTolerance: Number(q.numericalTolerance) } : {}),
+    ...answerExtrasOf(q),
     ...gridFieldsForPublish(q),
     solution,
     subject: String(q.subject || 'physics'),
@@ -195,6 +197,15 @@ export function pendingQuestionToPyqItem(paper, q, index) {
   }
 }
 
+/** Either-of answers and "marks to all" travel with the card to students and the bank. */
+function answerExtrasOf(q) {
+  const alternatives = numericalAlternativesOf(q)
+  return {
+    ...(alternatives.length ? { numericalAlternatives: alternatives } : {}),
+    ...(q?.bonusMarksToAll === true ? { bonusMarksToAll: true } : {}),
+  }
+}
+
 /**
  * @param {OfficialPyqPendingPaper} paper
  * @param {ReturnType<typeof pendingQuestionToPyqItem>} pyq
@@ -211,6 +222,7 @@ export function pyqItemToBankQuestion(paper, pyq, index) {
     correctInteger: pyq.correctInteger,
     correctNumerical: pyq.correctNumerical,
     ...(pyq.numericalTolerance != null ? { numericalTolerance: pyq.numericalTolerance } : {}),
+    ...answerExtrasOf(pyq),
     ...gridFieldsForPublish(pyq),
     solution: pyq.solution,
     subject: pyq.subject,
@@ -415,6 +427,7 @@ function officialPyqApproveCheck(paper, preHealed) {
       storedReviewIndex(paper.questions, q, i),
     )
     if (missingList) errors.push(missingList)
+    errors.push(...paperWideQualityBlockers(paper, filled))
     if (paper.exam === 'jee-advanced') {
       const min = pyqExtractLowCountThreshold('jee-advanced')
       const ocrExpected = expectedPyqPaperQuestionTarget(paper.exam, paper.session, paper.preparedText)
@@ -582,7 +595,28 @@ export function validateOfficialPyqForPublish(paper) {
   const blank = cards.filter((q) => !isOfficialPyqPlaceholder(q) && !String(q?.text ?? '').trim()).length
   if (blank) errors.push(`${blank} question(s) have no text.`)
   if (!paper.year || !paper.exam) errors.push('Exam and year must be set.')
+  errors.push(...paperWideQualityBlockers(paper, cards.length - reserved))
   return { ok: errors.length === 0, errors }
+}
+
+/**
+ * The saved quality check failed, or the card count is not the count the admin confirmed
+ * (a question lost by the split renumbers the rest, so no slot looks empty — 2025 P2 Q5).
+ * @param {OfficialPyqPendingPaper} paper
+ * @param {number} filled
+ */
+function paperWideQualityBlockers(paper, filled) {
+  const errors = []
+  if (paper?.localQuality?.passed === false) {
+    const nums = Array.isArray(paper.localQuality.failedGoTo) ? paper.localQuality.failedGoTo.slice(0, 24).join(', ') : ''
+    errors.push(`The quality check has not passed.${nums ? ` Go to Q ${nums}.` : ''} Fix it before continuing.`)
+  }
+  const facts = paper?.adminFacts?.confirmedAt ? factsForPaper(paper) : null
+  const expected = facts?.known && facts.source === 'admin' ? Number(facts.expectedQuestionCount) || 0 : 0
+  if (expected && filled !== expected) {
+    errors.push(`Paper facts (confirmed by you) say ${expected} questions. This paper has ${filled}. Re-parse stored OCR.`)
+  }
+  return errors
 }
 
 /**

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Shared Official PYQ post-process quality scan (Mathpix reparse -> pending display).
  */
 import { sanitizeStemForDisplay } from './sanitizeStemForDisplay.js'

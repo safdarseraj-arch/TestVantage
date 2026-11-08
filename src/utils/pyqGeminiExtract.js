@@ -59,6 +59,7 @@ import {
   stripMathpixQuestionMarker,
   extractMathpixQuestionNumber,
 } from './mathpixQuestionSplit.js'
+import { textIsMostlyHindi } from './stripHindiOcr.js'
 import { parseQuestionText } from './parseQuestionText.js'
 import { hasMathpixMedia } from './mathpixMedia.js'
 import { diagnoseLocalUploadSplit } from './uploadLocalFirstPipeline.js'
@@ -897,6 +898,10 @@ function questionsFromOfficialPyqExtractText(extracted, paperMeta, opts = {}) {
     const v = validateGeminiPyqExtractItem(raw)
     if (!v.ok) {
       rejected.push(`Q${i + 1}: ${v.error}`)
+      return
+    }
+    if (textIsMostlyHindi(v.item.stem)) {
+      rejected.push(`Q${i + 1}: Hindi copy of a question (English is kept)`)
       return
     }
     // Upload is the split only. Tags, AI answers, and solutions come from the

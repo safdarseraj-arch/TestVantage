@@ -33,6 +33,10 @@ import { isMatrixGridCard } from './matrixGridPyq.js'
 import { stripAnswerBoxTables } from './printedAnswerKey.js'
 import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import { reExtractOfficialPyqPendingPaperLocal } from './officialPyqLocalReparse.js'
+import { numericalAlternativesOf } from './answerAlternatives.js'
+import { buildPaperFacts } from './officialPyqPaperFacts.js'
+import { ocrIsHindiOnly, stripHindiOcr } from './stripHindiOcr.js'
+import { dropStaleOfficialPyqCompares } from './officialPyqCompareFreshness.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
@@ -173,7 +177,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 15
+export const LOCAL_QUALITY_REVISION = 17
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -258,15 +262,27 @@ function wordRun(text) {
 }
 
 /**
- * The stored paper has fewer cards than its facts while a fresh split of the same OCR has
- * exactly the right count: a question was lost by an older split (2025 P2 Q5, no "Q. 5" label).
+ * The count the paper is held to when the stored card count is off: a question lost by an
+ * older split (2025 P2 Q5, no "Q. 5" label), or one question cut in two / instructions kept
+ * as a card. Same facts the count line uses: confirmed admin facts, else the scan's own.
+ * 0 when the count is right or no facts are known.
  */
-function questionsMissingFromStoredSplit(paper, ocr) {
-  const facts = factsForPaper(paper)
+function countOffFacts(paper, ocr) {
+  if (!ocr) return 0
+  const facts = factsForPaper(paper) || buildPaperFacts(ocr)
   const expected = facts?.known ? Number(facts.expectedQuestionCount) || 0 : 0
   const stored = (Array.isArray(paper?.questions) ? paper.questions : []).filter((q) => q && !isOfficialPyqPlaceholder(q))
-  if (!expected || !ocr || stored.length >= expected) return false
-  return freshCardsFromOcr(ocr).length === expected
+  return expected && stored.length !== expected ? expected : 0
+}
+
+/** A rebuild that missed the facts count is not retried until the cards, facts or scan change. */
+const countRepairTried = new Set()
+
+const HINDI_ONLY_LINE = 'The scan is in Hindi only. Upload the English paper. Do not approve.'
+
+function withHindiOnlyFlag(result, ocr) {
+  if (!ocrIsHindiOnly(ocr)) return result
+  return { ...result, passed: false, lines: [HINDI_ONLY_LINE, ...result.lines.filter((l) => l !== HINDI_ONLY_LINE)] }
 }
 
 /** Same card in a fresh split: same card count and the stem opens with the same words. */
@@ -312,9 +328,18 @@ function storedCardLacksOcrFix(q, ocr) {
   return cardSignature(applyStoredOcrCardFixes(q, ocr)) !== cardSignature(q)
 }
 
-const ANSWER_FIELDS = ['correctIndex', 'correctIndices', 'correctInteger', 'correctNumerical', 'numericalTolerance']
+const ANSWER_FIELDS = [
+  'correctIndex',
+  'correctIndices',
+  'correctInteger',
+  'correctNumerical',
+  'numericalTolerance',
+  'numericalAlternatives',
+  'bonusMarksToAll',
+]
 
 function answerKeyOf(q) {
+  if (q?.bonusMarksToAll === true) return { letters: null, number: null, tol: null, alternatives: [], bonus: true, has: true }
   const letters = Array.isArray(q?.correctIndices) && q.correctIndices.length
     ? [...q.correctIndices].map(Number).sort((a, b) => a - b)
     : q?.correctIndex != null && q.correctIndex !== ''
@@ -323,7 +348,8 @@ function answerKeyOf(q) {
   const value = q?.correctInteger ?? q?.correctNumerical
   const number = value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null
   const tol = q?.numericalTolerance != null && q.numericalTolerance !== '' ? Number(q.numericalTolerance) : null
-  return { letters, number, tol, has: Boolean(letters || number != null) }
+  const alternatives = numericalAlternativesOf(q).map((c) => [Number(c.value), c.tolerance != null ? Number(c.tolerance) : null])
+  return { letters, number, tol, alternatives, bonus: false, has: Boolean(letters || number != null) }
 }
 
 /**
@@ -336,7 +362,8 @@ function answerDiffersFromPrintedKey(q, fresh) {
   const printed = answerKeyOf(fresh)
   if (!printed.has) return false
   const saved = answerKeyOf(q)
-  return JSON.stringify([saved.letters, saved.number, saved.tol]) !== JSON.stringify([printed.letters, printed.number, printed.tol])
+  const sig = (k) => JSON.stringify([k.letters, k.number, k.tol, k.alternatives, k.bonus])
+  return sig(saved) !== sig(printed)
 }
 
 function withPrintedKey(q, fresh) {
@@ -414,7 +441,7 @@ function mergeQualityResults(localFailed, review) {
  */
 export function localOfficialPyqQualityCheck(paper) {
   const questions = Array.isArray(paper?.questions) ? paper.questions : []
-  const ocr = String(paper?.preparedText ?? '')
+  const ocr = stripHindiOcr(paper?.preparedText)
   /** @type {number[]} */
   const failedGoTo = []
   questions.forEach((q, index) => {
@@ -476,7 +503,7 @@ export function localOfficialPyqQualityCheck(paper) {
     { cardsOnly: paper?.officialPyq === false },
   )
   return {
-    ...mergeQualityResults(failedGoTo, review),
+    ...withHindiOnlyFlag(mergeQualityResults(failedGoTo, review), ocr),
     revision: LOCAL_QUALITY_REVISION,
     checkedAt: Date.now(),
     by: 'local',
@@ -652,7 +679,7 @@ function adoptLeftoverFixes(q) {
  * @param {object} paper
  */
 export function repairOfficialPyqUntilQuality(paper) {
-  const ocr = String(paper?.preparedText ?? '')
+  const ocr = stripHindiOcr(paper?.preparedText)
   const stored = Array.isArray(paper?.questions) ? paper.questions : []
   /** Cards saved before a passage-cut fix still lack their shared passage; the facts put it back. */
   const withFacts = enforceAdminFactsOnQuestions(stored, paper?.adminFacts, ocr)
@@ -760,7 +787,7 @@ export function repairOfficialPyqUntilQuality(paper) {
   return {
     paper: { ...paper, questions },
     quality: {
-      ...mergeQualityResults(failedGoTo, review),
+      ...withHindiOnlyFlag(mergeQualityResults(failedGoTo, review), ocr),
       revision: LOCAL_QUALITY_REVISION,
       checkedAt: Date.now(),
       by: 'local',
@@ -774,7 +801,9 @@ export function repairOfficialPyqUntilQuality(paper) {
 /**
  * Run the same local check the red banner uses, then save the list mark.
  * Stored OCR only. Does not publish or change status.
- * Pending: every auto-fix is saved. Approved: only cards that failed the check change.
+ * Pending: every auto-fix is saved, and a card count off the facts is rebuilt from the stored
+ * OCR only when a rebuild lands exactly on the facts count. Approved: only cards that failed
+ * the check change; a wrong count is flagged, never restructured.
  * Published: checked and flagged only; students' questions are never rewritten here.
  * Auto-fix stops at 4 passes, or as soon as a pass finds nothing to fix.
  * @param {object | null | undefined} paper
@@ -782,14 +811,23 @@ export function repairOfficialPyqUntilQuality(paper) {
 export function persistOfficialPyqQualityRun(paper) {
   if (!paper?.id) return null
   let full = getOfficialPyqPendingPaper(paper.id) || paper
-  const ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
+  let ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
   const status = String(full?.status ?? '')
-  if (status === 'pending_review' && questionsMissingFromStoredSplit(full, ocr)) {
+  const requireCount = status === 'pending_review' ? countOffFacts(full, stripHindiOcr(ocr)) : 0
+  const attempt = `${full.id}|${requireCount}|${full.questions?.length ?? 0}|${ocr.length}`
+  if (requireCount && !countRepairTried.has(attempt)) {
+    let rebuilt = false
     try {
-      if (reExtractOfficialPyqPendingPaperLocal(full)?.ok) full = getOfficialPyqPendingPaper(paper.id) || full
+      if (reExtractOfficialPyqPendingPaperLocal(full, { requireCount })?.ok) {
+        rebuilt = true
+        full = getOfficialPyqPendingPaper(paper.id) || full
+        ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '') || ocr
+      }
     } catch {
       /* keep the stored cards; the count line still blocks approval */
     }
+    // Only a miss is remembered: the same broken cards uploaded again must be rebuilt again.
+    if (!rebuilt) countRepairTried.add(attempt)
   }
   if (status === 'published') {
     let quality
@@ -842,8 +880,39 @@ export function persistOfficialPyqQualityRun(paper) {
       questionsChanged = true
     }
   }
-  const saved = updateOfficialPyqPendingPaper(full.id, updates)
+  let saved = updateOfficialPyqPendingPaper(full.id, updates)
+  // The store keeps edited cards, so the saved list can differ from the repaired one;
+  // the mark must describe the cards that were saved.
+  if (saved && updates.questions) {
+    try {
+      const quality = localOfficialPyqQualityCheck({ ...saved, preparedText: ocr || saved.preparedText })
+      if (JSON.stringify(quality.failedGoTo) !== JSON.stringify(repaired.quality?.failedGoTo) || quality.passed !== repaired.quality?.passed) {
+        saved = updateOfficialPyqPendingPaper(full.id, { localQuality: quality }) || saved
+      }
+    } catch {
+      /* keep the repair's mark */
+    }
+  }
+  if (saved && status === 'pending_review' && Array.isArray(saved.questions)) {
+    const cleaned = dropStaleOfficialPyqCompares(saved.questions, saved.localQuality?.failedGoTo)
+    if (cleaned !== saved.questions) {
+      saved = updateOfficialPyqPendingPaper(full.id, { questions: cleaned }) || saved
+      questionsChanged = true
+    }
+  }
   return saved ? { ...saved, questionsChanged } : null
+}
+
+/**
+ * The facts count when a pending paper's card count is off it (questions missing or split),
+ * else 0. Stored OCR only.
+ * @param {any} paper
+ */
+export function officialPyqCountRepairNeeded(paper) {
+  if (!paper?.id || String(paper.status ?? '') !== 'pending_review') return 0
+  const full = getOfficialPyqPendingPaper(paper.id) || paper
+  const ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
+  return countOffFacts(full, stripHindiOcr(ocr))
 }
 
 /**

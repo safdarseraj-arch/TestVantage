@@ -16,10 +16,12 @@ import {
   trySolveIncreasingConcaveDownGraphMcq,
 } from './repairDerivativePrimeStemOcr.js'
 
+import { BONUS_MARKS_TO_ALL_RE, numericChoiceFields, parseNumericAnswerChoices } from './answerAlternatives.js'
+
 /** @typedef {'from_paper' | 'ai_generated' | 'manual' | 'draft' | 'unknown'} AnswerSource */
 
 const ANSWER_LINE =
-  /^(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?|Ans\.?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?([A-D1-4](?:\s*[,;&\/]\s*[A-D1-4])*)\b/i
+  /^(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?|Ans\.?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?([A-D1-4](?:\s*[,;&\/]\s*[A-D1-4])*)\b(?!\s*or\s+\d)/i
 
 const ANSWER_INLINE =
   /(?:^|[\n\s])(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?\(?([A-D])\)?(?:\s|$|[.,;])/i
@@ -32,7 +34,10 @@ const ANSWER_THEREFORE = /(?:∴|therefore|hence)\s*(?:the\s+)?(?:answer|option)
 const SOLUTION_LINE = /^(?:Solution|Explanation|Sol\.?|Hint)\s*[\:\-]?\s*(.*)$/i
 
 const INTEGER_ANS =
-  /^(?:Ans(?:wer)?s?|Key)\s*[\:\-\=]?\s*(-?\d{1,4}(?:\.\d+)?)\s*$/i
+  /^(?:Ans(?:wer)?s?|Key)\s*[\:\-\=]?\s*(-?\d{1,4}(?:\.\d+)?)(?:\s*\(\s*[a-z]+\s*\))?\s*$/i
+
+/** "Answer: (A), (C) and (D)" / "Answer (C) and (D)" (2014) → "Answer: A, C, D". */
+const BRACKETED_LETTER_KEY = /((?:Ans(?:wer)?s?|Key)\s*[:\-=]?\s*)((?:\(\s*[A-D]\s*\)\s*(?:,|\band\b|&)?\s*)+)/gi
 
 /** A printed key at the end of a stem: "Answer: A", "Answer: 6", "Answer: [0.7 to 0.8]". */
 const PRINTED_ANSWER_TAIL =
@@ -74,8 +79,13 @@ export function detectAnswerFromPaper(block) {
   const text = String(block ?? '')
     .replace(/\r\n/g, '\n')
     .replace(/\\section\*?\{\s*((?:(?:Official\s+)?Ans(?:wer)?s?\.?|Key)\s*[:.\-=][^{}\n]*)\}/gi, '$1')
+    .replace(BRACKETED_LETTER_KEY, (_, head, list) => `${head.replace(/[\s:\-=]*$/, '')}: ${[...list.matchAll(/\(\s*([A-D])\s*\)/gi)].map((m) => m[1]).join(', ')} `)
   if (!text.trim()) {
     return { answerSource: 'unknown', answerConfidence: 0 }
+  }
+  const bonus = text.match(BONUS_MARKS_TO_ALL_RE)
+  if (bonus) {
+    return { bonusMarksToAll: true, answerSource: 'from_paper', answerConfidence: 90, matchedLine: bonus[0].trim() }
   }
 
   const lines = text.split('\n')
@@ -167,6 +177,15 @@ function printedAnswerTail(text) {
       ...lettersToAnswer(letter[1]),
       answerSource: 'from_paper',
       answerConfidence: 94,
+      matchedLine: m[1].trim(),
+    }
+  }
+  const choices = parseNumericAnswerChoices(value)
+  if (choices) {
+    return {
+      ...numericChoiceFields(choices),
+      answerSource: 'from_paper',
+      answerConfidence: 90,
       matchedLine: m[1].trim(),
     }
   }
@@ -264,6 +283,7 @@ export function stripAnswerMetaLines(block) {
       if (!t) return [line]
       if (ANSWER_LINE.test(t) || INTEGER_ANS.test(t) || SOLUTION_LINE.test(t)) return []
       if (PRINTED_ANSWER_LINE.test(t)) return []
+      if (BONUS_MARKS_TO_ALL_RE.test(t)) return []
       if (PRINTED_ANSWER_TAIL.test(t)) {
         // 2025 P2: "Then the value of $r$ is \_\_\_\_. Answer: 6" — the question sentence stays.
         const kept = line.replace(PRINTED_ANSWER_TAIL, '').trimEnd()

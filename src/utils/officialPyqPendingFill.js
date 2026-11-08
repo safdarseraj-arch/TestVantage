@@ -12,6 +12,7 @@ import { getOfficialPyqPendingPaper, officialPyqCardIsAdminEdited } from './offi
 import { applyOfficialPyqPublishedMeta } from './officialPyqPublishedMeta.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
 import { gridColLabels, isMatrixGridCard } from './matrixGridPyq.js'
+import { formatNumericChoice, numericalAlternativesOf } from './answerAlternatives.js'
 
 export const HYBRID_FILL_NEEDS_APPROVAL =
   'Hybrid AI fills tags, answers, and solutions only on an Approved paper. Approve it first; if it is published, Unpublish it first.'
@@ -35,7 +36,13 @@ export function gridAnswerText(question, key = question?.matrixAnswerKey) {
 
 /** Stored answer as Hybrid AI reads it: letter(s), the number, or a grid "A-R; B-P,S". */
 export function currentAnswerText(question) {
+  if (question?.bonusMarksToAll === true) return 'Bonus (marks to all)'
   if (isMatrixGridCard(question)) return gridAnswerText(question)
+  const alternatives = numericalAlternativesOf(question)
+  if (alternatives.length && (question?.correctNumerical != null || question?.correctInteger != null)) {
+    const main = { value: Number(question.correctNumerical ?? question.correctInteger), tolerance: question.numericalTolerance }
+    return [main, ...alternatives].map(formatNumericChoice).join(' OR ')
+  }
   if (Array.isArray(question?.correctIndices) && question.correctIndices.length) {
     return question.correctIndices.map((n) => String.fromCharCode(65 + Number(n))).join(',')
   }
@@ -121,12 +128,14 @@ export function applyHybridPatchToCard(card, patch) {
     }
   }
   const answer = isMatrixGridCard(card) ? '' : currentAnswerText(patch)
-  if (!handEdited && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
+  const printedBonus = card.bonusMarksToAll === true
+  if (!handEdited && !printedBonus && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
     next.correctIndex = patch.correctIndex
     next.correctIndices = patch.correctIndices
     next.correctInteger = patch.correctInteger
     next.correctNumerical = patch.correctNumerical
     delete next.numericalTolerance
+    delete next.numericalAlternatives
     next.answerSource = 'hybrid_ai'
   }
   if (!handEdited && !KEPT_SOURCES.has(card.solutionSource) && has(patch.solution) && patch.solution !== card.solution) {

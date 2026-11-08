@@ -20,8 +20,16 @@ import { officialPyqCardAsShown } from './officialPyqCardAsShown.js'
 import { ORIGINAL_CROP_URL_PREFIX, consumeIncludeGraphics, isOriginalCropUrl } from './mathpixMedia.js'
 import { paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
 import { gridColLabels, gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.js'
+import {
+  formatNumericChoice,
+  numericChoiceFields,
+  numericalAlternativesOf,
+  parseNumericAnswerChoices,
+} from './answerAlternatives.js'
 
 export const OFFICIAL_PYQ_CARD_CHANGED_EVENT = 'testvantage:official-pyq-card-changed'
+
+const BONUS_KEY_TEXT = 'Bonus (marks to all)'
 
 const LETTERS = 'ABCDEFGH'
 
@@ -39,6 +47,8 @@ const SNAPSHOT_FIELDS = [
   'correctInteger',
   'correctNumerical',
   'numericalTolerance',
+  'numericalAlternatives',
+  'bonusMarksToAll',
   'matrixRows',
   'matrixCols',
   'matrixAnswerKey',
@@ -331,6 +341,7 @@ export function officialPyqDraftFromSuggestion(card, compare) {
 /** @param {any} q */
 export function officialPyqCardHasAnswerKey(q) {
   if (!q || typeof q !== 'object') return false
+  if (q.bonusMarksToAll === true) return true
   if (isMatrixGridCard(q)) return Object.keys(gridKeyCopy(q.matrixAnswerKey)).length > 0
   if (Array.isArray(q.correctIndices) && q.correctIndices.length) return true
   return [q.correctIndex, q.correctInteger, q.correctNumerical].some(
@@ -341,7 +352,13 @@ export function officialPyqCardHasAnswerKey(q) {
 /** @param {any} q */
 export function formatOfficialPyqAnswerKey(q) {
   if (!q || typeof q !== 'object') return ''
+  if (q.bonusMarksToAll === true) return BONUS_KEY_TEXT
   if (isMatrixGridCard(q)) return gridKeyText(q, q.matrixAnswerKey)
+  const alternatives = numericalAlternativesOf(q)
+  if (alternatives.length && (q.correctNumerical != null || q.correctInteger != null)) {
+    const main = { value: Number(q.correctNumerical ?? q.correctInteger), tolerance: q.numericalTolerance }
+    return [main, ...alternatives].map(formatNumericChoice).join(' OR ')
+  }
   if (Array.isArray(q.correctIndices) && q.correctIndices.length) {
     return q.correctIndices.map((i) => LETTERS[Number(i)] ?? String(i)).join(', ')
   }
@@ -374,8 +391,13 @@ export function parseOfficialPyqAnswerKey(raw, card) {
     correctInteger: undefined,
     correctNumerical: undefined,
     numericalTolerance: undefined,
+    numericalAlternatives: undefined,
+    bonusMarksToAll: undefined,
   }
   if (!text) return { ok: true, patch: cleared }
+  if (/^(?:bonus|marks\s+to\s+all)\b/i.test(text)) return { ok: true, patch: { ...cleared, bonusMarksToAll: true } }
+  const choices = parseNumericAnswerChoices(text)
+  if (choices) return { ok: true, patch: { ...cleared, ...numericChoiceFields(choices) } }
   const band = text.match(/^\[?\s*(-?\d+(?:\.\d+)?)\s*(?:to|–|—)\s*(-?\d+(?:\.\d+)?)\s*\]?$/i)
   if (band && Number(band[2]) > Number(band[1])) {
     const low = Number(band[1])
@@ -410,7 +432,10 @@ export function parseOfficialPyqAnswerKey(raw, card) {
         : { ...cleared, correctNumerical: num },
     }
   }
-  return { ok: false, error: 'Answer key: use option letters (A or A, C), a number, or a range (0.27 to 0.33).' }
+  return {
+    ok: false,
+    error: 'Answer key: use option letters (A or A, C), a number, a range (0.27 to 0.33), two answers (0.5 OR 0.75), or Bonus.',
+  }
 }
 
 /** An integer / numerical card has no options; all-blank option boxes only trip the quality check. @param {any} card */
@@ -626,6 +651,7 @@ export function approveOfficialPyqCard(paperId, index) {
     adminApproved: true,
     adminApprovedAt: at,
   }
+  delete next.originalCompare
   if (Object.prototype.hasOwnProperty.call(card, 'stem')) next.stem = shown.text
   if (shown.passage) next.passageText = shown.passage
   else delete next.passageText
@@ -803,7 +829,9 @@ export function recheckOfficialPyqCardQuality(paperId, index) {
     return localOfficialPyqQualityCheck({ questions: [q], preparedText: ocr }).failedGoTo.length > 0
   }
   let prior = full.localQuality
-  if (!prior || prior.revision !== LOCAL_QUALITY_REVISION) {
+  // A check made on a different card list (a question lost or added since) cannot be patched one card at a time.
+  const countMoved = Number.isFinite(Number(prior?.questionCount)) && Number(prior.questionCount) !== questions.length
+  if (!prior || prior.revision !== LOCAL_QUALITY_REVISION || countMoved) {
     prior = localOfficialPyqQualityCheck({ ...full, preparedText: paperOcr })
     const failed = new Set(prior.failedGoTo)
     questions.forEach((q, i) => {

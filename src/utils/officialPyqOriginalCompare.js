@@ -16,6 +16,7 @@ import {
 } from './officialPyqPendingStore.js'
 import { numberingPrintedInOcr, subjectLocalNumbers } from './officialPyqAdminFacts.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
+import { officialPyqCompareCardKey } from './officialPyqCompareFreshness.js'
 import {
   formatOfficialPyqAnswerKey,
   notifyOfficialPyqCardChanged,
@@ -403,8 +404,9 @@ export async function compareOfficialPyqCardRemote(paperId, index, stored, { sig
  * Store a compare result on the card and refresh the list status.
  * Only touches `originalCompare` — question text stays as it is.
  * @param {string} paperId @param {number} index @param {any} result
+ * @param {any} [comparedCard] the card as it was sent (defaults to the stored card)
  */
-export function saveOfficialPyqCompareResult(paperId, index, result) {
+export function saveOfficialPyqCompareResult(paperId, index, result, comparedCard) {
   const paper = getOfficialPyqPendingPaper(paperId)
   if (!paper || String(paper.status) !== 'pending_review') return null
   const questions = Array.isArray(paper.questions) ? paper.questions.slice() : []
@@ -433,6 +435,7 @@ export function saveOfficialPyqCompareResult(paperId, index, result) {
       error: result?.error ? String(result.error) : undefined,
       checkedAt: Date.now(),
       model: String(result?.model ?? 'gemini-3.7-flash'),
+      cardKey: officialPyqCompareCardKey(comparedCard ?? card),
     },
   }
   const saved = updateOfficialPyqPendingPaper(paper.id, { questions })
@@ -450,7 +453,7 @@ export async function compareOneOfficialPyqCard(paperId, index, opts = {}) {
   if (!card || isOfficialPyqPlaceholder(card)) return { ok: false, error: 'No question on this card.' }
   try {
     const result = await compareOfficialPyqCardRemote(paperId, index, card, opts)
-    const saved = saveOfficialPyqCompareResult(paperId, index, result)
+    const saved = saveOfficialPyqCompareResult(paperId, index, result, card)
     return { ok: true, result, card: saved?.questions?.[index] ?? null }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
@@ -562,7 +565,7 @@ export async function compareWholeOfficialPyqPaper(paperId, { signal, onProgress
       if (err instanceof CompareStopError) return { ok: false, error: err.message, code: err.code, tally, count }
       result = { verdict: 'error', error: err instanceof Error ? err.message : 'Compare failed.' }
     }
-    saveOfficialPyqCompareResult(paperId, index, result)
+    saveOfficialPyqCompareResult(paperId, index, result, fresh)
     if (result.verdict === 'matches') tally.matches += 1
     else if (result.verdict === 'error') {
       tally.error += 1

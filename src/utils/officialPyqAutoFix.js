@@ -26,6 +26,7 @@ import {
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
 import { mathDrawFailure } from './mathDrawCheck.js'
 import { reviewOfficialPyqCards } from './officialPyqUnifiedCheck.js'
+import { officialPyqCountRepairNeeded, persistOfficialPyqQualityRun } from './officialPyqLocalQuality.js'
 
 export const OFFICIAL_PYQ_AUTO_FIX_SOURCE = 'auto_compare'
 /** Runs that may retry a card after a timeout or network failure. */
@@ -165,14 +166,30 @@ function markAttempt(paperId, index, signatures, info) {
  */
 export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
   const { signal, onProgress, max = OFFICIAL_PYQ_AUTO_FIX_MAX, compare = compareOfficialPyqCardRemote } = opts
-  const paper = getOfficialPyqPendingPaper(paperId)
+  let paper = getOfficialPyqPendingPaper(paperId)
   if (!paper) return { ok: false, error: 'Paper not found.' }
   if (String(paper.status) !== 'pending_review') {
     return { ok: false, error: 'Auto-fix runs only on a pending paper. Published questions stay locked.' }
   }
+  /** @type {{ from: number, to: number, expected: number } | null} */
+  let rebuilt = null
+  const expected = officialPyqCountRepairNeeded(paper)
+  if (expected) {
+    // Missing or split questions shift every later card, so Compare would judge the wrong question.
+    const from = paper.questions?.length ?? 0
+    onProgress?.(0, 1, `Auto-fix · Rebuilding the question list from the scan (${from} of ${expected})`)
+    try {
+      persistOfficialPyqQualityRun(paper)
+    } catch {
+      /* the count line stays on the paper */
+    }
+    paper = getOfficialPyqPendingPaper(paperId) || paper
+    rebuilt = { from, to: paper.questions?.length ?? 0, expected }
+  }
   const ocr = getOfficialPyqPendingOcrText(paperId) || String(paper.preparedText ?? '')
   const out = {
     ok: true,
+    rebuilt,
     fixed: /** @type {number[]} */ ([]),
     stillFlagged: /** @type {number[]} */ ([]),
     needsAdmin: /** @type {{ goTo: number, reason: string }[]} */ ([]),
@@ -206,7 +223,7 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
       if (err?.code) return { ...out, ok: false, error: err.message || 'Compare stopped.' }
       result = { verdict: 'error', error: err instanceof Error ? err.message : 'Compare failed.' }
     }
-    const saved = saveOfficialPyqCompareResult(paperId, index, result)
+    const saved = saveOfficialPyqCompareResult(paperId, index, result, card)
     const compared = saved?.questions?.[index]?.originalCompare
     const verdict = String(result?.verdict ?? 'error')
     const note = (reason) => {

@@ -1,4 +1,4 @@
-﻿"""Mirror of src/utils/questionFamily.js parent/child exclusion."""
+"""Mirror of src/utils/questionFamily.js parent/child exclusion."""
 
 from __future__ import annotations
 

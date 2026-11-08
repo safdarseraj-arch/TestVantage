@@ -1,0 +1,10 @@
+---
+description: All files must be UTF-8 without BOM (no UTF-16).
+alwaysApply: true
+---
+# File encoding
+- Every text/code file is UTF-8 without BOM. UTF-16 is never needed in this project; Node/Vite cannot read it.
+- After creating or bulk-editing files, run `npm run check:utf8 -- --fix` in `TestVantage/onlinetest` (it lists and repairs UTF-16 / BOM files). `test:upload-gate` runs it first automatically.
+- Never write files with PowerShell `>` / `>>` redirection, `Out-File`, `Set-Content` or `Add-Content` (Windows PowerShell 5.1 writes UTF-16 or a BOM). Use the editor tools, Node `fs.writeFileSync(file, text, 'utf8')`, or `[System.IO.File]::WriteAllText($path, $text, (New-Object System.Text.UTF8Encoding $false))`.
+- To save command output to a file, use `cmd /c "npm run build > build-log.txt 2>&1"` or pipe through Node, not PowerShell redirection.
+- Exception: a `.ps1` file that contains non-ASCII characters keeps a UTF-8 BOM (PowerShell 5.1 needs it); `check:utf8` already allows that.

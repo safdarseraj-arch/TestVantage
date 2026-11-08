@@ -1,5 +1,6 @@
 import { formatMatrixCorrectAnswer, formatMatrixUserAnswer } from './matrixMatch.js'
 import { passageQuestionUsesNumerical } from './passageSubAnswer.js'
+import { formatNumericChoice, numericalAlternativesOf } from './answerAlternatives.js'
 
 /** @param {import('../data/tests').Question} q @param {unknown} answer */
 export function formatUserAnswer(q, answer) {
@@ -45,6 +46,12 @@ export function formatUserAnswer(q, answer) {
 /** @param {import('../data/tests').Question} q */
 export function formatCorrectAnswer(q) {
   const type = q.questionType ?? 'single_correct'
+  if (q.bonusMarksToAll === true) return 'Bonus — full marks to all'
+  const alternatives = numericalAlternativesOf(q)
+  if (alternatives.length && (q.correctNumerical != null || q.correctInteger != null)) {
+    const main = { value: Number(q.correctNumerical ?? q.correctInteger), tolerance: q.numericalTolerance }
+    return [main, ...alternatives].map(formatNumericChoice).join(' or ')
+  }
 
   switch (type) {
     case 'passage_integer':

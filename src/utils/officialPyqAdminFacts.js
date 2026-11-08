@@ -12,6 +12,8 @@ import {
   MATRIX_GRID_FACT_TYPE,
   withFactType,
 } from './matrixGridPyq.js'
+import { stripHindiOcr } from './stripHindiOcr.js'
+import { labelNumberedQuestions } from './numberedQuestionMarkers.js'
 
 export const ADMIN_FACTS_VERSION = 1
 
@@ -290,7 +292,7 @@ function questionsPerSubject(admin) {
  * @param {number} perSubject
  */
 export function numberingPrintedInOcr(ocr, perSubject) {
-  const src = String(ocr ?? '')
+  const src = labelNumberedQuestions(stripHindiOcr(ocr))
   if (!(perSubject > 0) || !src) return ''
   const nums = allMatches(ANY_Q_MARKER_RE, src).map(({ index, end }) => Number(src.slice(index, end).match(/(\d{1,3})\s*\]?$/)?.[1]))
   const seen = nums.filter((n) => n > 0)

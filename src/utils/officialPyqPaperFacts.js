@@ -5,6 +5,7 @@
 
 import { cleanOfficialPyqPassageBody } from './passage.js'
 import { MATRIX_GRID_FACT_TYPE, isMatrixGridCard, matrixGridSectionFacts, withFactType } from './matrixGridPyq.js'
+import { stripHindiOcr } from './stripHindiOcr.js'
 
 const WORD = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -55,13 +56,14 @@ function sectionType(window) {
  * @param {unknown} raw
  */
 export function buildPaperFacts(raw) {
-  const text = fixZeroInCountWords(String(raw ?? '').replace(/\r\n/g, '\n'))
+  const text = fixZeroInCountWords(stripHindiOcr(raw).replace(/\r\n/g, '\n'))
   const sections = []
   const notes = []
   // 2026: "This section contains TWO (02) questions corresponding to each question stem" is the
   // per-stem count of the section above, not a new section.
+  // 2014: "This section contains 10 multiple choice type questions".
   const re =
-    /This section contains\s+([A-Za-z]+|\d+)\s*(?:\(\s*0*(\d+)\s*\)\s*)?(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)\b(?!\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)/gi
+    /This section contains\s+([A-Za-z]+|\d+)\s*(?:\(\s*0*(\d+)\s*\)\s*)?(?:(?:multiple\s+choice|integer(?:\s+answer)?|numerical(?:\s+value)?|single\s+correct)\s+(?:type\s+)?)?(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)\b(?!\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)/gi
   let m
   let subject = ''
   let sawHeading = false
@@ -92,7 +94,7 @@ export function buildPaperFacts(raw) {
     const stop = ahead
       .slice(20)
       .search(
-        /This section contains\s+(?:[A-Za-z]+|\d+)\s*(?:\(\s*0*\d+\s*\)\s*)?(?:question(?!s?\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)|paragraph|matching list|list[-\s]match)|\bSECTION\s*[-–]?\s*\d/i,
+        /This section contains\s+(?:[A-Za-z]+|\d+)\s*(?:\(\s*0*\d+\s*\)\s*)?(?:(?:multiple\s+choice|integer(?:\s+answer)?|numerical(?:\s+value)?|single\s+correct)\s+(?:type\s+)?)?(?:question(?!s?\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)|paragraph|matching list|list[-\s]match)|\bSECTION\s*[-–]?\s*\d/i,
       )
     const window = stop >= 0 ? ahead.slice(0, stop + 20) : ahead
     let count = 0
@@ -139,7 +141,17 @@ export function buildPaperFacts(raw) {
   if (sawHeading && headings.size < 3 && sections.length >= 6) {
     notes.push('OCR is missing a PHYSICS, CHEMISTRY, or MATHEMATICS part heading. Those questions are not tagged.')
   }
-  const known = sections.length > 0 && sections.every((s) => s.count > 0 && s.type)
+  // Every subject of a sitting prints the same sections; a subject with fewer means the scan
+  // dropped a "This section contains …" line (2014 P1 lost Chemistry and Maths Section 2).
+  const perSubject = new Map()
+  for (const s of sections) if (s.subject) perSubject.set(s.subject, (perSubject.get(s.subject) || 0) + 1)
+  const uneven = perSubject.size >= 2 && sections.every((s) => s.subject) && new Set(perSubject.values()).size > 1
+  if (uneven) {
+    notes.push(
+      `OCR shows ${[...perSubject].map(([sub, n]) => `${n} section(s) for ${sub}`).join(', ')}. A section instruction is missing, so the facts card is unknown.`,
+    )
+  }
+  const known = !uneven && sections.length > 0 && sections.every((s) => s.count > 0 && s.type)
   const expectedQuestionCount = known ? sections.reduce((n, s) => n + s.count, 0) : null
   return {
     known,

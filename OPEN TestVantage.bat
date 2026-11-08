@@ -1,6 +1,6 @@
 @echo off
 
-title TestVantage — open app
+title TestVantage - open app
 
 cd /d "%~dp0"
 

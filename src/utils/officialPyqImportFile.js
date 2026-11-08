@@ -17,6 +17,7 @@ import {
   questionsFromOfficialPyqExtract,
   repairGeminiPyqBankItem,
 } from './pyqGeminiExtract.js'
+import { ocrIsHindiOnly } from './stripHindiOcr.js'
 
 function isSupportedOfficialPyqUpload(file) {
   const name = String(file?.name || '').toLowerCase()
@@ -102,6 +103,9 @@ export async function importFileToPending(file, meta, io = {}) {
       }
     })
     const min = pyqExtractLowCountThreshold(meta.exam)
+    if (ocrIsHindiOnly(visionText || preparedText || pdfText)) {
+      throw new Error('This PDF is in Hindi only. Nothing was saved. Upload the English (or English + Hindi) paper.')
+    }
     if (!questions.length && preparedText.length < 80) {
       throw new Error(
         built.rejected[0]

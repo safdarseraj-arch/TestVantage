@@ -6,6 +6,7 @@
  */
 
 import { isMatrixGridCard, parseMatrixGridAnswer } from './matrixGridPyq.js'
+import { numericChoiceFields, parseNumericAnswer, parseNumericAnswerChoices } from './answerAlternatives.js'
 
 // Two boxes can share a line ("Ans for Q.3: (D) Ans for Q.4: (A)"), and a box can accept
 // either of two answers ("Ans for Q.14: \{(C)\} or \{(C) and (D)\}") — both 2017 P2.
@@ -24,8 +25,8 @@ export function readPrintedAnswerKey(raw) {
   for (const m of text.matchAll(ENTRY_RE)) {
     const n = Number(m[1])
     const value = String(m[2] ?? '').trim()
-    // Either of two answers scores: no single key to put on the card.
-    if (/\\\{|\bor\b/i.test(value)) continue
+    // Either of two option sets scores: no single key to put on the card. Numbers "a or b" are kept.
+    if (/\\\{/.test(value) || (/\bor\b/i.test(value) && !parseNumericAnswerChoices(value))) continue
     if (n > 0 && value && !key.has(n)) key.set(n, value)
   }
   return key
@@ -125,6 +126,10 @@ export function printedAnswerFields(value, questionType) {
   const v = String(value ?? '').trim()
   const type = String(questionType ?? '')
   if (type === 'integer' || type === 'numerical') {
+    const choices = parseNumericAnswerChoices(v)
+    if (choices) return numericChoiceFields(choices)
+    const band = parseNumericAnswer(v)
+    if (band?.tolerance != null) return { correctNumerical: band.value, numericalTolerance: band.tolerance }
     const num = v.match(/-?\d+(?:\.\d+)?/)
     if (!num) return null
     const n = Number(num[0])
@@ -164,6 +169,8 @@ export function applyPrintedAnswerKey(questions, key) {
     delete next.correctIndices
     delete next.correctInteger
     delete next.correctNumerical
+    delete next.numericalTolerance
+    delete next.numericalAlternatives
     if (!fields) return { ...next, answerSource: 'unknown' }
     return { ...next, ...fields, answerSource: 'from_paper' }
   })

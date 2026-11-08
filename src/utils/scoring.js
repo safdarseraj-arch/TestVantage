@@ -9,6 +9,7 @@ import { matrixAnswersEqual } from './matrixMatch.js'
 import { gridFieldsOf, isMatrixGridCard, scoreMatrixGridRows } from './matrixGridPyq.js'
 import { DEFAULT_MSQ_MARKING, scoreMsqAnswer } from './msqMarking.js'
 import { passageQuestionUsesNumerical } from './passageSubAnswer.js'
+import { numericAnswerMatches } from './answerAlternatives.js'
 
 /**
  * @param {import('../data/tests').Question} q
@@ -29,6 +30,8 @@ function getMarking(q, pattern) {
  * @returns {{ grade: 'correct' | 'partial' | 'wrong' | 'unattempted', marks: number }}
  */
 function gradeQuestion(q, answer, pattern) {
+  /** The paper printed "MARKS TO ALL": every candidate gets full marks, answered or not. */
+  if (q.bonusMarksToAll === true) return { grade: 'correct', marks: getMaxMarks(q, pattern) }
   if (!isAnswerAttempted(answer, q)) {
     const m = getMarking(q, pattern)
     return { grade: 'unattempted', marks: m.unattempted ?? 0 }
@@ -42,14 +45,13 @@ function gradeQuestion(q, answer, pattern) {
       if (passageQuestionUsesNumerical(q)) {
         const n = parseFloat(String(answer))
         if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
-        const tol = q.numericalTolerance ?? 0.01
-        return Math.abs(n - (q.correctNumerical ?? 0)) <= tol + 1e-9
+        return numericAnswerMatches({ ...q, correctNumerical: q.correctNumerical ?? 0, numericalTolerance: q.numericalTolerance ?? 0.01 }, n)
           ? { grade: 'correct', marks: m.correct }
           : { grade: 'wrong', marks: m.wrong }
       }
       const n = parseFloat(String(answer))
       if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
-      return n === q.correctInteger
+      return n === q.correctInteger || numericAnswerMatches({ numericalAlternatives: q.numericalAlternatives }, n, 0)
         ? { grade: 'correct', marks: m.correct }
         : { grade: 'wrong', marks: m.wrong }
     }
@@ -73,7 +75,7 @@ function gradeQuestion(q, answer, pattern) {
       const n = parseInt(String(answer), 10)
       const m = getMarking(q, pattern)
       if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
-      return n === q.correctInteger
+      return n === q.correctInteger || numericAnswerMatches({ numericalAlternatives: q.numericalAlternatives }, n, 0)
         ? { grade: 'correct', marks: m.correct }
         : { grade: 'wrong', marks: m.wrong }
     }
@@ -82,9 +84,7 @@ function gradeQuestion(q, answer, pattern) {
       const n = parseFloat(String(answer))
       const m = getMarking(q, pattern)
       if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
-      /** Band edges: 0.33 - 0.30 is a hair above 0.03 in floating point. */
-      const tol = q.numericalTolerance ?? 0.01
-      return Math.abs(n - (q.correctNumerical ?? 0)) <= tol + 1e-9
+      return numericAnswerMatches({ ...q, correctNumerical: q.correctNumerical ?? 0, numericalTolerance: q.numericalTolerance ?? 0.01 }, n)
         ? { grade: 'correct', marks: m.correct }
         : { grade: 'wrong', marks: m.wrong }
     }

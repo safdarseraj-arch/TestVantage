@@ -35,7 +35,10 @@ import {
 import { stripTrailingPyqSectionHeader } from './bulkExtractClean.js'
 import { shapeOfficialPyqDrafts } from './officialPyqPaperFacts.js'
 import { stripAwardedToAllNotes, stripPrintedAnswerBoxes } from './printedAnswerKey.js'
+import { BONUS_MARKS_TO_ALL_RE } from './answerAlternatives.js'
 import { applyMatrixGridQuestions } from './matrixGridPyq.js'
+import { ocrIsHindiOnly, stripHindiOcr } from './stripHindiOcr.js'
+import { labelNumberedQuestions } from './numberedQuestionMarkers.js'
 
 function guessQuestionType(text, optionsFound) {
   if ((optionsFound ?? 0) >= 2) return 'single_correct'
@@ -118,7 +121,7 @@ const NEXT_FULL_STEM_RE =
 export function sanitizeMathpixOcrText(raw) {
   return restoreGluedQuestionNumbers(
     preCleanMathpixOcr(
-      stripPrintedAnswerBoxes(String(raw ?? ''))
+      stripPrintedAnswerBoxes(labelNumberedQuestions(stripHindiOcr(raw)))
         // A \begin{table} left before the next group's caption sticks to the last option.
         .replace(/\\(?:begin|end)\{table\}|\\captionsetup\{[^{}]*\}/g, '')
         // A page's running head "\section*{PHYSICS}" otherwise sticks to the last option of the page before.
@@ -256,7 +259,7 @@ function collectParagraphStarts(text) {
 
 /** @param {unknown} raw */
 export function countMathpixQuestionMarkers(raw) {
-  return collectMarkerStarts(restoreGluedQuestionNumbers(stripAwardedToAllNotes(raw))).length
+  return collectMarkerStarts(restoreGluedQuestionNumbers(stripAwardedToAllNotes(labelNumberedQuestions(stripHindiOcr(raw))))).length
 }
 
 /** "[A] text" in the A slot: the card already draws the letter. "(A) only" is the option's own words. */
@@ -271,9 +274,13 @@ export function stripOwnOptionLabel(opt, index) {
   return rest
 }
 
+/** "Answer: A", "\section*{Answer: (A), (B)}", "Answer (C) and (D)" (no colon, 2014). */
+const PRINTED_KEY_LINE_RE = /^\s*(?:\\section\*?\{\s*)?(?:Ans(?:wer)?s?|Key)\s*(?:[:.\-=]|\(\s*[A-D]\s*\))/i
+
 function stripKeyLeak(opt) {
   return String(opt ?? '')
     .replace(/\(\s*key\s*\)/gi, '')
+    .replace(/\s+(?:\\section\*?\{\s*)?Answer\s*(?:[:\-=]\s*)?\(\s*[A-D]\s*\)(?:\s*(?:,|and|&|or)\s*\(\s*[A-D]\s*\))*[^\n]*$/i, '')
     .replace(/^\s*&+\s*/g, '')
     .replace(/\s*&+\s*$/g, '')
     .replace(/\$\$\s*\\?\s*\\hline\s*\$*/gi, ' ')
@@ -1183,8 +1190,9 @@ export function healPaperItemCards(questions) {
 
 /** True when OCR is Mathpix LaTeX/MMD, not a broken PDF text layer. */
 export function looksLikeMathpixLatexPaper(raw) {
-  const t = String(raw ?? '')
-  const itemQ = /\\item\s*\[\s*Q/i.test(t)
+  const plain = String(raw ?? '')
+  const t = labelNumberedQuestions(plain)
+  const itemQ = /\\item\s*\[\s*Q/i.test(t) || t !== plain
   if (itemQ && countMathpixQuestionMarkers(t) >= 2) return true
   if (itemQ && /\\begin\{/.test(t)) return true
   const latexBits = (t.match(/\\(?:frac|int|lim|begin|mathrm|mathbf)\b/g) || []).length
@@ -1484,7 +1492,7 @@ function blockToMathpixDraft(block, i, attached, paper) {
     /** "Answer: A" printed under the option table left the stem with the table (2025 P2 Q23). */
     const keyLines = body
       .split('\n')
-      .filter((line) => /^\s*(?:Ans(?:wer)?s?|Key)\s*[:.\-=]/i.test(line))
+      .filter((line) => PRINTED_KEY_LINE_RE.test(line) || BONUS_MARKS_TO_ALL_RE.test(line))
       .join('\n')
     if (keyLines) printed = detectAnswerFromPaper(keyLines)
   }
@@ -1514,6 +1522,8 @@ function blockToMathpixDraft(block, i, attached, paper) {
           correctInteger: printed.correctInteger,
           correctNumerical: printed.correctNumerical,
           ...(printed.numericalTolerance != null ? { numericalTolerance: printed.numericalTolerance } : {}),
+          ...(printed.numericalAlternatives?.length ? { numericalAlternatives: printed.numericalAlternatives } : {}),
+          ...(printed.bonusMarksToAll ? { bonusMarksToAll: true } : {}),
           answerSource: 'from_paper',
           ...(printed.solution
             ? { solution: printed.solution, solutionSource: printed.solutionSource || 'from_paper' }
@@ -1770,7 +1780,8 @@ export function mathpixSplitToBankDrafts(raw, opts = {}) {
  * @param {{ paperMeta?: Record<string, unknown>, sectionMap?: { ranges?: unknown[], passageRanges?: unknown[] } }} [opts]
  */
 export function paperItemsFromMathpixOcr(raw, opts = {}) {
-  const text = restoreDroppedMathpixMatchPieces(raw)
+  if (ocrIsHindiOnly(raw)) return []
+  const text = restoreDroppedMathpixMatchPieces(labelNumberedQuestions(stripHindiOcr(raw)))
   const sectionMap = opts.sectionMap && Array.isArray(opts.sectionMap.ranges)
     ? opts.sectionMap
     : parsePaperSectionMap(text)

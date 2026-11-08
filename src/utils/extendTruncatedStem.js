@@ -17,6 +17,7 @@ import { findFirstOptionsBlockStart } from './mcqOptionMarkers.js'
 import { isMatrixGridCard, keepMatrixGridCards } from './matrixGridPyq.js'
 import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
 import { extractLatexItemizeMcq, extractLatexTabularMcq } from './mathpixQuestionSplit.js'
+import { stripHindiOcr } from './stripHindiOcr.js'
 import { hasOriginalPageCrop, isOriginalCropUrl, restoreMissingOptionGridGraphs } from './mathpixMedia.js'
 import { repairScanStructureCodes } from './smilesDisplay.js'
 import {
@@ -610,10 +611,13 @@ function stemWantsChemistryProducts(text) {
 }
 
 /** Physics match lists must not keep Q50-style SMILES leftovers. */
-function stripChemistryLeakFromPhysicsStem(text) {
+function stripChemistryLeakFromPhysicsStem(text, subject = '') {
   const t = String(text ?? '')
   if (!/<smiles>/i.test(t)) return t
   if (stemWantsChemistryProducts(t)) return t
+  // A chemistry stem's own structure ("the peptide shown below", 2014 P1 Q36) is the question.
+  if (subject === 'chemistry') return t
+  if (/(?:shown|given|drawn)\s+below|following\s+(?:compound|structure|molecule|peptide)/i.test(t.split(/<smiles>/i)[0])) return t
   if (/\(\s*[PQRS]\s*\)\s*<smiles>/i.test(t)) return t
   return t
     .replace(/\n?\(\s*[1-5]\s*\)\s*\n\s*<smiles>[\s\S]*?<\/smiles>/gi, '')
@@ -2175,7 +2179,7 @@ export function healUploadQuestionCard(q, source, map) {
   text = repairSmashedWeightSubscripts(text, src)
   const printedN = printedQuestionNumber(q)
   text = dropStolenFigures(text, src, printedN, map)
-  text = stripChemistryLeakFromPhysicsStem(text)
+  text = stripChemistryLeakFromPhysicsStem(text, String(q.subject || ''))
   text = restoreMissingListIFromSource(text, q.options, src)
   text = stripForeignListTwo(text)
   {
@@ -2424,7 +2428,8 @@ function isDisplayLeftoverCard(q) {
   if (isLeftoverMatchFragment(q)) return true
   if (isJunkOfficialPyqRow(q)) return true
   const tornTable = /\\end\{tabular\}/i.test(t) && !/\\begin\{tabular\}/i.test(t)
-  const midSentence = /^[a-z]/.test(t) && !/^(?:sin|cos|tan|log|lim)\b/.test(t)
+  // A full A–D set of its own means a real question whose first letter OCR lost ("he reactivity").
+  const midSentence = /^[a-z]/.test(t) && !/^(?:sin|cos|tan|log|lim)\b/.test(t) && optionCount(q) < 4
   if (looksLikeOrphanFragment(t) && (optionCount(q) < 2 || tornTable || midSentence)) return true
   return false
 }
@@ -2839,7 +2844,7 @@ export function officialPyqPaperSourceText(paper) {
   if (!paper || typeof paper !== 'object') return ''
   const notes = String(paper.notes ?? '')
   const prepared = String(paper.preparedText ?? '')
-  const stored = `${notes}\n\n${prepared}`.trim()
+  const stored = stripHindiOcr(`${notes}\n\n${prepared}`.trim())
   // Stored OCR / notes are the paper. Do not concatenate every other card —
   // that steals chemistry figures into a physics List-II and can freeze Q17
   // while scanning 51 figure-heavy stems (Approve shows 0 stored OCR chars).

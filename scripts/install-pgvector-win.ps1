@@ -1,4 +1,4 @@
-﻿# Requires Administrator. Copies pgvector bundle into PostgreSQL 17.
+# Requires Administrator. Copies pgvector bundle into PostgreSQL 17.
 $ErrorActionPreference = 'Stop'
 $pg = 'C:\Program Files\PostgreSQL\17'
 $src = Join-Path $PSScriptRoot 'vendor\pgvector-pg17'

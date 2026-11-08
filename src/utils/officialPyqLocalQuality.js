@@ -13,7 +13,6 @@ import {
   getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
   listOfficialPyqPendingSummaries,
-  officialPyqQuestionsArePublishedLocked,
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
 import { peelOfficialPyqCardForDisplay } from './passage.js'
@@ -31,12 +30,16 @@ import {
 } from './labelledFigureOptions.js'
 import { isMatrixGridCard } from './matrixGridPyq.js'
 import { stripAnswerBoxTables } from './printedAnswerKey.js'
+import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
+const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
+const BARE_FRACTION_RE = /^\s*(-?\d{1,4})\s*\/\s*(\d{1,4})\s*$/
 
 /**
  * Page leftovers saved on a card: the answer-letter / empty answer-box table under a page,
- * or the next page's running head ("PHYSICS") glued to the last option.
+ * the next page's running head ("PHYSICS") or list tags glued to the last option,
+ * or a last option left as "7/3" while its siblings were typeset as fractions.
  * @template {Record<string, any>} T
  * @param {T} q
  * @returns {T}
@@ -52,7 +55,9 @@ function withoutPageLeftovers(q) {
   if (Array.isArray(q?.options)) {
     const options = q.options.map((opt) => {
       const s = String(opt ?? '')
-      const cleaned = trimOptionLetterTail(s).replace(RUNNING_HEAD_TAIL_RE, '')
+      const cleaned = trimOptionLetterTail(s).replace(LIST_TAIL_RE, '').replace(RUNNING_HEAD_TAIL_RE, '')
+      const frac = cleaned.match(BARE_FRACTION_RE)
+      if (frac) return `$\\frac{${frac[1]}}{${frac[2]}}$`
       return cleaned.trim() ? cleaned : s
     })
     if (options.some((opt, i) => opt !== String(q.options[i] ?? ''))) next = { ...next, options }
@@ -60,20 +65,37 @@ function withoutPageLeftovers(q) {
   return next
 }
 
+/** A saved text option that the screen clean-up turns into nothing — students would see no option. */
+function optionBlankOnScreen(q) {
+  const options = Array.isArray(q?.options) ? q.options : []
+  const images = Array.isArray(q?.optionImages) ? q.optionImages : []
+  return options.some((opt, i) => {
+    const s = String(opt ?? '').trim()
+    if (!s || images[i] || /\\includegraphics|!\[[^\]]*\]\(|<smiles>/i.test(s)) return false
+    try {
+      return !String(prepareTextForMathTextDisplay(s) ?? '').trim()
+    } catch {
+      return false
+    }
+  })
+}
+
 /**
  * The preview shows the saved card, so saved junk fails even when the cleaned view looks right:
- * a "," / "and" option, page leftovers, or the option pictures repeated in the stem.
+ * a "," / "and" option, page leftovers, an option that shows blank, or the option pictures
+ * repeated in the stem.
  */
 function hasScrapOption(q) {
   const options = Array.isArray(q?.options) ? q.options : []
   return (
     options.some((opt) => String(opt ?? '').trim() && SCRAP_OPTION_RE.test(String(opt))) ||
     withoutPageLeftovers(q) !== q ||
+    optionBlankOnScreen(q) ||
     Boolean(stemRepeatsOptionPictures(q))
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 8
+export const LOCAL_QUALITY_REVISION = 12
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -202,7 +224,11 @@ export function localOfficialPyqQualityCheck(paper) {
   /** @type {number[]} */
   const failedGoTo = []
   questions.forEach((q, index) => {
-    if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
+    if (!q || isOfficialPyqPlaceholder(q)) return
+    if (q.adminApproved === true) {
+      if (!isMatrixGridCard(q) && hasScrapOption(q)) failedGoTo.push(index + 1)
+      return
+    }
     if (isMatrixGridCard(q)) {
       if (gridCardFailsLocalQuality(q)) failedGoTo.push(index + 1)
       return
@@ -407,6 +433,18 @@ function adoptKnownFixes(q, shown, ocr) {
 }
 
 /**
+ * Fixes that are never a judgement call, so they also apply to a card the admin approved:
+ * page leftovers, a bare "7/3" option, and option pictures repeated in the stem.
+ */
+function adoptLeftoverFixes(q) {
+  if (isMatrixGridCard(q)) return q
+  let next = withoutPageLeftovers(q)
+  const stem = stemRepeatsOptionPictures(next)
+  if (stem) next = { ...next, text: stem }
+  return next
+}
+
+/**
  * Check, repair what the stored OCR can support, and check again.
  * One clean per card. Later passes touch only cards that failed. Stops at 4
  * passes, or as soon as a pass finds nothing left to fix.
@@ -432,7 +470,8 @@ export function repairOfficialPyqUntilQuality(paper) {
   function prepare(index) {
     if (cleaned.has(index)) return shown[index]
     const view = cleanCard(questions[index], ocr)
-    const adopted = questions[index]?.adminApproved === true ? questions[index] : adoptKnownFixes(questions[index], view, ocr)
+    const adopted =
+      questions[index]?.adminApproved === true ? adoptLeftoverFixes(questions[index]) : adoptKnownFixes(questions[index], view, ocr)
     if (adopted !== questions[index]) {
       questions[index] = adopted
       questionsChanged = true
@@ -448,7 +487,13 @@ export function repairOfficialPyqUntilQuality(paper) {
     /** @type {number[]} */
     const failed = []
     questions.forEach((q, index) => {
-      if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
+      if (!q || isOfficialPyqPlaceholder(q)) return
+      if (q.adminApproved === true) {
+        if (isMatrixGridCard(q)) return
+        prepare(index)
+        if (hasScrapOption(questions[index])) failed.push(index + 1)
+        return
+      }
       if (isMatrixGridCard(q)) {
         if (gridCardFailsLocalQuality(q)) failed.push(index + 1)
         return
@@ -481,6 +526,7 @@ export function repairOfficialPyqUntilQuality(paper) {
     let changed = false
     for (const go of failedGoTo) {
       const index = go - 1
+      if (questions[index]?.adminApproved === true) continue
       const repaired = repairFailingCard(questions[index], ocr)
       if (repaired !== questions[index]) {
         questions[index] = repaired
@@ -514,15 +560,27 @@ export function repairOfficialPyqUntilQuality(paper) {
 
 /**
  * Run the same local check the red banner uses, then save the list mark.
- * Stored OCR only. Does not publish. Does not change a published paper.
+ * Stored OCR only. Does not publish or change status.
+ * Pending: every auto-fix is saved. Approved: only cards that failed the check change.
+ * Published: checked and flagged only; students' questions are never rewritten here.
  * Auto-fix stops at 4 passes, or as soon as a pass finds nothing to fix.
  * @param {object | null | undefined} paper
  */
 export function persistOfficialPyqQualityRun(paper) {
   if (!paper?.id) return null
   const full = getOfficialPyqPendingPaper(paper.id) || paper
-  if (officialPyqQuestionsArePublishedLocked(full)) return full
   const ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
+  const status = String(full?.status ?? '')
+  if (status === 'published') {
+    let quality
+    try {
+      quality = localOfficialPyqQualityCheck({ ...full, preparedText: ocr || full?.preparedText })
+    } catch {
+      return full
+    }
+    const saved = updateOfficialPyqPendingPaper(full.id, { localQuality: quality })
+    return saved ? { ...saved, questionsChanged: false } : null
+  }
   let repaired
   try {
     repaired = repairOfficialPyqUntilQuality({ ...full, preparedText: ocr || full?.preparedText })
@@ -538,34 +596,51 @@ export function persistOfficialPyqQualityRun(paper) {
     }
     return updateOfficialPyqPendingPaper(full.id, { localQuality: quality })
   }
+  const stored = Array.isArray(full?.questions) ? full.questions : []
+  /** @type {Record<string, any>} */
   const updates = { localQuality: repaired.quality }
+  let questionsChanged = false
   if (repaired.questionsChanged && Array.isArray(repaired.paper?.questions)) {
-    updates.questions = repaired.paper.questions
+    let next = repaired.paper.questions
+    if (status === 'approved') {
+      const before = localOfficialPyqQualityCheck({ ...full, preparedText: ocr || full?.preparedText })
+      const failing = new Set(before.failedGoTo.map((n) => n - 1))
+      next = next.map((q, i) => (failing.has(i) ? q : stored[i] ?? q))
+      updates.allowPublishedQuestionWrite = true
+    }
+    if (next.length !== stored.length || next.some((q, i) => JSON.stringify(q) !== JSON.stringify(stored[i]))) {
+      updates.questions = next
+      /** Leftover fixes also reach cards the admin edited — junk is never an admin choice. */
+      updates.releaseAdminEditIndexes = next
+        .map((q, i) => (stored[i] && hasScrapOption(stored[i]) && !hasScrapOption(q) ? i : -1))
+        .filter((i) => i >= 0)
+      questionsChanged = true
+    }
   }
   const saved = updateOfficialPyqPendingPaper(full.id, updates)
-  return saved ? { ...saved, questionsChanged: repaired.questionsChanged } : null
+  return saved ? { ...saved, questionsChanged } : null
 }
 
 /**
- * Check the next pending paper that does not yet have this revision.
+ * Check the next paper (pending first, then approved and published) that does not yet
+ * have this revision, so a new check rule also reaches papers approved before it existed.
  * Returns 'more' when another paper is still waiting, 'done' when finished.
  */
 const qualitySaveSkipped = new Set()
+const RECHECK_STATUSES = ['pending_review', 'approved', 'published']
+
+function papersWaitingForCheck() {
+  return RECHECK_STATUSES.flatMap((status) => listOfficialPyqPendingSummaries(status)).filter(
+    (paper) => paper?.id && !qualitySaveSkipped.has(paper.id) && !qualityIsCurrent(paper),
+  )
+}
 
 export function checkNextPendingPaper() {
-  const pending = listOfficialPyqPendingSummaries('pending_review')
-  const next = pending.find(
-    (paper) =>
-      paper?.id && !qualitySaveSkipped.has(paper.id) && !qualityIsCurrent(paper),
-  )
+  const next = papersWaitingForCheck()[0]
   if (!next?.id) return { status: 'done', paperId: '', changed: false }
   const saved = persistOfficialPyqQualityRun(next)
-  if (!saved) qualitySaveSkipped.add(next.id)
-  const rest = listOfficialPyqPendingSummaries('pending_review')
-  const waiting = rest.some(
-    (paper) =>
-      paper?.id && !qualitySaveSkipped.has(paper.id) && !qualityIsCurrent(paper),
-  )
+  if (!saved || !qualityIsCurrent(saved)) qualitySaveSkipped.add(next.id)
+  const waiting = papersWaitingForCheck().length > 0
   return {
     status: waiting ? 'more' : 'done',
     paperId: next.id,

@@ -1761,6 +1761,18 @@ test('2015 P1 grids, MSQs and coded-option List-I/II questions pass the approve 
   assert.ok(!approve.errors.some((e) => /missing List-I/.test(e)), approve.errors.join(' | '))
 })
 
+const { fixOcrBraceFractions } = await import('../src/utils/fixOcrMathSymbols.js')
+
+test('2015 P2 Q19: "\\sqrt{45} / 4" in a sentence stays √45 ÷ 4 and draws; scan "{a}/{b}" fractions still repair', () => {
+  const p2 = fs.readFileSync(new URL('./fixtures/jee-advanced-2015-p2-mathpix.txt', import.meta.url), 'utf8')
+  const q19 = paperItemsFromMathpixOcr(p2).find((q) => Number(q.printedNumber) === 19)
+  assert.match(q19.text, /\\sqrt\{45\} \/ 4/)
+  assert.equal(mathDrawFailure(q19.text), '')
+  assert.match(prepareTextForMathTextDisplay(q19.text), /\$n_\{1\}=\\sqrt\{45\} \/ 4\$/)
+  assert.equal(fixOcrBraceFractions('{p^{3}}/{61 m n} and {a+b} / 2'), '$\\frac{p^{3}}{61 m n}$ and $\\frac{a+b}{2}$')
+  assert.equal(fixOcrBraceFractions('$\\sqrt{45} / 4$ and $\\sqrt[3]{8} / 2$'), '$\\sqrt{45} / 4$ and $\\sqrt[3]{8} / 2$')
+})
+
 test('every sample paper: no card keeps page leftovers (running heads, answer tables, empty tables, list/section code, instructions)', () => {
   const dir = new URL('./fixtures/', import.meta.url)
   const papers = fs.readdirSync(dir).filter((f) => /^jee-advanced-.*-mathpix\.txt$/.test(f))
@@ -1781,12 +1793,107 @@ test('every sample paper: no card keeps page leftovers (running heads, answer ta
           /\(\s*[A-D]\s*\)\s+(?:and|or)\s+\(\s*[A-D]\s*\)\s*;/.test(s) && 'answer letters',
           /\\section|\\end\{itemize\}|\\item\b/.test(s) && 'list/section code',
           /Marking scheme|This section contains|darken the bubble/i.test(s) && 'instructions',
+          where.startsWith('option') && !/\\includegraphics|!\[|<smiles>/.test(s) && !String(prepareTextForMathTextDisplay(s) ?? '').trim() && 'blank on screen',
+          where.startsWith('option') && /^\s*-?\d+\s*\/\s*\d+\s*$/.test(s) && 'bare a/b fraction',
         ].filter(Boolean)
         if (found.length) problems.push(`${file} Q${q.printedNumber} ${where}: ${found.join(', ')}`)
       }
     }
   }
   assert.deepEqual(problems, [])
+})
+
+const { parseQuestionText } = await import('../src/utils/parseQuestionText.js')
+const { stripOfficialPyqPaperChrome } = await import('../src/utils/passage.js')
+
+test('2015 P2 Q14: the last option before a page break is "7/3", typeset like A–C and never erased as a page footer', () => {
+  const p2 = fs.readFileSync(new URL('./fixtures/jee-advanced-2015-p2-mathpix.txt', import.meta.url), 'utf8')
+  const q14 = paperItemsFromMathpixOcr(p2).find((q) => Number(q.printedNumber) === 14)
+  assert.deepEqual(q14.options, ['$\\frac{6}{5}$', '$\\frac{5}{3}$', '$\\frac{7}{5}$', '$\\frac{7}{3}$'])
+  const parsed = parseQuestionText('A ratio is\n(A) 6/5\n(B) 5/3\n(C) 7/5\n(D) 7/3\n\\end{itemize}\n\nPHYSICS\n\\begin{itemize}')
+  assert.equal(parsed.options[3], '$\\frac{7}{3}$')
+  for (const opt of ['7/3', '6/5', '15/16']) {
+    assert.equal(prepareTextForMathTextDisplay(opt), opt, `${opt} still shows`)
+    assert.equal(stripOfficialPyqPaperChrome(opt), opt)
+  }
+  assert.equal(stripOfficialPyqPaperChrome('Find x\n8/32\nnext line'), 'Find x\n\nnext line')
+  assert.equal(stripOfficialPyqPaperChrome('stem\n30/32'), 'stem')
+  const stored = { ...q14, options: [...q14.options.slice(0, 3), '7/3'] }
+  const paper = { id: 'p2-2015-test', preparedText: p2, questions: [stored] }
+  assert.deepEqual(localOfficialPyqQualityCheck(paper).failedGoTo, [1], 'saved bare "7/3" is flagged')
+  const repaired = repairOfficialPyqUntilQuality(paper)
+  assert.equal(repaired.paper.questions[0].options[3], '$\\frac{7}{3}$')
+  const blank = { ...q14, options: [...q14.options.slice(0, 3), '\\end{itemize}'] }
+  assert.deepEqual(localOfficialPyqQualityCheck({ ...paper, questions: [blank] }).failedGoTo, [1], 'an option that shows blank is flagged')
+  const approvedCard = { ...stored, adminApproved: true }
+  assert.deepEqual(localOfficialPyqQualityCheck({ ...paper, questions: [approvedCard] }).failedGoTo, [1], 'an admin-approved card with leftovers is still flagged')
+  const fixedApproved = repairOfficialPyqUntilQuality({ ...paper, questions: [approvedCard] })
+  assert.equal(fixedApproved.paper.questions[0].options[3], '$\\frac{7}{3}$')
+  assert.equal(fixedApproved.paper.questions[0].adminApproved, true)
+  assert.ok(!fixedApproved.quality.failedGoTo.includes(1))
+  const pictures = ['A', 'B', 'C', 'D'].map((l, i) => `![](https://cdn.mathpix.com/cropped/x-15.jpg?height=380&width=620&top_left_y=${1464 + 400 * (i >> 1)}&top_left_x=${392 + 770 * (i & 1)})`)
+  const repeated = {
+    questionType: 'single_correct',
+    printedNumber: 19,
+    text: `Among the following, the option representing change in the freezing point is\n${pictures.map((p) => p.replace(/^!\[\]\((.*)\)$/, '\\includegraphics{$1}')).join('\n')}`,
+    options: pictures,
+    adminApproved: true,
+  }
+  const rp = { id: 'p2017-test', preparedText: '', questions: [repeated] }
+  assert.deepEqual(localOfficialPyqQualityCheck(rp).failedGoTo, [1], 'option pictures repeated in an approved stem are flagged (2017 Q19)')
+  assert.doesNotMatch(repairOfficialPyqUntilQuality(rp).paper.questions[0].text, /includegraphics/)
+})
+
+test('section counts: "there will be TWO questions" (2015 P2) and "This section contains TWO (02) questions corresponding to each question stem" (2026 chem) are read, not flagged', () => {
+  const p2 = fs.readFileSync(new URL('./fixtures/jee-advanced-2015-p2-mathpix.txt', import.meta.url), 'utf8')
+  const f2015 = buildPaperFacts(p2)
+  assert.equal(f2015.expectedQuestionCount, 60)
+  assert.deepEqual(f2015.notes, [])
+  const stems = (second) => String.raw`\section*{SECTION 4 (Maximum Marks: 8)}
+\begin{itemize}
+\item[-] This section contains TWO (02) question stems.
+\item[-] ${second}
+\item[-] The answer to each question is a NUMERICAL VALUE.
+\end{itemize}
+\section*{Question Stem for Question Nos. 15 and 16}
+Text`
+  for (const second of ['There are TWO (02) questions corresponding to each question stem.', 'This section contains TWO (02) questions corresponding to each question stem.']) {
+    const f = buildPaperFacts(stems(second))
+    assert.equal(f.expectedQuestionCount, 4, second)
+    assert.equal(f.sections.length, 1, second)
+    assert.ok(!f.notes.some((n) => /how many questions|question type/.test(n)), `${second}: ${f.notes.join(' | ')}`)
+  }
+})
+
+const { kekulizeSmiles } = await import('../src/utils/smilesDisplay.js')
+const SmilesDrawer = (await import('smiles-drawer')).default
+
+test('2015 P2 Q29/Q30: structures draw with alternating double bonds like the paper; every sample code still parses', () => {
+  assert.equal(kekulizeSmiles('Cc1ccc2ccncc2c1'), 'CC1=CC=C2C=CN=CC2=C1')
+  assert.equal(kekulizeSmiles('Cc1ccc2ncccc2c1'), 'CC1=CC=C2N=CC=CC2=C1')
+  assert.equal(kekulizeSmiles('CC(C)(OO)c1ccccc1'), 'CC(C)(OO)C1=CC=CC=C1')
+  assert.equal(kekulizeSmiles('c1ccc2[nH]ccc2c1'), 'C1=CC=C2[NH]C=CC2=C1')
+  assert.equal(kekulizeSmiles('c1ccoc1'), 'C1C=COC=1')
+  assert.equal(kekulizeSmiles('C[n+]1ccccc1'), 'C[N+]1=CC=CC=C1')
+  assert.equal(kekulizeSmiles('CC(=O)O'), 'CC(=O)O')
+  assert.equal(kekulizeSmiles('c1cccc1x'), 'c1cccc1x', 'unreadable code is left alone')
+  const dir = new URL('./fixtures/', import.meta.url)
+  const codes = new Set()
+  for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.txt'))) {
+    for (const m of fs.readFileSync(new URL(f, dir), 'utf8').matchAll(/<smiles>\s*([\s\S]*?)\s*<\/smiles>/gi)) codes.add(m[1].trim())
+  }
+  assert.ok(codes.size >= 50)
+  const broken = []
+  for (const code of codes) {
+    const k = kekulizeSmiles(code)
+    let before = true
+    let after = true
+    SmilesDrawer.parse(code, () => {}, () => { before = false })
+    SmilesDrawer.parse(k, () => {}, () => { after = false })
+    if (before && !after) broken.push(`${code} -> ${k}`)
+    if (before && /[bcnops]/.test(code.replace(/\[[^\]]*\]|Cl|Br/g, '')) && k === code) broken.push(`${code} not converted`)
+  }
+  assert.deepEqual(broken, [])
 })
 if (failed) {
   console.error(`\n${failed} recurrence test(s) failed`)

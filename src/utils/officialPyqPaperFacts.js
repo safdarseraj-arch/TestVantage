@@ -58,8 +58,10 @@ export function buildPaperFacts(raw) {
   const text = fixZeroInCountWords(String(raw ?? '').replace(/\r\n/g, '\n'))
   const sections = []
   const notes = []
+  // 2026: "This section contains TWO (02) questions corresponding to each question stem" is the
+  // per-stem count of the section above, not a new section.
   const re =
-    /This section contains\s+([A-Za-z]+|\d+)\s*(?:\(\s*0*(\d+)\s*\)\s*)?(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)/gi
+    /This section contains\s+([A-Za-z]+|\d+)\s*(?:\(\s*0*(\d+)\s*\)\s*)?(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)\b(?!\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)/gi
   let m
   let subject = ''
   let sawHeading = false
@@ -90,7 +92,7 @@ export function buildPaperFacts(raw) {
     const stop = ahead
       .slice(20)
       .search(
-        /This section contains\s+(?:[A-Za-z]+|\d+)\s*(?:\(\s*0*\d+\s*\)\s*)?(?:question|paragraph|matching list|list[-\s]match)|\bSECTION\s*[-–]?\s*\d/i,
+        /This section contains\s+(?:[A-Za-z]+|\d+)\s*(?:\(\s*0*\d+\s*\)\s*)?(?:question(?!s?\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)|paragraph|matching list|list[-\s]match)|\bSECTION\s*[-–]?\s*\d/i,
       )
     const window = stop >= 0 ? ahead.slice(0, stop + 20) : ahead
     let count = 0
@@ -105,9 +107,9 @@ export function buildPaperFacts(raw) {
         window.match(
           /\beach\b[^.\n]{0,120}?([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*(?:multiple\s+choice\s+)?questions?/i,
         ) ||
-        // 2017: "Based on each paragraph, there are TWO questions" (no "(02)").
+        // 2017: "Based on each paragraph, there are TWO questions" (no "(02)"); 2015: "there will be TWO questions".
         window.match(
-          /\beach\s+(?:paragraph|passage|question\s+stem|stem)\b[^.\n]{0,40}?\bthere\s+(?:are|is)\s+([A-Za-z]+|\d+)()\s+(?:multiple\s+choice\s+)?questions?/i,
+          /\beach\s+(?:paragraph|passage|question\s+stem|stem)\b[^.\n]{0,40}?\bthere\s+(?:are|is|will\s+be)\s+([A-Za-z]+|\d+)()\s+(?:multiple\s+choice\s+)?questions?/i,
         )
       const k = each ? wordNumber(each[1], each[2]) : 0
       count = k ? n * k : 0

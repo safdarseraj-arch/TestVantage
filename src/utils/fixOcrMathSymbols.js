@@ -329,15 +329,16 @@ export function fixOcrBraceFractions(text) {
   if (!text?.trim()) return text
   let out = text
 
-  // Never turn a superscript r^{2}/2 or a subscript m_{1}/m_{2} into m_\frac.
+  // Never turn a superscript r^{2}/2, a subscript m_{1}/m_{2} or a command argument
+  // \sqrt{45} / 4 (√45 ÷ 4) into a fraction.
   out = out.replace(
-    new RegExp(`(?<![_^])\\{${BRACE_GROUP}\\}\\s*\\/\\s*\\{${BRACE_GROUP}\\}`, 'g'),
+    new RegExp(`(?<![_^A-Za-z\\]])\\{${BRACE_GROUP}\\}\\s*\\/\\s*\\{${BRACE_GROUP}\\}`, 'g'),
     (_, num, den) => `$\\frac{${num.trim()}}{${den.trim()}}$`,
   )
 
   out = out.replace(
     new RegExp(
-      `(?<![_^])\\{${BRACE_GROUP}\\}\\s*\\/\\s*([0-9a-zA-Z][0-9a-zA-Z\\s\\\\^_{}+.·]*)`,
+      `(?<![_^A-Za-z\\]])\\{${BRACE_GROUP}\\}\\s*\\/\\s*([0-9a-zA-Z][0-9a-zA-Z\\s\\\\^_{}+.·]*)`,
       'g',
     ),
     (_, num, den) => `$\\frac{${num.trim()}}{${den.trim()}}$`,

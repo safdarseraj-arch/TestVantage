@@ -192,6 +192,9 @@ const NEXT_QUESTION_RE =
   /\s+(?:\d{1,3}\.\s*)?If\s+(?:\\vec|\$\\vec|\$?\\hat)|\s+(?:Let|Given)\s+\\vec\{|\s+If\s+\$\\vec\{|\s+If\s+\$\\hat\{/i
 
 const BULK_NEXT_RE = /\n\s*(?:Q\s*\d|Question\s*\d|\d{1,3}\.\s*If\s|r\s+r\s*\^)/i
+/** Last option before a page break: "7/3 \end{itemize} PHYSICS \begin{itemize}". */
+const LIST_PAGE_TAIL_RE =
+  /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}(?:\s*(?:\\(?:begin|end)\{(?:itemize|enumerate)\}|\\section\*?\{[^{}]*\}|(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\b))*\s*$/
 
 /** Stem phrases that indicate duplicated question text — NOT "is equal to" (valid in options). */
 const STEM_TAIL_LEAK_RE =
@@ -298,7 +301,7 @@ export function stripNextQuestionFromOptions(options) {
 }
 
 export function trimQuestionLeakFromOption(opt, stem = '') {
-  let o = stripNextSubQuestionFromOption(String(opt ?? '').trim())
+  let o = stripNextSubQuestionFromOption(String(opt ?? '').trim().replace(LIST_PAGE_TAIL_RE, ''))
   if (!o) return o
 
   if (hasOptionEqualityAnswer(o) || hasMultiVectorOption(o)) {

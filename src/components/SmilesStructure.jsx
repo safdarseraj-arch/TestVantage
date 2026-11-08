@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import SmilesDrawer from 'smiles-drawer'
-import { repairScanStructureCodes } from '../utils/smilesDisplay.js'
+import { kekulizeSmiles, repairScanStructureCodes } from '../utils/smilesDisplay.js'
 
 /**
  * Draw a SMILES string as a structure (Official PYQ / bank / exam).
@@ -41,15 +41,36 @@ export default function SmilesStructure({ smiles, height = 150, width = 240 }) {
     const host = svgRef.current
     if (!host || !clean) return undefined
     host.replaceChildren()
-    try {
-      const drawer = new SmilesDrawer.SvgDrawer({ width, height, compactDrawing: false })
+    const draw = (code, onError) => {
+      const drawer = new SmilesDrawer.SvgDrawer({ width, height, compactDrawing: false, terminalCarbons: true })
       SmilesDrawer.parse(
-        clean,
+        code,
         (tree) => {
           drawer.draw(tree, host, 'light', false)
+          const box = drawer.svgWrapper
+          const w = box ? box.maxX - box.minX : 0
+          const h = box ? box.maxY - box.minY : 0
+          if (w > 0 && h > 0) {
+            // Fill the option box like the printed drawing; cap growth so tiny molecules stay readable.
+            const s = Math.min(width / w, height / h, 1.6)
+            host.setAttribute('viewBox', `${box.minX} ${box.minY} ${w} ${h}`)
+            host.setAttribute('width', String(Math.round(w * s)))
+            host.setAttribute('height', String(Math.round(h * s)))
+          }
         },
-        () => setFailed(true),
+        onError,
       )
+    }
+    try {
+      const kekule = kekulizeSmiles(clean)
+      draw(kekule, () => {
+        if (kekule === clean) {
+          setFailed(true)
+          return
+        }
+        host.replaceChildren()
+        draw(clean, () => setFailed(true))
+      })
     } catch {
       setFailed(true)
     }

@@ -917,7 +917,11 @@ export function stripOfficialPyqPaperChrome(text) {
     .replace(/\\section\*?/gi, '')
     .replace(/\bJEE\s*\(?\s*Advanced\s*\)?\s*\d{4}\s*Paper\s*[12]\b/gi, '')
     .replace(/\bEND\s+OF\s+THE\s+QUESTION\s+PAPER\b\.?/gi, '')
-    .replace(/(?:^|\n)\s*\d{1,2}\s*\/\s*\d{1,2}\s*(?=\n|$)/g, '\n')
+    // Page footers read "8/32" (page of total). A whole option "7/3" is an answer, not a footer.
+    .replace(/(?:^|\n)\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*(?=\n|$)/g, (line, page, total, at, all) => {
+      const onlyLine = !(all.slice(0, at) + all.slice(at + line.length)).trim()
+      return onlyLine || Number(total) < 10 || Number(page) > Number(total) ? line : '\n'
+    })
     .replace(/\n*---\s*page\s*---\n*/gi, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()

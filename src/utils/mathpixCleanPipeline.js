@@ -628,8 +628,42 @@ export function inlineSingleSymbolDisplayMath(text) {
   )
 }
 
+const LIST_TWO_HEADING_RE = /^[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*II[ \t]*$/i
+
+/**
+ * A "List II" heading printed beside List-I's first picture, with only row 1 under it and
+ * rows 2–4 after the last List-I row (2014 P2 Q18): the heading and row 1 move down to row 2.
+ */
+function regroupSplitListTwo(text) {
+  const lines = String(text).split('\n')
+  const head = lines.findIndex((line) => LIST_TWO_HEADING_RE.test(line))
+  if (head < 0) return text
+  let end = head + 1
+  while (end < lines.length && /^[ \t]*[1-5]\.[ \t]+\S/.test(lines[end])) end += 1
+  if (end === head + 1) return text
+  const after = lines.slice(end)
+  const nextRow = after.findIndex((line) => new RegExp(`^[ \\t]*${end - head}\\.[ \\t]+\\S`).test(line))
+  if (nextRow < 0) return text
+  const listOneAfter = after.slice(0, nextRow).some((line) => /^[ \t]*(?:\(\s*[QRST]\s*\)|[QRST]\.)/.test(line))
+  if (!listOneAfter) return text
+  const rest = [...lines.slice(0, head), ...after]
+  rest.splice(head + nextRow, 0, '', ...lines.slice(head, end))
+  return rest.join('\n').replace(/\n{3,}/g, '\n\n')
+}
+
+/** "2.r/2", "4.No water" and a lowercase "s." row under a P./Q./R. list are list row labels (2014 P2 Q18–Q20). */
+export function tidyMatchListRowLabels(text) {
+  const t = String(text ?? '')
+  if (!/(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*I/i.test(t)) return t
+  let out = t.replace(/^([ \t]*)([1-5])\.(?=[A-Za-z\\$(])/gm, '$1$2. ')
+  if (/^[ \t]*P\.[ \t]/m.test(out)) {
+    out = out.replace(/^([ \t]*)([qrst])\.(?=[ \t])/gm, (_, space, letter) => `${space}${letter.toUpperCase()}.`)
+  }
+  return regroupSplitListTwo(out)
+}
+
 export function cleanMathpixCardText(text) {
-  let t = htmlReactionsToMath(String(text ?? ''))
+  let t = tidyMatchListRowLabels(htmlReactionsToMath(String(text ?? '')))
   t = splitGluedChemDisplayEquations(t)
   t = inlineSingleSymbolDisplayMath(t)
   t = restoreDroppedMsOnGivenLine(t)

@@ -36,7 +36,7 @@ function filledOptions(q) {
 }
 
 /** First 90 characters with the math kept (spacing, braces and $ dropped); '' under 8 words. */
-const openingKey = (text) => {
+const openingKey = (text, length = 90) => {
   if (plainWords(text).length < 8) return ''
   return String(text ?? '')
     .replace(/<smiles\b[\s\S]*?<\/smiles>/gi, ' ')
@@ -46,7 +46,7 @@ const openingKey = (text) => {
     .replace(/\\[,;:! ]/g, '')
     .replace(/[\s${}~]/g, '')
     .toLowerCase()
-    .slice(0, 90)
+    .slice(0, length)
 }
 
 const Q_MARKER_RE =
@@ -85,8 +85,14 @@ function duplicateOf(questions, labelled) {
     const before = seen.get(key) || []
     seen.set(key, [...before, i])
     if (!before.length) return
+    // A grid's stem is the section's "Match the entries…" line; its rows are the question.
+    if (hasGridRows(q)) {
+      const same = before.find((k) => wholeCardWords(questions[k]) === wholeCardWords(q))
+      if (same !== undefined) out.set(i, same)
+      return
+    }
     if (scan) {
-      if (before.length + 1 > Math.max(1, scan.get(key) || 0)) out.set(i, before[0])
+      if (before.length + 1 > Math.max(1, scan.get(key) || 0, timesPrinted(labelled, key))) out.set(i, before[0])
       return
     }
     const first = questions[before[0]]
@@ -99,6 +105,25 @@ function duplicateOf(questions, labelled) {
     if (wholeCardWords(first) === wholeCardWords(q)) out.set(i, before[0])
   })
   return out
+}
+
+const hasGridRows = (q) => Array.isArray(q?.matrixRows) && q.matrixRows.some((row) => String(row ?? '').trim())
+
+let printedCache = { src: '', flat: '' }
+
+/**
+ * How often the scan prints an opening anywhere, not only right after a "Q. N" marker. Generic
+ * stems ("Which of the following is the only CORRECT combination?", "Match the entries in
+ * Column I…") follow a paragraph or a list, so the marker count misses them (2019 P2 Q51–Q53).
+ */
+function timesPrinted(labelled, key) {
+  if (!key) return 0
+  if (printedCache.src !== labelled) {
+    printedCache = { src: labelled, flat: openingKey(labelled, Infinity) }
+  }
+  let n = 0
+  for (let at = printedCache.flat.indexOf(key); at >= 0; at = printedCache.flat.indexOf(key, at + key.length)) n += 1
+  return n
 }
 
 /** Stem plus any grid rows, so two "Match the entries…" grids with different rows differ. */

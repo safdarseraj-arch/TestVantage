@@ -550,7 +550,9 @@ function hasListTwoEntries(text) {
     const after = t.slice(last)
     const listIAt = after.search(/(?:List|Column)\s*[-–]?\s*I(?!I)\b/i)
     const romanI = countListMarkers(t, ['I', 'II', 'III', 'IV']) >= 2
-    const numAt = after.search(romanI ? /\(\s*(?:[1-5]|[PQRST])\s*\)/ : /\(\s*[1-5]\s*\)/)
+    const numAt = after.search(
+      romanI ? /\(\s*(?:[1-5]|[PQRST])\s*\)/ : /\(\s*[1-5]\s*\)|(?:^|\n)[ \t]*[1-5]\.[ \t]+\S/,
+    )
     if (numAt >= 0 && (listIAt < 0 || numAt < listIAt)) return true
   }
   if (

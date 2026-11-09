@@ -25,6 +25,7 @@ const { quickOcrQuestionCount } = await import('../src/utils/pyqOcrCountLite.js'
 const { importQuestionsToOfficialPyqPending } = await import('../src/utils/officialPyqApproval.js')
 const { localOfficialPyqQualityCheck, persistOfficialPyqQualityRun } = await import('../src/utils/officialPyqLocalQuality.js')
 const pendingStore = await import('../src/utils/officialPyqPendingStore.js')
+const parseLists = await import('../src/utils/parseMatchingListDisplay.js')
 
 let failed = 0
 function test(name, fn) {
@@ -706,6 +707,98 @@ test('2014 P2: after the rebuild only genuine problems stay flagged', () => {
   // Q31: the scan's OCR printed one option twice and lost option D.
   assert.deepEqual(quality.failedGoTo, [31], quality.lines.join(' | '))
   assert.ok(quality.lines.some((l) => /scan prints “Only one correct”/.test(l)), 'confirmed facts the scan contradicts stay flagged')
+})
+
+const p14bQa = fs.readFileSync(new URL('./fixtures/jee-advanced-2014-p2-qa-mathpix.txt', import.meta.url), 'utf8')
+const p14bQaStored = JSON.parse(
+  fs.readFileSync(new URL('./fixtures/jee-advanced-2014-p2-qa-stored-cards.json', import.meta.url), 'utf8'),
+)
+
+test('2014 P2 (Q. N with answers): bare "1." / "P." list rows, "2.r/2" and a lowercase "s." split into clean lists', () => {
+  const items = paperItemsFromMathpixOcr(p14bQa)
+  assert.equal(items.length, 60)
+  const { parseMatchingListForDisplay } = parseLists
+  for (const n of [17, 18, 19, 20]) {
+    const q = items[n - 1]
+    const parsed = parseMatchingListForDisplay(q.text, q.options)
+    assert.equal(parsed?.listI?.length, 4, `Q${n} List-I`)
+    assert.equal(parsed?.listII?.length, 4, `Q${n} List-II`)
+    assert.equal((q.text.match(/List[\s-]*II\s*\n/g) || []).length, 1, `Q${n} prints List-II once`)
+    assert.doesNotMatch(q.text, /Choices\s*:/, `Q${n}`)
+  }
+  // "List II / 1. 2r" printed beside the first lens picture moves down to rows 2–4.
+  assert.match(items[17].text, /\(S\)[\s\S]*List II\n1\. \$2 r\$\n2\. r\/2\n3\. \$-r\$\n4\. \$r\$$/)
+  assert.match(items[18].text, /\nS\. \$\\theta=20\^\{\\circ\}\$/)
+  assert.doesNotMatch(items[18].text, /Q_\{1\}/, 'Q19 never carries Q17 rows')
+})
+
+test('2014 P2 (Q. N with answers): saved Q1 / Q18 / Q19 / Q20 damage is flagged and repaired from the scan', () => {
+  const before = localOfficialPyqQualityCheck({ ...p14bQaStored, preparedText: p14bQa })
+  const lines = before.lines.join('\n')
+  assert.equal(before.passed, false)
+  assert.match(lines, /Go to Q 1\. The option pictures are repeated inside the question text/)
+  assert.match(lines, /Go to Q 18, 19\. List rows of printed question 17 are inside this card/)
+  assert.match(lines, /Go to Q 20\. The chapter field holds question text/)
+
+  globalThis.localStorage.clear()
+  const { questions, adminFacts, paperFacts, localQuality: _old, ...rest } = p14bQaStored
+  const added = pendingStore.addOfficialPyqPendingPaper({ ...rest, preparedText: p14bQa, questions })
+  pendingStore.updateOfficialPyqPendingPaper(added.id, { adminFacts, paperFacts })
+  const rebuilt = persistOfficialPyqQualityRun(pendingStore.getOfficialPyqPendingPaper(added.id))
+  globalThis.localStorage.clear()
+
+  assert.equal(rebuilt.questions.length, 60)
+  assert.equal(rebuilt.localQuality.passed, true, rebuilt.localQuality.lines.join(' | '))
+  const [q1] = rebuilt.questions
+  assert.doesNotMatch(q1.text, /cdn\.mathpix|includegraphics/, 'Q1 stem keeps no option pictures')
+  assert.ok(q1.options.every((o) => /original\/crops/.test(o)), 'Q1 keeps its four picture options')
+  for (const n of [18, 19]) {
+    const text = rebuilt.questions[n - 1].text
+    assert.doesNotMatch(text, /Q_\{1\}|\+x/, `Q${n} lost Q17's rows`)
+    assert.equal((text.match(/List[\s-]*II\s*\n/g) || []).length, 1, `Q${n} prints List-II once`)
+  }
+  assert.match(rebuilt.questions[18].text, /P\. \$\\theta=5\^\{\\circ\}\$/, 'Q19 gets its own List-I back')
+  assert.equal(rebuilt.questions[19].chapter, 'General')
+})
+
+const stemLeaks = await import('../src/utils/officialPyqStemLeaks.js')
+const { officialPyqStructureDamage } = await import('../src/utils/officialPyqCardStructure.js')
+
+test('another question\'s picture or options on a card are found; a stem the scan prints three times is no duplicate', () => {
+  const pic = (y) => `\\includegraphics{https://cdn.mathpix.com/cropped/x-19.jpg?height=172&width=1531&top_left_y=${y}&top_left_x=340}`
+  const stem = 'For the reaction sequence given below, the correct statement(s) is(are)'
+  const items = [
+    { printedNumber: 7, text: `${stem}\n${pic(340)}`, options: ['a', 'b', 'c', 'd'] },
+    { printedNumber: 8, text: `${stem}\n${pic(1080)}`, options: ['e', 'f', 'g', 'h'] },
+  ]
+  const figure = stemLeaks.figureFromAnotherQuestion({ text: `${stem}\n${pic(340)}` }, items[1], items)
+  assert.equal(figure?.source, 0)
+  assert.match(figure.replacement, /top_left_y=1080/)
+  assert.equal(stemLeaks.figureFromAnotherQuestion(items[1], items[1], items), null)
+
+  const combo = 'Which of the following is the only CORRECT combination?'
+  const q51 = { printedNumber: 15, text: combo, options: ['(I), (P), (R)', '(II), (Q), (T)', '(I), (Q), (U)', '(II), (R), (S)'] }
+  const q52 = { printedNumber: 16, text: combo, options: ['(III), (R), (U)', '(IV), (P), (R), (S)', '(III), (P), (Q), (U)', '(IV), (Q), (T)'] }
+  const leaked = { ...q52, text: `${combo}\n(A) (I), (P), (R)\n(B) (II), (Q), (T)\n(C) (I), (Q), (U)\n(D) (II), (R), (S)` }
+  const lines = stemLeaks.optionLinesFromAnotherQuestion(leaked, q52, [q51, q52])
+  assert.equal(lines?.source, 0)
+  assert.equal(stemLeaks.withoutForeignListRows(leaked.text, lines.lines), combo)
+  assert.equal(stemLeaks.optionLinesFromAnotherQuestion(q52, q52, [q51, q52]), null)
+
+  // The generic stem follows each paragraph, so the scan prints it three times.
+  const q53 = { text: combo, options: ['(I), (S)', '(I), (U)', '(II), (Q)', '(II), (T)'] }
+  const queue = 'Three boys and two girls stand in a queue. The probability that every girl has a boy ahead is'
+  const q54 = { text: queue, options: ['1/2', '1/3', '2/3', '3/4'] }
+  const scan = [
+    'Answer Q. 15 and Q. 16 by appropriately matching the lists based on the information given.',
+    `Q. 15 ${combo}`,
+    `Q. 16 ${combo}`,
+    'Answer Q. 17 and Q. 18 by appropriately matching the lists based on the information given.',
+    `Q. 17 ${combo}`,
+    `Q. 18 ${queue}`,
+  ].join('\n')
+  assert.equal(officialPyqStructureDamage([q51, q52, q53, q54], scan).size, 0)
+  assert.equal(officialPyqStructureDamage([q51, q54, q53, { ...q54, options: ['a', 'b', 'c', 'd'] }], scan).get(3), 'The same question is also on Q 2')
 })
 
 if (failed) {

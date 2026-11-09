@@ -38,6 +38,14 @@ import { numericalAlternativesOf } from './answerAlternatives.js'
 import { buildPaperFacts } from './officialPyqPaperFacts.js'
 import { ocrIsHindiOnly, stripHindiOcr } from './stripHindiOcr.js'
 import { dropStaleOfficialPyqCompares } from './officialPyqCompareFreshness.js'
+import {
+  chapterIsNotAName,
+  figureFromAnotherQuestion,
+  listRowsFromAnotherQuestion,
+  optionLinesFromAnotherQuestion,
+  stemWithoutOptionPictures,
+  withoutForeignListRows,
+} from './officialPyqStemLeaks.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
@@ -178,7 +186,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 20
+export const LOCAL_QUALITY_REVISION = 22
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -608,13 +616,58 @@ function withAnswerDisagreementNote(result, questions) {
   return { ...result, lines: [...result.lines, line] }
 }
 
-function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true) {
+function stemLeakReason(q, fresh, items) {
+  const foreign = listRowsFromAnotherQuestion(q, fresh, items)
+  if (foreign) {
+    const n = Number(items[foreign.source]?.printedNumber) || foreign.source + 1
+    return `List rows of printed question ${n} are inside this card; the scan's lists are put back`
+  }
+  if (stemWithoutOptionPictures(q, fresh)) return 'The option pictures are repeated inside the question text; they are removed'
+  const choices = optionLinesFromAnotherQuestion(q, fresh, items)
+  if (choices) {
+    const n = Number(items[choices.source]?.printedNumber) || choices.source + 1
+    return `The options of printed question ${n} are inside this card's text; they are removed`
+  }
+  const figure = figureFromAnotherQuestion(q, fresh, items)
+  if (figure) {
+    const n = Number(items[figure.source]?.printedNumber) || figure.source + 1
+    return `The picture of printed question ${n} is on this card; the scan's own picture is put back`
+  }
+  return ''
+}
+
+/** Lowest-priority damage: shown only when nothing else is wrong with the card. */
+function chapterReason(q) {
+  return chapterIsNotAName(q) ? 'The chapter field holds question text, not a chapter name; it is reset' : ''
+}
+
+/** The scan's own text replaces foreign list rows on a card nobody edited; an edited card only loses the foreign rows. */
+function withStemLeaksRepaired(q, fresh, items) {
+  let next = q
+  const foreign = listRowsFromAnotherQuestion(next, fresh, items)
+  if (foreign) {
+    const text = next.adminEdited === true ? withoutForeignListRows(next.text, foreign.lines) : String(fresh.text ?? '')
+    if (text) next = { ...next, text }
+  }
+  const stem = stemWithoutOptionPictures(next, fresh)
+  if (stem) next = { ...next, text: stem }
+  const choices = optionLinesFromAnotherQuestion(next, fresh, items)
+  if (choices) next = { ...next, text: withoutForeignListRows(next.text, choices.lines) }
+  const figure = figureFromAnotherQuestion(next, fresh, items)
+  if (figure) next = { ...next, text: String(next.text).split(figure.url).join(figure.replacement) }
+  if (chapterIsNotAName(next)) next = { ...next, chapter: 'General' }
+  return next
+}
+
+function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, items = []) {
   if (answerLabelWithoutAnswer(q)) {
     return `The card is marked “${ANSWER_CLAIMS[q.answerSource]}”, and no answer is saved`
   }
   const printed = solutionRules ? printedSolutionReason(q, fresh) : ''
   if (printed) return printed
   if (isMatrixGridCard(q)) return ''
+  const leak = stemLeakReason(q, fresh, items)
+  if (leak) return leak
   const cut = stemStartCutOff(q?.text) || stemStartCutOff(q?.passageText)
   if (cut) return `The first word looks cut off (“${cut}”)`
   if (passageLostFigure) return 'The paragraph lost its figure; the other question under it has the figure'
@@ -629,11 +682,14 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true) {
 function cardDamageReasons(questions, ocr, solutionRules = true) {
   const siblings = passagesMissingSiblingFigure(questions)
   const structure = officialPyqStructureDamage(questions, ocr)
+  const items = freshCardsFromOcr(ocr)
   const out = new Map()
   questions.forEach((q, i) => {
     if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
     const reason =
-      cardDamageReason(q, freshCardFor(questions, i, ocr), siblings.has(i), solutionRules) || structure.get(i)
+      cardDamageReason(q, freshCardFor(questions, i, ocr), siblings.has(i), solutionRules, items) ||
+      structure.get(i) ||
+      chapterReason(q)
     if (reason) out.set(i, reason)
   })
   return out
@@ -650,15 +706,18 @@ export function officialPyqCardDamageReason(paper, index) {
   const q = questions[index]
   if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return ''
   const ocr = stripHindiOcr(paper?.preparedText)
-  return cardDamageReason(
-    q,
-    freshCardFor(questions, index, ocr),
-    passagesMissingSiblingFigure(questions).has(index),
-    paper?.status !== 'published',
+  return (
+    cardDamageReason(
+      q,
+      freshCardFor(questions, index, ocr),
+      passagesMissingSiblingFigure(questions).has(index),
+      paper?.status !== 'published',
+      freshCardsFromOcr(ocr),
+    ) || chapterReason(q)
   )
 }
 
-function withDamageRepaired(q, fresh, siblingPassage) {
+function withDamageRepaired(q, fresh, siblingPassage, items = []) {
   let next = q
   if (answerLabelWithoutAnswer(next)) {
     const { answerConfidence: _confidence, ...rest } = next
@@ -666,6 +725,7 @@ function withDamageRepaired(q, fresh, siblingPassage) {
   }
   next = withPrintedSolutionRepaired(next, fresh)
   if (isMatrixGridCard(next)) return next
+  next = withStemLeaksRepaired(next, fresh, items)
   const found = textWithLostWords(next, fresh)
   if (found) next = { ...next, text: found }
   for (const key of ['text', 'passageText']) {
@@ -1092,7 +1152,12 @@ export function repairOfficialPyqUntilQuality(paper) {
       questionsChanged = true
     }
     if (questions[index]?.adminApproved !== true) {
-      const mended = withDamageRepaired(questions[index], fresh, passagesMissingSiblingFigure(questions).get(index))
+      const mended = withDamageRepaired(
+        questions[index],
+        fresh,
+        passagesMissingSiblingFigure(questions).get(index),
+        freshCardsFromOcr(ocr),
+      )
       if (mended !== questions[index]) {
         questions[index] = mended
         questionsChanged = true
@@ -1280,7 +1345,11 @@ export function persistOfficialPyqQualityRun(paper) {
           if (!stored[i]) return -1
           if (hasScrapOption(stored[i]) && !hasScrapOption(q)) return i
           if (scanDamageRepaired(stored[i], q)) return i
-          const fresh = freshCardFor(stored, i, ocr || String(full?.preparedText ?? ''))
+          const source = ocr || String(full?.preparedText ?? '')
+          const fresh = freshCardFor(stored, i, source)
+          const items = freshCardsFromOcr(source)
+          if (stemLeakReason(stored[i], fresh, items) && !stemLeakReason(q, fresh, items)) return i
+          if (chapterReason(stored[i]) && !chapterReason(q)) return i
           return answerDiffersFromPrintedKey(stored[i], fresh) && !answerDiffersFromPrintedKey(q, fresh) ? i : -1
         })
         .filter((i) => i >= 0)

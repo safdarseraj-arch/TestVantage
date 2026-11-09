@@ -1396,9 +1396,14 @@ export function parseMatchingListForDisplay(text, options) {
   const key = `${optKey}\u0000${t}`
   if (matchParseCache.has(key)) return matchParseCache.get(key) ?? null
   let parsed = parseMatchingListForDisplayNoCache(t, options)
-  if (!parsed) {
+  const rowCount = (p) => (p?.listI?.length ?? 0) + (p?.listII?.length ?? 0)
+  // Picture rows "(P)" with a bare "1." List-II (2014 P2 Q18) parse List-I alone; read the bare labels too.
+  if (!parsed || (parsed.listI?.length ?? 0) < 2 || (parsed.listII?.length ?? 0) < 2) {
     const labelled = labelBareListRows(t)
-    if (labelled !== t) parsed = parseMatchingListForDisplayNoCache(labelled, options)
+    if (labelled !== t) {
+      const again = parseMatchingListForDisplayNoCache(labelled, options)
+      if (again && rowCount(again) > rowCount(parsed)) parsed = again
+    }
   }
   // One original-page picture of both lists is the whole table, not row (P) of List-I.
   if (

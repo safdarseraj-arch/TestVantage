@@ -362,6 +362,8 @@ export function adminFactsDisagreeWithScan(admin, ocr) {
   slots.forEach((slot, i) => {
     const scan = scanTypes[i]
     if (!scan || scan === slot.type) return
+    // Match-the-lists questions with four choices are printed under "Only one option correct".
+    if (slot.type === 'matrix_match' && scan === 'single_correct') return
     const last = runs[runs.length - 1]
     if (last && last.subject === slot.subject && last.mine === slot.type && last.scan === scan && last.to === slot.printed - 1) {
       last.to = slot.printed

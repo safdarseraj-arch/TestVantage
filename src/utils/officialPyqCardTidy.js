@@ -239,6 +239,96 @@ export function stemWithFigureCaptionCase(text) {
   return changed ? lines.join('\n') : ''
 }
 
+const SCAN_PLACEHOLDER_LINE_RE = /^[ \t]*\[(?:Figure|Image|Diagram)\][ \t]*\n?/gim
+
+/**
+ * "[Figure]" is the scan's caption for a picture it could not name; it stands on a line of its own
+ * above the picture (2014 P2 Q21–Q23). '' when there is none.
+ * @param {unknown} text
+ */
+export function stemWithoutScanPlaceholders(text) {
+  const t = String(text ?? '')
+  const cleaned = t.replace(SCAN_PLACEHOLDER_LINE_RE, '').replace(/\n{3,}/g, '\n\n').trim()
+  return cleaned !== t.trim() ? cleaned : ''
+}
+
+/** Text outside $…$, pictures and molecules, where English spacing rules apply. */
+function mapEnglish(text, fn) {
+  return String(text ?? '')
+    .split(/(\$\$[\s\S]*?\$\$|\$[^$]*\$|\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|<smiles>[\s\S]*?<\/smiles>)/)
+    .map((seg, i) => (i % 2 ? seg : fn(seg)))
+    .join('')
+}
+
+/**
+ * "$90~\Omega$,as shown": the scan dropped the space after a comma. '' when nothing changes.
+ * @param {unknown} text
+ */
+export function withSpaceAfterComma(text) {
+  const t = String(text ?? '')
+  const spaced = mapEnglish(t, (seg) => seg.replace(/,(?=[A-Za-z]{2,})/g, ', '))
+  return spaced !== t ? spaced : ''
+}
+
+/** English words that start with "a" + another word; never split. */
+const A_WORDS = new Set(
+  [
+    'about above abroad across adjust affix afloat again against ahead allot allow alone along aloud amend among amount another apart appear apply arise around arrange aside assign attach attend attest avail avert await awake aware away',
+    'aboard abridge afield afresh alight apiece aright asleep astray awhile',
+    'achiral acyclic apolar aperiodic aromatic asymmetric asymmetry atypical',
+  ]
+    .join(' ')
+    .split(' '),
+)
+
+/**
+ * "whichpasses", "ametre bridge": the scan glued "which" / "a" to the next word. "which" + word is
+ * never one English word (except whichever); "a" + word is split only after "with", "of", … and
+ * when that word stands alone elsewhere on the paper. '' when nothing changes.
+ * @param {unknown} text
+ * @param {string} ocr
+ */
+export function withGluedWordsSplit(text, ocr = '') {
+  const t = String(text ?? '')
+  const paper = `${t}\n${ocr}`
+  const standsAlone = (word) => new RegExp(`(?:^|[^A-Za-z])${escapeRe(word)}(?![A-Za-z])`, 'i').test(paper.replace(new RegExp(`\\b(?:which|a)${escapeRe(word)}\\b`, 'gi'), ' '))
+  const split = mapEnglish(t, (seg) =>
+    seg
+      .replace(/\b([Ww]hich)([a-z]{4,})\b/g, (whole, lead, rest) => (/^(?:ever|soever)$/.test(rest) ? whole : `${lead} ${rest}`))
+      // "with ametre bridge": only after a word that is followed by an article.
+      .replace(/\b((?:with|of|in|on|by|for|from|into|at|using)\s+)a([a-z]{5,})\b/g, (whole, before, rest) =>
+        A_WORDS.has(`a${rest}`) || !standsAlone(rest) ? whole : `${before}a ${rest}`,
+      ),
+  )
+  return split !== t ? split : ''
+}
+
+/**
+ * Damage only the original page can settle: a structure the scan reduced to one bracket atom
+ * ("<smiles>[CH]</smiles>", 2014 P2 Q38), text the scan replaced by "?", a condition cut before
+ * its "=", or a figure label missing from its sequence ("I … III" with no II, 2014 P2 Q22). '' when none.
+ * @param {any} q
+ */
+export function scanLossReason(q) {
+  const parts = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])].map((p) => String(p ?? ''))
+  if (parts.some((p) => /<smiles>\s*\[[A-Za-z]{1,2}H?\d?\]\s*<\/smiles>/.test(p))) {
+    return 'A structure drawing is broken (the scan kept one atom); compare with the original page'
+  }
+  const text = String(q?.text ?? '')
+  if (/(?:^|\n)[ \t]*\?[ \t]+\S/.test(text)) return 'Part of the text is lost (the scan printed “?”); compare with the original page'
+  // "(P) For each $z_k$ there exists a $z_j$ such that $z_{k} \cdot z_{j}$" — the "= 1" is gone (2014 P2 Q57).
+  const cutCondition = [...text.matchAll(/such\s+that\s+\$([^$]*)\$[ \t]*$/gm)].find(
+    (m) => !/[=<>]|\\(?:leq?|geq?|neq|in|notin|subset|subseteq|perp|parallel|equiv|sim|approx)\b/.test(m[1]),
+  )
+  if (cutCondition) return 'A condition ends without its “=” part (the scan cut it); compare with the original page'
+  const romans = ['I', 'II', 'III', 'IV', 'V', 'VI']
+  const labels = new Set([...text.matchAll(/^[ \t]*(I{1,3}|IV|V|VI)[ \t]*$/gm)].map((m) => m[1]))
+  const highest = Math.max(-1, ...[...labels].map((l) => romans.indexOf(l)))
+  const gap = romans.slice(0, highest + 1).find((l) => !labels.has(l))
+  if (labels.size >= 2 && gap) return `Figure label ${gap} is missing; compare with the original page`
+  return ''
+}
+
 /** "equal$s_$" — the scan read "equals ____" as a subscript; the answer blank is put back (2019 P2 Q45). */
 export function withAnswerBlankWord(text) {
   return String(text ?? '').replace(/\b([A-Za-z]{2,})\$([a-z]{1,3})_+\s*\$(?=\s*(?:\.|$))/g, '$1$2 ____')

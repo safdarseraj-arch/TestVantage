@@ -238,6 +238,13 @@ export function peelGluedMcqOptions(text, options = [], source = '') {
   // (keep Mathpix figures that follow the band). Never invent options.
   if (!band && filledCount(existing) >= 2) {
     const start = findOptionsBlockStart(raw)
+    const table = start > 24 ? tableAround(raw, start) : null
+    if (table) {
+      if (!codeTableRepeatsOptions(raw.slice(table.from, table.to), existing)) return { text: raw, options: existing }
+      const peeled = peelFiguresFromBand(raw.slice(table.from, table.to))
+      stem = [raw.slice(0, table.from).trim(), peeled.figures, raw.slice(table.to).trim()].filter(Boolean).join('\n')
+      return { text: stem, options: existing }
+    }
     if (start > 24) {
       const after = raw.slice(start)
       if (
@@ -285,6 +292,32 @@ export function peelGluedMcqOptions(text, options = [], source = '') {
   }
 
   return { text: stem, options: pad4(nextOpts) }
+}
+
+/** The tabular / array the (A)–(D) rows sit in, with its "Codes:" line and $$ fences. */
+function tableAround(text, at) {
+  const head = text.slice(0, at)
+  const open = [...head.matchAll(/\\begin\{(tabular|array)\}/g)].pop()
+  if (!open || head.slice(open.index).includes(`\\end{${open[1]}}`)) return null
+  const closeAt = text.indexOf(`\\end{${open[1]}}`, at)
+  if (closeAt < 0) return null
+  const lead = head.slice(0, open.index).match(/(?:\n[ \t]*Codes?\s*:?[ \t]*)?\n?[ \t]*(?:\$\$)?[ \t]*$/i)
+  const tail = text.slice(closeAt + open[1].length + 6).match(/^[ \t]*(?:\$\$)?/)
+  return {
+    from: open.index - (lead ? lead[0].length : 0),
+    to: closeAt + open[1].length + 6 + (tail ? tail[0].length : 0),
+  }
+}
+
+/** Rows "(A) & 1 & 4 & 2 & 3" under a P Q R S heading that say exactly what options A–D say. */
+function codeTableRepeatsOptions(table, options) {
+  const rows = [...table.matchAll(/\(\s*([A-D])\s*\)((?:\s*&\s*\d)+)/g)]
+  if (rows.length < 2) return false
+  return rows.every(([, letter, cells]) => {
+    const opt = String(options['ABCD'.indexOf(letter.toUpperCase())] ?? '')
+    const want = cells.match(/\d/g)?.join('') ?? ''
+    return want.length >= 2 && (opt.match(/\d/g)?.join('') ?? '') === want
+  })
 }
 
 function clipToThisQuestion(slice, probeAt) {

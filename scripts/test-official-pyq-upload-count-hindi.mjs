@@ -676,6 +676,17 @@ test('2014 P2: auto-fix rebuilds 63 scrambled cards to the 60 printed questions,
   assert.deepEqual(qs.slice(20, 40).map((q) => q.subject), Array(20).fill('chemistry'))
 })
 
+// The 2014 P2 scan itself lost Q22's label II, a Q38 structure and the end of Q57's condition:
+// only the original page can settle them, so they stay flagged after auto-fix.
+const SCAN_LOSS_2014_P2 = [22, 38, 57]
+function assertOnlyScanLossLeft(quality, extra = []) {
+  const why = quality.lines.join(' | ')
+  assert.deepEqual([...quality.failedGoTo].sort((a, b) => a - b), [...extra, ...SCAN_LOSS_2014_P2].sort((a, b) => a - b), why)
+  for (const n of SCAN_LOSS_2014_P2) {
+    assert.ok(quality.lines.some((l) => l.startsWith(`Go to Q ${n}.`) && /compare with the original page/.test(l)), `Q${n}: ${why}`)
+  }
+}
+
 const p14b60 = JSON.parse(fs.readFileSync(new URL('./fixtures/jee-advanced-2014-p2-stored-cards-60.json', import.meta.url), 'utf8'))
 let p14b60Rebuilt = null
 globalThis.localStorage.clear()
@@ -699,13 +710,13 @@ test('2014 P2: 60 cards with the right count but a duplicate and stray numbers a
   assert.doesNotMatch(qs[50].text, /Choices/)
   // The machine fix of Q18 had List-I pictures on A and C; the scan's card puts them in the stem.
   assert.ok(qs[17].options.every((o) => !/cdn\.mathpix\.com/.test(o)), JSON.stringify(qs[17].options))
-  assert.deepEqual(p14b60Rebuilt.localQuality.failedGoTo, [31], p14b60Rebuilt.localQuality.lines.join(' | '))
+  assertOnlyScanLossLeft(p14b60Rebuilt.localQuality, [31])
 })
 
 test('2014 P2: after the rebuild only genuine problems stay flagged', () => {
   const quality = p14bRebuilt.localQuality
   // Q31: the scan's OCR printed one option twice and lost option D.
-  assert.deepEqual(quality.failedGoTo, [31], quality.lines.join(' | '))
+  assertOnlyScanLossLeft(quality, [31])
   assert.ok(quality.lines.some((l) => /scan prints “Only one correct”/.test(l)), 'confirmed facts the scan contradicts stay flagged')
 })
 
@@ -748,7 +759,7 @@ test('2014 P2 (Q. N with answers): saved Q1 / Q18 / Q19 / Q20 damage is flagged 
   globalThis.localStorage.clear()
 
   assert.equal(rebuilt.questions.length, 60)
-  assert.equal(rebuilt.localQuality.passed, true, rebuilt.localQuality.lines.join(' | '))
+  assertOnlyScanLossLeft(rebuilt.localQuality)
   const [q1] = rebuilt.questions
   assert.doesNotMatch(q1.text, /cdn\.mathpix|includegraphics/, 'Q1 stem keeps no option pictures')
   assert.ok(q1.options.every((o) => /original\/crops/.test(o)), 'Q1 keeps its four picture options')
@@ -787,7 +798,7 @@ test('2014 P2 (Q. N with answers): saved code-only answers and Q60 with Q57 list
   pendingStore.updateOfficialPyqPendingPaper(added.id, { adminFacts, paperFacts })
   const rebuilt = persistOfficialPyqQualityRun(pendingStore.getOfficialPyqPendingPaper(added.id))
   globalThis.localStorage.clear()
-  assert.equal(rebuilt.localQuality.passed, true, rebuilt.localQuality.lines.join(' | '))
+  assertOnlyScanLossLeft(rebuilt.localQuality)
   for (const n of MATCH_LIST_QS) {
     const q = rebuilt.questions[n - 1]
     const parsed = parseLists.parseMatchingListForDisplay(q.text, q.options)

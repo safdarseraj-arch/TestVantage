@@ -1700,7 +1700,7 @@ function parseMatchingListForDisplayUnsafe(text, options) {
     listIHead?.index,
   )
 
-  return withMatchListOutro(
+  const parsed = withMatchListOutro(
     preferRicherMatchParse(
       {
         intro,
@@ -1712,6 +1712,36 @@ function parseMatchingListForDisplayUnsafe(text, options) {
       media,
     ),
   )
+  return withHeadingFiguresKept(parsed, [listIBlock, listIIBlock])
+}
+
+const LIST_ROW_MARKER_RE = /\(\s*(?:[PQRSTUABCD1-6]|i{1,3}|iv|I{1,3}|IV)\s*\)/
+const FIGURE_CODE_RE = /\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]+\)/g
+
+/**
+ * A question drawing printed just above "List-I" (2014 P2 Q17 charges, Q19 incline) is pulled into
+ * the list block with the heading; when no row shows it, it stays under the question text.
+ */
+function withHeadingFiguresKept(parsed, blocks) {
+  if (!parsed?.listI?.length) return parsed
+  const shown = new Set(
+    [parsed.intro, parsed.outro, ...[...(parsed.listI || []), ...(parsed.listII || [])].map((row) => row?.text)]
+      .flatMap((t) => extractMathpixImageUrls(String(t ?? ''))),
+  )
+  const lost = []
+  for (const block of blocks) {
+    const text = String(block ?? '')
+    const first = text.search(LIST_ROW_MARKER_RE)
+    for (const code of (first < 0 ? '' : text.slice(0, first)).match(FIGURE_CODE_RE) || []) {
+      const urls = extractMathpixImageUrls(code)
+      if (urls.length && urls.every((u) => !shown.has(u))) {
+        urls.forEach((u) => shown.add(u))
+        lost.push(code)
+      }
+    }
+  }
+  if (!lost.length) return parsed
+  return { ...parsed, intro: [String(parsed.intro ?? '').trim(), ...lost].filter(Boolean).join('\n') }
 }
 
 /** Keep (4) on row 4 when (2) and (3) are absent. Do not slide later numbers up. */

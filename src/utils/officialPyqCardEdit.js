@@ -852,9 +852,12 @@ export function recheckOfficialPyqCardQuality(paperId, index) {
   const stillFails = cardFails(index)
   if (stillFails) failed.add(go)
   const failedGoTo = Array.from(failed).sort((a, b) => a - b)
+  // The card can fail for a new reason after a fix; the old wording would point at damage that is gone.
+  const reason = stillFails ? officialPyqCardDamageReason({ ...full, preparedText: paperOcr }, index) : ''
   const lines = (Array.isArray(prior.lines) ? prior.lines : [])
-    .map((line) => (stillFails ? line : dropGoToFromLine(String(line ?? ''), go)))
+    .map((line) => (stillFails && !reason ? line : dropGoToFromLine(String(line ?? ''), go)))
     .filter(Boolean)
+  if (reason) lines.push(`Go to Q ${go}. ${reason}.`)
   /** A paper-wide line ("This paper has 47. Do not approve.") is not cleared by fixing one card. */
   const paperLevelProblem = lines.some((line) => !/^Go to Q\b/.test(String(line)))
   return updateOfficialPyqPendingPaper(full.id, {

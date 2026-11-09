@@ -619,6 +619,8 @@ function stemWantsChemistryProducts(text) {
 function stripChemistryLeakFromPhysicsStem(text, subject = '') {
   const t = String(text ?? '')
   if (!/<smiles>/i.test(t)) return t
+  // Not a match list (2014 P2 Q22 hexane classes): its structures are the question.
+  if (!/(?:List|Column)\s*[-–]?\s*I/i.test(t)) return t
   if (stemWantsChemistryProducts(t)) return t
   // A chemistry stem's own structure ("the peptide shown below", 2014 P1 Q36) is the question.
   if (subject === 'chemistry') return t
@@ -629,8 +631,8 @@ function stripChemistryLeakFromPhysicsStem(text, subject = '') {
     .replace(/<smiles>[\s\S]*?<\/smiles>/gi, '')
 }
 
-function stripForeignListTwo(text) {
-  const t = stripChemistryLeakFromPhysicsStem(text)
+function stripForeignListTwo(text, subject = '') {
+  const t = stripChemistryLeakFromPhysicsStem(text, subject)
   if (!listTwoLooksForeign(t)) return t
   const ii = standaloneListTwoIndex(t)
   if (ii < 12) return t
@@ -2193,7 +2195,7 @@ export function healUploadQuestionCard(q, source, map) {
   text = dropStolenFigures(text, src, printedN, map)
   text = stripChemistryLeakFromPhysicsStem(text, String(q.subject || ''))
   text = restoreMissingListIFromSource(text, q.options, src)
-  text = stripForeignListTwo(text)
+  text = stripForeignListTwo(text, String(q.subject || ''))
   {
     const folded = foldListIIFromOptionsIntoStem(text, q.options)
     text = folded.text

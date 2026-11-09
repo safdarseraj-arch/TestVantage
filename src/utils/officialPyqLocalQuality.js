@@ -17,7 +17,8 @@ import {
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
 import { peelOfficialPyqCardForDisplay } from './passage.js'
-import { stemLooksIncompleteOnDisplay } from './sanitizeStemForDisplay.js'
+import { sanitizeStemForDisplay, stemLooksIncompleteOnDisplay } from './sanitizeStemForDisplay.js'
+import { extractMathpixImageUrls } from './mathpixMedia.js'
 import { visibleLatexSourceHits } from './visibleLatexSource.js'
 import { givenLineDroppedUnit, inlineSingleSymbolDisplayMath, restoreDroppedMsOnGivenLine } from './mathpixCleanPipeline.js'
 import { officialPyqContentReviewMessages, officialPyqMissingListMessage } from './officialPyqReviewFlags.js'
@@ -37,7 +38,7 @@ import { reExtractOfficialPyqPendingPaperLocal } from './officialPyqLocalReparse
 import { numericalAlternativesOf } from './answerAlternatives.js'
 import { buildPaperFacts } from './officialPyqPaperFacts.js'
 import { ocrIsHindiOnly, stripHindiOcr } from './stripHindiOcr.js'
-import { dropStaleOfficialPyqCompares } from './officialPyqCompareFreshness.js'
+import { dropStaleOfficialPyqCompares, officialPyqCurrentCompare } from './officialPyqCompareFreshness.js'
 import { codeOptionsAsPairs, tidyMatchListCard } from './matchListTidy.js'
 import { parseMatchingListForDisplay } from './parseMatchingListDisplay.js'
 import {
@@ -52,8 +53,12 @@ import {
   choicesLeftInStem,
   gluedOptionsSplit,
   stemWithCapitalisedStart,
+  scanLossReason,
   stemWithFigureCaptionCase,
   stemWithoutOwnOptionLines,
+  stemWithoutScanPlaceholders,
+  withGluedWordsSplit,
+  withSpaceAfterComma,
   stemWithoutPrintedNumber,
   stemWithoutRepeatedPictures,
   withAnswerBlankWord,
@@ -209,7 +214,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 26
+export const LOCAL_QUALITY_REVISION = 29
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -763,13 +768,51 @@ function scanTidyReason(q, ocr) {
   if (stemWithFigureCaptionCase(q?.text)) {
     return 'A figure caption reads like an option letter, (A) for Figure (a); it is corrected'
   }
+  if (stemWithoutScanPlaceholders(q?.text) || stemWithoutScanPlaceholders(q?.passageText)) {
+    return 'The scan’s “[Figure]” placeholder is on the card; it is removed'
+  }
+  if (withEnglishSpacing(q, ocr) !== q) return 'Words are glued together (“whichpasses”, “,as”); the spaces are put back'
   return ''
+}
+
+/** The card with the scan's lost spaces put back in its text, passage and options (the same card when none). */
+function withEnglishSpacing(q, ocr) {
+  const fix = (s) => {
+    const spaced = withSpaceAfterComma(s) || String(s ?? '')
+    return withGluedWordsSplit(spaced, ocr) || spaced
+  }
+  let next = q
+  for (const key of ['text', 'passageText']) {
+    if (typeof q?.[key] !== 'string') continue
+    const fixed = fix(q[key])
+    if (fixed !== q[key]) next = { ...next, [key]: fixed }
+  }
+  if (Array.isArray(q?.options)) {
+    const options = q.options.map((opt) => (typeof opt === 'string' ? fix(opt) : opt))
+    if (options.some((opt, i) => opt !== q.options[i])) next = { ...next, options }
+  }
+  return next
 }
 
 /** The same drawing check as the alert list, so a card cannot pass while it shows raw code. */
 function drawnReason(q) {
   const problem = officialPyqDrawnProblems(q)[0]
-  return problem ? `On screen, ${problem}` : ''
+  if (problem) return `On screen, ${problem}`
+  return listLayoutDropsPicture(q) ? 'On screen, a picture on the card is not drawn by the List-I / List-II layout' : ''
+}
+
+/** The review page draws match cards as two lists; every picture on the card must still show (2014 P2 Q17, Q19). */
+function listLayoutDropsPicture(q) {
+  const text = sanitizeStemForDisplay(String(q?.text ?? ''), q?.options)
+  const pictures = extractMathpixImageUrls(text)
+  if (!pictures.length) return false
+  const parsed = parseMatchingListForDisplay(text, q?.options)
+  if (!parsed?.listI?.length) return false
+  const drawn = new Set(
+    [parsed.intro, parsed.outro, ...parsed.listI.map((row) => row?.text), ...(parsed.listII || []).map((row) => row?.text)]
+      .flatMap((t) => extractMathpixImageUrls(String(t ?? ''))),
+  )
+  return pictures.some((url) => !drawn.has(url))
 }
 
 function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, items = [], ocr = '') {
@@ -787,7 +830,13 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, ite
   if (cut) return `The first word looks cut off (“${cut}”)`
   if (passageLostFigure) return 'The paragraph lost its figure; the other question under it has the figure'
   if (textWithLostWords(q, fresh)) return 'Words printed in the scan are missing from the card'
-  return drawnReason(q)
+  return (originalConfirmsWording(q) ? '' : scanLossReason(q)) || drawnReason(q)
+}
+
+/** Compare read the original page for this exact wording and found the same words (2014 P2 Q57 prints no “= 1”). */
+function originalConfirmsWording(q) {
+  const compare = officialPyqCurrentCompare(q)
+  return compare?.textMatches === true || compare?.verdict === 'matches'
 }
 
 /**
@@ -854,6 +903,11 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   if (once) next = { ...next, text: once }
   const captioned = stemWithFigureCaptionCase(next.text)
   if (captioned) next = { ...next, text: captioned }
+  for (const key of ['text', 'passageText']) {
+    const unplaced = stemWithoutScanPlaceholders(next[key])
+    if (unplaced) next = { ...next, [key]: unplaced }
+  }
+  next = withEnglishSpacing(next, ocr)
   const found = textWithLostWords(next, fresh)
   if (found) next = { ...next, text: found }
   for (const key of ['text', 'passageText']) {

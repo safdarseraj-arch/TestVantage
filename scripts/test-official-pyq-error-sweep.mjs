@@ -38,6 +38,10 @@ const { localOfficialPyqQualityCheck, repairOfficialPyqUntilQuality } = await im
 const { officialPyqDrawnProblems } = await import('../src/utils/officialPyqDrawnCheck.js')
 const { officialPyqAlertGoTo } = await import('../src/utils/officialPyqAutoFix.js')
 const tidy = await import('../src/utils/officialPyqCardTidy.js')
+const { officialPyqCompareCardKey } = await import('../src/utils/officialPyqCompareFreshness.js')
+const { peelGluedMcqOptions } = await import('../src/utils/peelGluedMcqOptions.js')
+const { sanitizeStemForDisplay } = await import('../src/utils/sanitizeStemForDisplay.js')
+const { parseMatchingListForDisplay } = await import('../src/utils/parseMatchingListDisplay.js')
 const { healUploadQuestionCard } = await import('../src/utils/uploadQualityGuards.js')
 const { paperItemsFromMathpixOcr } = await import('../src/utils/mathpixQuestionSplit.js')
 
@@ -251,6 +255,74 @@ test('"\\left\\{\\begin{array} … \\right." and "( … $T_{1}$ ) $=10 P$" draw 
   assert.deepEqual(officialPyqDrawnProblems({ questionType: 'integer', text: piecewise, options: [] }), [])
   const paren = 'It is known that $P$ (computer is defective given plant $T_{1}$ ) $=10 P$ (computer is defective given plant $T_{2}$ ). The probability is'
   assert.deepEqual(officialPyqDrawnProblems(mcq(paren, ['$\\frac{36}{73}$', '$\\frac{47}{79}$', '$\\frac{78}{93}$', '$\\frac{75}{83}$'])), [])
+})
+
+test('"[Figure]" placeholders and glued words are removed / split; the structures stay (2014 P2 Q2, Q3, Q21, Q22)', () => {
+  const chem = { subject: 'chemistry' }
+  const q21 = flaggedThenFixed(
+    mcq(`The acidic hydrolysis of ether (X) shown below is fastest when\n\n[Figure]\n\n${PIC(886)}`, ['one methyl group', 'one para-methoxyphenyl group', 'two para-methoxyphenyl groups', 'no change'], chem),
+    '',
+    /“\[Figure\]” placeholder/,
+  )
+  assert.equal(q21.text, `The acidic hydrolysis of ether (X) shown below is fastest when\n\n${PIC(886)}`)
+  const hexane = `Isomers of hexane can be divided into three classes as shown in the figure.\n\n[Figure]\n\n${PIC(453)}\n<smiles>CC(C)C(C)C</smiles>\nand\n<smiles>CCC(C)(C)C</smiles>\n\nThe correct order of their boiling point is`
+  const q22 = flaggedThenFixed(mcq(hexane, ['I > II > III', 'III > II > I', 'II > III > I', 'III > I > II'], chem), '')
+  assert.equal((q22.text.match(/<smiles>/g) || []).length, 2, q22.text)
+  const ocr = 'The galvanometer shows a null point. The least count of the metre bridge scale is 1 mm.'
+  const q3 = flaggedThenFixed(
+    mcq('A wire, whichpasses through a bead, is used in an experiment with ametre bridge using a resistance of $90~\\Omega$,as given. The unknown resistance is', ['$60 \\Omega$', '$135 \\Omega$', '$90 \\Omega$', '$45 \\Omega$']),
+    ocr,
+    /Words are glued together/,
+  )
+  assert.equal(q3.text, 'A wire, which passes through a bead, is used in an experiment with a metre bridge using a resistance of $90~\\Omega$, as given. The unknown resistance is')
+  assert.equal(tidy.withGluedWordsSplit('A ray of achiral light along the axis, whichever is first', 'chiral light'), '', 'real words stay')
+  assert.equal(tidy.withSpaceAfterComma('points $(x,y)$ and 1,2,3'), '', 'math and numbers keep their commas')
+})
+
+test('what only the original page can settle is flagged: a one-atom structure, "?" text, a cut condition, a missing label (2014 P2 Q22, Q38, Q57)', () => {
+  assert.match(tidy.scanLossReason(mcq('List-I\n(P)\n<smiles>[CH]</smiles>\n(Q)\n<smiles>Oc1ccccc1</smiles>', ['1', '2', '3', '4'])), /structure drawing is broken/)
+  assert.match(tidy.scanLossReason(mcq('(1) Scheme I\n? (iii) $\\mathrm{SOCl}_{2}$ (iv) $\\mathrm{NH}_{3}$', ['1', '2', '3', '4'])), /scan printed “\?”/)
+  assert.match(tidy.scanLossReason(mcq('(P) For each $z_{k}$ there exists a $z_{j}$ such that $z_{k} \\cdot z_{j}$\n(Q) Another row', ['1', '2', '3', '4'])), /condition ends without/)
+  assert.match(tidy.scanLossReason(mcq('three classes\n\nI\n\n<smiles>CCC</smiles>\n\nIII\n<smiles>CCCC</smiles>', ['1', '2', '3', '4'])), /Figure label II is missing/)
+  assert.equal(tidy.scanLossReason(mcq('such that $z_{k} \\cdot z_{j}=1$ holds\nI\nII\nIII', ['1', '2', '3', '4'])), '')
+  const card = mcq('List-I\n(P)\n<smiles>[CH]</smiles>\n(Q)\n<smiles>Oc1ccccc1</smiles>\nMatch the lists', ['P-1', 'P-2', 'P-3', 'P-4'], { subject: 'chemistry' })
+  assert.deepEqual(localOfficialPyqQualityCheck({ questions: [card], preparedText: '' }).failedGoTo, [1])
+})
+
+test('a Compare that read the original and found the same words settles the flag; a stale one does not (2014 P2 Q57)', () => {
+  const card = mcq(
+    'Let $z_{k}=\\cos \\left(\\frac{2 k \\pi}{10}\\right)+i \\sin \\left(\\frac{2 k \\pi}{10}\\right) ; k=1,2, \\ldots, 9$.\n\nList-I\n(P) For each $z_{k}$ there exists a $z_{j}$ such that $z_{k} \\cdot z_{j}$\n(Q) There exists a $k \\in\\{1,2, \\ldots, 9\\}$ such that $z_{1} \\cdot z= z_{k}$ has no solution $z$ in the set of complex numbers.\n(R) $\\frac{\\left|1-z_{1}\\right| \\cdots\\left|1-z_{9}\\right|}{10}$ equals\n(S) $1-\\sum_{k=1}^{9} \\cos \\left(\\frac{2 k \\pi}{10}\\right)$ equals\n\nList-II\n(1) True\n(2) False\n(3) 1\n(4) 2',
+    ['P-1, Q-2, R-4, S-3', 'P-2, Q-1, R-3, S-4', 'P-1, Q-2, R-3, S-4', 'P-2, Q-1, R-4, S-3'],
+    { subject: 'mathematics' },
+  )
+  assert.deepEqual(localOfficialPyqQualityCheck({ questions: [card], preparedText: '' }).failedGoTo, [1])
+  const confirmed = { ...card, originalCompare: { verdict: 'differs', textMatches: true, differences: [{ kind: 'card_problem' }], cardKey: officialPyqCompareCardKey(card) } }
+  const settled = localOfficialPyqQualityCheck({ questions: [confirmed], preparedText: '' })
+  assert.deepEqual(settled.failedGoTo, [], settled.lines.join(' | '))
+  const stale = { ...confirmed, originalCompare: { ...confirmed.originalCompare, cardKey: '1:old' } }
+  assert.deepEqual(localOfficialPyqQualityCheck({ questions: [stale], preparedText: '' }).failedGoTo, [1])
+})
+
+test('a "Codes:" table that repeats the options is removed whole, never cut after its heading (2014 P2 Q38)', () => {
+  const table = (rows) => `Codes:\n\\begin{tabular}{ccccc}\n& P & Q & R & S \\\\\n${rows.join(' \\\\\n')}\n\\end{tabular}`
+  const head = 'Match the four starting materials (P, Q, R, S) given in List I with the reaction schemes in List II.\n\\includegraphics{/api/official-pyq/original/crops/x-p26.png}'
+  const options = ['P-1, Q-4, R-2, S-3', 'P-3, Q-1, R-4, S-2', 'P-3, Q-4, R-2, S-1', 'P-4, Q-1, R-3, S-2']
+  const same = `${head}\n${table(['(A) & 1 & 4 & 2 & 3', '(B) & 3 & 1 & 4 & 2', '(C) & 3 & 4 & 2 & 1', '(D) & 4 & 1 & 3 & 2'])}`
+  assert.equal(peelGluedMcqOptions(same, options).text, head)
+  assert.equal(sanitizeStemForDisplay(same, options), head)
+  const other = `${head}\n${table(['(A) & 2 & 4 & 2 & 3', '(B) & 3 & 1 & 4 & 2', '(C) & 3 & 4 & 2 & 1', '(D) & 4 & 1 & 3 & 2'])}`
+  assert.equal(peelGluedMcqOptions(other, options).text, other)
+})
+
+test('a drawing printed just above List-I still shows with the two lists (2014 P2 Q17, Q19)', () => {
+  const pic = '\\includegraphics{https://cdn.mathpix.com/cropped/19934504-6d9e-413a-a44e-2618e323b5ad-11.jpg?height=400&width=376&top_left_y=684&top_left_x=807}'
+  const text = `A block of mass $m_{1}=1 \\mathrm{~kg}$ and another mass $m_{2}=2 \\mathrm{~kg}$ are placed together (see figure) on an inclined plane with angle of inclination $\\theta$. Match the correct expression of the friction in List II with the angles given in List I, and choose the correct option.\n${pic}\n\nList I\nP. $\\theta=5^{\\circ}$\nQ. $\\theta=10^{\\circ}$\nR. $\\theta=15^{\\circ}$\nS. $\\theta=20^{\\circ}$\n\nList II\n1. $m_{2} g \\sin \\theta$\n2. $\\left(m_{1}+m_{2}\\right) g \\sin \\theta$\n3. $\\mu m_{2} g \\cos \\theta$\n4. $\\mu\\left(m_{1}+m_{2}\\right) g \\cos \\theta$`
+  const options = ['P-1, Q-1, R-1, S-3', 'P-2, Q-2, R-2, S-3', 'P-2, Q-2, R-2, S-4', 'P-2, Q-2, R-3, S-3']
+  const parsed = parseMatchingListForDisplay(sanitizeStemForDisplay(text, options), options)
+  assert.equal(parsed?.listI?.length, 4)
+  assert.ok(parsed.intro.includes(pic), parsed.intro)
+  const card = mcq(text, options, { subject: 'physics' })
+  assert.deepEqual(localOfficialPyqQualityCheck({ questions: [card], preparedText: '' }).failedGoTo, [])
 })
 
 test('a clean card is not flagged and auto-fix leaves it as it is', () => {

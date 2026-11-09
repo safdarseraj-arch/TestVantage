@@ -349,7 +349,8 @@ export function unwrapMathrmListLabels(text) {
   return String(text ?? '')
     .replace(/\$\s*\(\\mathrm\{([A-D1-5PQRS])\}\)\s*\$/g, '($1)')
     .replace(/\(\\mathrm\{([A-D1-5PQRS])\}\)/g, '($1)')
-    .replace(/\\mathrm\{([A-D1-5PQRS])\}/g, '$1')
+    // 9~\mu\mathrm{C}: a letter glued to the command before it would make the unknown \muC.
+    .replace(/(\\[A-Za-z]+)?\\mathrm\{([A-D1-5PQRS])\}/g, (_, cmd, label) => (cmd ? `${cmd} ${label}` : label))
 }
 
 /**
@@ -1050,8 +1051,10 @@ function peelTrailingListFigures(items, letters) {
     const head = text.slice(0, cut).trim()
     const tail = text.slice(cut).trim()
     const tailIsFigure = /^(?:\\includegraphics\{[^}]+\}\s*|!\[[^\]]*\]\([^)]+\)\s*)+$/.test(tail)
+    // A multi-line row ("Scheme IV" with its reaction steps) owns the picture under it.
     const headIsValue =
       head.length < 160 &&
+      !head.includes('\n') &&
       !/includegraphics|<smiles>/i.test(head) &&
       (/\\frac|\\sqrt|\\mathrm/.test(head) || looksLikePhysicsListTwoValue(head))
     if (!tailIsFigure || !headIsValue) {
@@ -1324,6 +1327,21 @@ function preferRicherMatchParse(parsed, media) {
       ? fillEmptyMatchRows(media.listI, parsed.listI, lettersI)
       : fillEmptyMatchRows(parsed.listI, media.listI, lettersI)
   let listII = fillEmptyMatchRows(parsed.listII, media.listII, lettersII)
+  // A picture the text rows or the intro already show ("Scheme IV" with its reaction, the
+  // pathway drawings above List-I) is not an extra List-II row (2014 P2 Q37/Q38).
+  const parsedII = (parsed.listII || []).filter((row) => String(row.text ?? '').trim())
+  if (parsedII.length >= 4) {
+    const shown = new Set(
+      [parsed.intro, ...(parsed.listI || []).map((row) => row.text), ...parsedII.map((row) => row.text)]
+        .flatMap((t) => extractMathpixImageUrls(String(t ?? ''))),
+    )
+    const own = new Set(parsedII.map((row) => row.label))
+    listII = listII.filter((row) => {
+      if (own.has(row.label)) return true
+      const urls = extractMathpixImageUrls(String(row.text ?? ''))
+      return !urls.length || !urls.every((u) => shown.has(u))
+    })
+  }
   const listIMedia = new Set(
     listI
       .map((row) => String(row.text ?? ''))

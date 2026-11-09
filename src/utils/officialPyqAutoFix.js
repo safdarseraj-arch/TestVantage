@@ -17,14 +17,12 @@ import {
 } from './officialPyqCardEdit.js'
 import {
   compareOfficialPyqCardRemote,
-  officialPyqDrawnRawCode,
-  officialPyqDrawnText,
   officialPyqFlaggedGoTo,
   officialPyqPrintedNumber,
   saveOfficialPyqCompareResult,
 } from './officialPyqOriginalCompare.js'
+import { officialPyqDrawnProblems } from './officialPyqDrawnCheck.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
-import { mathDrawFailure } from './mathDrawCheck.js'
 import { reviewOfficialPyqCards } from './officialPyqUnifiedCheck.js'
 import { officialPyqCountRepairNeeded, persistOfficialPyqQualityRun } from './officialPyqLocalQuality.js'
 
@@ -44,22 +42,7 @@ export function officialPyqAutoFixSignature(card) {
   return `${raw.length}:${(h >>> 0).toString(36)}`
 }
 
-/** @param {any} card */
-function drawnProblems(card) {
-  const parts = [card?.passageText, card?.text, ...(Array.isArray(card?.options) ? card.options : [])].map((p) =>
-    String(p ?? ''),
-  )
-  const out = []
-  for (const part of parts) {
-    const fail = mathDrawFailure(part)
-    if (fail) {
-      out.push(`the math does not draw (${fail})`)
-      break
-    }
-  }
-  out.push(...officialPyqDrawnRawCode(parts.map((p) => officialPyqDrawnText(p)).join('\n')))
-  return out
-}
+const drawnProblems = officialPyqDrawnProblems
 
 /**
  * Go-to numbers (1-based) that show an alert: the local quality flag, or raw code /

@@ -551,7 +551,7 @@ function hasListTwoEntries(text) {
     const listIAt = after.search(/(?:List|Column)\s*[-–]?\s*I(?!I)\b/i)
     const romanI = countListMarkers(t, ['I', 'II', 'III', 'IV']) >= 2
     const numAt = after.search(
-      romanI ? /\(\s*(?:[1-5]|[PQRST])\s*\)/ : /\(\s*[1-5]\s*\)|(?:^|\n)[ \t]*[1-5]\.[ \t]+\S/,
+      romanI ? /\(\s*(?:[1-5]|[PQRST])\s*\)/ : /\(\s*[1-5]\s*\)|(?:^|\n|&)[ \t]*[1-5]\.[ \t]+\S/,
     )
     if (numAt >= 0 && (listIAt < 0 || numAt < listIAt)) return true
   }
@@ -728,7 +728,14 @@ function extractListIBlockFromWindow(window) {
 }
 
 function extractListIIBlockFromWindow(window) {
-  const raw = rewriteLatexItemLabels(flattenTabularMatchLists(window))
+  let w = String(window ?? '')
+  const listTwoAt = w.search(/(?:List|Column)\s*[-–]?\s*II\b/i)
+  if (listTwoAt >= 0) {
+    // "PART-2 CHEMISTRY / SECTION -1 (...)" after the last row is the next part, never a List-II row.
+    const heading = w.slice(listTwoAt).search(/\n\s*(?:\\section\*?\{\s*)?(?:PART|SECTION)\s*[-–]?\s*(?:\d|[IVX]+)\b/)
+    if (heading > 0) w = w.slice(0, listTwoAt + heading)
+  }
+  const raw = rewriteLatexItemLabels(flattenTabularMatchLists(w))
   const parsed = parseMatchingListForDisplay(raw)
   if (parsed?.listII?.length >= 2) {
     const rows = parsed.listII

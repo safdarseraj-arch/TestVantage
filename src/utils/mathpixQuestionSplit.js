@@ -5,6 +5,7 @@
  */
 
 import { parseQuestionText } from './parseQuestionText.js'
+import { tidyMatchListCard } from './matchListTidy.js'
 import { restoreDroppedMathpixMatchPieces } from './restoreDroppedMathpixMatchPieces.js'
 import { wrapBareLatexRuns } from './wrapBareLatexRuns.js'
 import { extractMathpixImageUrls, hasMathpixMedia, restoreMissingOptionGridGraphs, stripMathpixFigureChrome } from './mathpixMedia.js'
@@ -122,7 +123,7 @@ const NEXT_FULL_STEM_RE =
 export function sanitizeMathpixOcrText(raw) {
   return restoreGluedQuestionNumbers(
     preCleanMathpixOcr(
-      stripPrintedAnswerBoxes(labelNumberedQuestions(stripHindiOcr(raw)))
+      optionArrayRowsAsTabular(stripPrintedAnswerBoxes(labelNumberedQuestions(stripHindiOcr(raw))))
         // A \begin{table} left before the next group's caption sticks to the last option.
         .replace(/\\(?:begin|end)\{table\}|\\captionsetup\{[^{}]*\}/g, '')
         // A page's running head "\section*{PHYSICS}" otherwise sticks to the last option of the page before.
@@ -137,6 +138,36 @@ export function sanitizeMathpixOcrText(raw) {
         .trim(),
     ),
   )
+}
+
+const OPTION_ARRAY_RE = /\$\$\s*\\begin\{array\}\{[^{}]*\}([\s\S]*?)\\end\{array\}\s*\$\$/g
+const ARRAY_OPTION_LABEL_RE = /^\\text\s*\{\s*\(\s*([A-D])\s*\)\s*\}$/
+
+/**
+ * Options printed as one display-math table row, `$$\begin{array}{|l|l|…} \hline \text { (A) } & 2 &
+ * \text { (B) } & \sqrt{2} … \end{array}$$` (2025 P2 Q19), become the text tabular
+ * `(A) & $2$ & (B) & …` that the A–D option peel reads; the labels would otherwise split the math.
+ * @param {string} text
+ */
+function optionArrayRowsAsTabular(text) {
+  return String(text ?? '').replace(OPTION_ARRAY_RE, (whole, body) => {
+    const rows = splitTabularRows(body)
+      .map((row) => row.replace(/\\hline/g, ' ').split('&').map((c) => c.trim()))
+      .filter((cells) => cells.some(Boolean))
+    if (/List|Column|\(\s*[pqrstPQRST1-5]\s*\)/.test(body)) return whole
+    // Only "label & value" pairs; a match grid or a data table keeps its array.
+    const pairs = rows.every((r) => r.length % 2 === 0 && r.every((c, i) => (i % 2 === 0) === ARRAY_OPTION_LABEL_RE.test(c)))
+    const labels = rows.flat().filter((c) => ARRAY_OPTION_LABEL_RE.test(c))
+    if (!pairs || labels.length < 2 || !/\(\s*A\s*\)/.test(labels[0])) return whole
+    const cells = (row) =>
+      row.map((c) => {
+        const label = c.match(ARRAY_OPTION_LABEL_RE)
+        if (label) return `(${label[1]})`
+        return c ? `$${c}$` : ''
+      })
+    const width = Math.max(...rows.map((r) => r.length))
+    return `\\begin{tabular}{${'|l'.repeat(width)}|}\n${rows.map((r) => `\\hline ${cells(r).join(' & ')} \\\\`).join('\n')}\n\\hline\n\\end{tabular}`
+  })
 }
 
 /**
@@ -1841,7 +1872,9 @@ export function paperItemsFromMathpixOcr(raw, opts = {}) {
     ? opts.sectionMap
     : parsePaperSectionMap(text)
   const { drafts } = mathpixSplitToBankDrafts(text, { ...opts, sectionMap })
-  return applyEndAnswerSection(applyMatrixGridQuestions(dedupePaperItemsByNumber(drafts), text), endSection)
+  return applyEndAnswerSection(applyMatrixGridQuestions(dedupePaperItemsByNumber(drafts), text), endSection).map(
+    (q) => tidyMatchListCard(q),
+  )
 }
 
 /**

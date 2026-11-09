@@ -38,6 +38,8 @@ import { numericalAlternativesOf } from './answerAlternatives.js'
 import { buildPaperFacts } from './officialPyqPaperFacts.js'
 import { ocrIsHindiOnly, stripHindiOcr } from './stripHindiOcr.js'
 import { dropStaleOfficialPyqCompares } from './officialPyqCompareFreshness.js'
+import { codeOptionsAsPairs, tidyMatchListCard } from './matchListTidy.js'
+import { parseMatchingListForDisplay } from './parseMatchingListDisplay.js'
 import {
   chapterIsNotAName,
   figureFromAnotherQuestion,
@@ -46,11 +48,28 @@ import {
   stemWithoutOptionPictures,
   withoutForeignListRows,
 } from './officialPyqStemLeaks.js'
+import {
+  choicesLeftInStem,
+  gluedOptionsSplit,
+  stemWithCapitalisedStart,
+  stemWithFigureCaptionCase,
+  stemWithoutOwnOptionLines,
+  stemWithoutPrintedNumber,
+  stemWithoutRepeatedPictures,
+  withAnswerBlankWord,
+} from './officialPyqCardTidy.js'
+import { officialPyqDrawnProblems } from './officialPyqDrawnCheck.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
 const BARE_FRACTION_RE = /^\s*(-?\d{1,4})\s*\/\s*(\d{1,4})\s*$/
 const TRAILING_LINE_BREAK_RE = /(?:\s*\\\\)+\s*$/
+/** Page furniture the scan glued to the last option or line: "Space for rough work", an empty \author{ }. */
+const PAGE_FURNITURE_TAIL_RE = /(?:\s*(?:\$\s*\\(?:author|title|date)\{[^}]*\}\s*\$|\\(?:author|title|date)\{[^}]*\}|Space\s+for\s+rough\s+work))+\s*$/i
+const PAGE_FURNITURE_LINE_RE = /^[ \t]*Space\s+for\s+rough\s+work[ \t]*$/gim
+/** "PART-2 CHEMISTRY" / "SECTION -1 (Only One Option Correct Type)": the next part's heading, never question words. */
+const PAPER_HEADING_LINE_RE =
+  /^[ \t]*(?:\\section\*?\{\s*)?(?:(?:PART|SECTION)\s*[-–]?\s*(?:\d|[IVX]+)\b[^\n]*|END OF THE QUESTION PAPER\.?\}?)[ \t]*$/gm
 
 const MATHPIX_FIGURE_RE =
   /\\includegraphics(?:\[[^\]]*\])?\{https:\/\/cdn\.mathpix\.com\/cropped\/[^}]*?-(\d{2,3})\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)[^}]*\}|!\[[^\]]*\]\(https:\/\/cdn\.mathpix\.com\/cropped\/[^)]*?-(\d{2,3})\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)[^)]*\)/g
@@ -136,7 +155,9 @@ function withoutPageLeftovers(q) {
   for (const key of ['text', 'passageText']) {
     const raw = q?.[key]
     if (typeof raw !== 'string') continue
-    let cleaned = withoutFiguresInMath(withoutDuplicateFigures(raw))
+    let cleaned = withoutFiguresInMath(withoutDuplicateFigures(raw)).replace(PAGE_FURNITURE_TAIL_RE, '')
+    const unfurnished = cleaned.replace(PAGE_FURNITURE_LINE_RE, '').replace(PAPER_HEADING_LINE_RE, '')
+    if (unfurnished !== cleaned) cleaned = unfurnished.replace(/\n{3,}/g, '\n\n').trim()
     if (/\\begin\{tabular\}/.test(cleaned)) cleaned = stripAnswerBoxTables(cleaned).replace(/\n{3,}/g, '\n\n').trim()
     if (cleaned && cleaned !== raw && cleaned !== raw.trim()) next = { ...next, [key]: cleaned }
   }
@@ -146,6 +167,8 @@ function withoutPageLeftovers(q) {
       const cleaned = trimOptionLetterTail(s)
         .replace(LIST_TAIL_RE, '')
         .replace(RUNNING_HEAD_TAIL_RE, '')
+        .replace(PAGE_FURNITURE_TAIL_RE, '')
+        .replace(PAPER_HEADING_LINE_RE, '')
         .replace(TRAILING_LINE_BREAK_RE, '')
       const frac = cleaned.match(BARE_FRACTION_RE)
       if (frac) return `$\\frac{${frac[1]}}{${frac[2]}}$`
@@ -186,7 +209,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 22
+export const LOCAL_QUALITY_REVISION = 26
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -315,7 +338,13 @@ function freshCardFor(questions, index, ocr) {
   const fresh = items[index]
   const opening = proseWords(fresh?.text).slice(0, 4)
   if (opening.length < 3) return null
-  return wordRun(questions[index]?.text).includes(` ${opening.join(' ').toLowerCase()} `) ? fresh : null
+  const run = wordRun(questions[index]?.text)
+  if (run.includes(` ${opening.join(' ').toLowerCase()} `)) return fresh
+  // A math-heavy stem has few words before its lists ("Let $f_1$… be defined by / List I"):
+  // the same printed number and the same first three words still name the same question.
+  const printed = Number(fresh?.printedNumber)
+  if (!(printed > 0) || printed !== Number(questions[index]?.printedNumber)) return null
+  return run.startsWith(` ${opening.slice(0, 3).join(' ').toLowerCase()} `) ? fresh : null
 }
 
 /**
@@ -328,6 +357,7 @@ function lostClosingLines(card, fresh) {
   const lines = String(fresh?.text ?? '').split('\n')
   const lost = []
   for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (lines[i].trim() && !lines[i].replace(PAGE_FURNITURE_TAIL_RE, '').trim()) continue
     const words = proseWords(lines[i])
     if (words.length < 2) {
       if (lost.length || !lines[i].trim()) continue
@@ -633,7 +663,68 @@ function stemLeakReason(q, fresh, items) {
     const n = Number(items[figure.source]?.printedNumber) || figure.source + 1
     return `The picture of printed question ${n} is on this card; the scan's own picture is put back`
   }
+  return matchListReason(q, fresh, items)
+}
+
+/** "4/4" for a card whose lists read as four and four rows; '' when no lists are read. */
+function listShape(q) {
+  const parsed = parseMatchingListForDisplay(q?.text, q?.options)
+  return parsed ? `${parsed.listI?.length ?? 0}/${parsed.listII?.length ?? 0}` : ''
+}
+
+const fullLists = (shape) => /^(?:[2-9])\/(?:[2-9])$/.test(shape)
+
+const rowKey = (text) =>
+  String(text ?? '')
+    .replace(/\\(?:left|right|mathrm|mathbf|text|textbf)\b/g, '')
+    .replace(/[\s${}~]/g, '')
+    .toLowerCase()
+
+/**
+ * Two or more list rows the scan prints under other questions, while the scan's own card reads
+ * as two full lists (2014 P2 Q60 showed Q57's List-I and Q1's option pictures). A different
+ * row count alone is no proof: the fresh split of an older scan is often the worse one.
+ */
+function listsDifferFromScan(q, fresh, items) {
+  if (!fresh || !Array.isArray(items) || !/(?:List|Column)\s*[-–]?\s*I/i.test(String(fresh.text ?? ''))) return false
+  if (!fullLists(listShape(fresh))) return false
+  const parsed = parseMatchingListForDisplay(q?.text, q?.options)
+  const own = rowKey([fresh.text, ...(fresh.options || [])].join(' '))
+  const others = items
+    .filter((other) => other && other !== fresh)
+    .map((other) => rowKey([other.text, ...(other.options || [])].join(' ')))
+  const foreign = [...(parsed?.listI || []), ...(parsed?.listII || [])].filter((row) => {
+    const body = rowKey(row.text)
+    return body.length >= 6 && !own.includes(body) && others.some((text) => text.includes(body))
+  })
+  return foreign.length >= 2
+}
+
+/** Answer codes without P–S, list rows read wrong, or lists unlike the scan's (2014 P2 Q37–Q40, Q57–Q60). */
+function matchListReason(q, fresh, items) {
+  if (codeOptionsAsPairs(q?.options, q?.text)) {
+    return 'The answer codes are shown without P, Q, R, S; they are written as P-1, Q-2, …'
+  }
+  const tidy = tidyMatchListCard(q)
+  if (tidy !== q && fullLists(listShape(tidy)) && listShape(tidy) !== listShape(q)) {
+    return 'The list rows are not read right (row labels or List headings); they are put right'
+  }
+  if (listsDifferFromScan(q, fresh, items)) return "List rows of other questions are on this card; the scan's lists are put back"
   return ''
+}
+
+/** Tidied lists and written-out codes; the scan's lists on a card nobody edited when it shows other questions' rows. */
+function withMatchListsRepaired(q, fresh, items) {
+  let next = q
+  if (codeOptionsAsPairs(next.options, next.text)) next = tidyMatchListCard(next)
+  const tidy = tidyMatchListCard(next)
+  if (tidy !== next && fullLists(listShape(tidy)) && listShape(tidy) !== listShape(next)) next = tidy
+  if (next.adminEdited !== true && listsDifferFromScan(next, fresh, items)) {
+    next = { ...next, text: String(fresh.text ?? '') }
+    const pairs = codeOptionsAsPairs(next.options, next.text)
+    if (pairs) next = { ...next, options: pairs }
+  }
+  return next
 }
 
 /** Lowest-priority damage: shown only when nothing else is wrong with the card. */
@@ -655,24 +746,48 @@ function withStemLeaksRepaired(q, fresh, items) {
   if (choices) next = { ...next, text: withoutForeignListRows(next.text, choices.lines) }
   const figure = figureFromAnotherQuestion(next, fresh, items)
   if (figure) next = { ...next, text: String(next.text).split(figure.url).join(figure.replacement) }
+  next = withMatchListsRepaired(next, fresh, items)
   if (chapterIsNotAName(next)) next = { ...next, chapter: 'General' }
   return next
 }
 
-function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, items = []) {
+/** Scan leftovers the scan itself settles: its marker in front of the text, the options repeated in the stem, two options in one box. */
+function scanTidyReason(q, ocr) {
+  if (stemWithoutPrintedNumber(q, ocr)) return 'The card text starts with its printed question number'
+  if (choicesLeftInStem(q)) {
+    return 'The answer choices are inside the question text and the option boxes hold its drawings; they are put back'
+  }
+  if (stemWithoutOwnOptionLines(q)) return 'The options are repeated inside the question text; they are removed'
+  if (gluedOptionsSplit(q)) return 'Two options are glued together in one box; they are split into two'
+  if (stemWithoutRepeatedPictures(q?.text)) return 'A picture is shown twice on this card; the extra copy is removed'
+  if (stemWithFigureCaptionCase(q?.text)) {
+    return 'A figure caption reads like an option letter, (A) for Figure (a); it is corrected'
+  }
+  return ''
+}
+
+/** The same drawing check as the alert list, so a card cannot pass while it shows raw code. */
+function drawnReason(q) {
+  const problem = officialPyqDrawnProblems(q)[0]
+  return problem ? `On screen, ${problem}` : ''
+}
+
+function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, items = [], ocr = '') {
   if (answerLabelWithoutAnswer(q)) {
     return `The card is marked “${ANSWER_CLAIMS[q.answerSource]}”, and no answer is saved`
   }
   const printed = solutionRules ? printedSolutionReason(q, fresh) : ''
   if (printed) return printed
-  if (isMatrixGridCard(q)) return ''
+  if (isMatrixGridCard(q)) return drawnReason(q)
   const leak = stemLeakReason(q, fresh, items)
   if (leak) return leak
+  const tidy = scanTidyReason(q, ocr)
+  if (tidy) return tidy
   const cut = stemStartCutOff(q?.text) || stemStartCutOff(q?.passageText)
   if (cut) return `The first word looks cut off (“${cut}”)`
   if (passageLostFigure) return 'The paragraph lost its figure; the other question under it has the figure'
   if (textWithLostWords(q, fresh)) return 'Words printed in the scan are missing from the card'
-  return ''
+  return drawnReason(q)
 }
 
 /**
@@ -687,7 +802,7 @@ function cardDamageReasons(questions, ocr, solutionRules = true) {
   questions.forEach((q, i) => {
     if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
     const reason =
-      cardDamageReason(q, freshCardFor(questions, i, ocr), siblings.has(i), solutionRules, items) ||
+      cardDamageReason(q, freshCardFor(questions, i, ocr), siblings.has(i), solutionRules, items, ocr) ||
       structure.get(i) ||
       chapterReason(q)
     if (reason) out.set(i, reason)
@@ -713,11 +828,12 @@ export function officialPyqCardDamageReason(paper, index) {
       passagesMissingSiblingFigure(questions).has(index),
       paper?.status !== 'published',
       freshCardsFromOcr(ocr),
+      ocr,
     ) || chapterReason(q)
   )
 }
 
-function withDamageRepaired(q, fresh, siblingPassage, items = []) {
+function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   let next = q
   if (answerLabelWithoutAnswer(next)) {
     const { answerConfidence: _confidence, ...rest } = next
@@ -726,11 +842,24 @@ function withDamageRepaired(q, fresh, siblingPassage, items = []) {
   next = withPrintedSolutionRepaired(next, fresh)
   if (isMatrixGridCard(next)) return next
   next = withStemLeaksRepaired(next, fresh, items)
+  const unnumbered = stemWithoutPrintedNumber(next, ocr)
+  if (unnumbered) next = { ...next, text: unnumbered }
+  const swapped = choicesLeftInStem(next)
+  if (swapped) next = { ...next, ...swapped }
+  const withoutOptions = stemWithoutOwnOptionLines(next)
+  if (withoutOptions) next = { ...next, text: withoutOptions }
+  const split = gluedOptionsSplit(next)
+  if (split) next = { ...next, options: split }
+  const once = stemWithoutRepeatedPictures(next.text)
+  if (once) next = { ...next, text: once }
+  const captioned = stemWithFigureCaptionCase(next.text)
+  if (captioned) next = { ...next, text: captioned }
   const found = textWithLostWords(next, fresh)
   if (found) next = { ...next, text: found }
   for (const key of ['text', 'passageText']) {
     if (typeof next[key] !== 'string') continue
-    const restored = withRestoredStemStart(next[key])
+    let restored = withRestoredStemStart(next[key])
+    if (restored === next[key] && stemStartCutOff(restored)) restored = stemWithCapitalisedStart(restored, ocr) || restored
     if (restored !== next[key]) next = { ...next, [key]: restored }
   }
   if (siblingPassage && !FIGURE_IN_TEXT_RE.test(String(next.passageText ?? ''))) next = { ...next, passageText: siblingPassage }
@@ -828,6 +957,7 @@ function cardFailsLocalQuality(card, ocr) {
   const options = Array.isArray(card?.options) ? card.options.map((o) => String(o ?? '')) : []
   const parts = [text, passage, ...options]
   if (parts.some((part) => CHECKER_NOTE.test(part))) return true
+  if (parts.some((part) => part.replace(PAPER_HEADING_LINE_RE, '') !== part)) return true
   const drawn =
     closedChemReactionDisplays(text) || closedChemReactionDisplays(passage)
   if (!drawn) {
@@ -1084,8 +1214,8 @@ function adoptKnownFixes(q, shown, ocr) {
   let next = q
   const unwrapped = String(q?.text ?? '').replace(/\$\$\s*(?=\\includegraphics\b)/g, '')
   if (unwrapped !== String(q?.text ?? '')) next = { ...next, text: unwrapped }
-  const text = inlineSingleSymbolDisplayMath(restoreDroppedMsOnGivenLine(String(next.text ?? '')))
-  const passage = inlineSingleSymbolDisplayMath(restoreDroppedMsOnGivenLine(String(next.passageText ?? '')))
+  const text = withAnswerBlankWord(inlineSingleSymbolDisplayMath(restoreDroppedMsOnGivenLine(String(next.text ?? ''))))
+  const passage = withAnswerBlankWord(inlineSingleSymbolDisplayMath(restoreDroppedMsOnGivenLine(String(next.passageText ?? ''))))
   if (text !== String(next.text ?? '')) next = { ...next, text }
   if (next.passageText != null && passage !== String(next.passageText)) {
     next = { ...next, passageText: passage }
@@ -1157,6 +1287,7 @@ export function repairOfficialPyqUntilQuality(paper) {
         fresh,
         passagesMissingSiblingFigure(questions).get(index),
         freshCardsFromOcr(ocr),
+        ocr,
       )
       if (mended !== questions[index]) {
         questions[index] = mended
@@ -1349,6 +1480,8 @@ export function persistOfficialPyqQualityRun(paper) {
           const fresh = freshCardFor(stored, i, source)
           const items = freshCardsFromOcr(source)
           if (stemLeakReason(stored[i], fresh, items) && !stemLeakReason(q, fresh, items)) return i
+          if (scanTidyReason(stored[i], source) && !scanTidyReason(q, source)) return i
+          if (drawnReason(stored[i]) && !drawnReason(q)) return i
           if (chapterReason(stored[i]) && !chapterReason(q)) return i
           return answerDiffersFromPrintedKey(stored[i], fresh) && !answerDiffersFromPrintedKey(q, fresh) ? i : -1
         })

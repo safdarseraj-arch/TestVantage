@@ -114,7 +114,11 @@ function nothingLost(q, ocr) {
   const card = norm(cardBlob(q))
   const missing = []
   for (const num of span.match(/\d+\.\d+/g) || []) {
-    if (!card.includes(num.replace(/\s+/g, ''))) missing.push(num)
+    if (card.includes(num.replace(/\s+/g, ''))) continue
+    // "3.1" printed as List-II row 3 with value 1 is "(3) 1" on the card.
+    const [row, value] = num.split('.')
+    if (/^[1-5]$/.test(row) && (card.includes(`(${row})${value}`) || card.includes(`${row}.${value}`))) continue
+    missing.push(num)
   }
   const optionLetters = new Set((span.match(/\(\s*[A-D]\s*\)/g) || []).map((l) => l.replace(/\s+/g, '')))
   const numerical = ['numerical', 'integer', 'passage_integer'].includes(String(q?.questionType ?? ''))
@@ -286,7 +290,8 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     const lost = nothingLost(q, ocr)
     if (lost) reasons.push(lost)
     if (/single_correct|multiple_correct|matrix_match/.test(type)) {
-      if (opts.length < 2) reasons.push('An MCQ option is empty')
+      // Confirmed paper facts name the option count; their own message says it.
+      if (opts.length < 4 && !(slot?.options > 0)) reasons.push('An MCQ option is empty')
       if (opts.some((opt) => /<smiles>\s*<\/smiles>/i.test(opt))) {
         reasons.push('An option has an empty structure (the scan lost the drawing)')
       }

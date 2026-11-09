@@ -332,11 +332,15 @@ export function stripStrayMathDelimiters(text) {
         (right === '(' && /\s/.test(t[i + 1] || '') && /^\(\s*[A-Za-z]{3,}\b/.test(t.slice(j)))
       const hyphenBeforeCommand =
         (left === '-' || left === '\u2013' || left === '\u2014') && right === '\\'
+      // $\beta^{-}$-decay and $x$-axis: a hyphen and a word after the closer are English.
+      const closerBeforeHyphenWord = right === '-' && t[i + 1] === '-' && /^-[A-Za-z]{2,}\b/.test(t.slice(j))
       // [Given: $9^{1/3}=2.08$ ] and $...mol^{-1}$ ] — the bracket is English.
       const closerBeforeEnglishBracket =
         (right === ']' || right === ')') && (left === '}' || left === ')' || /[0-9]/.test(left))
       // ( $\mathrm{M}_{1}$ and ( $2 a, 2 b$ ) — the dollar after "(" opens a real formula.
-      const openerBeforeCommand = right === '\\' || left === '(' || left === '['
+      // "(… produced in plant $T_{1}$ ) $=10 P$": a spaced ")" closes English words, so the $ opens.
+      const openerAfterEnglishParen = /\s\)\s+$/.test(out) && !/\s/.test(t[i + dl] || '')
+      const openerBeforeCommand = right === '\\' || left === '(' || left === '[' || openerAfterEnglishParen
       // (P)\n$|z|^{2}$ — a $ that starts a line or follows a row label opens a formula.
       const lineEdge = /\n[ \t]*$/.test(out) || /^[ \t]*\n/.test(t.slice(i + dl))
       const afterRowLabel = /(?:^|\s)\(\s*(?:[A-Z]|[IVX]{1,4}|\d{1,2})\s*\)\s*$/.test(out)
@@ -349,6 +353,7 @@ export function stripStrayMathDelimiters(text) {
         !answerBlankAfter &&
         !closedGroupThenParen &&
         !hyphenBeforeCommand &&
+        !closerBeforeHyphenWord &&
         !closerBeforeEnglishBracket &&
         !openerBeforeCommand &&
         !lineEdge &&

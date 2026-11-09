@@ -225,8 +225,9 @@ export function repairPiecewiseBraceArray(text) {
     (_, a, gAssign, b) =>
       `\\begin{cases}${a}\\end{cases}$ and $$${gAssign}\\begin{cases}${b}\\end{cases}$$`,
   )
+  // cases brings its own brace, so the "\right." that closed \left\{ goes too.
   s = s.replace(
-    /\\left\s*\\\{\s*\\begin\{array\}\{l+\}([\s\S]*?)\\end\{array\}/gi,
+    /\\left\s*\\\{\s*\\begin\{array\}\{l+\}([\s\S]*?)\\end\{array\}(?:\s*\\right\s*\.)?/gi,
     (_, body) => `\\begin{cases}${body}\\end{cases}`,
   )
   // After sanitize: f(x)=$\{$ $$\begin{array}…\end{array}$$

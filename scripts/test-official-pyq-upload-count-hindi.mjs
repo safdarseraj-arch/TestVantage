@@ -621,7 +621,7 @@ test('2014 P2: "1." numbering with List rows "\\item[Q.]" and "58." alone splits
   // Match codes "P-1, Q-2" and "3142" under a "P Q R S" header are the options; both lists stay.
   assert.deepEqual(items[17].options, ['P-1, Q-2, R-3, S-4', 'P-2, Q-4, R-3, S-1', 'P-4, Q-1, R-2, S-3', 'P-2, Q-1, R-3, S-4'])
   assert.match(items[19].text, /P\. Lift is accelerating vertically up[\s\S]*S\. Lift is falling freely[\s\S]*List II/)
-  assert.deepEqual(items[59].options, ['3142', '1342', '3124', '1324'])
+  assert.deepEqual(items[59].options, ['P-3, Q-1, R-4, S-2', 'P-1, Q-3, R-4, S-2', 'P-3, Q-1, R-2, S-4', 'P-1, Q-3, R-2, S-4'])
   for (const [i, q] of items.entries()) {
     assert.doesNotMatch([q.text, ...q.options].join('\n'), /\{Answer|Answer\s*\(\s*[A-D]\s*\)/, `Q${i + 1} keeps no answer line`)
     assert.doesNotMatch(q.text, /Choices\s*:\s*$/, `Q${i + 1} stem ends without "Choices:"`)
@@ -727,7 +727,7 @@ test('2014 P2 (Q. N with answers): bare "1." / "P." list rows, "2.r/2" and a low
     assert.doesNotMatch(q.text, /Choices\s*:/, `Q${n}`)
   }
   // "List II / 1. 2r" printed beside the first lens picture moves down to rows 2–4.
-  assert.match(items[17].text, /\(S\)[\s\S]*List II\n1\. \$2 r\$\n2\. r\/2\n3\. \$-r\$\n4\. \$r\$$/)
+  assert.match(items[17].text, /\(S\)[\s\S]*List II\n\(1\) \$2 r\$\n\(2\) r\/2\n\(3\) \$-r\$\n\(4\) \$r\$$/)
   assert.match(items[18].text, /\nS\. \$\\theta=20\^\{\\circ\}\$/)
   assert.doesNotMatch(items[18].text, /Q_\{1\}/, 'Q19 never carries Q17 rows')
 })
@@ -759,6 +759,44 @@ test('2014 P2 (Q. N with answers): saved Q1 / Q18 / Q19 / Q20 damage is flagged 
   }
   assert.match(rebuilt.questions[18].text, /P\. \$\\theta=5\^\{\\circ\}\$/, 'Q19 gets its own List-I back')
   assert.equal(rebuilt.questions[19].chapter, 'General')
+})
+
+const MATCH_LIST_QS = [17, 18, 19, 20, 37, 38, 39, 40, 57, 58, 59, 60]
+
+test('2014 P2 (Q. N with answers): every match-the-list card reads 4 + 4 rows with P-1, Q-2 … answer codes', () => {
+  const items = paperItemsFromMathpixOcr(p14bQa)
+  for (const n of MATCH_LIST_QS) {
+    const q = items[n - 1]
+    const parsed = parseLists.parseMatchingListForDisplay(q.text, q.options)
+    assert.deepEqual(parsed?.listI?.map((r) => r.label), ['(P)', '(Q)', '(R)', '(S)'], `Q${n} List-I`)
+    assert.deepEqual(parsed?.listII?.map((r) => r.label), ['(1)', '(2)', '(3)', '(4)'], `Q${n} List-II`)
+    assert.ok(q.options.every((o) => /^P-\d,? Q\s?-\d,? R-\d,? S-\d$/.test(o)), `Q${n} options ${JSON.stringify(q.options)}`)
+    assert.doesNotMatch(q.text, /^\s*P\s*Q\s*R\s*S\s*$/m, `Q${n} keeps no code-table heading`)
+  }
+  assert.deepEqual(items[56].options, ['P-1, Q-2, R-4, S-3', 'P-2, Q-1, R-3, S-4', 'P-1, Q-2, R-3, S-4', 'P-2, Q-1, R-4, S-3'])
+  assert.match(items[56].text, /\(2\) False\n\(3\) 1\n\(4\) 2/, 'Q57 row "3.1" is row 3, value 1')
+  assert.match(items[59].text, /List I\n[\s\S]*\(P\)\s*\$f_\{4\}\$ is[\s\S]*List II\n[\s\S]*\(1\)\s*onto but not one-one/, 'Q60 headings swapped back')
+})
+
+test('2014 P2 (Q. N with answers): saved code-only answers and Q60 with Q57 lists are flagged and repaired', () => {
+  const before = localOfficialPyqQualityCheck({ ...p14bQaStored, preparedText: p14bQa })
+  assert.match(before.lines.join('\n'), /Go to Q 37, 38, 39, 40, 57, 58, 59, 60\. The answer codes are shown without P, Q, R, S/)
+  globalThis.localStorage.clear()
+  const { questions, adminFacts, paperFacts, localQuality: _old, ...rest } = p14bQaStored
+  const added = pendingStore.addOfficialPyqPendingPaper({ ...rest, preparedText: p14bQa, questions })
+  pendingStore.updateOfficialPyqPendingPaper(added.id, { adminFacts, paperFacts })
+  const rebuilt = persistOfficialPyqQualityRun(pendingStore.getOfficialPyqPendingPaper(added.id))
+  globalThis.localStorage.clear()
+  assert.equal(rebuilt.localQuality.passed, true, rebuilt.localQuality.lines.join(' | '))
+  for (const n of MATCH_LIST_QS) {
+    const q = rebuilt.questions[n - 1]
+    const parsed = parseLists.parseMatchingListForDisplay(q.text, q.options)
+    assert.equal(`${parsed?.listI?.length}/${parsed?.listII?.length}`, '4/4', `Q${n}`)
+    assert.ok(q.options.every((o) => /^P-\d/.test(o)), `Q${n} options ${JSON.stringify(q.options)}`)
+  }
+  const q60 = rebuilt.questions[59].text
+  assert.doesNotMatch(q60, /z_\{k\}|-01\.jpg/, 'Q60 lost Q57 rows and Q1 pictures')
+  assert.match(q60, /onto but not one-one/)
 })
 
 const stemLeaks = await import('../src/utils/officialPyqStemLeaks.js')

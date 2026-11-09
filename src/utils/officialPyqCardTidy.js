@@ -1,0 +1,245 @@
+/**
+ * Card damage the scan itself settles, with no judgement call: the printed question number
+ * left in front of the text, the card's own options repeated inside the stem, two options glued
+ * into one box, and a first word the scan printed in lower case. Pure functions only.
+ */
+
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const compact = (text) =>
+  String(text ?? '')
+    .replace(/\\(?:left|right|mathrm|mathbf|text|textbf)\b/g, '')
+    .replace(/[\s${}~]/g, '')
+    .toLowerCase()
+
+const MARKER_LEAD_RE = /^\s*(?:\\item\s*\[\s*Q\s*\.?\s*\]\s*|Q\s*\.\s*)(\d{1,3})\b[ \t]*[.:)]?[ \t]*/
+const NUMBER_LEAD_RE = /^\s*(\d{1,3})(?:[ \t]*[.)])?[ \t]+(?=\S)/
+
+/** The first two words of the text, as a pattern that tolerates any spacing. */
+function openingPattern(rest) {
+  const words = String(rest ?? '').trim().split(/\s+/).slice(0, 2)
+  if (!words.length || !/[A-Za-z]{2,}/.test(words[0])) return ''
+  return words.map(escapeRe).join('\\s+')
+}
+
+/**
+ * The text without "Q. 12" / "3 " in front of it when that is the printed marker of this question
+ * (2019 P1 Q30 "Q. 12 Choose …", 2025 P2 Q19 "3 As shown …" — the scan prints "\item[Q.] 3 As
+ * shown"). '' when the text does not start with its own marker.
+ * @param {any} q
+ * @param {string} ocr
+ */
+export function stemWithoutPrintedNumber(q, ocr) {
+  const text = String(q?.text ?? '')
+  const printed = Number(q?.printedNumber)
+  if (!Number.isFinite(printed) || printed <= 0) return ''
+  const marker = text.match(MARKER_LEAD_RE)
+  if (marker && Number(marker[1]) === printed && text.slice(marker[0].length).trim()) {
+    return text.slice(marker[0].length).trimStart()
+  }
+  const lead = text.match(NUMBER_LEAD_RE)
+  if (!lead || Number(lead[1]) !== printed) return ''
+  const rest = text.slice(lead[0].length)
+  const opening = openingPattern(rest)
+  if (!opening) return ''
+  const inScan = new RegExp(
+    `(?:\\\\item\\s*\\[\\s*Q\\s*\\.?\\s*\\]\\s*|Q\\s*\\.?\\s*|(?:^|\\n)[ \\t]*)${printed}\\s*[.)]?\\s*${opening}`,
+  )
+  return inScan.test(String(ocr ?? '')) ? rest.trimStart() : ''
+}
+
+const OWN_OPTION_LINE_RE = /^\s*(?:\[\s*([A-D])\s*\]|\(\s*([A-D])\s*\)|([A-D])\s*[.)])\s*(\S.*)$/
+
+/**
+ * The stem without its own options repeated as "[A] … [D]" / "(A) …" lines (2017 P2 Q48).
+ * '' when fewer than three such lines match the card's options.
+ * @param {any} q
+ */
+export function stemWithoutOwnOptionLines(q) {
+  const options = (Array.isArray(q?.options) ? q.options : []).map(compact)
+  if (options.filter(Boolean).length < 3) return ''
+  const lines = String(q?.text ?? '').split('\n')
+  const drop = new Set()
+  lines.forEach((line, i) => {
+    const m = line.match(OWN_OPTION_LINE_RE)
+    if (!m) return
+    const at = (m[1] || m[2] || m[3]).charCodeAt(0) - 65
+    const body = compact(m[4])
+    if (body && options[at] && body === options[at]) drop.add(i)
+  })
+  if (drop.size < 3) return ''
+  const kept = lines.filter((_, i) => !drop.has(i)).join('\n').replace(/\n{3,}/g, '\n\n').trim()
+  return kept || ''
+}
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI']
+const DRAWING_RE = /^\s*(?:<smiles>[\s\S]*<\/smiles>|\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]*\))\s*$/
+
+/**
+ * The answer choices left in the stem as "[A] II > I > IV > III" lines while the option boxes hold
+ * the drawings I–IV the choices name (2017 P2 Q25). The drawings go back into the stem under
+ * their labels and the choices become the options. null when not the case.
+ * @param {any} q
+ * @returns {{ text: string, options: string[] } | null}
+ */
+export function choicesLeftInStem(q) {
+  const options = (Array.isArray(q?.options) ? q.options : []).map((o) => String(o ?? ''))
+  if (options.length < 2 || options.length > ROMAN.length || !options.every((o) => DRAWING_RE.test(o))) return null
+  const lines = String(q?.text ?? '').split('\n')
+  /** @type {Map<number, string>} */
+  const choices = new Map()
+  lines.forEach((line, i) => {
+    const m = line.match(OWN_OPTION_LINE_RE)
+    if (m) choices.set(i, m[4].trim())
+  })
+  if (choices.size < 3 || choices.size > 4) return null
+  const letters = [...choices.keys()].map((i) => {
+    const m = lines[i].match(OWN_OPTION_LINE_RE)
+    return m?.[1] || m?.[2] || m?.[3]
+  })
+  if (letters.join('') !== 'ABCD'.slice(0, letters.length)) return null
+  const labels = ROMAN.slice(0, options.length)
+  const named = [...choices.values()].every((body) => {
+    const used = body.replace(/\$[^$]*\$/g, ' ').match(/\b[IVX]+\b/g) || []
+    return used.length >= 2 && used.every((label) => labels.includes(label))
+  })
+  if (!named) return null
+  const stem = lines
+    .filter((line, i) => !choices.has(i) && !labels.includes(line.trim()))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  const drawings = options.map((o, i) => `${o.trim()}\n${labels[i]}`).join('\n')
+  return { text: `${stem}\n${drawings}`, options: [...choices.values()] }
+}
+
+/** "$(50-25 \sqrt{3}, 25)(25,25 \sqrt{3})$" → two options; null when the box holds one. */
+function splitGluedOption(opt) {
+  const s = String(opt ?? '').trim()
+  const tuple = s.match(/^\$\s*(\([^()$]*(?:\([^()$]*\)[^()$]*)*\))\s*(\([^()$]*(?:\([^()$]*\)[^()$]*)*\))\s*\$$/)
+  if (tuple) return [`$${tuple[1]}$`, `$${tuple[2]}$`]
+  const twoMath = s.match(/^(\$[^$]+\$)\s+(\$[^$]+\$)$/)
+  if (twoMath) return [twoMath[1], twoMath[2]]
+  return null
+}
+
+/**
+ * Four options when three boxes are filled and one of them holds two options the scan glued
+ * together (2016 P2 Q5). null when not the case.
+ * @param {any} q
+ * @returns {string[] | null}
+ */
+export function gluedOptionsSplit(q) {
+  if (!/single_correct|multiple_correct/.test(String(q?.questionType ?? ''))) return null
+  const options = (Array.isArray(q?.options) ? q.options : []).map((o) => String(o ?? ''))
+  const filled = options.filter((o) => o.trim())
+  if (filled.length !== 3 || options.length > 4) return null
+  const glued = filled.map(splitGluedOption)
+  if (glued.filter(Boolean).length !== 1) return null
+  const out = filled.flatMap((opt, i) => glued[i] || [opt])
+  return out.length === 4 ? out : null
+}
+
+/**
+ * The text with its first word capitalised when the scan printed that word in lower case right
+ * after the question marker (2016 P2 Q8: "\item[Q.] 8 light of wavelength"), so nothing was lost
+ * before it. '' when not the case.
+ * @param {string} text
+ * @param {string} ocr
+ */
+export function stemWithCapitalisedStart(text, ocr) {
+  const s = String(text ?? '')
+  const m = s.match(/^(\s*)([a-z]{3,})\b(\s+\S+)/)
+  if (!m) return ''
+  const pattern = new RegExp(
+    `(?:\\\\item\\s*\\[\\s*Q\\s*\\.?\\s*\\]\\s*\\d{1,3}|Q\\s*\\.?\\s*\\d{1,3}|(?:^|\\n)[ \\t]*\\d{1,3}\\s*[.)])\\s*${escapeRe(m[2])}\\s+${escapeRe(m[3].trim())}`,
+  )
+  if (!pattern.test(String(ocr ?? ''))) return ''
+  return `${m[1]}${m[2][0].toUpperCase()}${m[2].slice(1)}${s.slice(m[1].length + m[2].length)}`
+}
+
+const PICTURE_TOKEN_RE = /\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]*\)/g
+const ROW_LABEL_RE = /^\s*(\(\s*[A-Z1-9]\s*\)|[A-Z1-9]\s*[.)])/
+const LABEL_ONLY_RE = /^\s*(\(\s*[A-Z1-9]\s*\)|[A-Z1-9]\s*[.)])\s*$/
+const labelKey = (label) => String(label ?? '').replace(/[\s().]/g, '')
+
+/**
+ * The text with each picture shown once: a copy on a labelled row "(1) <picture>" is kept, a loose
+ * copy elsewhere goes, with its label line when that label has a row of its own (2026 P1 Q31
+ * printed List-II's pictures twice). '' when no picture repeats.
+ * @param {string} text
+ */
+export function stemWithoutRepeatedPictures(text) {
+  const lines = String(text ?? '').split('\n')
+  /** @type {Map<string, number[]>} */
+  const seen = new Map()
+  lines.forEach((line, i) => {
+    for (const m of line.matchAll(PICTURE_TOKEN_RE)) {
+      const at = seen.get(m[0]) || []
+      at.push(i)
+      seen.set(m[0], at)
+    }
+  })
+  const repeated = [...seen].filter(([, at]) => at.length > 1)
+  if (!repeated.length) return ''
+  /** @type {Map<string, number>} */
+  const labelRows = new Map()
+  for (const line of lines) {
+    if (LABEL_ONLY_RE.test(line)) continue
+    const key = labelKey(line.match(ROW_LABEL_RE)?.[1])
+    if (key) labelRows.set(key, (labelRows.get(key) || 0) + 1)
+  }
+  // A labelled copy whose label another row also uses is the extra one (2014 P2 Q38's "(2) <picture>").
+  const ownRow = (i) => labelRows.get(labelKey(lines[i].match(ROW_LABEL_RE)?.[1])) === 1
+  const out = lines.slice()
+  for (const [token, at] of repeated) {
+    const keep = at.find((i) => ROW_LABEL_RE.test(lines[i]) && ownRow(i)) ?? at[0]
+    for (const i of at) {
+      if (i === keep) continue
+      out[i] = out[i].split(token).join('').trimEnd()
+      if (!out[i].trim()) out[i] = '\u0000'
+    }
+  }
+  const rowLabels = new Set(
+    out.filter((line) => line !== '\u0000' && !LABEL_ONLY_RE.test(line)).map((line) => labelKey(line.match(ROW_LABEL_RE)?.[1])).filter(Boolean),
+  )
+  const kept = out.filter((line, i) => {
+    if (line === '\u0000') return false
+    const label = line.match(LABEL_ONLY_RE)?.[1]
+    if (!label || !rowLabels.has(labelKey(label))) return true
+    // Only a label whose picture was the loose copy goes; a label line in front of its own row stays.
+    let k = i + 1
+    while (k < out.length && !out[k].trim()) k += 1
+    return k < out.length && out[k] !== '\u0000'
+  })
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/**
+ * "Figure (a)" in the text while the caption under the picture reads "(A)": the scan
+ * capitalised the caption, which then looks like an option letter (2022 P1 Q27).
+ * Returns '' when no caption changes.
+ * @param {unknown} text
+ */
+export function stemWithFigureCaptionCase(text) {
+  const t = String(text ?? '')
+  const lines = t.split('\n')
+  let changed = false
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = lines[i].trim().match(/^\(([A-D])\)$/)
+    if (!m) continue
+    let k = i - 1
+    while (k >= 0 && !lines[k].trim()) k -= 1
+    if (k < 0 || !/^\\includegraphics\b/.test(lines[k].trim())) continue
+    const lower = m[1].toLowerCase()
+    if (!new RegExp(`\\b(?:FIG|[Ff]ig)(?:URE|ure|\\.)?\\s*\\(${lower}\\)`).test(t)) continue
+    lines[i] = lines[i].replace(`(${m[1]})`, `(${lower})`)
+    changed = true
+  }
+  return changed ? lines.join('\n') : ''
+}
+
+/** "equal$s_$" — the scan read "equals ____" as a subscript; the answer blank is put back (2019 P2 Q45). */
+export function withAnswerBlankWord(text) {
+  return String(text ?? '').replace(/\b([A-Za-z]{2,})\$([a-z]{1,3})_+\s*\$(?=\s*(?:\.|$))/g, '$1$2 ____')
+}

@@ -2962,6 +2962,8 @@ export function prepareOfficialPyqHealContext(paper, opts = {}) {
 /** One card: restore List-I, wrap math, recover options. Never invents rows. */
 export function extendOfficialPyqHealCard(q, source) {
   if (isMatrixGridCard(q)) return q
+  // Pictures cut from the original page stay. The scan's cut-up copy is not pasted back (2014 P2 Q37).
+  if (hasOriginalPageCrop(q?.text) || hasOriginalPageCrop(q?.passageText)) return q
   let text = restoreMissingListIFromSource(
     stripPageBreakAndSectionGlue(extendStemFromSource(q.text, source)),
     q.options,

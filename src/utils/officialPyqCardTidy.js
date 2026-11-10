@@ -239,6 +239,143 @@ export function stemWithFigureCaptionCase(text) {
   return changed ? lines.join('\n') : ''
 }
 
+const MATHPIX_PIECE_RE =
+  /^[ \t]*\\includegraphics(?:\[[^\]]*\])?\{(https:\/\/cdn\.mathpix\.com\/cropped\/[^?}\s]+)\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)\}[ \t]*$/
+/** "compound ↑", "(Peroxyester)": words of a drawing that the scan printed as text between its pieces. */
+const DRAWING_WORDS_RE = /^[ \t]*\(?[A-Za-z][A-Za-z'-]{3,}(?:[ \t]+[A-Za-z'-]+)?\)?(?:[ \t]*[↑↓])?[ \t]*$/
+const NOT_DRAWING_WORDS_RE = /^\s*\(?(?:fig|figure|list|column|codes?|table|answer|ans|note|given|where|then|and|or)\b/i
+/** Pieces of one drawing are this close on the scan page (about two lines of print). */
+const PIECE_GAP = 120
+/** About one printed letter on a Mathpix page, for the drawing's words beside a piece. */
+const LETTER_WIDTH = 20
+
+/**
+ * The text with a drawing the scan cut into pieces shown whole: two or more pictures of one page
+ * that sit together, with the drawing's own words printed as text between them (2014 P2 Q37's
+ * peroxyester scheme came as five pieces and "compound ↑", "(Peroxyester)"). Mathpix draws any
+ * box of the page, so the pieces become one picture of the box around them, widened by the
+ * length of those words because they sit beside a piece. '' when no drawing is in pieces.
+ * @param {unknown} text
+ */
+export function stemWithJoinedFigurePieces(text) {
+  const lines = String(text ?? '').split('\n')
+  const out = []
+  let changed = false
+  let i = 0
+  while (i < lines.length) {
+    const first = lines[i].match(MATHPIX_PIECE_RE)
+    if (!first) {
+      out.push(lines[i])
+      i += 1
+      continue
+    }
+    const pieces = [first]
+    const words = []
+    let pending = []
+    let last = i
+    for (let k = i + 1; k < lines.length; k += 1) {
+      const piece = lines[k].match(MATHPIX_PIECE_RE)
+      if (piece && piece[1] === first[1]) {
+        pieces.push(piece)
+        words.push(...pending.filter((line) => line.trim()))
+        pending = []
+        last = k
+        continue
+      }
+      if (!lines[k].trim() || (DRAWING_WORDS_RE.test(lines[k]) && !NOT_DRAWING_WORDS_RE.test(lines[k]))) {
+        pending.push(lines[k])
+        continue
+      }
+      break
+    }
+    const boxes = pieces
+      .map((m) => ({ h: Number(m[2]), w: Number(m[3]), y: Number(m[4]), x: Number(m[5]) }))
+      .sort((a, b) => a.y - b.y)
+    let bottom = boxes[0].y + boxes[0].h
+    const together = boxes.every((b, k) => {
+      if (k && b.y > bottom + PIECE_GAP) return false
+      bottom = Math.max(bottom, b.y + b.h)
+      return true
+    })
+    if (pieces.length < 2 || !words.length || !together) {
+      out.push(lines[i])
+      i += 1
+      continue
+    }
+    const x0 = Math.min(...boxes.map((b) => b.x))
+    const y0 = boxes[0].y
+    const x1 = Math.max(...boxes.map((b) => b.x + b.w)) + Math.max(...words.map((w) => w.trim().length)) * LETTER_WIDTH
+    out.push(`\\includegraphics{${first[1]}?height=${bottom - y0}&width=${x1 - x0}&top_left_y=${y0}&top_left_x=${x0}}`)
+    changed = true
+    i = last + 1
+  }
+  return changed ? out.join('\n') : ''
+}
+
+const ORIGINAL_CROP_PREFIX = '/api/official-pyq/original/crops/'
+
+/** Pictures cut from the original page, in the order Compare named them. */
+function originalPageCrops(urls) {
+  return (Array.isArray(urls) ? urls : [])
+    .map((url) => String(url ?? '').trim())
+    .filter((url) => url.startsWith(ORIGINAL_CROP_PREFIX))
+}
+
+/**
+ * List-II when every row is only a label and a molecule code or a picture (2014 P2 Q37).
+ * null when the block also holds ordinary words.
+ * @param {string} text
+ * @returns {{ index: number, block: string } | null}
+ */
+function structureOnlyListTwo(text) {
+  const found = String(text).match(/(?:^|\n)([ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*II\b[\s\S]*)$/i)
+  if (!found) return null
+  const block = found[1]
+  const lines = block.split('\n').map((line) => line.trim()).filter(Boolean)
+  const onlyStructures = lines.every(
+    (line, i) =>
+      (i === 0 && /^(?:List|Column)[ \t]*[-–]?[ \t]*II\b/i.test(line)) ||
+      /^\(\s*[1-5]\s*\)$/.test(line) ||
+      /^[1-5]\.$/.test(line) ||
+      /^<smiles>[\s\S]*<\/smiles>$/i.test(line) ||
+      /^\\includegraphics\b/.test(line),
+  )
+  if (!onlyStructures || !/<smiles>/i.test(block)) return null
+  return { index: found.index ?? 0, block }
+}
+
+/**
+ * A drawing the scan cut into pieces, and a List-II that is only molecule codes, shown from the
+ * original page (2014 P2 Q37). The first picture replaces the pieces. One picture left over
+ * replaces that whole List-II; one picture per molecule code replaces each code and keeps the
+ * row labels. The lists and the answer codes stay. '' when this card has no cut-up drawing or
+ * no original-page pictures.
+ * @param {unknown} text
+ * @param {unknown} urls
+ */
+export function textWithOriginalFigureCrops(text, urls) {
+  const crops = originalPageCrops(urls)
+  if (!crops.length) return ''
+  const t = String(text ?? '')
+  const joined = stemWithJoinedFigurePieces(t)
+  if (!joined) return ''
+  const oldUrls = new Set([...t.matchAll(/\\includegraphics\{([^}]+)\}/g)].map((m) => m[1]))
+  const made = [...joined.matchAll(/\\includegraphics\{([^}]+)\}/g)].find((m) => !oldUrls.has(m[1]))
+  if (!made) return ''
+  let out = joined.replace(made[0], `\\includegraphics{${crops[0]}}`)
+  const rest = crops.slice(1)
+  const list = structureOnlyListTwo(out)
+  if (list && rest.length === 1) {
+    out = `${out.slice(0, list.index)}\n\\includegraphics{${rest[0]}}`
+  } else if (list && rest.length === (list.block.match(/<smiles>/gi) || []).length) {
+    let i = 0
+    const replaced = list.block.replace(/<smiles>[\s\S]*?<\/smiles>/gi, () => `\\includegraphics{${rest[i++]}}`)
+    out = out.slice(0, list.index) + replaced
+  }
+  const cleaned = out.replace(/\n{3,}/g, '\n\n').trim()
+  return cleaned !== t.trim() ? cleaned : ''
+}
+
 const SCAN_PLACEHOLDER_LINE_RE = /^[ \t]*\[(?:Figure|Image|Diagram)\][ \t]*\n?/gim
 
 /**

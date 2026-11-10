@@ -5,6 +5,7 @@
  */
 
 import { parseMatchColumnUpload, looksLikeMatchColumnUpload } from './parseMatchColumnUpload.js'
+import { hasOriginalPageCrop } from './mathpixMedia.js'
 import { isMatrixGridCard } from './matrixGridPyq.js'
 
 /** Whole words only: "blister copper" is not a List question. */
@@ -69,6 +70,7 @@ export function enrichMatchListsFromOcr(q, source) {
   const src = String(source ?? '')
   let text = String(q.text ?? '').trim()
   if (!text || src.length < 40) return q
+  if (hasOriginalPageCrop(text) || hasOriginalPageCrop(q.passageText)) return q
   const needI = matchQuestionMissingListI({ text, options: q.options })
   const needII = MATCH_WORD_RE.test(text) && !hasListTwo(text)
   if (!needI && !needII) return q

@@ -1712,11 +1712,56 @@ function parseMatchingListForDisplayUnsafe(text, options) {
       media,
     ),
   )
-  return withHeadingFiguresKept(parsed, [listIBlock, listIIBlock])
+  return placeSchemeAboveLists(raw, withHeadingFiguresKept(parsed, [listIBlock, listIIBlock]))
 }
 
 const LIST_ROW_MARKER_RE = /\(\s*(?:[PQRSTUABCD1-6]|i{1,3}|iv|I{1,3}|IV)\s*\)/
 const FIGURE_CODE_RE = /\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]+\)/g
+
+const FIGURE_ONLY_RE = /\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]+\)/g
+
+/**
+ * The scheme sits above List-I, and the picture after row (S) is List-II (2014 P2 Q37).
+ * A picture that belongs on row (S) itself is left there.
+ * @param {string} raw
+ * @param {MatchingListDisplay | null} parsed
+ */
+function placeSchemeAboveLists(raw, parsed) {
+  if (!parsed?.listI?.length) return parsed
+  const listAt = String(raw).search(/(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*I(?!I)\b/i)
+  const scheme = listAt > 0 ? extractMathpixImageUrls(String(raw).slice(0, listAt)) : []
+  const bareScheme = (row) => {
+    const urls = extractMathpixImageUrls(row?.text)
+    const bare = !String(row?.text ?? '').replace(FIGURE_ONLY_RE, '').trim()
+    return bare && urls.length > 0 && urls.every((url) => scheme.includes(url))
+  }
+  const listI = parsed.listI.map((row) => ({ ...row }))
+  let listII = (parsed.listII || []).map((row) => ({ ...row }))
+  const last = listI[listI.length - 1]
+  const lastText = String(last?.text ?? '')
+  const lastUrls = extractMathpixImageUrls(lastText)
+  const words = lastText.replace(FIGURE_ONLY_RE, '').replace(/\s+/g, ' ').trim()
+  const rightIsScheme = listII.length === 1 && bareScheme(listII[0])
+  if (last && (listII.length === 0 || rightIsScheme) && lastUrls.length === 1 && words && words.length < lastText.trim().length) {
+    listI[listI.length - 1] = { ...last, text: words }
+    listII = [...listII, { label: '(1)', text: `\\includegraphics{${lastUrls[0]}}` }]
+  }
+  let intro = String(parsed.intro ?? '')
+  if (scheme.length && listII.length > 1) {
+    const kept = []
+    for (const row of listII) {
+      if (!bareScheme(row)) {
+        kept.push(row)
+        continue
+      }
+      if (!extractMathpixImageUrls(intro).some((url) => scheme.includes(url))) {
+        intro = `${intro}\n${scheme.map((url) => `\\includegraphics{${url}}`).join('\n')}`.trim()
+      }
+    }
+    listII = kept
+  }
+  return { ...parsed, intro, listI, listII }
+}
 
 /**
  * A question drawing printed just above "List-I" (2014 P2 Q17 charges, Q19 incline) is pulled into

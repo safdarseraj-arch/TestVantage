@@ -55,6 +55,8 @@ import {
   stemWithCapitalisedStart,
   scanLossReason,
   stemWithFigureCaptionCase,
+  stemWithJoinedFigurePieces,
+  textWithOriginalFigureCrops,
   stemWithoutOwnOptionLines,
   stemWithoutScanPlaceholders,
   withGluedWordsSplit,
@@ -214,7 +216,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 29
+export const LOCAL_QUALITY_REVISION = 30
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -771,6 +773,9 @@ function scanTidyReason(q, ocr) {
   if (stemWithoutScanPlaceholders(q?.text) || stemWithoutScanPlaceholders(q?.passageText)) {
     return 'The scan’s “[Figure]” placeholder is on the card; it is removed'
   }
+  if (stemWithJoinedFigurePieces(q?.text) || stemWithJoinedFigurePieces(q?.passageText)) {
+    return 'A drawing is shown in pieces with its words as loose text between them; it is shown as one picture'
+  }
   if (withEnglishSpacing(q, ocr) !== q) return 'Words are glued together (“whichpasses”, “,as”); the spaces are put back'
   return ''
 }
@@ -903,9 +908,14 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   if (once) next = { ...next, text: once }
   const captioned = stemWithFigureCaptionCase(next.text)
   if (captioned) next = { ...next, text: captioned }
+  const crops = officialPyqCurrentCompare(next)?.suggestedFigures?.text
+  const fromPage = textWithOriginalFigureCrops(next.text, crops)
+  if (fromPage) next = { ...next, text: fromPage }
   for (const key of ['text', 'passageText']) {
     const unplaced = stemWithoutScanPlaceholders(next[key])
     if (unplaced) next = { ...next, [key]: unplaced }
+    const whole = stemWithJoinedFigurePieces(next[key])
+    if (whole) next = { ...next, [key]: whole }
   }
   next = withEnglishSpacing(next, ocr)
   const found = textWithLostWords(next, fresh)

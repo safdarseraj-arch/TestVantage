@@ -19,6 +19,7 @@ import {
 } from './officialPyqLocalQuality.js'
 import { officialPyqCardAsShown } from './officialPyqCardAsShown.js'
 import { ORIGINAL_CROP_URL_PREFIX, consumeIncludeGraphics, isOriginalCropUrl } from './mathpixMedia.js'
+import { textWithOriginalFigureCrops } from './officialPyqCardTidy.js'
 import { paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
 import { gridColLabels, gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.js'
 import {
@@ -308,8 +309,22 @@ function placeCropFigures(before, suggested, urls) {
 }
 
 /**
+ * Compare rewrote a match-the-list card as a code table (2014 P2 Q37). The lists already on the
+ * card are kept; only the pictures cut from the original page are used.
+ * @param {string} before
+ * @param {string} suggested
+ */
+function suggestionDropsTheLists(before, suggested) {
+  const cardHasLists = /(?:List|Column)[ \t]*[-–]?[ \t]*I\b/i.test(before) && /(?:^|\n)[ \t]*\(\s*P\s*\)/.test(before)
+  const addsTable = /\\begin\{tabular\}/i.test(suggested) && !/\\begin\{tabular\}/i.test(before)
+  const addsCodes = /(?:^|\n)[ \t]*Codes?[ \t]*:/i.test(suggested) && !/(?:^|\n)[ \t]*Codes?[ \t]*:/i.test(before)
+  return cardHasLists && (addsTable || addsCodes)
+}
+
+/**
  * Draft from a Compare suggestion: corrected words from the page, and pictures cut out of the
  * original page where the card had broken SMILES / pictures. Nothing is drawn by Gemini.
+ * A suggestion that turns a match list into a code table is not used; the pictures still are.
  * @param {any} card
  * @param {{ suggestedText?: string, suggestedOptions?: string[], suggestedPassage?: string, suggestedFigures?: any }} compare
  */
@@ -319,6 +334,10 @@ export function officialPyqDraftFromSuggestion(card, compare) {
   const text = String(compare?.suggestedText ?? '').trim()
   const passage = String(compare?.suggestedPassage ?? '').trim()
   const opts = Array.isArray(compare?.suggestedOptions) ? compare.suggestedOptions : []
+  if (figures.text.length && suggestionDropsTheLists(base.text, text)) {
+    const kept = textWithOriginalFigureCrops(base.text, figures.text)
+    if (kept) return { ...base, text: kept }
+  }
   const count = Math.max(base.options.length, opts.length, figures.options.length)
   /** Gemini sends "(A)" or "" for a drawing it cannot write; the card's own option stays then. */
   const options = Array.from({ length: count }, (_, i) => {

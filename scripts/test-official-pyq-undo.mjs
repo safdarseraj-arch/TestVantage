@@ -47,6 +47,9 @@ const {
   saveOfficialPyqCompareResult,
 } = await import('../src/utils/officialPyqOriginalCompare.js')
 const { splitMathpixMediaSegments } = await import('../src/utils/mathpixMedia.js')
+const { extendOfficialPyqHealCard } = await import('../src/utils/extendTruncatedStem.js')
+const { enrichMatchListsFromOcr } = await import('../src/utils/restoreMatchListsOcr.js')
+const { parseMatchingListForDisplay } = await import('../src/utils/parseMatchingListDisplay.js')
 
 let failed = 0
 function test(name, fn) {
@@ -341,6 +344,76 @@ test('Compare pictures: only crop addresses are kept, and [figure] marks decide 
 
   const textOnly = officialPyqDraftFromSuggestion(card, { suggestedText: 'Fixed words [figure]', suggestedFigures: {} })
   assert.equal(textOnly.text, 'Fixed words\n![](https://cdn.mathpix.com/cropped/y-1.jpg)', 'without crops the old picture stays')
+
+  // 2014 P2 Q37: Compare rewrites the lists as a code table. The pictures are kept; the lists are not.
+  const scheme = '/api/official-pyq/original/crops/opyq-1-p25-3333333333333333.png?page=25&x0=0.1485&y0=0.2293&x1=0.8551&y1=0.5225'
+  const structures = '/api/official-pyq/original/crops/opyq-1-p25-4444444444444444.png?page=25&x0=0.4273&y0=0.5265&x1=0.8351&y1=0.6907'
+  const piece = (y, h, w, x) =>
+    `\\includegraphics{https://cdn.mathpix.com/cropped/19934504-6d9e-413a-a44e-2618e323b5ad-25.jpg?height=${h}&width=${w}&top_left_y=${y}&top_left_x=${x}}`
+  const q37 = {
+    text: [
+      'Different possible thermal decomposition pathways for peroxyesters are shown below. Match each pathway from List I with an appropriate structure from List II.',
+      piece(645, 140, 355, 743),
+      piece(867, 133, 851, 751),
+      'compound ↑',
+      piece(933, 180, 338, 321),
+      '(Peroxyester)',
+      piece(1080, 126, 856, 749),
+      'compound ↑',
+      piece(1292, 128, 722, 752),
+      '',
+      'List-I',
+      '',
+      '(P)',
+      'Pathway P',
+      '',
+      '(Q)',
+      'Pathway Q',
+      '',
+      '(R)',
+      'Pathway R',
+      '',
+      '(S)',
+      'Pathway S',
+      '',
+      'List-II',
+      '',
+      '(1)',
+      '',
+      '<smiles>COOC(=O)Cc1ccccc1</smiles>',
+      '',
+      '(4)',
+      '',
+      '<smiles>CC(C)(OOC(=O)c1ccccc1)c1ccccc1</smiles>',
+    ].join('\n'),
+    options: ['P-1, Q-3, R-4, S-2', 'P-2, Q-4, R-3, S-1', 'P-4, Q-1, R-2, S-3', 'P-3, Q-2, R-1, S-4'],
+  }
+  const rewritten = officialPyqDraftFromSuggestion(q37, {
+    suggestedText: 'Different possible thermal decomposition pathways.\n[figure]\n\\begin{tabular}{ll}\nList-I & List-II \\\\\nP. Pathway P & [figure] \\\\\n\\end{tabular}\nCodes:\n\\begin{tabular}{lllll}\n & P & Q & R & S \\\\\n(A) & 1 & 3 & 4 & 2 \\\\\n\\end{tabular}',
+    suggestedOptions: ['(A) P-1, Q-3, R-4, S-2'],
+    suggestedFigures: { text: [scheme, structures], passage: [], options: [] },
+  })
+  assert.match(rewritten.text, new RegExp(scheme.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  assert.match(rewritten.text, new RegExp(structures.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  assert.match(rewritten.text, /\(P\)\nPathway P/)
+  assert.doesNotMatch(rewritten.text, /compound|Peroxyester|smiles|tabular|Codes:/)
+  assert.deepEqual(rewritten.options, q37.options)
+
+  const kept = extendOfficialPyqHealCard(
+    { ...rewritten, questionType: 'matrix_match' },
+    `Q. 37 ${q37.text}\ncompound ↑\n(Peroxyester)\n<smiles>COOC(=O)Cc1ccccc1</smiles>`,
+  )
+  assert.equal(kept.text, rewritten.text, 'opening the paper does not paste the scan over the original-page pictures')
+  const enriched = enrichMatchListsFromOcr(kept, `match List-II\n(1)\n<smiles>COOC(=O)Cc1ccccc1</smiles>`)
+  assert.equal(enriched.text, rewritten.text)
+  const shown = parseMatchingListForDisplay(rewritten.text, rewritten.options)
+  assert.match(shown.intro, /3333333333333333/, 'the scheme stays above the lists')
+  assert.deepEqual(
+    shown.listI.map((row) => row.text.replace(/\s+/g, ' ').trim()),
+    ['Pathway P', 'Pathway Q', 'Pathway R', 'Pathway S'],
+  )
+  assert.equal(shown.listII.length, 1)
+  assert.match(shown.listII[0].text, /4444444444444444/)
 
   const honest = honestOfficialPyqCompareResult({ verdict: 'matches', suggested_figures: { text: [A] } }, ['flagged'])
   assert.equal(honest.suggested_figures, undefined)

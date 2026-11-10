@@ -70,6 +70,7 @@ import BankMathpixUploadPanel from '../components/BankMathpixUploadPanel'
 import QuestionBankHubNav from '../components/QuestionBankHubNav'
 import QuestionBankSubBankNav from '../components/QuestionBankSubBankNav'
 import BankReviewApproveStrip from '../components/BankReviewApproveStrip'
+import BankHybridFill from '../components/BankHybridFill.jsx'
 import {
   countHybridAiDrafts,
   countHybridAiDraftTrays,
@@ -1064,10 +1065,11 @@ export default function QuestionBank() {
     [scopedSaved],
   )
 
-  const draftCount = useMemo(
-    () => shownQuestions.filter((q) => effectiveBankStatus(q) === 'draft').length,
+  const shownDrafts = useMemo(
+    () => shownQuestions.filter((q) => effectiveBankStatus(q) === 'draft'),
     [shownQuestions],
   )
+  const draftCount = shownDrafts.length
   const publishedCount = useMemo(
     () => shownQuestions.filter((q) => effectiveBankStatus(q) === 'published').length,
     [shownQuestions],
@@ -7574,6 +7576,12 @@ export default function QuestionBank() {
             />
           </ErrorBoundary>
         </>
+      )}
+
+      {(panelHub === 'view' || (panelHub === 'review' && accessMainBank)) && viewTab === 'draft' && canPublishBank && (
+        <ErrorBoundary compact title="Fill with Hybrid AI">
+          <BankHybridFill drafts={shownDrafts} onChanged={refresh} />
+        </ErrorBoundary>
       )}
 
       {panelHub === 'view' && (

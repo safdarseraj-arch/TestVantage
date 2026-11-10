@@ -466,10 +466,10 @@ export function describeMcqExtractResult({ engine, cloudNote, lowConfidence } = 
     const warn = lowConfidence ? ' Review stem, options, answers, and tags before publish.' : ''
     return cloudNote
       ? `${cloudNote}${warn}`
-      : `Mathpix read the page. Local AI split questions. Gemini filled tags, answers, and solutions.${warn}`
+      : `Mathpix read the page. Local AI split questions. Press Fill with Hybrid AI on Draft questions to add tags, answers, and solutions.${warn}`
   }
   if (engine === 'cloud-vision') {
-    return 'Gemini is not used for OCR. Re-upload so Mathpix can read the PDF or image, then Gemini can fill tags and answers.'
+    return 'Gemini is not used for OCR. Re-upload so Mathpix can read the PDF or image, then press Fill with Hybrid AI on Draft questions.'
   }
   if (engine === 'pix2text') {
     const warn = lowConfidence

@@ -127,7 +127,7 @@ export function bankDraftsSuccessMessage(result) {
   const head =
     note ||
     (n
-      ? `Mathpix OCR + Gemini saved ${n} draft${n === 1 ? '' : 's'} (not published).`
+      ? `Mathpix OCR saved ${n} draft${n === 1 ? '' : 's'} (not published). Press Fill with Hybrid AI on Draft questions to add tags, answers, and solutions.`
       : 'Upload finished.')
   return `${head}${named}${extra} Open Saved questions → Draft to review. Published questions were not wiped.`
 }

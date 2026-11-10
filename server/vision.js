@@ -1089,8 +1089,8 @@ export async function structureOcrWithGemini(body = {}) {
     const extra = official
       ? 'Official PYQ paper: split EVERY \\item[Q.] / Q.n into its own question. Instructions stay instructions, not extra questions. Returning 1 blob for a multi-question paper is wrong. Keep paper identity from context. Split only: set chapter, topic, and toughness to null, and give an answer only when the answer key is printed on the paper (answerKeyVisible true). If the paper prints a solution for a question (after the question or in an end Solutions section), copy it word for word into solution and set solutionPrinted true; otherwise set solution to null and solutionPrinted false. Never write your own solution. Tags, missing answers, and missing solutions are filled later, after the paper is approved.'
       : deferSolutions
-        ? 'Question-bank verify step: split every question with stem + options + questionType. Do NOT write solutions — set solution to null on every row. User will approve split first, then ask for solutions later.'
-        : 'Question-bank upload: fill every field you can.'
+        ? 'Question-bank verify step: split every question with stem + options + questionType. Do NOT write solutions — set solution to null on every row. Set chapter, topic, and toughness to null, and give an answer only when the answer key is printed on the paper (answerKeyVisible true). User will approve split first, then press Fill with Hybrid AI later.'
+        : 'Question-bank upload: split only. Split every question with stem + options + questionType. Set chapter, topic, toughness, and solution to null, and give an answer only when the answer key is printed on the paper (answerKeyVisible true). Tags, answers, and solutions are filled later when the user presses Fill with Hybrid AI.'
     const userText = `Format: ${format}\nPaper context JSON: ${JSON.stringify(paperMeta).slice(0, 4000)}\n${extra}\nChunk ${i + 1}/${chunks.length} of Mathpix OCR:\n${chunks[i]}`
     try {
       const result =

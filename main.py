@@ -1273,6 +1273,40 @@ async def official_pyq_original_crop(paper_id: str, body: OfficialPyqCropRequest
     return {"ok": True, **result}
 
 
+class OfficialPyqMathpixCropsRequest(BaseModel):
+    urls: list[str] = Field(default_factory=list, max_length=800)
+
+
+@app.post("/api/official-pyq/original/{paper_id}/mathpix-crops", tags=["Official PYQ"])
+async def official_pyq_mathpix_crops(paper_id: str, body: OfficialPyqMathpixCropsRequest) -> dict[str, Any]:
+    """Mathpix picture links cut again from the stored original PDF (PyMuPDF, local). Mathpix deletes its links."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    try:
+        result = await asyncio.to_thread(opc.crops_for_mathpix_links, paper_id, body.urls)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _compare_http_error(exc) from exc
+    return {"ok": True, **result}
+
+
+@app.get("/api/official-pyq/original/mathpix-picture", tags=["Official PYQ"])
+async def official_pyq_mathpix_picture(u: str = Query(..., max_length=600)) -> Response:
+    """The local copy of a Mathpix picture link, once it was cut from the original PDF."""
+    import official_pyq_compare as opc
+
+    local = opc.local_crop_for_mathpix(u)
+    if not local:
+        raise HTTPException(status_code=404, detail={"code": "no_local_picture", "message": "No local copy of this picture."})
+    name = local[len(opc.CROP_URL_PREFIX) :].split("?", 1)[0]
+    try:
+        data = opc.read_crop(name)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _compare_http_error(exc) from exc
+    return Response(content=data, media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/api/official-pyq/original/{paper_id}", tags=["Official PYQ"])
 async def official_pyq_original_status(paper_id: str) -> dict[str, Any]:
     """Is the original PDF / page image stored for this pending paper?"""

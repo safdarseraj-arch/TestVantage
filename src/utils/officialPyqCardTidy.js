@@ -389,6 +389,38 @@ export function stemWithoutScanPlaceholders(text) {
   return cleaned !== t.trim() ? cleaned : ''
 }
 
+const PICTURE_ROW_RE = /^[ \t]*(?:\(\s*[A-Z1-9]\s*\)[ \t]*)?\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}[ \t]*$/
+const AXIS_LABEL_RE = /^[ \t]*\$[^$\n]{1,14}\$[ \t]*$/
+/** "(1) (T)" with the row's picture on the next line: a stray letter the scan read in a numbered row. */
+const STRAY_ROW_LETTER_RE = /^([ \t]*\(\s*[1-9]\s*\))[ \t]+\(\s*[A-Z]\s*\)[ \t]*\n+(?=[ \t]*\\includegraphics)/gm
+
+/**
+ * A graph's own axis label printed as loose text after picture rows, and a stray letter in a
+ * numbered row (2025 P1 Q31: "$i(t)$" after (Q), (R), (S) and (4), "(1) (T)" in List-II).
+ * A label counts only when the same line follows two or more picture rows. '' when none.
+ * @param {unknown} text
+ */
+export function stemWithoutGraphAxisLeftovers(text) {
+  const t = String(text ?? '')
+  if (!/\\includegraphics/.test(t)) return ''
+  let out = t.replace(STRAY_ROW_LETTER_RE, '$1 ')
+  const lines = out.split('\n')
+  const afterPicture = new Map()
+  let lastFilled = ''
+  lines.forEach((line, i) => {
+    if (!line.trim()) return
+    if (AXIS_LABEL_RE.test(line) && PICTURE_ROW_RE.test(lastFilled)) {
+      const key = line.trim()
+      afterPicture.set(key, [...(afterPicture.get(key) || []), i])
+    }
+    lastFilled = line
+  })
+  const drop = new Set([...afterPicture.values()].filter((at) => at.length >= 2).flat())
+  if (drop.size) out = lines.filter((_, i) => !drop.has(i)).join('\n')
+  const cleaned = out.replace(/\n{3,}/g, '\n\n').trim()
+  return cleaned !== t.trim() ? cleaned : ''
+}
+
 /** Text outside $…$, pictures and molecules, where English spacing rules apply. */
 function mapEnglish(text, fn) {
   return String(text ?? '')

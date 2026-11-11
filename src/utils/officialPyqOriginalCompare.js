@@ -11,7 +11,9 @@ import { officialPyqMatchListLayoutProblems } from './matchListLayoutCheck.js'
 import {
   getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
+  loadOfficialPyqPendingPapers,
   updateOfficialPyqPendingPaper,
+  updateOfficialPyqPendingPapersMeta,
 } from './officialPyqPendingStore.js'
 import { numberingPrintedInOcr, subjectLocalNumbers } from './officialPyqAdminFacts.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
@@ -112,7 +114,28 @@ export async function uploadOfficialPyqOriginal(paperId, file, fileName) {
     undefined,
   )
   if (!res.ok) throw await readError(res)
-  return res.json()
+  const stored = await res.json()
+  void keepPaperPicturesLocal(paperId)
+  return stored
+}
+
+/**
+ * Local copies of the paper's Mathpix pictures, cut from its stored original PDF.
+ * @param {string} [paperId] one paper; every stored paper when omitted
+ */
+export async function keepPaperPicturesLocal(paperId) {
+  try {
+    const { keepOfficialPyqPicturesLocal } = await import('./mathpixLocalPictures.js')
+    return await keepOfficialPyqPicturesLocal({
+      papers: loadOfficialPyqPendingPapers(),
+      ocrTextOf: getOfficialPyqPendingOcrText,
+      savePaperMeta: updateOfficialPyqPendingPapersMeta,
+      onlyPaperId: paperId,
+      force: Boolean(paperId),
+    })
+  } catch {
+    return { kept: 0, noOriginal: [] }
+  }
 }
 
 /** Printed number on the original paper for this card. @param {any} q @param {number} index */

@@ -3,6 +3,7 @@
  * KaTeX cannot render tabular; array + $$ is the permanent display path.
  */
 import katex from 'katex'
+import { localPictureOnErrorAttr } from './mathpixLocalPictures.js'
 
 /** Read one `{...}` group. Nested braces and `\{` stay inside. */
 function readBraceGroup(s, i) {
@@ -574,7 +575,7 @@ function matchCellHtml(raw) {
     html += matchCellProseHtml(s.slice(last, m.index))
     const src = m[1] || m[2]
     html += src
-      ? `<img src="${escapeHtml(src)}" alt="" style="display:block;max-width:10rem;height:auto;margin:0.3rem 0">`
+      ? `<img src="${escapeHtml(src)}" alt="" style="display:block;max-width:10rem;height:auto;margin:0.3rem 0"${localPictureOnErrorAttr(src)}>`
       : matchCellMathHtml(m[3] ?? m[4])
     last = m.index + m[0].length
   }

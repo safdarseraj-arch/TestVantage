@@ -152,6 +152,9 @@ function loadOfficialPyqHeal() {
   return import('../utils/extendTruncatedStem.js')
 }
 
+/** Mathpix picture links expire; local copies are cut once per app session. */
+let picturesKeptThisSession = false
+
 /** Run work after paint; prefer idle time so row clicks stay responsive. */
 function scheduleIdleWork(fn, { timeoutMs = 1500, fallbackMs = 48 } = {}) {
   let cancelled = false
@@ -383,6 +386,15 @@ export default function OfficialPyqPending() {
       }
     }
   }, [bump])
+
+  useEffect(() => {
+    if (picturesKeptThisSession) return undefined
+    const timer = setTimeout(() => {
+      picturesKeptThisSession = true
+      void import('../utils/officialPyqOriginalCompare.js').then(({ keepPaperPicturesLocal }) => keepPaperPicturesLocal())
+    }, 4000)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (!busy || !uploadAbortRef.current || progressPct < 60) return undefined

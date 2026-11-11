@@ -11,6 +11,7 @@ import {
 import { wrapBareLatexRuns, repairOrphanAlignedBody } from '../utils/wrapBareLatexRuns.js'
 import { hasMathpixMedia, splitMathpixMediaSegments, stripMathpixFigureChrome } from '../utils/mathpixMedia'
 import { figureRowShare, groupSideBySideFigureSegments } from '../utils/figureLayout.js'
+import { showLocalPictureOnError } from '../utils/mathpixLocalPictures.js'
 import { splitSmilesDisplaySegments } from '../utils/smilesDisplay.js'
 import { displayMathStandsAlone } from '../utils/sanitizeMathDelimiters.js'
 import SmilesStructure from './SmilesStructure.jsx'
@@ -463,6 +464,7 @@ export default function MathText({ text, questionContext, optionLetter }) {
                   src={fig.url}
                   alt=""
                   style={{ maxWidth: `calc(${figureRowShare(seg.value, j)}% - 0.75rem)` }}
+                  onError={showLocalPictureOnError}
                 />
               ))}
             </span>
@@ -472,6 +474,7 @@ export default function MathText({ text, questionContext, optionLetter }) {
               className="mathpix-paper-figure"
               src={seg.value}
               alt=""
+              onError={showLocalPictureOnError}
             />
           ) : (
             <span key={`tx-${i}`}>

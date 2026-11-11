@@ -56,6 +56,7 @@ import {
   scanLossReason,
   stemWithFigureCaptionCase,
   stemWithJoinedFigurePieces,
+  stemWithoutGraphAxisLeftovers,
   textWithOriginalFigureCrops,
   stemWithoutOwnOptionLines,
   stemWithoutScanPlaceholders,
@@ -219,7 +220,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 35
+export const LOCAL_QUALITY_REVISION = 36
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -568,7 +569,20 @@ function answerClaimsUnprintedKey(q, fresh, items = []) {
   if (!fresh || q?.answerSource !== 'from_paper' || q?.answerFromOriginalPage === true || isMatrixGridCard(q)) return false
   if (fresh.answerSource === 'from_paper' || answerKeyOf(fresh).has || fresh.bonusMarksToAll === true) return false
   if (!items.some((item) => item?.answerSource === 'from_paper' && answerKeyOf(item).has)) return false
-  return answerKeyOf(q).has
+  const saved = answerKeyOf(q)
+  if (saved.letters && sameAsPageKey(saved.letters, q?.originalCompare?.printedAnswer)) return false
+  return saved.has
+}
+
+/**
+ * Compare read this letter key on the original page (2025 P1 Q31: the scan lost "A", the page
+ * prints it). The page's key does not change when the card's text is edited.
+ * @param {number[]} letters
+ * @param {unknown} printed
+ */
+function sameAsPageKey(letters, printed) {
+  const page = [...String(printed ?? '').toUpperCase().replace(/[^A-D]/g, '')].sort().join('')
+  return Boolean(page) && letters.map((i) => 'ABCD'[i] ?? '?').join('') === page
 }
 
 const PRINTED_KEY_SHARE = 0.5
@@ -837,6 +851,9 @@ function scanTidyReason(q, ocr) {
   if (stemWithJoinedFigurePieces(q?.text) || stemWithJoinedFigurePieces(q?.passageText)) {
     return 'A drawing is shown in pieces with its words as loose text between them; it is shown as one picture'
   }
+  if (stemWithoutGraphAxisLeftovers(q?.text) || stemWithoutGraphAxisLeftovers(q?.passageText)) {
+    return 'A graph’s axis label or a stray letter is loose text between the list rows; it is removed'
+  }
   if (withEnglishSpacing(q, ocr) !== q) return 'Words are glued together (“whichpasses”, “,as”); the spaces are put back'
   return ''
 }
@@ -986,6 +1003,8 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
     if (unplaced) next = { ...next, [key]: unplaced }
     const whole = stemWithJoinedFigurePieces(next[key])
     if (whole) next = { ...next, [key]: whole }
+    const unlabelled = stemWithoutGraphAxisLeftovers(next[key])
+    if (unlabelled) next = { ...next, [key]: unlabelled }
   }
   next = withEnglishSpacing(next, ocr)
   const found = textWithLostWords(next, fresh)

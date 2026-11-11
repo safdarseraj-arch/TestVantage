@@ -17,9 +17,11 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs
 
 import fitz
 import httpx
@@ -569,16 +571,118 @@ def crop_original_page(paper_id: str, page: int, box: dict[str, Any]) -> dict[st
             rect.y0 + y1 * rect.height,
         )
         scale = (_CROP_DPI / 72.0) if path.suffix == ".pdf" else 1.0
-        pix = pdf_page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip, alpha=False)
-        data = pix.tobytes("png")
+        return _save_crop(paper_id, page, pdf_page, clip, scale, (x0, y0, x1, y1))
+
+
+def _save_crop(
+    paper_id: str, page: int, pdf_page: fitz.Page, clip: fitz.Rect, scale: float, box: tuple[float, float, float, float]
+) -> dict[str, Any]:
+    pix = pdf_page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip, alpha=False)
+    data = pix.tobytes("png")
     digest = hashlib.sha1(data).hexdigest()[:16]
     name = f"{_safe_id(paper_id)}-p{page}-{digest}.png"
     CROPS_DIR.mkdir(parents=True, exist_ok=True)
     dest = CROPS_DIR / name
     if not dest.exists():
         dest.write_bytes(data)
+    x0, y0, x1, y1 = box
     place = f"page={page}&x0={x0:.4f}&y0={y0:.4f}&x1={x1:.4f}&y1={y1:.4f}"
     return {"name": name, "url": f"{CROP_URL_PREFIX}{name}?{place}", "width": pix.width, "height": pix.height}
+
+
+# Mathpix draws each PDF page at 250 DPI; its cropped/<id>-<page>.jpg links name the page and a pixel box
+# on that drawing, and are deleted from its server about a month after upload.
+_MATHPIX_DPI = 250.0
+_MATHPIX_CROP_RE = re.compile(r"^https?://cdn\.mathpix\.com/cropped/([A-Za-z0-9-]+?)-(\d{1,3})\.jpg\?(\S+)$")
+_MAX_MATHPIX_URLS = 800
+
+
+def _mathpix_box(url: str) -> tuple[str, int, int, int, int, int] | None:
+    """(picture id, 1-based page, x, y, width, height) of a Mathpix crop link, in its 250 DPI pixels."""
+    clean = str(url or "").replace("\\&", "&").replace("&amp;", "&").strip()
+    match = _MATHPIX_CROP_RE.match(clean)
+    if not match:
+        return None
+    query = parse_qs(match.group(3))
+    try:
+        x, y, w, h = (int(query[k][0]) for k in ("top_left_x", "top_left_y", "width", "height"))
+    except (KeyError, ValueError, IndexError):
+        return None
+    return match.group(1).lower(), int(match.group(2)), x, y, w, h
+
+
+def _mathpix_key(url: str) -> str | None:
+    box = _mathpix_box(url)
+    return "{}-{}:{}:{}:{}:{}".format(*box) if box else None
+
+
+def crops_for_mathpix_links(paper_id: str, urls: list[str]) -> dict[str, Any]:
+    """The same boxes cut from the stored original PDF, so pictures survive the Mathpix links. Pixels only."""
+    path = _original_file(paper_id)
+    if path is None or path.suffix != ".pdf":
+        raise OriginalMissingError(ORIGINAL_MISSING_MESSAGE)
+    out: dict[str, str] = {}
+    keyed: dict[str, str] = {}
+    skipped: list[str] = []
+    with fitz.open(str(path)) as doc:
+        for url in list(dict.fromkeys(str(u or "") for u in urls))[:_MAX_MATHPIX_URLS]:
+            box = _mathpix_box(url)
+            if not box:
+                skipped.append(url)
+                continue
+            _, page, x, y, w, h = box
+            if not 1 <= page <= doc.page_count or w <= 0 or h <= 0:
+                skipped.append(url)
+                continue
+            pdf_page = doc[page - 1]
+            rect = pdf_page.rect
+            s = 72.0 / _MATHPIX_DPI
+            clip = fitz.Rect(rect.x0 + x * s, rect.y0 + y * s, rect.x0 + (x + w) * s, rect.y0 + (y + h) * s) & rect
+            if clip.is_empty or clip.width < 2 or clip.height < 2:
+                skipped.append(url)
+                continue
+            box = (
+                (clip.x0 - rect.x0) / rect.width,
+                (clip.y0 - rect.y0) / rect.height,
+                (clip.x1 - rect.x0) / rect.width,
+                (clip.y1 - rect.y0) / rect.height,
+            )
+            out[url] = _save_crop(paper_id, page, pdf_page, clip, _CROP_DPI / 72.0, box)["url"]
+            keyed[str(_mathpix_key(url))] = out[url]
+    if keyed:
+        with _MATHPIX_LINKS_LOCK:
+            known = _read_mathpix_links()
+            known.update(keyed)
+            MATHPIX_LINKS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            tmp = MATHPIX_LINKS_FILE.with_suffix(".tmp")
+            tmp.write_text(json.dumps(known, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(MATHPIX_LINKS_FILE)
+    return {"crops": out, "skipped": skipped}
+
+
+MATHPIX_LINKS_FILE = CROPS_DIR / "mathpix-links.json"
+_MATHPIX_LINKS_LOCK = threading.Lock()
+
+
+def _read_mathpix_links() -> dict[str, str]:
+    try:
+        data = json.loads(MATHPIX_LINKS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def local_crop_for_mathpix(url: str) -> str | None:
+    """The local copy recorded for this Mathpix link, while its file still exists."""
+    key = _mathpix_key(url)
+    if not key:
+        return None
+    with _MATHPIX_LINKS_LOCK:
+        local = _read_mathpix_links().get(key)
+    if not isinstance(local, str) or not local.startswith(CROP_URL_PREFIX):
+        return None
+    name = local[len(CROP_URL_PREFIX) :].split("?", 1)[0]
+    return local if (CROPS_DIR / name).is_file() else None
 
 
 def read_crop(name: str) -> bytes:

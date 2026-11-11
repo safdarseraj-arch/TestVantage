@@ -54,6 +54,7 @@ const { splitMathpixMediaSegments } = await import('../src/utils/mathpixMedia.js
 const { extendOfficialPyqHealCard } = await import('../src/utils/extendTruncatedStem.js')
 const { enrichMatchListsFromOcr } = await import('../src/utils/restoreMatchListsOcr.js')
 const { parseMatchingListForDisplay } = await import('../src/utils/parseMatchingListDisplay.js')
+const { stemWithoutGraphAxisLeftovers } = await import('../src/utils/officialPyqCardTidy.js')
 const { paperItemsFromMathpixOcr } = await import('../src/utils/mathpixQuestionSplit.js')
 const { healUploadQuestionCard } = await import('../src/utils/uploadQualityGuards.js')
 
@@ -782,6 +783,61 @@ test('2013 P2 Q60: an answer marked "from the paper" where the scan prints no ke
     localOfficialPyqQualityCheck({ id: 'p-q60', officialPyq: true, preparedText: scan, questions: typed }).lines.join('\n'),
     /prints no answer/,
   )
+  // 2025 P1 Q31: the scan lost the key, Compare read the same "A" on the original page.
+  const onPage = [cards[0], { ...cards[1], correctIndex: 0, answerSource: 'from_paper', originalCompare: { verdict: 'differs', printedAnswer: 'A' } }]
+  assert.doesNotMatch(
+    localOfficialPyqQualityCheck({ id: 'p-q60', officialPyq: true, preparedText: scan, questions: onPage }).lines.join('\n'),
+    /prints no answer/,
+  )
+  const otherOnPage = [cards[0], { ...cards[1], correctIndex: 0, answerSource: 'from_paper', originalCompare: { verdict: 'differs', printedAnswer: 'C' } }]
+  assert.match(
+    localOfficialPyqQualityCheck({ id: 'p-q60', officialPyq: true, preparedText: scan, questions: otherOnPage }).lines.join('\n'),
+    /prints no answer/,
+  )
+})
+
+test('2025 P1 Q31: graph axis labels and a stray "(T)" between the list rows are removed', () => {
+  const pic = (y, x) => `\\includegraphics{https://cdn.mathpix.com/cropped/9deb824d-21.jpg?height=120&width=450&top_left_y=${y}&top_left_x=${x}}`
+  const text = [
+    'A circuit with an electrical load having impedance $Z$ is connected with an AC source as shown in the diagram. List-I shows various options for the load. The possible currents $i(t)$ in the circuit are given in List-II.',
+    pic(406, 886),
+    'Choose the option that describes the correct match between the entries in List-I to those in List-II.',
+    '',
+    'List-I',
+    `(P) ${pic(870, 462)}`,
+    `(Q) ${pic(1160, 449)}`,
+    '',
+    '$i(t)$',
+    `(R) ${pic(1439, 474)}`,
+    '',
+    '$i(t)$',
+    `(S) ${pic(1740, 467)}`,
+    '',
+    '$i(t)$',
+    '',
+    'List-II',
+    '(1) (T)',
+    '',
+    pic(868, 1293),
+    `(2) ${pic(1150, 1312)}`,
+    `(3) ${pic(1439, 1305)}`,
+    `(4) ${pic(1748, 1312)}`,
+    '',
+    '$i(t)$',
+    `(5) ${pic(2038, 1315)}`,
+  ].join('\n')
+  const tidy = stemWithoutGraphAxisLeftovers(text)
+  assert.ok(tidy)
+  assert.doesNotMatch(tidy, /^\$i\(t\)\$$/m)
+  assert.doesNotMatch(tidy, /\(T\)/)
+  assert.match(tidy, /currents \$i\(t\)\$ in the circuit/, 'the stem keeps its own i(t)')
+  assert.match(tidy, /^\(1\) \\includegraphics/m)
+  const shown = parseMatchingListForDisplay(tidy, ['P→3, Q→5, R→2, S→1', 'P→1, Q→5, R→2, S→3', 'P→3, Q→4, R→2, S→1', 'P→1, Q→4, R→2, S→5'])
+  assert.equal(shown.listI.length, 4)
+  assert.equal(shown.listII.length, 5)
+  assert.ok(shown.listII.every((row) => /^\\includegraphics\{[^}]*\}$/.test(row.text.trim())), shown.listII.map((r) => r.text).join(' | '))
+  const once = `(P) ${pic(870, 462)}\n\n$x$\n(Q) Two words`
+  assert.equal(stemWithoutGraphAxisLeftovers(once), '', 'one short line after one picture is not an axis label')
 })
 
 test('2013 P2 Q19: List II is not added again when the scan dropped its heading', () => {

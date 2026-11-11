@@ -942,6 +942,29 @@ function recoverMatchListIntro(raw, intro, listIHeadIndex) {
   return out
 }
 
+/**
+ * "Match List I of the nuclear processes with List II …" with no List-I heading line
+ * (2013 P2 Q19): the List-I found is a word in the sentence, so the whole sentence up to
+ * the first row is the intro, not just "Match". '' when the List-I found is a heading.
+ * @param {string} raw
+ * @param {{ index: number, end: number } | null | undefined} head
+ */
+function sentenceIntroAroundListWord(raw, head) {
+  if (!head) return ''
+  const src = String(raw ?? '')
+  const lineStart = src.lastIndexOf('\n', head.index - 1) + 1
+  const lineEndAt = src.indexOf('\n', head.end)
+  const lineEnd = lineEndAt < 0 ? src.length : lineEndAt
+  const before = src.slice(lineStart, head.index)
+  const after = src.slice(head.end, lineEnd)
+  if (!/[A-Za-z]/.test(before)) return ''
+  if (!/^[ \t]*[,:]?[ \t]*[A-Za-z]+[ \t]+[A-Za-z]+/.test(after)) return ''
+  if (LIST_ROW_MARKER_RE.test(after)) return ''
+  const rowAt = src.slice(lineEnd).search(/\n[ \t]*\(\s*(?:[PQRSTABCD1-5]|I{1,3}|IV)\s*\)/)
+  const cut = rowAt < 0 ? lineEnd : lineEnd + rowAt
+  return src.slice(0, cut).trim()
+}
+
 /** Keep the Mathpix figure that sits above \caption{List-I} / \caption{List-II}. */
 function includePrecedingFigure(text, head) {
   if (!head) return head
@@ -1689,6 +1712,8 @@ function parseMatchingListForDisplayUnsafe(text, options) {
     return true
   })
 
+  const sentence = sentenceIntroAroundListWord(raw, listIHead)
+  if (sentence.length > intro.trim().length) intro = sentence
   intro = recoverMatchListIntro(
     raw,
     intro

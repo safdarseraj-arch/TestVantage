@@ -813,4 +813,43 @@ for (const label of ['(P)', '(Q)', '(R)', '(S)']) {
   assert.ok(rRows?.listI?.some((r) => r.label === label), label)
 }
 
+const nuclear = [
+  'Match List I of the nuclear processes with List II containing parent nucleus and one of the end products of each process and then select the correct answer using the codes given below the lists :',
+  '',
+  '(P)',
+  'Alpha decay',
+  '',
+  '(Q)',
+  '$\\beta^{+}$decay',
+  '',
+  '(R)',
+  'Fission',
+  '',
+  '(S)',
+  'Proton emission',
+  '',
+  '(1)',
+  '${ }_{8}^{15} \\mathrm{O} \\rightarrow{ }_{7}^{15} \\mathrm{~N}+\\ldots$..',
+  '',
+  '(2)',
+  '${ }_{92}^{238} U \\rightarrow{ }_{90}^{234} T h+\\ldots$..',
+  '',
+  '(3)',
+  '${ }_{83}^{185} \\mathrm{Bi} \\rightarrow{ }_{82}^{184} \\mathrm{~Pb}+\\ldots$..',
+  '',
+  '(4)',
+  '${ }_{94}^{239} \\mathrm{Pu} \\rightarrow{ }_{57}^{140} \\mathrm{La}+\\ldots$..',
+].join('\n')
+const nuclearRows = parseMatchingListForDisplay(nuclear, ['4 2 1 3', '1 3 2 4', '2 1 4 3', '4 3 2 1'])
+assert.equal(
+  nuclearRows?.intro,
+  'Match List I of the nuclear processes with List II containing parent nucleus and one of the end products of each process and then select the correct answer using the codes given below the lists :',
+  '2013 P2 Q19: "List I" inside the sentence is not the List-I heading',
+)
+assert.deepEqual(
+  nuclearRows?.listI?.map((r) => r.text),
+  ['Alpha decay', '$\\beta^{+}$decay', 'Fission', 'Proton emission'],
+)
+assert.equal(nuclearRows?.listII?.length, 4)
+
 console.log('ok matching-list display + arrow repair')

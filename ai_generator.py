@@ -51,7 +51,7 @@ OFFICIAL_PYQ_SOLUTION_INSTRUCTION = (
     "in the text or the attached pictures, return an empty step_by_step_solution and an empty correct_answer."
 )
 _CROP_URL_RE = re.compile(r"/api/official-pyq/original/crops/([A-Za-z0-9_.-]{1,160}\.png)")
-_MAX_FILL_PICTURES = 4
+_MAX_FILL_PICTURES = 12
 _PUBLISHED_FILL_TIMEOUT_MS = 75_000
 _CACHE_CLONE_MODEL = _MODEL_FLASH
 _CLONE_CACHE_DISPLAY_NAME = "testvantage-clone-batch-reference"
@@ -943,6 +943,64 @@ def _fill_metatags_sync(draft: QuestionOutput, params: dict[str, Any], units: li
     }
 
 
+def _published_curriculum_text(subject: str | None) -> str:
+    """Main-bank units and chapters the tags must be picked from (every subject when unknown)."""
+    from hybrid_metadata import curriculum_chapters, curriculum_units
+
+    known = str(subject or "").strip()
+    subjects = [known] if known and curriculum_units(known) else ["Physics", "Chemistry", "Mathematics"]
+    lines = []
+    for name in subjects:
+        for unit in curriculum_units(name):
+            lines.append(f"{name} / {unit}: {', '.join(curriculum_chapters(name, unit))}")
+    return "\n".join(lines)
+
+
+def _published_tag_rules(params: dict[str, Any]) -> str:
+    return (
+        "Always fill subject, unit, chapter, topic, question_type, exam, and toughness_level (1-10).\n"
+        "unit and chapter must be copied exactly from this Main-bank list (subject / unit: chapters):\n"
+        f"{_published_curriculum_text(params.get('subject'))}\n"
+        "topic is the specific idea tested, in a few words.\n"
+        "Leave source empty; the app sets it from the paper.\n"
+    )
+
+
+def _published_stored_text(params: dict[str, Any], *, with_answer: bool) -> str:
+    lines = [
+        f"Paper: {params.get('source') or ''}",
+        f"Stored subject: {params.get('subject') or ''}",
+        f"Stored unit: {params.get('unit') or params.get('section') or ''}",
+        f"Stored chapter: {params.get('chapter') or ''}",
+        f"Stored topic: {params.get('topic') or ''}",
+        f"Stored question type: {params.get('question_type') or ''}",
+        f"Stored exam: {params.get('exam') or ''}",
+        f"Stored toughness: {params.get('toughness_level') or ''}",
+    ]
+    if with_answer:
+        if params.get("answer") and params.get("answer_is_official"):
+            lines.append(f"Official answer (from the paper's answer key; it is correct): {params.get('answer')}")
+        else:
+            lines.append(f"Stored answer (unchecked): {params.get('answer') or ''}")
+        lines.append(f"Stored solution (unchecked): {params.get('solution') or ''}")
+    lines.append(f"Stem:\n{params.get('question_text') or ''}")
+    lines.append(f"Options:\n{params.get('options_text') or ''}")
+    return "\n".join(lines) + "\n"
+
+
+def _published_answer_rule(params: dict[str, Any]) -> str:
+    if params.get("answer") and params.get("answer_is_official"):
+        return (
+            "The official answer given below is correct. Solve the question so the working reaches exactly that answer; "
+            "correct_answer is that official answer and the last line is 'Answer: ' with it. "
+            "If your working gives something else, find your mistake; never change the answer.\n"
+        )
+    return (
+        "Solve the question yourself; ignore the unchecked stored answer and solution if they disagree with your working. "
+        "correct_answer must be the answer your own solution reaches, the same as its last line.\n"
+    )
+
+
 def _published_tags_prompt(params: dict[str, Any]) -> str:
     """Metatags only: the paper prints the answer and solution, so neither is asked for."""
     return (
@@ -950,20 +1008,8 @@ def _published_tags_prompt(params: dict[str, Any]) -> str:
         "Its answer and solution are printed on the paper: do not solve it and do not write an answer or a solution.\n"
         "Do not rewrite the question stem. Do not rewrite the options.\n"
         "Fields: subject, unit, chapter, topic, question_type, exam, toughness_level (1-10), source.\n"
-        "Use the Main-bank unit and chapter names already used for this subject "
-        "(Mathematics units include Algebra, Calculus, Coordinate Geometry, Trigonometry, "
-        "Vectors & 3D, Probability & Statistics).\n"
-        "If you are not sure of a tag, return an empty string for that field.\n"
-        f"Stored subject: {params.get('subject') or ''}\n"
-        f"Stored unit: {params.get('unit') or params.get('section') or ''}\n"
-        f"Stored chapter: {params.get('chapter') or ''}\n"
-        f"Stored topic: {params.get('topic') or ''}\n"
-        f"Stored question type: {params.get('question_type') or ''}\n"
-        f"Stored exam: {params.get('exam') or ''}\n"
-        f"Stored toughness: {params.get('toughness_level') or ''}\n"
-        f"Stored source: {params.get('source') or ''}\n"
-        f"Stem:\n{params.get('question_text') or ''}\n"
-        f"Options:\n{params.get('options_text') or ''}\n"
+        f"{_published_tag_rules(params)}"
+        f"{_published_stored_text(params, with_answer=False)}"
     )
 
 
@@ -972,55 +1018,64 @@ def _published_fill_prompt(params: dict[str, Any]) -> str:
     if params.get("tags_only"):
         return _published_tags_prompt(params)
     return (
-        "Fill the Question Bank metatags, the answer, and the solution for this published question.\n"
+        "Fill the Question Bank metatags, the answer, and the solution for this past exam question.\n"
         "Do not rewrite the question stem. Do not rewrite the options.\n"
         "Fields: subject, unit, chapter, topic, question_type, exam, toughness_level (1-10), source, "
         "correct_answer, step_by_step_solution.\n"
-        "Use the Main-bank unit and chapter names already used for this subject "
-        "(Mathematics units include Algebra, Calculus, Coordinate Geometry, Trigonometry, "
-        "Vectors & 3D, Probability & Statistics).\n"
-        "If you are not sure of a tag, return an empty string for that field.\n"
+        f"{_published_tag_rules(params)}"
         "correct_answer is a letter (A-D), letters joined by commas, or the number. "
         "Empty if you cannot mark it.\n"
+        f"{_published_answer_rule(params)}"
         f"{OFFICIAL_PYQ_SOLUTION_INSTRUCTION}\n"
         "If the stored solution is a hint, a story, or longer than this, replace it with this concise complete solution. "
+        "Use the exact values in the stem, options, and attached pictures; never assume a value that is not given. "
         "If you cannot solve it, return an empty step_by_step_solution.\n"
         "If the stored question type is matrix_match_grid (Column I rows A-D, Column II entries P-T, "
         "each row matches one or more entries), correct_answer lists every row like "
         "\"A-P,R; B-Q; C-Q,S,T; D-R\" and question_type stays matrix_match_grid.\n"
-        f"Stored subject: {params.get('subject') or ''}\n"
-        f"Stored unit: {params.get('unit') or params.get('section') or ''}\n"
-        f"Stored chapter: {params.get('chapter') or ''}\n"
-        f"Stored topic: {params.get('topic') or ''}\n"
-        f"Stored question type: {params.get('question_type') or ''}\n"
-        f"Stored exam: {params.get('exam') or ''}\n"
-        f"Stored toughness: {params.get('toughness_level') or ''}\n"
-        f"Stored source: {params.get('source') or ''}\n"
-        f"Stored answer: {params.get('answer') or ''}\n"
-        f"Stored solution: {params.get('solution') or ''}\n"
-        f"Stem:\n{params.get('question_text') or ''}\n"
-        f"Options:\n{params.get('options_text') or ''}\n"
-        "Pictures named in \\includegraphics lines above are attached in the same order; read structures, "
-        "graphs, and tables from them.\n"
+        f"{_published_stored_text(params, with_answer=True)}"
+        "Pictures named in \\includegraphics or ![](...) lines above are attached in the same order; read circuits, "
+        "structures, graphs, and tables from them.\n"
     )
 
 
+_MATHPIX_LINK_RE = re.compile(r"https?://cdn\.mathpix\.com/cropped/[^\s)}\"'<>\]]+")
+
+
 def _published_fill_pictures(params: dict[str, Any]) -> list[types.Part]:
-    """Crops the stem or options point at, so the model sees molecule P and graphs, not just their URLs."""
-    from official_pyq_compare import read_crop
+    """Pictures the stem or options point at, in order, so the model reads them instead of guessing values.
+    Mathpix links are read from their local copies cut from the original PDF."""
+    from official_pyq_compare import CROP_URL_PREFIX, local_crop_for_mathpix, read_crop
 
     text = f"{params.get('question_text') or ''}\n{params.get('options_text') or ''}"
+    names: list[str] = []
+    for match in re.finditer(f"{_CROP_URL_RE.pattern}|{_MATHPIX_LINK_RE.pattern}", text):
+        name = match.group(1)
+        if not name:
+            local = local_crop_for_mathpix(match.group(0))
+            name = local[len(CROP_URL_PREFIX) :].split("?", 1)[0] if local else ""
+        if name and name not in names:
+            names.append(name)
     parts: list[types.Part] = []
-    seen: set[str] = set()
-    for name in _CROP_URL_RE.findall(text):
-        if name in seen or len(parts) >= _MAX_FILL_PICTURES:
-            continue
-        seen.add(name)
+    for name in names[:_MAX_FILL_PICTURES]:
         try:
             parts.append(types.Part.from_bytes(data=read_crop(name), mime_type="image/png"))
         except Exception:
             logger.warning("Fill picture %s is not on this computer", name)
     return parts
+
+
+def _snapped_published_tags(params: dict[str, Any], parsed: Any) -> dict[str, str]:
+    """Unit, chapter, and topic on the Main-bank list; the model's words stay when nothing matches."""
+    from hybrid_metadata import resolve_hybrid_curriculum_tags
+
+    subject = parsed.subject or params.get("subject") or ""
+    tags = resolve_hybrid_curriculum_tags(subject, unit=parsed.unit, chapter=parsed.chapter, topic=parsed.topic)
+    return {
+        "unit": str(tags.get("unit") or parsed.unit or ""),
+        "chapter": str(tags.get("chapter") or parsed.chapter or ""),
+        "topic": str(parsed.topic or tags.get("topic") or ""),
+    }
 
 
 def solution_as_lines(text: str) -> str:
@@ -1100,28 +1155,26 @@ def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
     parsed = _structured_output_from_response(response, schema)
     if not isinstance(parsed, schema):
         parsed = schema.model_validate(parsed)
+    tags = _snapped_published_tags(params, parsed)
+    source = str(params.get("source") or "")
     if tags_only:
         return {
             "subject": parsed.subject,
-            "unit": parsed.unit,
-            "chapter": parsed.chapter,
-            "topic": parsed.topic,
+            **tags,
             "question_type": parsed.question_type,
             "exam": parsed.exam,
             "toughness_level": parsed.toughness_level,
-            "source": parsed.source,
+            "source": source,
             "tags_only": True,
             "model": model,
         }
     return {
         "subject": parsed.subject,
-        "unit": parsed.unit,
-        "chapter": parsed.chapter,
-        "topic": parsed.topic,
+        **tags,
         "question_type": parsed.question_type,
         "exam": parsed.exam,
         "toughness_level": parsed.toughness_level,
-        "source": parsed.source,
+        "source": source,
         "correct_answer": parsed.correct_answer,
         "step_by_step_solution": solution_as_lines(parsed.step_by_step_solution),
         "model": model,

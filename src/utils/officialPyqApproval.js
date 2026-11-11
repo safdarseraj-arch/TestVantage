@@ -85,7 +85,7 @@ import { sanitizeMathpixOcrText } from './mathpixQuestionSplit.js'
 import { formatStoredPrintedAnswerKey, readPrintedAnswerKey } from './printedAnswerKey.js'
 import { storedEndAnswerSectionText } from './printedEndSolutions.js'
 import { raceStepTimeout } from './ocrTimeout.js'
-import { getOfficialPyqExamLabel } from '../data/officialPyqSources.js'
+import { getOfficialPyqExamLabel, officialPyqPaperSourceName } from '../data/officialPyqSources.js'
 import {
   healAndPersistOfficialPyqPaper,
   officialPyqStoredOcrTextLocal,
@@ -180,7 +180,7 @@ export function pendingQuestionToPyqItem(paper, q, index) {
     pyqSlot: q.pyqSlot != null ? Number(q.pyqSlot) : index + 1,
     imported: true,
     officialPyq: true,
-    source: `Official PYQ · ${getOfficialPyqExamLabel(examPatternId)} ${year}`,
+    source: `Official PYQ · ${officialPyqPaperSourceName(paper) || `${getOfficialPyqExamLabel(examPatternId)} ${year}`}`,
     sourceUrl: paper.sourceUrl,
     sourceLabel: paper.sourceLabel,
     answerSource,

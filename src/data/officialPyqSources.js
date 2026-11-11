@@ -205,6 +205,19 @@ export function getOfficialPyqExamLabel(exam) {
   return OFFICIAL_PYQ_EXAMS.find((e) => e.id === exam)?.label ?? String(exam)
 }
 
+/**
+ * The paper a question comes from, e.g. "JEE Advanced 2025 Paper 1" or "JEE Main 2024 27 Jan Shift 1".
+ * @param {{ exam?: string, year?: number | string, session?: string, pyqDate?: string, pyqShift?: string | number } | null | undefined} paper
+ */
+export function officialPyqPaperSourceName(paper) {
+  const year = Number(paper?.year) || ''
+  const session = String(paper?.session ?? '').trim().replace(/^paper\b/i, 'Paper')
+  const date = String(paper?.pyqDate ?? '').trim()
+  const rawShift = String(paper?.pyqShift ?? '').trim()
+  const shift = rawShift && !/shift/i.test(rawShift) ? `Shift ${rawShift}` : rawShift
+  return [paper?.exam ? getOfficialPyqExamLabel(paper.exam) : '', year, session, date, shift].filter(Boolean).join(' ')
+}
+
 /** @param {OfficialPyqExam | string} [exam] @param {number} [year] */
 export function listOfficialPyqSourceSlots(exam, year) {
   return OFFICIAL_PYQ_SOURCE_SLOTS.filter((s) => {

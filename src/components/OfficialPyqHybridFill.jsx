@@ -54,7 +54,10 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
       })
       onChanged?.()
       const look = result.needsLook.length
-        ? ` Check question(s) ${result.needsLook.join(', ')} — the solution or answer needs a look.`
+        ? ` Check question(s) ${result.needsLook.join(', ')} — after 3 tries the solution still did not reach the official answer or read as a full solution; their tags were saved. Press the button again to retry them.`
+        : ''
+      const notSaved = result.notSaved?.length
+        ? ` Question(s) ${result.notSaved.join(', ')} could not be saved (the card changed while filling). Press the button again.`
         : ''
       const tagsOnly = result.tagsOnly ? ` ${result.tagsOnly} question(s) had a printed answer and solution, so only their tags were filled.` : ''
       const noKey = result.noPrintedAnswer?.length
@@ -66,7 +69,7 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
         )
       } else {
         setNote(
-          `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} question(s). The paper is still Approved — press Publish when it looks right.${tagsOnly}${look}${noKey}`,
+          `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} question(s). The paper is still Approved — press Publish when it looks right.${tagsOnly}${look}${notSaved}${noKey}`,
         )
       }
     } catch (err) {
@@ -85,9 +88,10 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
   return (
     <div className="official-pyq-pending-fill" data-testid="official-pyq-hybrid-fill">
       <p className="form-hint">
-        Optional: Hybrid AI fills the tags, answer, and solution, two questions at a time. Answers
-        printed on the paper and your own edits stay. Question wording does not change. When a question
-        has its answer and solution printed, only its tags are filled.
+        Optional: Hybrid AI fills the tags, answer, and solution, two questions at a time. Source is the
+        paper's own name. Answers printed on the paper and your own edits stay, and the solution must reach
+        the printed answer; with no printed answer, the answer is the one the solution reaches. Question
+        wording does not change. When a question has its answer and solution printed, only its tags are filled.
       </p>
       <label className="form-hint" data-testid="official-pyq-printed-solutions-toggle">
         <input

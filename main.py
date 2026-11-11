@@ -271,6 +271,10 @@ class OfficialPyqFillRequest(BaseModel):
     toughness_level: str | None = None
     source: str | None = None
     answer: str | None = None
+    answer_is_official: bool = Field(
+        default=False,
+        description="The answer is printed on the paper or set by an admin: the solution must reach it.",
+    )
     solution: str | None = None
     tags_only: bool = Field(
         default=False,
@@ -1125,6 +1129,7 @@ async def official_pyq_fill_tags(body: OfficialPyqFillRequest) -> dict[str, Any]
         "toughness_level": body.toughness_level,
         "source": body.source,
         "answer": "" if body.tags_only else body.answer,
+        "answer_is_official": bool(body.answer_is_official) and not body.tags_only,
         "solution": "" if body.tags_only else body.solution,
         "tags_only": body.tags_only,
     }

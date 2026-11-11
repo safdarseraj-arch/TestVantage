@@ -179,9 +179,15 @@ export function applyOfficialPyqPublishedMeta(paperId, index, patch) {
   let idx = Number(index)
   const expectId = String(patch?.questionId ?? '').trim()
   if (!Number.isInteger(idx) || idx < 0 || idx >= questions.length) idx = -1
-  if (expectId) {
-    const found = questions.findIndex((q) => String(q?.id ?? '') === expectId)
-    if (found >= 0) idx = found
+  // Some papers repeat an id on neighbouring cards; the slot asked for wins, then a same-id card with this text.
+  if (expectId && String(questions[idx]?.id ?? '') !== expectId) {
+    const sameId = questions.map((q, i) => (String(q?.id ?? '') === expectId ? i : -1)).filter((i) => i >= 0)
+    const sameText =
+      patch?.expectText != null
+        ? sameId.find((i) => String(questions[i]?.text ?? questions[i]?.stem ?? '') === String(patch.expectText))
+        : undefined
+    if (sameText != null) idx = sameText
+    else if (sameId.length) idx = sameId[0]
   }
   const prev = questions[idx]
   if (!prev) return { ok: false, error: 'Question not found.' }

@@ -331,9 +331,10 @@ export const HYBRID_FILL_PART_SIZE = 2
  * A failed question is tried up to 2 more times, then marked for a look.
  * Each finished part is handed to `onApplied` before the next part starts.
  * A `tagsOnly` question asks for metatags only, so its solution is never judged or retried.
+ * `answerProblem` judges the reply's answer (e.g. it misses the official one); a problem is retried like a weak solution.
  * @param {object[]} questions
  * @param {(question: object, index: number, attempt: number) => Promise<object>} fillOne
- * @param {{ onProgress?: Function, onApplied?: Function, isFatal?: (err: Error) => boolean, concurrency?: number, signal?: AbortSignal, skip?: (question: object, index: number) => boolean, tagsOnly?: (question: object, index: number) => boolean }} [hooks]
+ * @param {{ onProgress?: Function, onApplied?: Function, isFatal?: (err: Error) => boolean, concurrency?: number, signal?: AbortSignal, skip?: (question: object, index: number) => boolean, tagsOnly?: (question: object, index: number) => boolean, answerProblem?: (question: object, filled: object) => string }} [hooks]
  */
 export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}) {
   const list = Array.isArray(questions) ? questions : []
@@ -344,6 +345,7 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
   const isFatal = typeof hooks.isFatal === 'function' ? hooks.isFatal : () => false
   const skip = typeof hooks.skip === 'function' ? hooks.skip : () => false
   const tagsOnlyFor = typeof hooks.tagsOnly === 'function' ? hooks.tagsOnly : () => false
+  const answerProblem = typeof hooks.answerProblem === 'function' ? hooks.answerProblem : () => ''
   const size = Math.max(1, Math.min(HYBRID_FILL_PART_SIZE, Number(hooks.concurrency) || 1))
 
   async function fillAt(index) {
@@ -360,7 +362,9 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
       if (onProgress) onProgress(index, total, attempt)
       try {
         const next = await fillOne(question, index, attempt)
-        const nextProblem = tagsOnly ? '' : officialPyqSolutionProblem(next?.step_by_step_solution)
+        const nextProblem = tagsOnly
+          ? ''
+          : officialPyqSolutionProblem(next?.step_by_step_solution) || answerProblem(question, next)
         if (!filled || !nextProblem) {
           filled = next
           problem = nextProblem

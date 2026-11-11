@@ -228,8 +228,10 @@ await test('tags-only applies when the answer and a real solution are kept, or w
   assert.equal(officialPyqCardTagsOnly({ ...printed, answerSource: 'ai_generated' }, {}), false)
   assert.equal(officialPyqCardTagsOnly({ ...printed, solutionSource: 'manual' }, {}), true)
   assert.equal(officialPyqCardTagsOnly({ text: 'S' }, { printedAnswersAndSolutions: true }), true)
-  assert.equal(officialPyqCardIsFilled({ chapter: 'Kinematics' }, { printedAnswersAndSolutions: true }), true)
-  assert.equal(officialPyqCardIsFilled({ chapter: 'Kinematics' }, {}), false)
+  const tagged = { chapter: 'Kinematics', section: 'Mechanics', topic: 'Projectile', toughnessLevel: 5 }
+  assert.equal(officialPyqCardIsFilled(tagged, { printedAnswersAndSolutions: true }), true)
+  assert.equal(officialPyqCardIsFilled({ chapter: 'Kinematics' }, { printedAnswersAndSolutions: true }), false, 'every tag is needed')
+  assert.equal(officialPyqCardIsFilled(tagged, {}), false)
 })
 
 await test('Hybrid AI answer that disagrees with the printed key is noted; the printed answer stays', () => {

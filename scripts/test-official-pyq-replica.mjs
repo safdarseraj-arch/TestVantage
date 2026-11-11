@@ -393,7 +393,16 @@ const approveUi = fs.readFileSync(
 assert.ok(approveUi.includes("sub_bank_type = 'similar_pyq'"))
 
 const { officialPyqSolutionProblem, HYBRID_FILL_PART_SIZE } = await import('../src/utils/officialPyqReplica.js')
-const { applyHybridPatchToCard, fillOfficialPyqApprovedPaperPartByPart, HYBRID_FILL_NEEDS_APPROVAL } = await import(
+const {
+  answerFromSolution,
+  answerMatchesCard,
+  applyHybridPatchToCard,
+  fillOfficialPyqApprovedPaperPartByPart,
+  hybridFillRequestForQuestion,
+  officialPyqFillAnswerProblem,
+  withAnswerFromSolution,
+  HYBRID_FILL_NEEDS_APPROVAL,
+} = await import(
   '../src/utils/officialPyqPendingFill.js'
 )
 const GOOD_SOLUTION = 'Use $\\det(kA)=k^3\\det A$.\n$\\det(2A)=8\\times 2=16$.\nAnswer: (B)'
@@ -497,6 +506,9 @@ const fillQuestions = [
     options: ['1', '2', '3', '4'],
     pyqSlot: 4,
     chapter: 'Matrices & Determinants',
+    section: 'Algebra',
+    topic: 'Determinants',
+    toughnessLevel: 4,
     correctIndex: 1,
     solution: GOOD_SOLUTION,
   },
@@ -522,11 +534,24 @@ const fillPaper = addOfficialPyqPendingPaper({
 })
 const realFetch = globalThis.fetch
 const sentStems = []
+const sentBodies = []
+const PRINTED_D_SOLUTION = 'Expand the determinant.\nIt equals $-4$.\nAnswer: (D)'
 globalThis.fetch = async (_url, init) => {
   const body = JSON.parse(init.body)
   sentStems.push(body.question_text)
+  sentBodies.push(body)
+  const printed = body.question_text === 'Printed answer stem.'
   return new Response(
-    JSON.stringify({ ok: true, chapter: 'Matrices & Determinants', correct_answer: 'B', step_by_step_solution: GOOD_SOLUTION }),
+    JSON.stringify({
+      ok: true,
+      chapter: 'Matrices & Determinants',
+      unit: 'Algebra',
+      topic: 'Determinants',
+      toughness_level: '4',
+      source: 'AI guessed source',
+      correct_answer: 'C',
+      step_by_step_solution: printed ? PRINTED_D_SOLUTION : GOOD_SOLUTION,
+    }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   )
 }
@@ -549,8 +574,15 @@ assert.deepEqual(sentStems.sort(), ['Fill stem one.', 'Fill stem two.', 'Printed
 assert.ok(progress.includes('1-2/4'))
 const savedFill = getOfficialPyqPendingPaper(fillPaper.id)
 assert.equal(savedFill.status, 'approved', 'the fill keeps the paper approved, not published')
-assert.equal(savedFill.questions[0].correctIndex, 1)
+assert.equal(savedFill.questions[0].correctIndex, 1, 'the answer is the one the solution reaches, not the reply field')
 assert.equal(savedFill.questions[0].answerSource, 'hybrid_ai')
+assert.ok(savedFill.questions.every((q) => q.source === 'JEE Advanced 2022 Paper 2'), 'source is the paper name, never the AI guess')
+assert.equal(savedFill.questions[0].topic, 'Determinants')
+const printedBody = sentBodies.find((b) => b.question_text === 'Printed answer stem.')
+assert.equal(printedBody.answer, 'D')
+assert.equal(printedBody.answer_is_official, true)
+assert.equal(printedBody.source, 'JEE Advanced 2022 Paper 2')
+assert.equal(sentBodies.find((b) => b.question_text === 'Fill stem one.').answer_is_official, false)
 assert.equal(savedFill.questions[0].solutionSource, 'hybrid_ai')
 assert.equal(savedFill.questions[1].solution, GOOD_SOLUTION)
 assert.equal(savedFill.questions[1].chapter, 'Matrices & Determinants')
@@ -558,9 +590,74 @@ assert.equal(savedFill.questions[1].text, 'Fill stem two.')
 assert.equal(savedFill.questions[2].correctIndex, 3, 'the printed answer is never replaced')
 assert.equal(savedFill.questions[2].answerSource, 'from_paper')
 assert.equal(savedFill.questions[2].chapter, 'Matrices & Determinants')
-assert.equal(savedFill.questions[2].solution, GOOD_SOLUTION)
+assert.equal(savedFill.questions[2].solution, PRINTED_D_SOLUTION)
 assert.equal(savedFill.questions[3].correctIndex, 1)
 assert.equal(getOfficialPyqPendingPaper(pendingFillPaper.id).questions[0].chapter, undefined)
+
+// The solution must reach the official answer: one that keeps reaching another answer is tried 3 times,
+// then only its tags are saved. Cards that share an id are each saved on their own slot, and the run goes on.
+const officialRunPaper = addOfficialPyqPendingPaper({
+  exam: 'jee-advanced',
+  year: 2023,
+  session: 'Paper 1',
+  paperLabel: 'JEE Advanced 2023 Paper 1',
+  paperId: 'jee-advanced-2023-official-answer',
+  sourceLabel: 'test',
+  status: 'approved',
+  questions: [
+    { id: 'DUP1', text: 'Official C stem.', options: ['1', '2', '3', '4'], subject: 'mathematics', correctIndex: 2, answerSource: 'from_paper' },
+    { id: 'DUP1', text: 'Twin stem.', options: ['1', '2', '3', '4'], subject: 'mathematics' },
+    { id: 'DUP1', text: 'Third twin stem.', options: ['1', '2', '3', '4'], subject: 'mathematics' },
+  ],
+})
+let officialCalls = 0
+globalThis.fetch = async () => {
+  officialCalls += 1
+  return new Response(
+    JSON.stringify({ ok: true, chapter: 'Matrices & Determinants', unit: 'Algebra', topic: 'Determinants', toughness_level: '5', correct_answer: 'B', step_by_step_solution: GOOD_SOLUTION }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+try {
+  loginAs('admin')
+  const run = await fillOfficialPyqApprovedPaperPartByPart(officialRunPaper.id)
+  assert.equal(officialCalls, 5, 'the off-answer card is asked 3 times, the twins once each')
+  assert.deepEqual(run.needsLook, [1])
+  assert.deepEqual(run.notSaved, [])
+  assert.equal(run.filled, 3)
+} finally {
+  globalThis.fetch = realFetch
+  sessionStorage.removeItem('testvantage-session')
+}
+const officialSaved = getOfficialPyqPendingPaper(officialRunPaper.id).questions
+assert.equal(officialSaved[0].correctIndex, 2, 'the official answer stays')
+assert.equal(officialSaved[0].solution, undefined, 'a solution reaching another answer is not saved')
+assert.equal(officialSaved[0].chapter, 'Matrices & Determinants', 'its tags are still saved')
+assert.deepEqual(officialSaved.map((q) => q.text), ['Official C stem.', 'Twin stem.', 'Third twin stem.'])
+assert.equal(officialSaved[1].solution, GOOD_SOLUTION)
+assert.equal(officialSaved[2].solution, GOOD_SOLUTION)
+assert.equal(officialSaved[2].correctIndex, 1)
+
+// Reading the answer a solution reaches.
+const mcq = { options: ['1', '2', '3', '4'] }
+assert.equal(answerFromSolution('Work.\n**Answer:** (A) and (C)', mcq), 'A,C')
+assert.equal(answerFromSolution('Work.\nAnswer: $\\frac{3}{4}$', {}), '0.75')
+assert.equal(answerFromSolution('Work.\nAnswer: $2.5 \\times 10^{-2}$ m', {}), '0.025')
+assert.equal(answerFromSolution('Work.\nFinal answer: 12', {}), '12')
+assert.equal(answerFromSolution('Answer: (B)\nThen more working that ends nowhere.\nStill going.\nAnd going.', mcq), '')
+assert.equal(answerMatchesCard({ ...mcq, correctIndices: [0, 2] }, 'A,C'), true)
+assert.equal(answerMatchesCard({ ...mcq, correctIndex: 1 }, 'C'), false)
+assert.equal(answerMatchesCard({ correctNumerical: 0.75, numericalTolerance: 0.01 }, '0.75'), true)
+assert.equal(answerMatchesCard({ ...mcq, correctIndex: 1, bonusMarksToAll: true }, 'C'), true)
+const officialB = { ...mcq, correctIndex: 1, answerSource: 'from_paper' }
+assert.equal(officialPyqFillAnswerProblem(officialB, { step_by_step_solution: GOOD_SOLUTION }), '')
+assert.match(officialPyqFillAnswerProblem(officialB, { step_by_step_solution: 'x\nAnswer: (C)' }), /official answer is B/)
+assert.match(officialPyqFillAnswerProblem(mcq, { step_by_step_solution: 'Some working only.' }), /does not end with its answer/)
+assert.equal(withAnswerFromSolution(mcq, { correct_answer: 'D', step_by_step_solution: GOOD_SOLUTION }).correct_answer, 'B')
+assert.equal(withAnswerFromSolution(officialB, { correct_answer: 'D', step_by_step_solution: GOOD_SOLUTION }).correct_answer, 'D')
+const draftCard = { ...officialB, text: 'S', solution: '**Answer.** (B) Quick eliminations', solutionSource: 'draft' }
+assert.equal(hybridFillRequestForQuestion(draftCard, 'jee-advanced', { source: 'X' }).solution, '', 'a draft is not sent as a solution')
+assert.equal(hybridFillRequestForQuestion(draftCard, 'jee-advanced', { source: 'X' }).source, 'X')
 
 const pendingPage = fs.readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/pages/OfficialPyqPending.jsx'),

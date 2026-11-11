@@ -1050,7 +1050,7 @@ export function splitMatchListItems(block, letters) {
     if (echo >= 0) body = body.slice(0, echo).trim()
     return { label: `(${h.letter})`, text: body }
   })
-  return letters.every((L) => /^[1-5]$/.test(L)) ? peelTrailingListFigures(rows, letters) : rows
+  return letters.every((L) => /^[1-6]$/.test(L)) ? peelTrailingListFigures(rows, letters) : rows
 }
 
 /**
@@ -1674,8 +1674,9 @@ function parseMatchingListForDisplayUnsafe(text, options) {
 
   const numCount = countMarkers(listIIBlock, ['1', '2', '3', '4'])
   const colPQ = countMarkers(listIIBlock, ['P', 'Q', 'R', 'S'])
+  /** List-II can run to (6) (2018 P2 Q33, Q51, Q52). */
   const listIILetters =
-    numCount >= 2 && numCount >= colPQ ? ['1', '2', '3', '4', '5'] : ['P', 'Q', 'R', 'S', 'T', 'U']
+    numCount >= 2 && numCount >= colPQ ? ['1', '2', '3', '4', '5', '6'] : ['P', 'Q', 'R', 'S', 'T', 'U']
 
   let itemsII = splitMatchListItems(listIIBlock, listIILetters).filter((x) => String(x.text).trim())
   // Labels present but bodies empty (missing figs) — do not steal List-I media.

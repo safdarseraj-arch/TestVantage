@@ -524,6 +524,7 @@ export function keepAdminEditedCards(next, prev) {
       correctNumerical: old.correctNumerical,
       numericalTolerance: old.numericalTolerance,
       numericalAlternatives: old.numericalAlternatives,
+      correctIndicesAlternatives: old.correctIndicesAlternatives,
       bonusMarksToAll: old.bonusMarksToAll,
       ...gridFieldsOf(old),
       solution: old.solution,
@@ -604,6 +605,7 @@ export function copyAnswersOntoCanonical(canonical, prev) {
       correctNumerical: printed ? q.correctNumerical : q.correctNumerical ?? old.correctNumerical,
       numericalTolerance: printed || q.correctNumerical != null ? q.numericalTolerance : old.numericalTolerance,
       numericalAlternatives: printed || q.correctNumerical != null ? q.numericalAlternatives : old.numericalAlternatives,
+      correctIndicesAlternatives: printed || q.correctIndices?.length ? q.correctIndicesAlternatives : old.correctIndicesAlternatives,
       bonusMarksToAll: printed ? q.bonusMarksToAll : q.bonusMarksToAll ?? old.bonusMarksToAll,
       solution: stripEmptyFigureShells(
         stripEmptyImageMarkdown(

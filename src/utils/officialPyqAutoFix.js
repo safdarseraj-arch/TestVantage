@@ -9,10 +9,14 @@
 import { getOfficialPyqPendingPaper, getOfficialPyqPendingOcrText, updateOfficialPyqPendingPaper } from './officialPyqPendingStore.js'
 import {
   applyOfficialPyqCardDraft,
+  formatOfficialPyqAnswerKey,
   officialPyqCardForAdmin,
   officialPyqCompareHasSuggestion,
   officialPyqDraftFigureProblem,
+  officialPyqDraftFromCard,
   officialPyqDraftFromSuggestion,
+  officialPyqPrintedAnswerPatch,
+  recheckOfficialPyqCardQuality,
   saveOfficialPyqCardEdit,
 } from './officialPyqCardEdit.js'
 import {
@@ -22,9 +26,14 @@ import {
   saveOfficialPyqCompareResult,
 } from './officialPyqOriginalCompare.js'
 import { officialPyqDrawnProblems } from './officialPyqDrawnCheck.js'
+import { officialPyqCurrentCompare } from './officialPyqCompareFreshness.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
 import { reviewOfficialPyqCards } from './officialPyqUnifiedCheck.js'
-import { officialPyqCountRepairNeeded, persistOfficialPyqQualityRun } from './officialPyqLocalQuality.js'
+import {
+  officialPyqCountRepairNeeded,
+  officialPyqPrintedKeyMissingGoTo,
+  persistOfficialPyqQualityRun,
+} from './officialPyqLocalQuality.js'
 
 export const OFFICIAL_PYQ_AUTO_FIX_SOURCE = 'auto_compare'
 /** Runs that may retry a card after a timeout or network failure. */
@@ -112,16 +121,41 @@ export function officialPyqCardHumanEdited(card) {
  */
 export function officialPyqAutoFixTodo(paper) {
   const questions = Array.isArray(paper?.questions) ? paper.questions : []
+  const keyOnly = answerOnlyGoTo(paper)
   return officialPyqAlertGoTo(paper).filter((goTo) => {
     const card = questions[goTo - 1]
-    return card && !isOfficialPyqPlaceholder(card) && !officialPyqCardHumanEdited(card) && !alreadyTried(card)
+    if (!card || isOfficialPyqPlaceholder(card)) return false
+    if (keyOnly.has(goTo) && storedKeyPatch(card)) return true
+    if (alreadyTried(card, keyOnly.has(goTo))) return false
+    return !officialPyqCardHumanEdited(card) || keyOnly.has(goTo)
   })
 }
 
-/** @param {any} card */
-function alreadyTried(card) {
+/** The key an earlier Compare read on the original page, when it can now go on the card. @param {any} card */
+function storedKeyPatch(card) {
+  const compared = officialPyqCurrentCompare(card)
+  return compared ? officialPyqPrintedAnswerPatch(card, compared) : null
+}
+
+/** A person's wording is never rewritten, but the answer printed on the page may still be filled in. */
+function answerOnlyGoTo(paper) {
+  try {
+    return new Set(officialPyqPrintedKeyMissingGoTo(paper))
+  } catch {
+    return new Set()
+  }
+}
+
+/**
+ * A try that did not read the page's answer key (made before Compare reported it) does not
+ * count for a card flagged for its missing key; it gets one more try.
+ * @param {any} card @param {boolean} [keyMissing]
+ */
+function alreadyTried(card, keyMissing = false) {
   const tried = Array.isArray(card?.autoFix?.tried) ? card.autoFix.tried : []
-  return tried.includes(officialPyqAutoFixSignature(card))
+  if (!tried.includes(officialPyqAutoFixSignature(card))) return false
+  if (!keyMissing) return true
+  return card.autoFix.keyRead === true || (Number(card.autoFix.keyTries) || 0) >= 1
 }
 
 /**
@@ -181,11 +215,12 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
     notTried: /** @type {number[]} */ ([]),
   }
   const todo = []
+  const keyOnly = answerOnlyGoTo(paper)
   for (const goTo of officialPyqAlertGoTo(paper)) {
     const card = paper.questions[goTo - 1]
     if (!card || isOfficialPyqPlaceholder(card)) continue
-    if (officialPyqCardHumanEdited(card)) out.skippedAdminEdited.push(goTo)
-    else if (alreadyTried(card)) out.skippedTried.push(goTo)
+    if (officialPyqCardHumanEdited(card) && !keyOnly.has(goTo)) out.skippedAdminEdited.push(goTo)
+    else if (alreadyTried(card, keyOnly.has(goTo)) && !(keyOnly.has(goTo) && storedKeyPatch(card))) out.skippedTried.push(goTo)
     else todo.push(goTo)
   }
   const run = todo.slice(0, Math.max(0, max))
@@ -198,20 +233,29 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
     const card = getOfficialPyqPendingPaper(paperId)?.questions?.[index]
     if (!card) continue
     const signature = officialPyqAutoFixSignature(card)
+    const keyOnStore = keyOnly.has(goTo) && storedKeyPatch(card)
     let result
-    try {
-      result = await compare(paperId, index, card, { signal })
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return { ...out, ok: false, aborted: true, error: 'Stopped.' }
-      if (err?.code) return { ...out, ok: false, error: err.message || 'Compare stopped.' }
-      result = { verdict: 'error', error: err instanceof Error ? err.message : 'Compare failed.' }
+    let compared
+    if (keyOnStore) {
+      compared = officialPyqCurrentCompare(card)
+      result = { verdict: String(compared?.verdict ?? 'differs') }
+    } else {
+      try {
+        result = await compare(paperId, index, card, { signal })
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return { ...out, ok: false, aborted: true, error: 'Stopped.' }
+        if (err?.code) return { ...out, ok: false, error: err.message || 'Compare stopped.' }
+        result = { verdict: 'error', error: err instanceof Error ? err.message : 'Compare failed.' }
+      }
+      compared = saveOfficialPyqCompareResult(paperId, index, result, card)?.questions?.[index]?.originalCompare
     }
-    const saved = saveOfficialPyqCompareResult(paperId, index, result, card)
-    const compared = saved?.questions?.[index]?.originalCompare
     const verdict = String(result?.verdict ?? 'error')
+    const keyInfo = keyOnly.has(goTo)
+      ? { keyRead: typeof compared?.printedAnswer === 'string', keyTries: (Number(card.autoFix?.keyTries) || 0) + 1 }
+      : {}
     const note = (reason) => {
       out.needsAdmin.push({ goTo, reason })
-      markAttempt(paperId, index, [signature], { outcome: 'needs_admin', reason })
+      markAttempt(paperId, index, [signature], { outcome: 'needs_admin', reason, ...keyInfo })
     }
     if (verdict === 'error') {
       // A timeout or network failure does not use up the card's one try, up to OFFICIAL_PYQ_AUTO_FIX_ERROR_RETRIES runs.
@@ -224,10 +268,18 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
       }
       continue
     }
-    if (verdict === 'matches' || !compared || !officialPyqCompareHasSuggestion(compared)) {
+    const answer = compared ? officialPyqPrintedAnswerPatch(card, compared) : null
+    const human = officialPyqCardHumanEdited(card)
+    if (!compared || (!answer && (human || verdict === 'matches' || !officialPyqCompareHasSuggestion(compared)))) {
       const lost =
         result?.notFound === true ||
         (Array.isArray(result?.differences) && result.differences.some((d) => d?.kind === 'extra_card'))
+      if (!lost && keyOnly.has(goTo) && compared?.printedAnswer === '') {
+        markAttempt(paperId, index, [signature], { outcome: 'no_printed_key', ...keyInfo })
+        const rechecked = recheckOfficialPyqCardQuality(paperId, index)
+        if ((rechecked?.localQuality?.failedGoTo || []).map(Number).includes(goTo)) out.stillFlagged.push(goTo)
+        continue
+      }
       note(
         lost
           ? `Compare could not find this question on the original page it looked at (page ${(result?.pages || []).join(', ') || '?'}); check the card's question number`
@@ -235,20 +287,25 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
       )
       continue
     }
-    const shown = officialPyqCardForAdmin(paperId, card)
-    const draft = officialPyqDraftFromSuggestion(shown, compared)
-    const reject = officialPyqAutoFixRejectReason(shown, draft, { ocr, printedNumber: officialPyqPrintedNumber(card, index) })
-    if (reject) {
-      note(`Correction not used: ${reject}`)
-      continue
+    let draft
+    if (human || keyOnStore) {
+      draft = { ...officialPyqDraftFromCard(card), answerKey: formatOfficialPyqAnswerKey(answer), answerFromPage: true }
+    } else {
+      const shown = officialPyqCardForAdmin(paperId, card)
+      draft = officialPyqDraftFromSuggestion(shown, compared)
+      const reject = officialPyqAutoFixRejectReason(shown, draft, { ocr, printedNumber: officialPyqPrintedNumber(card, index) })
+      if (reject) {
+        note(`Correction not used: ${reject}`)
+        continue
+      }
     }
-    const res = saveOfficialPyqCardEdit(paperId, index, { ...draft, source: OFFICIAL_PYQ_AUTO_FIX_SOURCE })
+    const res = saveOfficialPyqCardEdit(paperId, index, human ? draft : { ...draft, source: OFFICIAL_PYQ_AUTO_FIX_SOURCE })
     if (!res.ok) {
       note(`Correction not saved: ${res.error}`)
       continue
     }
     const fresh = getOfficialPyqPendingPaper(paperId)?.questions?.[index]
-    markAttempt(paperId, index, [officialPyqAutoFixSignature(fresh), signature], { outcome: 'fixed', source: OFFICIAL_PYQ_AUTO_FIX_SOURCE })
+    markAttempt(paperId, index, [officialPyqAutoFixSignature(fresh), signature], { outcome: 'fixed', source: OFFICIAL_PYQ_AUTO_FIX_SOURCE, ...keyInfo })
     const passed = !(res.paper?.localQuality?.failedGoTo || []).map(Number).includes(goTo)
     if (passed) out.fixed.push(goTo)
     else out.stillFlagged.push(goTo)

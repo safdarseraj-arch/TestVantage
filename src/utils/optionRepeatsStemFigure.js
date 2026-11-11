@@ -13,11 +13,16 @@ export function dropOptionFigureRepeatingStem(q) {
   let changed = false
   const options = q.options.map((o) => {
     if (typeof o !== 'string') return o
+    let dropped = false
     const next = o
-      .replace(FIGURE_IN_TEXT_RE, (all, a, b) => (stemFigures.has(a || b) ? '' : all))
+      .replace(FIGURE_IN_TEXT_RE, (all, a, b) => {
+        if (!stemFigures.has(a || b)) return all
+        dropped = true
+        return ''
+      })
       .replace(/[ \t]+$/gm, '')
       .trimEnd()
-    if (next !== o && next.trim()) {
+    if (dropped && next.trim()) {
       changed = true
       return next
     }

@@ -66,6 +66,8 @@ import {
   withAnswerBlankWord,
 } from './officialPyqCardTidy.js'
 import { officialPyqDrawnCutOff, officialPyqDrawnProblems } from './officialPyqDrawnCheck.js'
+import { officialPyqMatchListLayoutProblems, withoutHeadingOnRowLabel } from './matchListLayoutCheck.js'
+import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
@@ -217,7 +219,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 33
+export const LOCAL_QUALITY_REVISION = 35
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -563,10 +565,38 @@ function answerLabelWithoutAnswer(q) {
  * from the paper: it was carried over from an older split (2013 P2 Q60 kept the "ANSWER : A" printed for Q59).
  */
 function answerClaimsUnprintedKey(q, fresh, items = []) {
-  if (!fresh || q?.answerSource !== 'from_paper' || isMatrixGridCard(q)) return false
+  if (!fresh || q?.answerSource !== 'from_paper' || q?.answerFromOriginalPage === true || isMatrixGridCard(q)) return false
   if (fresh.answerSource === 'from_paper' || answerKeyOf(fresh).has || fresh.bonusMarksToAll === true) return false
   if (!items.some((item) => item?.answerSource === 'from_paper' && answerKeyOf(item).has)) return false
   return answerKeyOf(q).has
+}
+
+const PRINTED_KEY_SHARE = 0.5
+
+/**
+ * No answer on the card, while the scan reads printed keys for most of the paper: the scan lost this
+ * one (an "ANSWER : A" at the foot of a page — 2013 P1 Q2, Q8, Q12–15). Compare reads it from the
+ * original page; once Compare saw no key printed there, the card is left for Hybrid AI.
+ */
+function printedKeyMissing(q, fresh, items = []) {
+  if (!q || isMatrixGridCard(q) || answerKeyOf(q).has || numericalAlternativesOf(q).length) return false
+  if (fresh && answerKeyOf(fresh).has) return false
+  const keyed = items.filter((item) => item?.answerSource === 'from_paper' && answerKeyOf(item).has).length
+  if (keyed < 5 || keyed < items.length * PRINTED_KEY_SHARE) return false
+  return officialPyqCurrentCompare(q)?.printedAnswer !== ''
+}
+
+/** 1-based numbers of the cards whose printed answer the scan lost (see printedKeyMissing). @param {any} paper */
+export function officialPyqPrintedKeyMissingGoTo(paper) {
+  const questions = Array.isArray(paper?.questions) ? paper.questions : []
+  const ocr = stripHindiOcr(getOfficialPyqPendingOcrText(paper?.id) || paper?.preparedText)
+  const items = freshCardsFromOcr(ocr)
+  const out = []
+  questions.forEach((q, i) => {
+    if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
+    if (printedKeyMissing(q, freshCardFor(questions, i, ocr), items)) out.push(i + 1)
+  })
+  return out
 }
 
 const HAND_SOLUTION_SOURCES = new Set(['manual', 'admin_edit'])
@@ -729,6 +759,8 @@ function matchListReason(q, fresh, items) {
     return 'The list rows are not read right (row labels or List headings); they are put right'
   }
   if (listsDifferFromScan(q, fresh, items)) return "List rows of other questions are on this card; the scan's lists are put back"
+  if (withoutHeadingOnRowLabel(q?.text) !== String(q?.text ?? '')) return 'A List heading is printed inside a list row; it is removed'
+  if (scanListsWhenLayoutBroken(q, fresh)) return "The List-I / List-II rows are broken on this card; the scan's lists are put back"
   return ''
 }
 
@@ -743,7 +775,24 @@ function withMatchListsRepaired(q, fresh, items) {
     const pairs = codeOptionsAsPairs(next.options, next.text)
     if (pairs) next = { ...next, options: pairs }
   }
+  const unheaded = withoutHeadingOnRowLabel(next.text)
+  if (unheaded !== String(next.text ?? '')) next = { ...next, text: unheaded }
+  const scanLists = scanListsWhenLayoutBroken(next, fresh)
+  if (scanLists) next = scanLists
   return next
+}
+
+/**
+ * The scan's lists on a card nobody edited whose List-I / List-II layout is broken (rows emptied,
+ * a row lost) while the scan's own card lays out cleanly (2024 P1 Q50). null otherwise.
+ */
+function scanListsWhenLayoutBroken(q, fresh) {
+  if (!fresh || q?.adminEdited === true || !/(?:List|Column)\s*[-–]?\s*I/i.test(String(fresh.text ?? ''))) return null
+  if (!officialPyqMatchListLayoutProblems(q).length) return null
+  const text = withoutHeadingOnRowLabel(fresh.text)
+  const pairs = codeOptionsAsPairs(q.options, text)
+  const candidate = { ...q, text, ...(pairs ? { options: pairs } : {}) }
+  return officialPyqMatchListLayoutProblems(candidate).length ? null : candidate
 }
 
 /** Lowest-priority damage: shown only when nothing else is wrong with the card. */
@@ -850,7 +899,13 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, ite
   if (cut) return `The first word looks cut off (“${cut}”)`
   if (passageLostFigure) return 'The paragraph lost its figure; the other question under it has the figure'
   if (textWithLostWords(q, fresh)) return 'Words printed in the scan are missing from the card'
+  if (optionsCutShortOfScan(q, fresh)) return 'An option is cut short; the scan prints more of it, which is put back'
   return (originalConfirmsWording(q) ? '' : scanLossReason(q)) || drawnReason(q)
+}
+
+/** Named after every other problem: one reason shows per card, and a missing key is fixed without touching the wording. */
+function keyMissingReason(q, fresh, items) {
+  return printedKeyMissing(q, fresh, items) ? 'No answer is saved, but this paper prints its answers; Auto-fix reads it from the original page' : ''
 }
 
 /** Compare read the original page for this exact wording and found the same words (2014 P2 Q57 prints no “= 1”). */
@@ -870,10 +925,12 @@ function cardDamageReasons(questions, ocr, solutionRules = true) {
   const out = new Map()
   questions.forEach((q, i) => {
     if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
+    const fresh = freshCardFor(questions, i, ocr)
     const reason =
-      cardDamageReason(q, freshCardFor(questions, i, ocr), siblings.has(i), solutionRules, items, ocr) ||
+      cardDamageReason(q, fresh, siblings.has(i), solutionRules, items, ocr) ||
       structure.get(i) ||
-      chapterReason(q)
+      chapterReason(q) ||
+      keyMissingReason(q, fresh, items)
     if (reason) out.set(i, reason)
   })
   return out
@@ -890,15 +947,12 @@ export function officialPyqCardDamageReason(paper, index) {
   const q = questions[index]
   if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return ''
   const ocr = stripHindiOcr(paper?.preparedText)
+  const fresh = freshCardFor(questions, index, ocr)
+  const items = freshCardsFromOcr(ocr)
   return (
-    cardDamageReason(
-      q,
-      freshCardFor(questions, index, ocr),
-      passagesMissingSiblingFigure(questions).has(index),
-      paper?.status !== 'published',
-      freshCardsFromOcr(ocr),
-      ocr,
-    ) || chapterReason(q)
+    cardDamageReason(q, fresh, passagesMissingSiblingFigure(questions).has(index), paper?.status !== 'published', items, ocr) ||
+    chapterReason(q) ||
+    keyMissingReason(q, fresh, items)
   )
 }
 
@@ -921,6 +975,7 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   if (split) next = { ...next, options: split }
   const once = stemWithoutRepeatedPictures(next.text)
   if (once) next = { ...next, text: once }
+  next = dropOptionFigureRepeatingStem(next)
   const captioned = stemWithFigureCaptionCase(next.text)
   if (captioned) next = { ...next, text: captioned }
   const crops = officialPyqCurrentCompare(next)?.suggestedFigures?.text
@@ -935,6 +990,8 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   next = withEnglishSpacing(next, ocr)
   const found = textWithLostWords(next, fresh)
   if (found) next = { ...next, text: found }
+  const fuller = optionsCutShortOfScan(next, fresh)
+  if (fuller) next = { ...next, options: fuller }
   for (const key of ['text', 'passageText']) {
     if (typeof next[key] !== 'string') continue
     let restored = withRestoredStemStart(next[key])
@@ -943,6 +1000,34 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   }
   if (siblingPassage && !FIGURE_IN_TEXT_RE.test(String(next.passageText ?? ''))) next = { ...next, passageText: siblingPassage }
   return next
+}
+
+const optionKey = (text) => String(text ?? '').replace(/\s+/g, ' ').trim()
+
+/**
+ * Options the fresh split of the scan reads longer, the saved one being the start of it
+ * ("$F e$" for "$F e$ (III)" — 2013 P1 Q26; options cut at "and" — 2013 P2 Q31). null when none.
+ */
+function optionsCutShortOfScan(card, fresh) {
+  if (!fresh || card?.adminEdited === true || card?.adminApproved === true || isMatrixGridCard(card)) return null
+  const have = Array.isArray(card?.options) ? card.options : []
+  /** "… the atom Space for rough work" is page text the saved card rightly dropped (2016 P2 Q27). */
+  const scan = withoutPageLeftovers({ options: Array.isArray(fresh?.options) ? fresh.options : [] }).options
+  if (have.length < 2 || have.length !== scan.length) return null
+  let changed = false
+  const options = have.map((opt, i) => {
+    const mine = optionKey(opt)
+    const full = optionKey(scan[i])
+    if (!mine || full.length <= mine.length || !full.startsWith(mine)) return opt
+    const tail = full.slice(mine.length).trim()
+    if (tail.length > 60 || KEY_OR_HEAD_RUN.test(tail)) return opt
+    if (/\([A-D]\)|!\[|\\(?:includegraphics|item|section|begin|end)\b|\b(?:Answer|Ans|Sol)\b/i.test(tail)) return opt
+    /** A tail on its own line is page text after the option, not the option's end. */
+    if (String(scan[i]).trim().includes('\n') && !String(opt).trim().includes('\n')) return opt
+    changed = true
+    return String(scan[i])
+  })
+  return changed ? options : null
 }
 
 /** Scan damage repaired on a card an admin edited: a cut first word or a paragraph figure is never an admin choice. */
@@ -969,6 +1054,7 @@ const ANSWER_FIELDS = [
   'correctNumerical',
   'numericalTolerance',
   'numericalAlternatives',
+  'correctIndicesAlternatives',
   'bonusMarksToAll',
 ]
 
@@ -1323,7 +1409,7 @@ function adoptLeftoverFixes(q) {
   let next = withoutPageLeftovers(q)
   const stem = stemRepeatsOptionPictures(next)
   if (stem) next = { ...next, text: stem }
-  return next
+  return dropOptionFigureRepeatingStem(next)
 }
 
 /**
@@ -1555,6 +1641,7 @@ export function persistOfficialPyqQualityRun(paper) {
           if (!stored[i]) return -1
           if (hasScrapOption(stored[i]) && !hasScrapOption(q)) return i
           if (scanDamageRepaired(stored[i], q)) return i
+          if (dropOptionFigureRepeatingStem(stored[i]) !== stored[i] && dropOptionFigureRepeatingStem(q) === q) return i
           const source = ocr || String(full?.preparedText ?? '')
           const fresh = freshCardFor(stored, i, source)
           const items = freshCardsFromOcr(source)

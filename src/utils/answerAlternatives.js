@@ -1,6 +1,7 @@
 /**
  * Printed keys the single answer fields cannot hold:
  * - "0.5 OR 0.75", "[75 to 79] OR [94 to 95]": either answer scores (numericalAlternatives).
+ * - "ABCD or BCD" on a one-or-more-correct question: either option set scores (correctIndicesAlternatives).
  * - "MARKS TO ALL": a bonus question, full marks to every candidate (bonusMarksToAll).
  */
 
@@ -66,6 +67,39 @@ export function numericalAlternativesOf(q) {
   return (Array.isArray(q?.numericalAlternatives) ? q.numericalAlternatives : []).filter((c) =>
     Number.isFinite(Number(c?.value)),
   )
+}
+
+const LETTER_GROUP_RE = /^\(?[A-H]\)?(?:\s*(?:,|&|and)?\s*\(?[A-H]\)?)*$/i
+
+/**
+ * Two or more option-letter sets joined by OR ("ABCD or BCD", "(A), (C) or (A)"), each as sorted
+ * 0-based indices. Null when it is not that shape.
+ * @param {string} text
+ * @returns {number[][] | null}
+ */
+export function parseLetterAnswerChoices(text) {
+  const parts = String(text ?? '').trim().split(/\s+OR\s+/i)
+  if (parts.length < 2) return null
+  const sets = []
+  for (const part of parts) {
+    const p = part.trim()
+    if (!LETTER_GROUP_RE.test(p)) return null
+    const letters = p.replace(/\band\b/gi, ' ').toUpperCase().match(/[A-H]/g) || []
+    sets.push([...new Set(letters.map((l) => l.charCodeAt(0) - 65))].sort((a, b) => a - b))
+  }
+  return sets
+}
+
+/** @param {any} q @returns {number[][]} */
+export function letterAlternativesOf(q) {
+  return (Array.isArray(q?.correctIndicesAlternatives) ? q.correctIndicesAlternatives : [])
+    .filter((set) => Array.isArray(set) && set.length && set.every((i) => Number.isInteger(Number(i)) && Number(i) >= 0))
+    .map((set) => set.map(Number))
+}
+
+/** @param {number[]} set */
+export function formatLetterChoice(set) {
+  return set.map((i) => String.fromCharCode(65 + Number(i))).join(', ')
 }
 
 /**

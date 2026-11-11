@@ -16,7 +16,7 @@ import {
   persistOfficialPyqQualityRun,
 } from './officialPyqLocalQuality.js'
 import { enforceAdminFactsOnQuestions, factsForPaper } from './officialPyqAdminFacts.js'
-import { numericalAlternativesOf } from './answerAlternatives.js'
+import { letterAlternativesOf, numericalAlternativesOf } from './answerAlternatives.js'
 import {
   looksLikeAnswerKeyMappingBlob,
   looksLikePyqSectionInstructionStem,
@@ -205,8 +205,10 @@ export function pendingQuestionToPyqItem(paper, q, index) {
 /** Either-of answers and "marks to all" travel with the card to students and the bank. */
 function answerExtrasOf(q) {
   const alternatives = numericalAlternativesOf(q)
+  const letterSets = letterAlternativesOf(q)
   return {
     ...(alternatives.length ? { numericalAlternatives: alternatives } : {}),
+    ...(letterSets.length ? { correctIndicesAlternatives: letterSets } : {}),
     ...(q?.bonusMarksToAll === true ? { bonusMarksToAll: true } : {}),
   }
 }

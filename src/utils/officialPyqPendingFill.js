@@ -180,6 +180,7 @@ export function applyHybridPatchToCard(card, patch) {
     next.correctNumerical = patch.correctNumerical
     delete next.numericalTolerance
     delete next.numericalAlternatives
+    delete next.correctIndicesAlternatives
     next.answerSource = 'hybrid_ai'
   }
   if (answer && !printedBonus && answer !== currentAnswerText(card) && (handEdited || KEPT_SOURCES.has(card.answerSource))) {

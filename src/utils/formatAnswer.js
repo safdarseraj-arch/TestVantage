@@ -1,6 +1,6 @@
 import { formatMatrixCorrectAnswer, formatMatrixUserAnswer } from './matrixMatch.js'
 import { passageQuestionUsesNumerical } from './passageSubAnswer.js'
-import { formatNumericChoice, numericalAlternativesOf } from './answerAlternatives.js'
+import { formatLetterChoice, formatNumericChoice, letterAlternativesOf, numericalAlternativesOf } from './answerAlternatives.js'
 
 /** @param {import('../data/tests').Question} q @param {unknown} answer */
 export function formatUserAnswer(q, answer) {
@@ -77,9 +77,11 @@ export function formatCorrectAnswer(q) {
 
     case 'multiple_correct': {
       const indices = q.correctIndices ?? []
-      return indices
+      const main = indices
         .map((i) => `${String.fromCharCode(65 + i)}) ${q.options?.[i] ?? i}`)
         .join('; ')
+      const alternatives = letterAlternativesOf(q)
+      return alternatives.length ? [formatLetterChoice(indices), ...alternatives.map(formatLetterChoice)].join(' or ') : main
     }
 
     case 'numerical':

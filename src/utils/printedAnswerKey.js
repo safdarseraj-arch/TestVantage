@@ -182,6 +182,7 @@ export function applyPrintedAnswerKey(questions, key) {
     delete next.correctNumerical
     delete next.numericalTolerance
     delete next.numericalAlternatives
+    delete next.correctIndicesAlternatives
     if (!fields) return { ...next, answerSource: 'unknown' }
     return { ...next, ...fields, answerSource: 'from_paper' }
   })

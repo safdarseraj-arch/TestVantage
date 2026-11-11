@@ -417,13 +417,21 @@ test('Compare pictures: only crop addresses are kept, and [figure] marks decide 
   assert.equal(noWords.options[0], `\\includegraphics{${A}}\n\\includegraphics{${B}}`)
   assert.deepEqual(noWords.options.slice(1), ['water', '$3$', '$4$'], 'options without pictures stay')
 
+  const C = '/api/official-pyq/original/crops/opyq-1-p3-4444444444444444.png?page=3&x0=0.1000&y0=0.5000&x1=0.4000&y1=0.6000'
   const twoMarks = officialPyqDraftFromSuggestion(card, {
     suggestedText: 'First [figure] then [figure 2] and [figure 3].',
     suggestedOptions: ['(A) Q: [figure]', '', '', ''],
-    suggestedFigures: { text: [A, B], options: [[B]] },
+    suggestedFigures: { text: [A, B], options: [[C]] },
   })
   assert.equal(twoMarks.text, `First\n\\includegraphics{${A}}\nthen\n\\includegraphics{${B}}\nand .`)
-  assert.equal(twoMarks.options[0], `Q:\n\\includegraphics{${B}}`)
+  assert.equal(twoMarks.options[0], `Q:\n\\includegraphics{${C}}`)
+  // 2013 P1 Q15: the question's own picture is never kept as an option's picture.
+  const repeated = officialPyqDraftFromSuggestion(card, {
+    suggestedText: 'First [figure] then [figure 2].',
+    suggestedOptions: ['(A) Q: [figure]', '', '', ''],
+    suggestedFigures: { text: [A, B], options: [[B]] },
+  })
+  assert.equal(repeated.options[0].includes(B), false)
 
   const textOnly = officialPyqDraftFromSuggestion(card, { suggestedText: 'Fixed words [figure]', suggestedFigures: {} })
   assert.equal(textOnly.text, 'Fixed words\n![](https://cdn.mathpix.com/cropped/y-1.jpg)', 'without crops the old picture stays')

@@ -7,6 +7,7 @@
  */
 
 import { officialPyqDrawnCutOff, officialPyqDrawnRawCode, officialPyqDrawnText } from './officialPyqDrawnCheck.js'
+import { officialPyqMatchListLayoutProblems } from './matchListLayoutCheck.js'
 import {
   getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
@@ -20,6 +21,7 @@ import {
   notifyOfficialPyqCardChanged,
   officialPyqCardForAdmin,
   officialPyqCompareHasSuggestion,
+  officialPyqPrintedAnswerPatch,
   officialPyqSuggestedFigures,
 } from './officialPyqCardEdit.js'
 
@@ -195,6 +197,8 @@ export function officialPyqCardScreenProblems(paper, index, drawn) {
   const parts = [drawn?.passage, drawn?.text, ...options]
   for (const hit of officialPyqDrawnRawCode(parts.map((p) => String(p ?? '')).join('\n'))) out.push(hit)
   out.push(...officialPyqDrawnCutOff(null, { text: String(drawn?.text ?? ''), options }))
+  const card = paper?.questions?.[index]
+  if (card) out.push(...officialPyqMatchListLayoutProblems(card).map((p) => `in the List-I / List-II layout, ${p}`))
   return out
 }
 
@@ -218,6 +222,27 @@ export function honestOfficialPyqCompareResult(result, problems) {
     suggested_passage: '',
     suggested_figures: undefined,
   }
+}
+
+/**
+ * The page prints an answer key the card lacks or contradicts: Compare cannot say "matches"
+ * (2013 P1 Q2 — the scan lost "ANSWER : A" at the foot of the page).
+ * @param {any} result @param {any} card the card as sent
+ */
+export function withPrintedAnswerDifference(result, card) {
+  const verdict = String(result?.verdict ?? '')
+  if (verdict !== 'matches' && verdict !== 'differs') return result
+  const patch = officialPyqPrintedAnswerPatch(card, result)
+  if (!patch) return result
+  const onCard = formatOfficialPyqAnswerKey(card)
+  const detail = onCard
+    ? `The page prints answer ${String(result.printed_answer).trim()}; the card says ${onCard}.`
+    : `The page prints answer ${String(result.printed_answer).trim()}; the card has no answer.`
+  const differences = Array.isArray(result?.differences) ? result.differences : []
+  if (verdict === 'matches') {
+    return { ...result, verdict: 'differs', textMatches: true, differences: [{ kind: 'wrong_answer', detail }] }
+  }
+  return { ...result, differences: [...differences, { kind: 'wrong_answer', detail }] }
 }
 
 /** @param {any} q */
@@ -267,7 +292,7 @@ export async function compareOfficialPyqCardRemote(paperId, index, stored, { sig
         signal,
       )
       if (!res.ok) throw await readError(res)
-      return honestOfficialPyqCompareResult(await res.json(), problems)
+      return withPrintedAnswerDifference(honestOfficialPyqCompareResult(await res.json(), problems), q)
     } catch (err) {
       if (err instanceof CompareStopError) throw err
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -310,6 +335,7 @@ export function saveOfficialPyqCompareResult(paperId, index, result, comparedCar
         ? result.suggested_options.map((o) => String(o ?? ''))
         : [],
       suggestedFigures: officialPyqCompareHasSuggestion({ suggestedFigures: figures }) ? figures : undefined,
+      printedAnswer: typeof result?.printed_answer === 'string' ? result.printed_answer.trim() : undefined,
       pages: Array.isArray(result?.pages) ? result.pages : [],
       error: result?.error ? String(result.error) : undefined,
       checkedAt: Date.now(),

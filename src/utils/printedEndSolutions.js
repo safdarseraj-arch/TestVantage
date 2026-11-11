@@ -200,7 +200,15 @@ export function storedEndAnswerSectionText(raw) {
   return end ? `\n\n${end.sectionText}\n` : ''
 }
 
-const ANSWER_FIELDS = ['correctIndex', 'correctIndices', 'correctInteger', 'correctNumerical', 'numericalTolerance', 'numericalAlternatives']
+const ANSWER_FIELDS = [
+  'correctIndex',
+  'correctIndices',
+  'correctInteger',
+  'correctNumerical',
+  'numericalTolerance',
+  'numericalAlternatives',
+  'correctIndicesAlternatives',
+]
 
 /** Answer fields for one card from a printed value ("(B)", "A, C", "7", "[0.7 to 0.8]"). */
 export function endKeyAnswerFields(value, q) {

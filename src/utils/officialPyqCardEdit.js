@@ -23,11 +23,16 @@ import { textWithOriginalFigureCrops } from './officialPyqCardTidy.js'
 import { paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
 import { gridColLabels, gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.js'
 import {
+  formatLetterChoice,
   formatNumericChoice,
+  letterAlternativesOf,
   numericChoiceFields,
   numericalAlternativesOf,
+  parseLetterAnswerChoices,
   parseNumericAnswerChoices,
 } from './answerAlternatives.js'
+import { detectAnswerFromPaper } from './answerProvenance.js'
+import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
 
 export const OFFICIAL_PYQ_CARD_CHANGED_EVENT = 'testvantage:official-pyq-card-changed'
 
@@ -50,12 +55,14 @@ const SNAPSHOT_FIELDS = [
   'correctNumerical',
   'numericalTolerance',
   'numericalAlternatives',
+  'correctIndicesAlternatives',
   'bonusMarksToAll',
   'matrixRows',
   'matrixCols',
   'matrixAnswerKey',
   'matrixAnswerAlternates',
   'answerSource',
+  'answerFromOriginalPage',
   'questionImage',
   'adminEdited',
   'adminEditedAt',
@@ -350,12 +357,74 @@ export function officialPyqDraftFromSuggestion(card, compare) {
     if (crops.length) return placeCropFigures(before, withoutFigurePlaceholders(suggested) ? suggested : '', crops)
     return withoutFigurePlaceholders(suggested) ? keepCardFigures(before, suggested) : before
   }
-  return {
+  const printed = officialPyqPrintedAnswerPatch(card, compare)
+  /** A kept card picture must not come back on an option when it is the question's own figure (2013 P1 Q15). */
+  return dropOptionFigureRepeatingStem({
     ...base,
     text: fix(base.text, text, figures.text),
     passageText: fix(base.passageText, passage, figures.passage),
     options,
-  }
+    ...(printed ? { answerKey: formatOfficialPyqAnswerKey(printed), answerFromPage: true } : {}),
+  })
+}
+
+const PRINTED_ANSWER_FIELDS = [
+  'correctIndex',
+  'correctIndices',
+  'correctInteger',
+  'correctNumerical',
+  'numericalTolerance',
+  'numericalAlternatives',
+  'correctIndicesAlternatives',
+  'bonusMarksToAll',
+]
+
+/**
+ * The answer key Compare read printed on the original page, as answer fields; null when the page
+ * prints none. The scan often loses an "ANSWER : A" line at the foot of a page (2013 P1 Q2, Q8).
+ * @param {unknown} printed
+ * @param {any} [card]
+ */
+export function officialPyqPrintedAnswerFields(printed, card) {
+  const raw = String(printed ?? '').trim().replace(/^(?:ANSWER|Ans(?:wer)?|Key)\s*[:.\-=]?\s*/i, '').replace(/[.;]\s*$/, '')
+  if (!raw) return null
+  const type = String(card?.questionType ?? '')
+  const multi = /multiple/i.test(type) || Array.isArray(card?.correctIndices)
+  /** Either of two option sets scores only on a one-or-more-correct card; "A or C" on a one-answer card needs a person. */
+  if (/\bor\b/i.test(raw) && /\b[A-D]{1,4}\b/.test(raw.replace(/\bor\b/gi, '')) && !(multi && parseLetterAnswerChoices(raw))) return null
+  const hint = multi
+    ? { correctIndices: [] }
+    : /integer/i.test(type) || card?.correctInteger != null
+      ? { correctInteger: 0 }
+      : card
+  const typed = parseOfficialPyqAnswerKey(raw.replace(/^\(?([A-H])\)?$/i, '$1'), hint)
+  /** @type {Record<string, unknown>} */
+  const fields = {}
+  const read = typed.ok ? typed.patch : detectAnswerFromPaper(`ANSWER : ${raw}`)
+  if (!typed.ok && read.answerSource !== 'from_paper') return null
+  for (const key of PRINTED_ANSWER_FIELDS) if (read[key] != null) fields[key] = read[key]
+  return Object.keys(fields).length ? fields : null
+}
+
+/**
+ * Answer fields to save when the key printed on the page is missing from the card or differs
+ * from it; null when it matches or the page prints none.
+ * @param {any} card @param {any} compare card.originalCompare (or a raw Compare result)
+ */
+export function officialPyqPrintedAnswerPatch(card, compare) {
+  if (!card || isMatrixGridCard(card)) return null
+  const fields = officialPyqPrintedAnswerFields(compare?.printedAnswer ?? compare?.printed_answer, card)
+  if (!fields) return null
+  const options = Array.isArray(card.options) ? card.options : []
+  const optionCount = options.some((o) => String(o ?? '').trim()) ? options.length : 0
+  const letters = [
+    fields.correctIndex,
+    ...(Array.isArray(fields.correctIndices) ? fields.correctIndices : []),
+    ...letterAlternativesOf(fields).flat(),
+  ].filter((i) => i != null)
+  if (letters.length && letters.some((i) => Number(i) >= Math.max(optionCount, 1))) return null
+  if (!letters.length && fields.bonusMarksToAll !== true && optionCount >= 2) return null
+  return formatOfficialPyqAnswerKey(fields) === formatOfficialPyqAnswerKey(card) ? null : fields
 }
 
 /** @param {any} q */
@@ -380,7 +449,8 @@ export function formatOfficialPyqAnswerKey(q) {
     return [main, ...alternatives].map(formatNumericChoice).join(' OR ')
   }
   if (Array.isArray(q.correctIndices) && q.correctIndices.length) {
-    return q.correctIndices.map((i) => LETTERS[Number(i)] ?? String(i)).join(', ')
+    const main = q.correctIndices.map((i) => LETTERS[Number(i)] ?? String(i)).join(', ')
+    return [main, ...letterAlternativesOf(q).map(formatLetterChoice)].join(' OR ')
   }
   if (q.correctIndex != null && Number.isFinite(Number(q.correctIndex))) {
     return LETTERS[Number(q.correctIndex)] ?? String(q.correctIndex)
@@ -412,9 +482,17 @@ export function parseOfficialPyqAnswerKey(raw, card) {
     correctNumerical: undefined,
     numericalTolerance: undefined,
     numericalAlternatives: undefined,
+    correctIndicesAlternatives: undefined,
     bonusMarksToAll: undefined,
   }
   if (!text) return { ok: true, patch: cleared }
+  const letterSets = parseLetterAnswerChoices(text)
+  if (letterSets) {
+    const multi = Array.isArray(card?.correctIndices) || /multiple/i.test(String(card?.questionType ?? ''))
+    if (!multi) return { ok: false, error: 'Answer key: two option answers joined by OR fit only a one-or-more-correct question.' }
+    const [first, ...rest] = letterSets
+    return { ok: true, patch: { ...cleared, correctIndices: first, correctIndicesAlternatives: rest } }
+  }
   if (/^(?:bonus|marks\s+to\s+all)\b/i.test(text)) return { ok: true, patch: { ...cleared, bonusMarksToAll: true } }
   const choices = parseNumericAnswerChoices(text)
   if (choices) return { ok: true, patch: { ...cleared, ...numericChoiceFields(choices) } }
@@ -521,7 +599,7 @@ export function officialPyqPassageGroupIndexes(questions, index) {
 /**
  * @param {string} paperId
  * @param {number} index 0-based card index on the paper
- * @param {{ text: string, options: string[], answerKey?: string, removeFigure?: boolean }} draft
+ * @param {{ text: string, options: string[], answerKey?: string, answerFromPage?: boolean, removeFigure?: boolean }} draft
  */
 export function saveOfficialPyqCardEdit(paperId, index, draft) {
   const paper = getOfficialPyqPendingPaper(paperId)
@@ -555,7 +633,8 @@ export function saveOfficialPyqCardEdit(paperId, index, draft) {
     if (!parsed.ok) return parsed
     next = { ...next, ...parsed.patch }
     if (String(draft.answerKey ?? '').trim() !== formatOfficialPyqAnswerKey(card)) {
-      next.answerSource = 'admin_edit'
+      next.answerSource = draft.answerFromPage === true ? 'from_paper' : 'admin_edit'
+      next.answerFromOriginalPage = draft.answerFromPage === true ? true : undefined
     }
   }
   const prevAt = Number(card.adminEditedAt) || 0

@@ -679,12 +679,22 @@ test('2014 P2: auto-fix rebuilds 63 scrambled cards to the 60 printed questions,
 // The 2014 P2 scan itself lost Q22's label II, a Q38 structure and the end of Q57's condition:
 // only the original page can settle them, so they stay flagged after auto-fix.
 const SCAN_LOSS_2014_P2 = [22, 38, 57]
+// The scan also lost the printed keys of Q18 and Q21; Auto-fix reads them from the original page.
+const KEY_LOSS_2014_P2 = [18, 21]
 function assertOnlyScanLossLeft(quality, extra = []) {
   const why = quality.lines.join(' | ')
-  assert.deepEqual([...quality.failedGoTo].sort((a, b) => a - b), [...extra, ...SCAN_LOSS_2014_P2].sort((a, b) => a - b), why)
+  assert.deepEqual(
+    [...quality.failedGoTo].sort((a, b) => a - b),
+    [...new Set([...extra, ...SCAN_LOSS_2014_P2, ...KEY_LOSS_2014_P2])].sort((a, b) => a - b),
+    why,
+  )
   for (const n of SCAN_LOSS_2014_P2) {
     assert.ok(quality.lines.some((l) => l.startsWith(`Go to Q ${n}.`) && /compare with the original page/.test(l)), `Q${n}: ${why}`)
   }
+  assert.ok(
+    quality.lines.some((l) => l.startsWith(`Go to Q ${KEY_LOSS_2014_P2.join(', ')}.`) && /prints its answers/.test(l)),
+    `Q${KEY_LOSS_2014_P2.join(', ')}: ${why}`,
+  )
 }
 
 const p14b60 = JSON.parse(fs.readFileSync(new URL('./fixtures/jee-advanced-2014-p2-stored-cards-60.json', import.meta.url), 'utf8'))

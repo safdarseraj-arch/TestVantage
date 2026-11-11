@@ -1085,6 +1085,8 @@ function dropStolenFigures(stem, source, printedNumber, map, { passage = false }
     if (figureSubjectConflictsStem(t, ctx)) next = stripUrlFromStem(next, url)
   }
   next = next.replace(/\n{3,}/g, '\n\n').trim()
+  // Without a scan nothing shows a picture belongs to another question (a hand-edited card is checked this way).
+  if (!src.trim()) return next
   const kept = extractMathpixImageUrls(next).filter((url) => !isOriginalCropUrl(url))
   if (!kept.length) return next
   if (stemMentionsFigure(next)) return next
@@ -1301,11 +1303,24 @@ export function restoreMissingListIIFromSource(stem, options, source) {
   return spliceListIIIntoStem(text, bestBlock)
 }
 
+/** Whitespace-free body of every labelled row in a "List-II\n(1) …" block. */
+function listBlockRowBodies(block) {
+  return String(block ?? '')
+    .split('\n')
+    .map((line) => line.match(/^\s*\(\s*(?:[1-6]|[A-Za-z])\s*\)\s*(.*)$/)?.[1] ?? '')
+    .map((body) => body.replace(/\s+/g, ''))
+    .filter(Boolean)
+}
+
 function spliceListIIIntoStem(stem, listIIBlock) {
   const t = String(stem ?? '').trim()
   const block = String(listIIBlock ?? '').trim()
   if (!t || !block) return t
   if (hasListTwoEntries(t)) return t
+  /** The scan's List-II is the card's own, row for row: copying it again only shows it twice (2018 P2 Q16 lost row 4 in both). */
+  const bodies = listBlockRowBodies(block)
+  const flat = t.replace(/\s+/g, '')
+  if (bodies.length && bodies.every((body) => flat.includes(body))) return t
   const emptyII = t.search(
     /(?:List|Column)\s*[-–]?\s*II\b\s*(?=\s*$)/i,
   )

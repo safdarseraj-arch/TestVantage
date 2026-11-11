@@ -7,6 +7,7 @@ import katex from 'katex'
 import { convertLatexTabularToArray } from './latexTabularDisplay.js'
 import { answerBlanksInMath, prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import { mathDrawFailure } from './mathDrawCheck.js'
+import { officialPyqMatchListLayoutProblems } from './matchListLayoutCheck.js'
 
 const HTML_ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'" }
 
@@ -161,6 +162,9 @@ function cutOffTail(drawn, comma) {
   if (word && t.slice(0, word.index).trim()) return word[1]
   if (/\S\s*&$/.test(t)) return '&'
   if (comma && /\S\s*,$/.test(t) && !CODE_PAIR_COMMA_RE.test(t)) return ','
+  /** "The point (-2, 3" — a bracket opened and never closed; "(0, 1]" closes with "]". */
+  const open = comma ? t.match(/\(([^()[\]]*)$/) : null
+  if (open && /\d/.test(open[1]) && open[1].includes(',')) return t.slice(open.index)
   return ''
 }
 
@@ -205,5 +209,6 @@ export function officialPyqDrawnProblems(card) {
   const drawn = parts.map((p) => officialPyqDrawnText(p))
   out.push(...officialPyqDrawnRawCode(drawn.join('\n')))
   out.push(...officialPyqDrawnCutOff(card, { text: drawn[1], options: drawn.slice(2) }))
+  out.push(...officialPyqMatchListLayoutProblems(card).map((p) => `in the List-I / List-II layout, ${p}`))
   return out
 }

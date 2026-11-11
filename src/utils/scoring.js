@@ -9,7 +9,7 @@ import { matrixAnswersEqual } from './matrixMatch.js'
 import { gridFieldsOf, isMatrixGridCard, scoreMatrixGridRows } from './matrixGridPyq.js'
 import { DEFAULT_MSQ_MARKING, scoreMsqAnswer } from './msqMarking.js'
 import { passageQuestionUsesNumerical } from './passageSubAnswer.js'
-import { numericAnswerMatches } from './answerAlternatives.js'
+import { letterAlternativesOf, numericAnswerMatches } from './answerAlternatives.js'
 
 /**
  * @param {import('../data/tests').Question} q
@@ -67,7 +67,10 @@ function gradeQuestion(q, answer, pattern) {
     case 'multiple_correct': {
       const scheme = q.msqMarking ?? DEFAULT_MSQ_MARKING
       const selected = Array.isArray(answer) ? answer : []
-      const result = scoreMsqAnswer(selected, q.correctIndices ?? [], scheme)
+      const sets = [q.correctIndices ?? [], ...letterAlternativesOf(q)]
+      const result = sets
+        .map((set) => scoreMsqAnswer(selected, set, scheme))
+        .reduce((best, r) => (r.marks > best.marks ? r : best))
       return { grade: result.grade, marks: result.marks }
     }
 

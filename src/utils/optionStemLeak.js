@@ -280,8 +280,14 @@ export function stripNextSubQuestionFromOption(opt) {
   const valueLeak = o.search(/\s+Value\s+of\s+(?:\$|\\frac|\\sum|\\dfrac)/i)
   if (valueLeak > 4 && /^[\d$\\]/.test(o)) o = o.slice(0, valueLeak).trim()
 
+  const numbered = [...o.matchAll(/\s+\d{1,2}([.)])\s+/g)].find((m) => {
+    if (m[1] !== ')') return true
+    /** "(-2, 7) lies in" — the ")" closes the point, it does not number a new question (2018 P2 Q38). */
+    const before = o.slice(0, m.index)
+    return (before.match(/\(/g) || []).length <= (before.match(/\)/g) || []).length
+  })
+  if (numbered) o = o.slice(0, numbered.index)
   o = o
-    .replace(/\s+\d{1,2}[\.\)]\s+.*$/s, '')
     .replace(/\s+Value\s+of\b.*$/is, '')
     .replace(/\s*\(\s*A\s*\)\s*.*$/is, '')
     .trim()
@@ -384,6 +390,8 @@ export function trimTrailingProseAfterMath(opt) {
   }
   if (
     /^and\s+\$/.test(tail) ||
+    /** An oxidation state or phase after the formula: "$F e$ (III)" (2013 P1 Q26). */
+    /^\(\s*(?:[IVX]{1,4}|[+-]?\d[+-]?|aq|g|l|s)\s*\)\s*[.,]?$/.test(tail) ||
     hasOptionEqualityAnswer(tail) ||
     hasMeaningfulOptionAnswerTail(tail) ||
     isOptionClauseTail(tail)

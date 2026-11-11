@@ -114,6 +114,13 @@ class CompareVerdict(BaseModel):
         default_factory=list,
         description="Boxes around drawings the card is missing or draws wrong. Empty if every picture is right.",
     )
+    printed_answer: str = Field(
+        default="",
+        description=(
+            "The answer key printed on the page for this question, copied as printed after 'ANSWER' / 'Ans.' "
+            "(e.g. 'B', 'BD', 'A or C', '5', '2.25 to 2.30'). Empty if the page prints no answer for it."
+        ),
+    )
     found_on_page: int | None = None
 
 
@@ -928,7 +935,11 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         "- With figure boxes for the question text or passage, write [figure] in suggested_text / "
         "suggested_passage where each boxed drawing goes (in box order) and leave out the words that "
         "are inside the drawing (reagents, labels).\n"
-        "- Do not judge the answer key unless the page prints one.\n"
+        "- printed_answer: if the page prints an answer key for this question (often 'ANSWER : X' under "
+        "it, sometimes at the very bottom of the page or the top of the next image), copy it exactly as "
+        "printed; otherwise leave it empty. A card answer key that is missing or differs from the printed "
+        "one is a difference (kind wrong_option, verdict 'differs'). Do not judge the answer key unless "
+        "the page prints one.\n"
         "Return JSON only."
     )
 
@@ -1025,6 +1036,7 @@ async def compare_question(body: dict[str, Any]) -> dict[str, Any]:
         "suggested_options": _real_suggested_options(verdict.suggested_options) if kind == "differs" else [],
         "suggested_passage": verdict.suggested_passage.strip() if kind == "differs" else "",
         "suggested_figures": figures,
+        "printed_answer": verdict.printed_answer.strip() if kind != "not_found" else "",
         "pages": pages,
         "model": COMPARE_MODEL,
     }

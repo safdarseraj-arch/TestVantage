@@ -123,6 +123,15 @@ function isOptionContinuationLine(line) {
   return t.length < 72
 }
 
+/** Pictures on their own lines under the last option's words belong to the stem (2013 P1 Q32: "(D) S", then four schemes). */
+function withoutTrailingStemFigures(slice) {
+  const at = slice.search(/\n[ \t]*(?:!\[[^\]]*\]\(|\\includegraphics)/)
+  if (at < 0) return slice
+  const head = slice.slice(0, at)
+  const words = head.replace(/\\caption\{[^}]*\}|\\(?:begin|end)\{figure\}(?:\[[^\]]*\])?|\\centering|[{}\s]/g, '')
+  return words ? head : slice
+}
+
 /**
  * Robust parser: slice text between (A)(B)(C)(D) markers — handles $…$ and ©→C.
  * @param {string} text
@@ -150,7 +159,8 @@ function parseOptionsByMarkers(text) {
     let end = i + 1 < hits.length ? hits[i + 1].index : block.length
     const idx = optionMarkerToIndex(hits[i].letter)
     if (idx < 0 || idx > 3) continue
-    const rawSlice = block.slice(hits[i].contentStart, end)
+    const slice = block.slice(hits[i].contentStart, end)
+    const rawSlice = i === hits.length - 1 ? withoutTrailingStemFigures(slice) : slice
     const content = normalizeOptionContent(rawSlice, stem)
     if (String(content ?? '').trim() !== '' && !options[idx]) options[idx] = content
   }

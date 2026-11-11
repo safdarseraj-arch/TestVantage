@@ -6,7 +6,7 @@
  * question box. The "Show original page" picture is local (no Gemini).
  */
 
-import { officialPyqDrawnRawCode, officialPyqDrawnText } from './officialPyqDrawnCheck.js'
+import { officialPyqDrawnCutOff, officialPyqDrawnRawCode, officialPyqDrawnText } from './officialPyqDrawnCheck.js'
 import {
   getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
@@ -171,7 +171,8 @@ function qualityReasonsFor(paper, goTo) {
 
 /**
  * Problems a student would see on this card right now, from the local quality
- * check and from the drawn text. A Compare "matches" must not hide them.
+ * check and from the drawn text (raw code, an option cut off after "and").
+ * A Compare "matches" must not hide them.
  * @param {any} paper @param {number} index
  * @param {{ text?: string, passage?: string, options?: string[] }} drawn
  * @returns {string[]}
@@ -190,8 +191,10 @@ export function officialPyqCardScreenProblems(paper, index, drawn) {
         : `the quality check flags Q${goTo} (see the red banner)`,
     )
   }
-  const parts = [drawn?.passage, drawn?.text, ...(Array.isArray(drawn?.options) ? drawn.options : [])]
+  const options = Array.isArray(drawn?.options) ? drawn.options.map((o) => String(o ?? '')) : []
+  const parts = [drawn?.passage, drawn?.text, ...options]
   for (const hit of officialPyqDrawnRawCode(parts.map((p) => String(p ?? '')).join('\n'))) out.push(hit)
+  out.push(...officialPyqDrawnCutOff(null, { text: String(drawn?.text ?? ''), options }))
   return out
 }
 

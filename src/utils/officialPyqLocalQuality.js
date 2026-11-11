@@ -65,7 +65,7 @@ import {
   stemWithoutRepeatedPictures,
   withAnswerBlankWord,
 } from './officialPyqCardTidy.js'
-import { officialPyqDrawnProblems } from './officialPyqDrawnCheck.js'
+import { officialPyqDrawnCutOff, officialPyqDrawnProblems } from './officialPyqDrawnCheck.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
@@ -203,8 +203,8 @@ function optionBlankOnScreen(q) {
 
 /**
  * The preview shows the saved card, so saved junk fails even when the cleaned view looks right:
- * a "," / "and" option, page leftovers, an option that shows blank, or the option pictures
- * repeated in the stem.
+ * a "," / "and" option, an option cut off after "and", page leftovers, an option that shows
+ * blank, or the option pictures repeated in the stem.
  */
 function hasScrapOption(q) {
   const options = Array.isArray(q?.options) ? q.options : []
@@ -212,11 +212,12 @@ function hasScrapOption(q) {
     options.some((opt) => String(opt ?? '').trim() && SCRAP_OPTION_RE.test(String(opt))) ||
     withoutPageLeftovers(q) !== q ||
     optionBlankOnScreen(q) ||
-    Boolean(stemRepeatsOptionPictures(q))
+    Boolean(stemRepeatsOptionPictures(q)) ||
+    officialPyqDrawnCutOff(q).length > 0
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 30
+export const LOCAL_QUALITY_REVISION = 32
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([

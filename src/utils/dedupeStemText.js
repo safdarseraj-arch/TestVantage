@@ -9,6 +9,18 @@ function collapseDedupeSpace(text) {
 }
 
 /**
+ * The tail is a second copy of the opening, not a different formula or phrase that starts the
+ * same way: "$[Cr(NH_3)_5Cl]Cl_2$ and $[Cr(NH_3)_4Cl_2]Cl$" (2013 P2 Q31), "… unit cell of x >
+ * Packing efficiency of unit cell of y" (2023 P2 Q40). Nearly all of the shorter side must match.
+ * @param {string} text @param {string} rest @param {number} restAt
+ */
+function repeatsOpening(text, rest, restAt) {
+  let same = 0
+  while (same < rest.length && rest[same] === text[same]) same += 1
+  return same >= 0.95 * Math.min(restAt, rest.length)
+}
+
+/**
  * Remove OCR/paste duplicates — same question stem or $...$ block repeated twice.
  * @param {string} text
  * @returns {string}
@@ -52,7 +64,7 @@ export function dedupeRepeatedStemPhrase(text) {
     const pos2 = out.indexOf(anchor, Math.max(anchor.length, 12))
     if (pos2 > 20 && pos2 < out.length - 25) {
       const rest = out.slice(pos2).trim()
-      if (rest.startsWith(anchor.slice(0, Math.min(28, anchor.length)))) {
+      if (rest.startsWith(anchor.slice(0, Math.min(28, anchor.length))) && repeatsOpening(out, rest, pos2)) {
         out = out.slice(0, pos2).trim()
         break
       }

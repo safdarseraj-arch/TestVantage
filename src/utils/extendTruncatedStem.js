@@ -945,7 +945,8 @@ function dropForeignOptionFigures(options, stem, source) {
       .replace(/\$+/g, '')
       .trim()
     if (prose.length > 12) return o
-    if (urls.every((u) => winUrls.has(u))) return o
+    // A crop cut from the original page is never in the scan text.
+    if (urls.every((u) => winUrls.has(u) || isOriginalCropUrl(u))) return o
     return ''
   })
 }

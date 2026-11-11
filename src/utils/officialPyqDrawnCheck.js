@@ -147,8 +147,46 @@ export function officialPyqDrawnRawCode(drawn) {
 }
 
 /**
- * What a student would see go wrong on the card: math KaTeX cannot draw, raw code or a broken
- * picture line. Empty when the card draws cleanly.
+ * Lower case only: "OR" / "AND" / "NOR" alone are logic-gate options, not a cut-off pair.
+ * Not "with": an option may end on it ("the same charge they went up with", 2016 P2 Q17).
+ */
+const CUT_WORD_RE = /(?<![A-Za-z])(and|or|nor)$/
+/** "IV → Q," closes a complete match code; the stray comma loses nothing (2022 P1 Q35). */
+const CODE_PAIR_COMMA_RE = /(?:→|->)\s*[A-Z0-9]{1,4}\s*,$/
+
+/** @param {string} drawn @param {boolean} comma */
+function cutOffTail(drawn, comma) {
+  const t = String(drawn ?? '').replace(/\s+/g, ' ').trim()
+  const word = t.match(CUT_WORD_RE)
+  if (word && t.slice(0, word.index).trim()) return word[1]
+  if (/\S\s*&$/.test(t)) return '&'
+  if (comma && /\S\s*,$/.test(t) && !CODE_PAIR_COMMA_RE.test(t)) return ','
+  return ''
+}
+
+/**
+ * Drawn options (and the question) that stop on "and", "or", "," or "&": the second half of a pair
+ * is missing on screen, whether the saved text lost it or the display dropped it (2013 P2 Q31 A, D).
+ * @param {any} card
+ * @param {{ text?: string, options?: string[] }} [drawn] already drawn text, else drawn here
+ * @returns {string[]}
+ */
+export function officialPyqDrawnCutOff(card, drawn) {
+  const options = drawn?.options ?? (Array.isArray(card?.options) ? card.options : []).map((o) => officialPyqDrawnText(o))
+  const out = []
+  options.forEach((opt, i) => {
+    const tail = cutOffTail(opt, true)
+    if (tail) out.push(`option ${String.fromCharCode(65 + i)} stops at “${tail}” — the rest of the option is missing`)
+  })
+  const stem = drawn?.text ?? officialPyqDrawnText(card?.text)
+  const tail = cutOffTail(stem, false)
+  if (tail) out.push(`the question stops at “${tail}” — the rest of the question is missing`)
+  return out
+}
+
+/**
+ * What a student would see go wrong on the card: math KaTeX cannot draw, raw code, a broken
+ * picture line, or an option cut off after "and". Empty when the card draws cleanly.
  * @param {any} card
  * @returns {string[]}
  */
@@ -164,6 +202,8 @@ export function officialPyqDrawnProblems(card) {
       break
     }
   }
-  out.push(...officialPyqDrawnRawCode(parts.map((p) => officialPyqDrawnText(p)).join('\n')))
+  const drawn = parts.map((p) => officialPyqDrawnText(p))
+  out.push(...officialPyqDrawnRawCode(drawn.join('\n')))
+  out.push(...officialPyqDrawnCutOff(card, { text: drawn[1], options: drawn.slice(2) }))
   return out
 }

@@ -22,9 +22,13 @@ const WORD_COUNT = {
 const NVQ_TYPES = new Set(['numerical', 'integer', 'passage_integer'])
 const MCQ_TYPES = new Set(['single_correct', 'multiple_correct', 'passage_scq'])
 
-/** Section headers only — never “This section contains” (that sits inside the same block). */
+/**
+ * Section headers only — never “This section contains” (that sits inside the same block).
+ * A plain "SECTION - 1 : (…)" line counts too (2013 P2 Mathematics): missing it let the section
+ * before run on over the next questions.
+ */
 const SECTION_ANCHOR_RE =
-  /\\section\*?\{[^}\n]*SECTION[^}]*\}|(?:^|\n)\s*SECTION\s+\d+\b/gi
+  /\\section\*?\{[^}\n]*SECTION[^}]*\}|(?:^|\n)\s*SECTION\s*[-–]?\s*\d+\b/gi
 
 const PARA_ANCHOR_RE =
   /\\section\*?\{[^}\n]*PARAGRAPH[^}]*\}|(?:^|\n)\s*PARAGRAPH\s*["']?[IVXL\d]|(?:^|\n)\s*Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d|(?:^|\n)\s*(?:Passage|Comprehension)\s*:|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?\s*\d{1,3}|(?:\\section\*?\{\s*)?Answer\s+Q\.?\s*\d{1,3}(?:\s*,\s*Q\.?\s*\d{1,3})*\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/gi

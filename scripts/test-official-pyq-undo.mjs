@@ -46,10 +46,16 @@ const {
   officialPyqDrawnText,
   saveOfficialPyqCompareResult,
 } = await import('../src/utils/officialPyqOriginalCompare.js')
+const { officialPyqDrawnCutOff, officialPyqDrawnProblems } = await import('../src/utils/officialPyqDrawnCheck.js')
+const { localOfficialPyqQualityCheck } = await import('../src/utils/officialPyqLocalQuality.js')
+const { prepareTextForMathTextDisplay } = await import('../src/utils/prepareMathForRender.js')
+const { dedupeRepeatedStemPhrase } = await import('../src/utils/dedupeStemText.js')
 const { splitMathpixMediaSegments } = await import('../src/utils/mathpixMedia.js')
 const { extendOfficialPyqHealCard } = await import('../src/utils/extendTruncatedStem.js')
 const { enrichMatchListsFromOcr } = await import('../src/utils/restoreMatchListsOcr.js')
 const { parseMatchingListForDisplay } = await import('../src/utils/parseMatchingListDisplay.js')
+const { paperItemsFromMathpixOcr } = await import('../src/utils/mathpixQuestionSplit.js')
+const { healUploadQuestionCard } = await import('../src/utils/uploadQualityGuards.js')
 
 let failed = 0
 function test(name, fn) {
@@ -255,6 +261,83 @@ test('Compare does not say "matches" while the card is flagged or shows raw code
   assert.equal(fromServer.questions[4].originalCompare.textMatches, true)
 })
 
+test('2013 P2 Q31: an option cut off after "and" is drawn in full, flagged when cut, and never "matches"', () => {
+  const Q31_STEM = 'The pair(s) of coordination complexes/ions exhibiting the same kind of isomerism is(are)'
+  const Q31_OPTIONS = [
+    '$\\left[\\mathrm{Cr}\\left(\\mathrm{NH}_{3}\\right)_{5} \\mathrm{Cl}\\right] \\mathrm{Cl}_{2}$ and $\\left[\\mathrm{Cr}\\left(\\mathrm{NH}_{3}\\right)_{4} \\mathrm{Cl}_{2}\\right] \\mathrm{Cl}$',
+    '$\\left[\\mathrm{Co}\\left(\\mathrm{NH}_{3}\\right)_{4} \\mathrm{Cl}_{2}\\right]^{+}$and $\\left[\\mathrm{Pt}\\left(\\mathrm{NH}_{3}\\right)_{2}\\left(\\mathrm{H}_{2} \\mathrm{O}\\right) \\mathrm{Cl}\\right]^{+}$',
+    '$\\left[\\mathrm{CoBr}_{2} \\mathrm{Cl}_{2}\\right]^{2-}$ and $\\left[\\mathrm{PtBr}_{2} \\mathrm{Cl}_{2}\\right]^{2-}$',
+    '$\\left[\\mathrm{Pt}\\left(\\mathrm{NH}_{3}\\right)_{3}\\left(\\mathrm{NO}_{3}\\right)\\right] \\mathrm{Cl}$ and $\\left[\\mathrm{Pt}\\left(\\mathrm{NH}_{3}\\right)_{3} \\mathrm{Cl}\\right] \\mathrm{Br}$',
+  ]
+  // Two complexes that start alike are not an OCR repeat: the display used to drop the second one.
+  assert.equal(officialPyqDrawnText(Q31_OPTIONS[0]), '[Cr(NH3)5Cl]Cl2 and [Cr(NH3)4Cl2]Cl')
+  assert.equal(officialPyqDrawnText(Q31_OPTIONS[3]), '[Pt(NH3)3(NO3)]Cl and [Pt(NH3)3Cl]Br')
+  for (const opt of Q31_OPTIONS) assert.equal(prepareTextForMathTextDisplay(opt), opt)
+  const chain = 'Packing efficiency of unit cell of $\\mathrm{x}>$ Packing efficiency of unit cell of $\\mathrm{y}>$ Packing efficiency of unit cell of z'
+  assert.equal(dedupeRepeatedStemPhrase(chain), chain, '2023 P2 Q40: a phrase repeated with another letter is kept')
+  const twice = 'Let ABC be a triangle with sides a, b and c opposite the angles. Let ABC be a triangle with sides a, b and c opposite the angles.'
+  assert.equal(dedupeRepeatedStemPhrase(twice), 'Let ABC be a triangle with sides a, b and c opposite the angles.')
+
+  const full = { text: Q31_STEM, options: Q31_OPTIONS, questionType: 'multiple_correct' }
+  assert.deepEqual(officialPyqDrawnCutOff(full), [])
+  assert.deepEqual(officialPyqDrawnProblems(full), [])
+  const cut = { ...full, options: [Q31_OPTIONS[0].replace(/ \$\\left\[\\mathrm\{Cr\}.*\$$/, ' '), Q31_OPTIONS[1], Q31_OPTIONS[2], '$\\mathrm{X}$, '] }
+  assert.match(cut.options[0], /\$ and $/)
+  assert.deepEqual(officialPyqDrawnCutOff(cut), [
+    'option A stops at “and” — the rest of the option is missing',
+    'option D stops at “,” — the rest of the option is missing',
+  ])
+  assert.match(officialPyqDrawnProblems(cut)[0], /option A stops at “and”/)
+  assert.deepEqual(officialPyqDrawnCutOff({ text: 'The output Y of the circuit is', options: ['AND', 'OR', 'NOR', 'NAND'] }), [])
+  assert.deepEqual(
+    officialPyqDrawnCutOff({
+      text: 'Which one of the following statements is correct?',
+      options: [
+        'The balls will bounce back to the bottom plate carrying the same charge they went up with',
+        'I → T, II → R, III → S, IV → Q,',
+        'one or both',
+        'The point (-2,',
+      ],
+    }),
+    ['option D stops at “,” — the rest of the option is missing'],
+  )
+  assert.deepEqual(officialPyqDrawnCutOff({ text: 'Which of P and', options: [] }), [
+    'the question stops at “and” — the rest of the question is missing',
+  ])
+
+  const withQ31 = (year, card) => {
+    const made = freshPaper(year)
+    const questions = getOfficialPyqPendingPaper(made.id).questions.map((q, i) =>
+      i === 4 ? { ...q, subject: 'chemistry', ...card, correctIndices: [1, 3] } : q,
+    )
+    updateOfficialPyqPendingPaper(made.id, { questions })
+    return getOfficialPyqPendingPaper(made.id)
+  }
+  const whole = localOfficialPyqQualityCheck(withQ31(2098, full))
+  assert.ok(!whole.failedGoTo.includes(5), `the full card passes\n${whole.lines.join('\n')}`)
+  const stored = withQ31(2097, cut)
+  const quality = localOfficialPyqQualityCheck(stored)
+  assert.ok(quality.failedGoTo.includes(5), 'the cut-off card fails the local check')
+  assert.ok(quality.lines.some((l) => /^Go to Q 5\. On screen, option A stops at “and”/.test(l)), quality.lines.join('\n'))
+  const approved = { ...stored, questions: stored.questions.map((q, i) => (i === 4 ? { ...q, adminApproved: true } : q)) }
+  assert.ok(localOfficialPyqQualityCheck(approved).failedGoTo.includes(5), 'approving does not hide a cut-off option')
+
+  const drawn = { text: officialPyqDrawnText(cut.text), passage: '', options: cut.options.map((o) => officialPyqDrawnText(o)) }
+  const problems = officialPyqCardScreenProblems({ localQuality: { failedGoTo: [] } }, 4, drawn)
+  assert.ok(problems.some((p) => /option A stops at “and”/.test(p)), 'Compare is told the option is cut off')
+  const honest = honestOfficialPyqCompareResult({ verdict: 'matches', differences: [], pages: [22] }, problems)
+  assert.equal(honest.verdict, 'differs')
+  const saved = saveOfficialPyqCompareResult(stored.id, 4, honest, stored.questions[4])
+  assert.notEqual(saved.questions[4].originalCompare.verdict, 'matches')
+
+  const fromPage = officialPyqDraftFromSuggestion(stored.questions[4], {
+    verdict: 'differs',
+    suggestedOptions: ['(A) ' + Q31_OPTIONS[0], '', '', '(D) ' + Q31_OPTIONS[3]],
+  })
+  assert.deepEqual(fromPage.options, [Q31_OPTIONS[0], Q31_OPTIONS[1], Q31_OPTIONS[2], Q31_OPTIONS[3]], 'the page fills only the cut options')
+  assert.deepEqual(officialPyqDrawnCutOff(fromPage), [])
+})
+
 test('Compare pictures cut from the original replace broken SMILES / pictures; Fix it now saves them and Undo works', () => {
   const at = (hex, y0, y1) =>
     `/api/official-pyq/original/crops/opyq-1-p22-${hex.repeat(16)}.png?page=22&x0=0.1960&y0=${y0}&x1=0.5410&y1=${y1}`
@@ -417,6 +500,128 @@ test('Compare pictures: only crop addresses are kept, and [figure] marks decide 
 
   const honest = honestOfficialPyqCompareResult({ verdict: 'matches', suggested_figures: { text: [A] } }, ['flagged'])
   assert.equal(honest.suggested_figures, undefined)
+})
+
+test('2013 P2: a "Paragraphs for Questions" heading is no card of its own, and a plain "SECTION - 1" line ends the list section', () => {
+  const ocr = [
+    '\\section*{PART II : CHEMISTRY}',
+    '\\section*{SECTION - 2 : (Paragraph Type) \\\\ -2 : }',
+    'This section contains 4 paragraphs each describing theory, experiment, data etc. Each question has only one correct answer.',
+    '\\section*{Paragraphs for Questions 35 and 36 \\\\ 35 36 }',
+    '$P$ and $\\boldsymbol{Q}$ are isomers of dicarboxylic acid $\\mathrm{C}_{4} \\mathrm{H}_{4} \\mathrm{O}_{4}$. Both decolorize $\\mathrm{Br}_{2} / \\mathrm{H}_{2} \\mathrm{O}$. On heating, $\\boldsymbol{P}$ forms the cyclic anhydride.',
+    '<smiles>O=C(O)C(O)C(O)C(=O)O</smiles>',
+    '',
+    '$\\boldsymbol{S}$',
+    '\\begin{itemize}',
+    '\\item[Q.] 35 Compounds formed from $\\boldsymbol{P}$ and $\\boldsymbol{Q}$ are, respectively',
+    '(A) Optically active $\\boldsymbol{S}$ and optically active pair $(\\boldsymbol{T}, \\boldsymbol{U})$',
+    '(B) Optically inactive $\\boldsymbol{S}$ and optically inactive pair $(\\boldsymbol{T}, \\boldsymbol{U})$',
+    '(C) Optically active pair $(\\boldsymbol{T}, \\boldsymbol{U})$ and optically active $\\boldsymbol{S}$',
+    '(D) Optically inactive pair $(\\boldsymbol{T}, \\boldsymbol{U})$ and optically inactive $\\boldsymbol{S}$',
+    '\\end{itemize}',
+    '',
+    '\\section*{ANSWER : B}',
+    '\\begin{itemize}',
+    '\\item[Q.] 36 Which of the compounds $\\boldsymbol{S}, \\boldsymbol{T}$ or $\\boldsymbol{U}$ is formed from $\\boldsymbol{Q}$ on hydrogenation',
+    '(A) only $\\boldsymbol{S}$',
+    '(B) only $\\boldsymbol{T}$',
+    '(C) only $\\boldsymbol{U}$',
+    '(D) none of these',
+    '\\end{itemize}',
+    '',
+    '\\section*{SECTION - 3 : (Matching List Type) \\\\ - 3 : }',
+    'This section contains 4 multiple choice questions. Each question has matching lists. The codes for the lists have choices (A), (B), (C) and (D) out of which ONLY ONE is correct.',
+    '\\begin{itemize}',
+    '\\item[Q.] 37 Match the reactions in List I with the reagents in List II and select the correct answer using the code given below the lists :',
+    'List I',
+    '\\item[P.] reaction one',
+    '\\item[Q.] reaction two',
+    'List II',
+    '\\item[1.] reagent one',
+    '\\item[2.] reagent two',
+    '(A) P-1, Q-2',
+    '(B) P-2, Q-1',
+    '(C) P-1, Q-1',
+    '(D) P-2, Q-2',
+    '\\end{itemize}',
+    '',
+    '\\section*{PART III : MATHEMATICS}',
+    '',
+    'SECTION - 1 : (One or more options correct Type)',
+    'This section contains 8 multiple choice questions. Each question has four choices (A), (B), (C) and (D) out of which ONE or MORE are correct.',
+    '\\begin{itemize}',
+    '\\item[Q.] 41 If $3^{x}=4^{x-1}$, then $x=$',
+    '(A) $\\frac{2 \\log _{3} 2}{2 \\log _{3} 2-1}$',
+    '(B) $\\frac{2}{2-\\log _{2} 3}$',
+    '(C) $\\frac{1}{1-\\log _{4} 3}$',
+    '(D) $\\frac{2 \\log _{2} 3}{2 \\log _{2} 3-1}$',
+    '\\end{itemize}',
+    '',
+    '\\section*{ANSWER : ABC}',
+    '\\begin{itemize}',
+    '\\item[Q.] 42 Let $f(x)=x \\sin \\pi x$, $x>0$. Then for all natural numbers $n$, $f^{\\prime}(x)$ vanishes at',
+    '(A) a unique point in the interval $\\left(n, n+\\frac{1}{2}\\right)$',
+    '(B) a unique point in the interval $\\left(n+\\frac{1}{2}, n+1\\right)$',
+    '(C) a unique point in the interval $(n, n+1)$',
+    '(D) two points in the interval $(n, n+1)$',
+    '\\end{itemize}',
+  ].join('\n')
+  const cards = paperItemsFromMathpixOcr(ocr)
+  assert.deepEqual(cards.map((q) => Number(q.printedNumber)), [35, 36, 37, 41, 42])
+  assert.ok(cards.every((q) => !/^\s*Paragraphs?\s+for/i.test(String(q.text ?? ''))), 'the heading is not a card')
+  for (const q of cards.slice(0, 2)) assert.match(String(q.passageText ?? ''), /isomers of dicarboxylic acid/)
+  assert.equal(cards[2].questionType, 'matrix_match')
+  assert.deepEqual(cards.slice(3).map((q) => q.questionType), ['multiple_correct', 'multiple_correct'])
+})
+
+test('2013 P2 Q36: options cut from the original page are kept, not dropped as stray pictures', () => {
+  const crop = (n) => `\\includegraphics{/api/official-pyq/original/crops/opyq-1-p25-${n}.png?page=25&x0=0.2059&y0=0.2810&x1=0.4395&y1=0.3686}`
+  const options = ['0a1b2c3d4e5f6a7b', '1a1b2c3d4e5f6a7b', '2a1b2c3d4e5f6a7b', '3a1b2c3d4e5f6a7b'].map(crop)
+  const card = {
+    id: 'q36',
+    text: `In the following reaction sequences $V$ and $W$ are, respectively\n${crop('9a1b2c3d4e5f6a7b')}`,
+    options,
+    questionType: 'single_correct',
+    printedNumber: 36,
+    adminEdited: true,
+  }
+  const scan = [
+    '\\section*{SECTION - 2 : (Paragraph Type) \\\\ -2 : }',
+    '\\section*{Paragraph for Questions 35 and 36 \\\\ 35 36 }',
+    '$P$ and $\\boldsymbol{Q}$ are isomers of dicarboxylic acid $\\mathrm{C}_{4} \\mathrm{H}_{4} \\mathrm{O}_{4}$. Both decolorize $\\mathrm{Br}_{2} / \\mathrm{H}_{2} \\mathrm{O}$. On heating, $\\boldsymbol{P}$ forms the cyclic anhydride.',
+    '\\begin{itemize}',
+    '\\item[Q.] 35 Compounds formed from $\\boldsymbol{P}$ and $\\boldsymbol{Q}$ are, respectively',
+    '(A) Optically active $\\boldsymbol{S}$',
+    '(B) Optically inactive $\\boldsymbol{S}$',
+    '(C) Optically active pair $(\\boldsymbol{T}, \\boldsymbol{U})$',
+    '(D) Optically inactive pair $(\\boldsymbol{T}, \\boldsymbol{U})$',
+    '\\end{itemize}',
+    '',
+    '\\section*{ANSWER : B}',
+    '\\begin{itemize}',
+    '\\item[Q.] 36 In the following reaction sequences $\\boldsymbol{V}$ and $\\boldsymbol{W}$ are, respectively , $\\boldsymbol{V}$ $\\boldsymbol{W}$',
+    '$$Q \\xrightarrow[\\Delta]{\\mathrm{H}_{2} / \\mathrm{Ni}} V$$',
+    '![](https://cdn.mathpix.com/cropped/d2a1c4c0-25.jpg?height=130&width=915&top_left_y=648&top_left_x=338)',
+    '\\begin{itemize}',
+    '\\item[(A)]',
+    '<smiles>O=C1CCC(=O)C(=O)O1</smiles>',
+    'and/',
+    '<smiles>O=C1CCCc2ccccc21</smiles>',
+    '',
+    '$\\boldsymbol{W}$',
+    '\\item[(B)]',
+    '<smiles>OC/C=C\\CCO</smiles>',
+    'and/',
+    '<smiles>C1=CC2=CCCC=C2CC1</smiles>',
+    '\\end{itemize}',
+    '\\end{itemize}',
+    '',
+    '\\section*{SECTION - 3 : (Matching List Type) \\\\ - 3 : }',
+  ].join('\n')
+  const healed = healUploadQuestionCard(card, scan)
+  assert.deepEqual(healed.options, options)
+  const paper = { id: 'p-q36', officialPyq: true, preparedText: scan, questions: [card] }
+  assert.doesNotMatch(localOfficialPyqQualityCheck(paper).lines.join('\n'), /MCQ option is empty/)
 })
 if (failed) {
   console.error(`\n${failed} official PYQ undo test(s) failed`)

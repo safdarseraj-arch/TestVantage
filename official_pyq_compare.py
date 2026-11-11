@@ -769,11 +769,40 @@ def _real_suggested_options(raw: list[Any]) -> list[str]:
 _SMILES_RE = re.compile(r"<smiles>.*?</smiles>", re.IGNORECASE | re.DOTALL)
 _RAW_PICTURE_RE = re.compile(r"\\includegraphics|!\[[^\]]*\]\(|/api/official-pyq/original/crops/", re.IGNORECASE)
 _RAW_TEX_RE = re.compile(r"\$|\\[A-Za-z]{2,}")
+# Same rule as officialPyqDrawnCheck.js. Lower case only: "OR" / "AND" / "NOR" alone are logic-gate options.
+_CUT_WORD_RE = re.compile(r"(?<![A-Za-z])(and|or|nor)$")
+_CODE_PAIR_COMMA_RE = re.compile(r"(?:\u2192|->)\s*[A-Z0-9]{1,4}\s*,$")
+
+
+def _cut_off_tail(drawn: Any, comma: bool) -> str:
+    t = re.sub(r"\s+", " ", str(drawn or "")).strip()
+    word = _CUT_WORD_RE.search(t)
+    if word and t[: word.start()].strip():
+        return word.group(1)
+    if re.search(r"\S\s*&$", t):
+        return "&"
+    if comma and re.search(r"\S\s*,$", t) and not _CODE_PAIR_COMMA_RE.search(t):
+        return ","
+    return ""
+
+
+def _cut_off_problems(body: dict[str, Any]) -> list[str]:
+    """Drawn options / question that stop on "and", "or", "," or "&": the rest is missing (2013 P2 Q31 A, D)."""
+    out = []
+    for i, opt in enumerate(body.get("drawn_options") or []):
+        tail = _cut_off_tail(opt, True)
+        if tail:
+            out.append(f"option {chr(65 + i)} stops at \u201c{tail}\u201d \u2014 the rest of the option is missing")
+    tail = _cut_off_tail(body.get("drawn_text"), False)
+    if tail:
+        out.append(f"the question stops at \u201c{tail}\u201d \u2014 the rest of the question is missing")
+    return out
 
 
 def _screen_problems(body: dict[str, Any]) -> list[str]:
     """What a student would see wrong on the card: problems the app already found,
-    plus raw code left in the drawn text (complete pictures are drawn as [picture])."""
+    raw code left in the drawn text (complete pictures are drawn as [picture]),
+    and options cut off after "and"."""
     found = [str(p).strip() for p in body.get("screen_problems") or [] if str(p or "").strip()][:4]
     drawn = "\n".join(
         [str(body.get("drawn_passage") or ""), str(body.get("drawn_text") or "")]
@@ -784,7 +813,8 @@ def _screen_problems(body: dict[str, Any]) -> list[str]:
         found.append("a picture line is broken, so the card shows \\includegraphics code instead of the picture")
     elif not found and _RAW_TEX_RE.search(drawn):
         found.append("raw code or a formula that does not draw shows on the card")
-    return found
+    found.extend(p for p in _cut_off_problems(body) if p not in found)
+    return found[:6]
 
 
 def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
@@ -866,6 +896,11 @@ def _compare_prompt(body: dict[str, Any], pages: list[int]) -> str:
         "- verdict 'matches' only if the card says the same thing as the page AND draws cleanly "
         "for students. Ignore LaTeX vs plain formatting that renders the same, line breaks, and "
         "the question-number prefix. If problems are listed above, the verdict is 'differs'.\n"
+        "- Check that the question text and EVERY option are complete, word for word and formula "
+        "for formula, against the page. An option that stops early - e.g. ends in 'and', 'or', ',' "
+        "or '&' where the page prints a second formula or more words after it (page '[Cr(NH3)5Cl]Cl2 "
+        "and [Cr(NH3)4Cl2]Cl', card '[Cr(NH3)5Cl]Cl2 and') - is missing_text: verdict 'differs', and "
+        "give every option, complete and copied from the page, in suggested_options.\n"
         "- verdict 'differs' with a short list of concrete differences: missing text, wrong "
         "number/unit/symbol, wrong option, wrong alignment of reactions/tables/lists, missing "
         "figure, or extra_card if this card is not a real question on the page.\n"

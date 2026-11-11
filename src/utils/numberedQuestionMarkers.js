@@ -42,14 +42,18 @@ const HEADLESS_GAP_RE = new RegExp(
 )
 
 /**
- * "Paragraph For Questions 11 \& 12" reads as "11 and 12". In a comprehension section the scan
+ * "Paragraph For Questions 11 \& 12" reads as "11 and 12", and "Paragraphs for Questions 35 and 36"
+ * (2013 P2) as "Paragraph for …": every passage reader matches the singular heading only, so the
+ * plural one became a card of its own. In a comprehension section the scan
  * can also drop the heading, leaving the paragraph between one question's printed answer and
  * the next question (2014 P2 Q33–36); the heading is put back so the paragraph is the passage of
  * the questions after it, not the tail of the question before.
  * @param {string} text
  */
 function restorePassageHeadings(text) {
-  const out = text.replace(/(Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d{1,3})\s*(?:\\&|&)\s*(\d{1,3})/gi, '$1 and $2')
+  const out = text
+    .replace(/\b(Paragraph)s(\s+for\s+(?:Questions?|Q\.?)\s*\d)/gi, '$1$2')
+    .replace(/(Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d{1,3})\s*(?:\\&|&)\s*(\d{1,3})/gi, '$1 and $2')
   if (!PASSAGE_SECTION_RE.test(out)) return out
   return out.replace(HEADLESS_GAP_RE, (whole, answer, gap, num, at) => {
     if (/Paragraph|Passage|This section contains|(?<!\\)\bSECTION\b|\bPART\b/i.test(gap)) return whole

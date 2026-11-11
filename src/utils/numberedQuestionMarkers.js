@@ -48,12 +48,15 @@ const HEADLESS_GAP_RE = new RegExp(
  * can also drop the heading, leaving the paragraph between one question's printed answer and
  * the next question (2014 P2 Q33–36); the heading is put back so the paragraph is the passage of
  * the questions after it, not the tail of the question before.
+ * A bilingual heading keeps only the numbers of its Hindi half ("… 9 and 10 \\ 9 10"); they are dropped,
+ * or they open the paragraph as broken math.
  * @param {string} text
  */
 function restorePassageHeadings(text) {
   const out = text
     .replace(/\b(Paragraph)s(\s+for\s+(?:Questions?|Q\.?)\s*\d)/gi, '$1$2')
     .replace(/(Paragraph\s+for\s+(?:Questions?|Q\.?)\s*\d{1,3})\s*(?:\\&|&)\s*(\d{1,3})/gi, '$1 and $2')
+    .replace(/(Paragraph\s+for\s+(?:Questions?|Q\.?)[^\n{}\\]*?\d)\s*\\\\[\s\d,&]*(?=\})/gi, '$1')
   if (!PASSAGE_SECTION_RE.test(out)) return out
   return out.replace(HEADLESS_GAP_RE, (whole, answer, gap, num, at) => {
     if (/Paragraph|Passage|This section contains|(?<!\\)\bSECTION\b|\bPART\b/i.test(gap)) return whole

@@ -4,6 +4,8 @@ import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import { looksLikeMatchingListStem, parseMatchingListForDisplay } from './parseMatchingListDisplay.js'
 import { missingStructureLabels } from './structureLabels.js'
 import { SCRAP_OPTION_RE } from './labelledFigureOptions.js'
+import { bilingualLeftoversOnCard } from './bilingualScanLeftovers.js'
+import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
 import {
   MATRIX_GRID_DEFAULT_COLS,
   MATRIX_GRID_DEFAULT_ROWS,
@@ -18,6 +20,26 @@ function filled(options) {
   return (Array.isArray(options) ? options : [])
     .map((o) => String(o ?? '').trim())
     .filter((o) => !SCRAP_OPTION_RE.test(o))
+}
+
+/** Row "(1)" comes back after the (P) … rows a second time: List II was added under itself. */
+function listTwoShownTwice(text) {
+  const t = String(text ?? '')
+  const firstRow = t.search(/(?:^|\n)[ \t]*\(\s*P\s*\)/)
+  if (firstRow < 0) return false
+  return [...t.slice(firstRow).matchAll(/\n[ \t]*\(\s*1\s*\)/g)].length >= 2
+}
+
+/** S, T, U drawn as one SMILES: the scan dropped the wedges that make them different isomers (2013 P2 Q36). */
+function sameDrawingUnderTwoLabels(text) {
+  const labelOf = new Map()
+  for (const m of String(text ?? '').matchAll(/<smiles>([^<]*)<\/smiles>\s*(\$[^$\n]{1,40}\$|\(?\s*[IVX]{1,4}\s*\)?(?=\s*(?:\n|$)))/g)) {
+    const code = m[1].trim()
+    const label = m[2].replace(/\s+/g, '')
+    if (labelOf.has(code) && labelOf.get(code) !== label) return true
+    labelOf.set(code, label)
+  }
+  return false
 }
 
 function norm(text) {
@@ -307,6 +329,12 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     const unlabelled = missingStructureLabels(q)
     if (unlabelled.length) {
       reasons.push(`The options name structures ${unlabelled.join(', ')}, and the drawings have no such label`)
+    }
+    reasons.push(...bilingualLeftoversOnCard(q).map((r) => r.charAt(0).toUpperCase() + r.slice(1)))
+    if (dropOptionFigureRepeatingStem(q) !== q) reasons.push("An option repeats the question's figure")
+    if (listTwoShownTwice(text)) reasons.push('List II is shown twice')
+    if (sameDrawingUnderTwoLabels(text) || sameDrawingUnderTwoLabels(passage)) {
+      reasons.push('Two labelled drawings show the same structure (the scan lost how they differ)')
     }
     if (!adminSlots && OPENING.test(text.trim()) && !passage) reasons.push('This question has no passage')
     if (/shown in the figure/i.test(text) && !cardHasFigure(q)) {

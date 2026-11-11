@@ -2,8 +2,9 @@
  * Bilingual JEE papers print each question (or whole pages) in English and then Hindi.
  * Cards are English only, so every OCR reader (splitter, marker count, facts card,
  * quality check) drops the Hindi copy first and they all see the same paper.
- * Text without Devanagari comes back unchanged.
+ * Text without Devanagari loses only what the Hindi copy left once its words were dropped.
  */
+import { stripBilingualScanLeftovers } from './bilingualScanLeftovers.js'
 
 const DEVANAGARI_RE = /[\u0900-\u097F]/
 const DEVANAGARI_ALL_RE = /[\u0900-\u097F]/g
@@ -129,12 +130,25 @@ const norm = (text) => String(text).replace(/\\hline/g, '').replace(/\s+/g, '')
  * Drop the Hindi copy of a bilingual scan. Keeps English text, English options, one
  * copy of each figure, answer lines and the English question markers. A Hindi-only
  * repeat of a question marker is dropped so it never becomes an extra card.
+ * A scan that lost its Hindi words still has the Hindi copy's formulas and slashes; they go too.
  * @param {unknown} raw
  * @returns {string}
  */
+let lastStripIn = ''
+let lastStripOut = ''
+
 export function stripHindiOcr(raw) {
   const text = String(raw ?? '')
-  if (!DEVANAGARI_RE.test(text) || ocrIsHindiOnly(text)) return text
+  if (text === lastStripIn) return lastStripOut
+  const out = ocrIsHindiOnly(text) ? text : stripBilingualScanLeftovers(stripHindiCopy(text))
+  lastStripIn = text
+  lastStripOut = out
+  return out
+}
+
+/** @param {string} text */
+function stripHindiCopy(text) {
+  if (!DEVANAGARI_RE.test(text)) return text
   const units = splitUnits(text.split(/\r?\n/)).map((u) => ({ ...u, ...classify(u) }))
 
   units.forEach((u, i) => {

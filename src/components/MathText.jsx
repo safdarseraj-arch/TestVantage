@@ -439,13 +439,12 @@ export default function MathText({ text, questionContext, optionLetter }) {
           seg.kind === 'smiles' ? (
             <SmilesStructure key={`smi-${i}`} smiles={seg.value} />
           ) : (
-            <span key={`tx-${i}`}>
-              {renderPreparedMath(
-                String(seg.value ?? '').replace(/<\/?smiles>/gi, ''),
-                questionContext,
-                optionLetter,
-              )}
-            </span>
+            <MathText
+              key={`tx-${i}`}
+              text={String(seg.value ?? '').replace(/<\/?smiles>/gi, '')}
+              questionContext={questionContext}
+              optionLetter={optionLetter}
+            />
           ),
         )}
       </span>

@@ -623,6 +623,178 @@ test('2013 P2 Q36: options cut from the original page are kept, not dropped as s
   const paper = { id: 'p-q36', officialPyq: true, preparedText: scan, questions: [card] }
   assert.doesNotMatch(localOfficialPyqQualityCheck(paper).lines.join('\n'), /MCQ option is empty/)
 })
+
+const { detectAnswerFromPaper } = await import('../src/utils/answerProvenance.js')
+const { stripBilingualScanLeftovers, bilingualLeftoversOnCard } = await import('../src/utils/bilingualScanLeftovers.js')
+const { dropOptionFigureRepeatingStem } = await import('../src/utils/optionRepeatsStemFigure.js')
+const { missingStructureLabels, restoreStructureLabels } = await import('../src/utils/structureLabels.js')
+const { reviewOfficialPyqCards } = await import('../src/utils/officialPyqUnifiedCheck.js')
+const { labelNumberedQuestions } = await import('../src/utils/numberedQuestionMarkers.js')
+
+test('2013 P2: a multiple-correct key printed as glued letters ("ANSWER : AD") is read', () => {
+  assert.deepEqual(detectAnswerFromPaper('ANSWER : AD').correctIndices, [0, 3])
+  assert.deepEqual(detectAnswerFromPaper('\\section*{ANSWER : ACD}').correctIndices, [0, 2, 3])
+  assert.equal(detectAnswerFromPaper('ANSWER : ABCD or BCD').answerSource, 'unknown')
+  assert.equal(detectAnswerFromPaper('Answer: Bad luck').answerSource, 'unknown')
+})
+
+test('2013 P2: leftovers of the dropped Hindi copy are removed from the scan', () => {
+  const scan = [
+    '(2) $\\mu_{2}>\\mu_{1}$ and/ $\\mu_{2}>\\mu_{3}$',
+    'List I / I',
+    '(3) Warm/',
+    '\\item[Q.] 26 In the following reaction, the product(s) formed is(are) /',
+    '(A) $\\boldsymbol{P}$ (major) $\\boldsymbol{P}$',
+    '\\item[Q.] 56 If chord $P Q$ subtends an angle $\\theta$ at the vertex of $y^{2}=4 a x$, then $\\tan \\theta=$ $P Q, y^{2}=4 a x$ $\\theta$ $\\tan \\theta=$',
+  ].join('\n')
+  assert.equal(
+    stripBilingualScanLeftovers(scan),
+    [
+      '(2) $\\mu_{2}>\\mu_{1}$ and $\\mu_{2}>\\mu_{3}$',
+      'List I',
+      '(3) Warm',
+      '\\item[Q.] 26 In the following reaction, the product(s) formed is(are)',
+      '(A) $\\boldsymbol{P}$ (major)',
+      '\\item[Q.] 56 If chord $P Q$ subtends an angle $\\theta$ at the vertex of $y^{2}=4 a x$, then $\\tan \\theta=$',
+    ].join('\n'),
+  )
+  for (const english of [
+    'A gas with $p=2$ and $V=3$ has $pV=6$, $p$, $V$ fixed.',
+    'Let $\\vec{a}$, $\\vec{b}$, $\\vec{c}$ be unit vectors. Then the vectors $\\vec{a}$, $\\vec{b}$, $\\vec{c}$',
+    '(A) $0$ and $0$',
+    'Speed in km/h and/or m/s',
+  ]) {
+    assert.equal(stripBilingualScanLeftovers(english), english)
+  }
+  assert.ok(bilingualLeftoversOnCard({ text: 'List II / II\n(1) NO', options: ['P-1'] }).length)
+  assert.deepEqual(bilingualLeftoversOnCard({ text: 'Find $x$ in km/h.', options: ['$1$', '$2$'] }), [])
+})
+
+test('2013 P2 Q30: the second A-D list that is the first one without its words is dropped', () => {
+  const scan = [
+    '(A) K to L and L to M',
+    '(B) L to M and N to K',
+    '(C) L to M and M to N',
+    '(D) M to N and N to K',
+    '(A) K L L M',
+    '(B) L M N K',
+    '(C) L M M N',
+    '(D) M N N K',
+  ].join('\n')
+  assert.equal(stripBilingualScanLeftovers(scan), scan.split('\n').slice(0, 4).join('\n'))
+})
+
+test('2013 P2: a bilingual heading keeps no Hindi question numbers', () => {
+  const out = labelNumberedQuestions('\\section*{Paragraph for Questions 9 and 10 \\\\ 9 10}\nA body moves.')
+  assert.doesNotMatch(out, /\\\\\s*9 10/)
+  assert.match(out, /Paragraph for Questions 9 and 10/)
+})
+
+test('2013 P2 Q2, Q3: an option does not repeat the stem figure; the check flags it', () => {
+  const fig = 'https://cdn.mathpix.com/cropped/x-02.jpg?height=394&width=598&top_left_y=757&top_left_x=763'
+  const card = {
+    text: `At all points in the overlapping region,\n\\includegraphics{${fig}}`,
+    questionType: 'multiple_correct',
+    options: ['zero.', 'constant.', 'constant in magnitude.', `same direction. ![](${fig})`],
+  }
+  assert.equal(dropOptionFigureRepeatingStem(card).options[3], 'same direction.')
+  assert.match(reviewOfficialPyqCards([card], '', null, { cardsOnly: true }).messages.join('\n'), /repeats the question's figure/)
+  const own = { ...card, options: ['a', 'b', 'c', '![](https://cdn.mathpix.com/cropped/x-03.jpg)'] }
+  assert.equal(dropOptionFigureRepeatingStem(own), own)
+})
+
+test('2013 P2 Q26, Q27: a lost letter label under the last drawing is restored and flagged', () => {
+  const card = {
+    text: [
+      'The major product(s) of the following reaction is(are)',
+      '<smiles>Oc1ccccc1</smiles>',
+      '',
+      '$\\boldsymbol{P}$',
+      '<smiles>Oc1ccc(Br)cc1</smiles>',
+      '',
+      '$\\boldsymbol{Q}$',
+      '<smiles>Oc1ccccc1Br</smiles>',
+      '',
+      '$\\boldsymbol{R}$',
+      '<smiles>Oc1cccc(Br)c1</smiles>',
+    ].join('\n'),
+    questionType: 'multiple_correct',
+    options: ['$\\boldsymbol{P}$', '$\\boldsymbol{Q}$', '$\\boldsymbol{R}$', '$\\boldsymbol{S}$'],
+  }
+  assert.deepEqual(missingStructureLabels(card), ['S'])
+  assert.match(reviewOfficialPyqCards([card], '', null, { cardsOnly: true }).messages.join('\n'), /structures S/)
+  const fixed = restoreStructureLabels(card)
+  assert.match(fixed.text, /<smiles>Oc1cccc\(Br\)c1<\/smiles>\n\$\\boldsymbol\{S\}\$$/)
+  assert.deepEqual(missingStructureLabels(fixed), [])
+  const inPicture = { ...card, text: card.text.replace(/\n\$\\boldsymbol\{[PQR]\}\$/g, '') }
+  assert.deepEqual(missingStructureLabels(inPicture), [])
+})
+
+test('2013 P2 Q36: S, T, U drawn as one SMILES are flagged (the scan lost the isomers)', () => {
+  const tartaric = '<smiles>O=C(O)C(O)C(O)C(=O)O</smiles>'
+  const card = {
+    passageText: `P and Q could produce one or more than one from S, T and U.\n${tartaric}\n\n$\\boldsymbol{S}$\n${tartaric}\n\n$\\boldsymbol{T}$`,
+    text: 'Compounds formed from P and Q are, respectively',
+    questionType: 'single_correct',
+    options: ['one', 'two', 'three', 'four'],
+  }
+  assert.match(reviewOfficialPyqCards([card], '', null, { cardsOnly: true }).messages.join('\n'), /same structure/)
+  const distinct = { ...card, passageText: card.passageText.replace(tartaric, '<smiles>O=C(O)[C@@H](O)[C@H](O)C(=O)O</smiles>') }
+  assert.doesNotMatch(reviewOfficialPyqCards([distinct], '', null, { cardsOnly: true }).messages.join('\n'), /same structure/)
+})
+
+test('2013 P2 Q60: an answer marked "from the paper" where the scan prints no key is flagged', () => {
+  const scan = [
+    '\\begin{itemize}',
+    '\\item[Q.] 1 Find the value of $x$ when $x+1=3$ for the given equation here.',
+    '(A) $1$',
+    '(B) $2$',
+    '(C) $3$',
+    '(D) $4$',
+    '\\end{itemize}',
+    '',
+    'ANSWER : B',
+    '\\begin{itemize}',
+    '\\item[Q.] 2 Find the value of $y$ when $y+2=6$ for the given equation here.',
+    '(A) $1$',
+    '(B) $2$',
+    '(C) $3$',
+    '(D) $4$',
+    '\\end{itemize}',
+  ].join('\n')
+  const cards = paperItemsFromMathpixOcr(scan)
+  assert.equal(cards.length, 2)
+  assert.equal(cards[0].correctIndex, 1)
+  assert.equal(cards[1].answerSource === 'from_paper', false)
+  const carried = [cards[0], { ...cards[1], correctIndex: 0, answerSource: 'from_paper' }]
+  const lines = localOfficialPyqQualityCheck({ id: 'p-q60', officialPyq: true, preparedText: scan, questions: carried }).lines.join('\n')
+  assert.match(lines, /Go to Q 2\. The answer is marked “answer from the paper”, and the paper prints no answer/)
+  const typed = [cards[0], { ...cards[1], correctIndex: 3, answerSource: 'admin_edit' }]
+  assert.doesNotMatch(
+    localOfficialPyqQualityCheck({ id: 'p-q60', officialPyq: true, preparedText: scan, questions: typed }).lines.join('\n'),
+    /prints no answer/,
+  )
+})
+
+test('2013 P2 Q19: List II is not added again when the scan dropped its heading', () => {
+  const stem = [
+    'Match List I with List II and select the correct answer using the codes given below the lists:',
+    '(P) Boltzmann constant',
+    '(Q) Coefficient of viscosity',
+    '(R) Planck constant',
+    '(S) Thermal conductivity',
+    '(1) $\\left[\\mathrm{ML}^{2} \\mathrm{~T}^{-1}\\right]$',
+    '(2) $\\left[\\mathrm{ML}^{-1} \\mathrm{~T}^{-1}\\right]$',
+    '(3) $\\left[\\mathrm{MLT}^{-3} \\mathrm{~K}^{-1}\\right]$',
+    '(4) $\\left[\\mathrm{ML}^{2} \\mathrm{~T}^{-2} \\mathrm{~K}^{-1}\\right]$',
+  ].join('\n')
+  const card = { text: stem, questionType: 'matrix_match', options: ['P-3, Q-1, R-2, S-4', 'P-3, Q-2, R-1, S-4', 'P-4, Q-2, R-1, S-3', 'P-4, Q-1, R-2, S-3'] }
+  const scan = `\\item[Q.] 19 ${stem}\nList II\n${stem.split('\n').slice(5).join('\n')}`
+  const enriched = enrichMatchListsFromOcr(card, scan)
+  assert.equal((String(enriched.text).match(/\n\(1\)/g) || []).length, 1)
+  const doubled = { ...card, text: `${stem}\nList II\n${stem.split('\n').slice(5).join('\n')}` }
+  assert.match(reviewOfficialPyqCards([doubled], '', null, { cardsOnly: true }).messages.join('\n'), /List II is shown twice/)
+})
 if (failed) {
   console.error(`\n${failed} official PYQ undo test(s) failed`)
   process.exit(1)

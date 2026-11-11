@@ -20,8 +20,9 @@ import { BONUS_MARKS_TO_ALL_RE, numericChoiceFields, parseNumericAnswerChoices }
 
 /** @typedef {'from_paper' | 'ai_generated' | 'manual' | 'draft' | 'unknown'} AnswerSource */
 
+/** "ANSWER : AD" prints the letters of a multiple-correct key side by side (2013 P2). */
 const ANSWER_LINE =
-  /^(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?|Ans\.?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?([A-D1-4](?:\s*[,;&\/]\s*[A-D1-4])*)\b(?!\s*or\s+\d)/i
+  /^(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?|Ans\.?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?([A-D1-4](?:\s*[,;&\/]\s*[A-D1-4])*|[A-D]{2,4})\b(?!\s*or\s+(?:\d|[A-D]{1,4}\b))/i
 
 const ANSWER_INLINE =
   /(?:^|[\n\s])(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?\(?([A-D])\)?(?:\s|$|[.,;])/i
@@ -113,7 +114,7 @@ export function detectAnswerFromPaper(block) {
       }
     }
     const m = t.match(ANSWER_LINE)
-    if (m) {
+    if (m && !(/^[A-D]{2,4}$/i.test(m[1]) && m[1] !== m[1].toUpperCase())) {
       return {
         ...lettersToAnswer(m[1]),
         answerSource: 'from_paper',

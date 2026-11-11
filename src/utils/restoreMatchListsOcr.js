@@ -50,6 +50,10 @@ function formatListIIFromMatchParse(parsed) {
 
 function hasListTwo(text) {
   const t = String(text ?? '')
+  const firstRow = t.search(/(?:^|\n)[ \t]*\(\s*P\s*\)/)
+  if (firstRow >= 0 && new Set([...t.slice(firstRow).matchAll(/\n[ \t]*\(\s*([1-5])\s*\)/g)].map((m) => m[1])).size >= 2) {
+    return true
+  }
   return (
     /(?:List|Column)\s*[-–]?\s*II\b/i.test(t) &&
     (/\(\s*[1-5]\s*\)/.test(t) || /\(\s*[PQRS]\s*\)/.test(t) || (/\\begin\{tabular\}/.test(t) && TABLE_ROW_RE('1-5').test(t)))

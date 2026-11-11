@@ -40,6 +40,7 @@ import { stripAwardedToAllNotes, stripPrintedAnswerBoxes } from './printedAnswer
 import { BONUS_MARKS_TO_ALL_RE } from './answerAlternatives.js'
 import { applyMatrixGridQuestions } from './matrixGridPyq.js'
 import { ocrIsHindiOnly, stripHindiOcr } from './stripHindiOcr.js'
+import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
 import { labelNumberedQuestions } from './numberedQuestionMarkers.js'
 
 function guessQuestionType(text, optionsFound) {
@@ -1873,7 +1874,7 @@ export function paperItemsFromMathpixOcr(raw, opts = {}) {
     : parsePaperSectionMap(text)
   const { drafts } = mathpixSplitToBankDrafts(text, { ...opts, sectionMap })
   return applyEndAnswerSection(applyMatrixGridQuestions(dedupePaperItemsByNumber(drafts), text), endSection).map(
-    (q) => tidyMatchListCard(q),
+    (q) => dropOptionFigureRepeatingStem(tidyMatchListCard(q)),
   )
 }
 

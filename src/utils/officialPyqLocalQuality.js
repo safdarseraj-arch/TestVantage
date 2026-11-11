@@ -217,7 +217,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 32
+export const LOCAL_QUALITY_REVISION = 33
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -558,6 +558,17 @@ function answerLabelWithoutAnswer(q) {
   return true
 }
 
+/**
+ * The scan prints keys for this paper but none for this question, and the card still says its answer came
+ * from the paper: it was carried over from an older split (2013 P2 Q60 kept the "ANSWER : A" printed for Q59).
+ */
+function answerClaimsUnprintedKey(q, fresh, items = []) {
+  if (!fresh || q?.answerSource !== 'from_paper' || isMatrixGridCard(q)) return false
+  if (fresh.answerSource === 'from_paper' || answerKeyOf(fresh).has || fresh.bonusMarksToAll === true) return false
+  if (!items.some((item) => item?.answerSource === 'from_paper' && answerKeyOf(item).has)) return false
+  return answerKeyOf(q).has
+}
+
 const HAND_SOLUTION_SOURCES = new Set(['manual', 'admin_edit'])
 const SOLUTION_CUE_RE = /\\therefore|\b(?:Hence|Therefore|Thus|we get|we have)\b/
 const LONG_OPTION_CHARS = 350
@@ -824,6 +835,9 @@ function listLayoutDropsPicture(q) {
 function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, items = [], ocr = '') {
   if (answerLabelWithoutAnswer(q)) {
     return `The card is marked “${ANSWER_CLAIMS[q.answerSource]}”, and no answer is saved`
+  }
+  if (answerClaimsUnprintedKey(q, fresh, items)) {
+    return 'The answer is marked “answer from the paper”, and the paper prints no answer for this question — check it and type the answer'
   }
   const printed = solutionRules ? printedSolutionReason(q, fresh) : ''
   if (printed) return printed

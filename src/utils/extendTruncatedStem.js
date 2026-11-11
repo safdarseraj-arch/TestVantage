@@ -562,6 +562,11 @@ function hasListTwoEntries(text) {
   ) {
     return true
   }
+  // Rows "(1)" … after the (P) … rows are List-II even when the scan dropped its heading (2013 P2 Q19, Q39, Q59).
+  const firstRow = t.search(/(?:^|\n)[ \t]*\(\s*P\s*\)/)
+  if (firstRow >= 0 && new Set([...t.slice(firstRow).matchAll(/\n[ \t]*\(\s*([1-5])\s*\)/g)].map((m) => m[1])).size >= 2) {
+    return true
+  }
   return false
 }
 

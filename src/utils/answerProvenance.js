@@ -16,7 +16,12 @@ import {
   trySolveIncreasingConcaveDownGraphMcq,
 } from './repairDerivativePrimeStemOcr.js'
 
-import { BONUS_MARKS_TO_ALL_RE, numericChoiceFields, parseNumericAnswerChoices } from './answerAlternatives.js'
+import {
+  BONUS_MARKS_TO_ALL_RE,
+  ZERO_MARKS_TO_ALL_RE,
+  numericChoiceFields,
+  parseNumericAnswerChoices,
+} from './answerAlternatives.js'
 
 /** @typedef {'from_paper' | 'ai_generated' | 'manual' | 'draft' | 'unknown'} AnswerSource */
 
@@ -83,6 +88,10 @@ export function detectAnswerFromPaper(block) {
     .replace(BRACKETED_LETTER_KEY, (_, head, list) => `${head.replace(/[\s:\-=]*$/, '')}: ${[...list.matchAll(/\(\s*([A-D])\s*\)/gi)].map((m) => m[1]).join(', ')} `)
   if (!text.trim()) {
     return { answerSource: 'unknown', answerConfidence: 0 }
+  }
+  const dropped = text.match(ZERO_MARKS_TO_ALL_RE)
+  if (dropped) {
+    return { zeroMarksToAll: true, answerSource: 'from_paper', answerConfidence: 90, matchedLine: dropped[0].trim() }
   }
   const bonus = text.match(BONUS_MARKS_TO_ALL_RE)
   if (bonus) {
@@ -351,7 +360,7 @@ export function stripAnswerMetaLines(block) {
       if (!t) return [line]
       if (ANSWER_LINE.test(t) || INTEGER_ANS.test(t) || SOLUTION_LINE.test(t)) return []
       if (PRINTED_ANSWER_LINE.test(t)) return []
-      if (BONUS_MARKS_TO_ALL_RE.test(t)) return []
+      if (BONUS_MARKS_TO_ALL_RE.test(t) || ZERO_MARKS_TO_ALL_RE.test(t)) return []
       if (PRINTED_ANSWER_TAIL.test(t)) {
         // 2025 P2: "Then the value of $r$ is \_\_\_\_. Answer: 6" — the question sentence stays.
         const kept = line.replace(PRINTED_ANSWER_TAIL, '').trimEnd()

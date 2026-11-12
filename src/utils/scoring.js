@@ -32,6 +32,8 @@ function getMarking(q, pattern) {
 function gradeQuestion(q, answer, pattern) {
   /** The paper printed "MARKS TO ALL": every candidate gets full marks, answered or not. */
   if (q.bonusMarksToAll === true) return { grade: 'correct', marks: getMaxMarks(q, pattern) }
+  /** The paper printed "Zero Marks to all": the question is dropped, no marks either way. */
+  if (q.zeroMarksToAll === true) return { grade: 'unattempted', marks: 0 }
   if (!isAnswerAttempted(answer, q)) {
     const m = getMarking(q, pattern)
     return { grade: 'unattempted', marks: m.unattempted ?? 0 }

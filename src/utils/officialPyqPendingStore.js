@@ -179,6 +179,7 @@ export const OFFICIAL_PYQ_ADMIN_EDIT_FIELDS = [
   'numericalAlternatives',
   'correctIndicesAlternatives',
   'bonusMarksToAll',
+  'zeroMarksToAll',
   'matrixRows',
   'matrixCols',
   'matrixColLabels',

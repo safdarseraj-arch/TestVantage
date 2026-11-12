@@ -216,6 +216,7 @@ function answerExtrasOf(q) {
     ...(alternatives.length ? { numericalAlternatives: alternatives } : {}),
     ...(letterSets.length ? { correctIndicesAlternatives: letterSets } : {}),
     ...(q?.bonusMarksToAll === true ? { bonusMarksToAll: true } : {}),
+    ...(q?.zeroMarksToAll === true ? { zeroMarksToAll: true } : {}),
   }
 }
 

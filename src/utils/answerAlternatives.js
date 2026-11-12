@@ -3,6 +3,7 @@
  * - "0.5 OR 0.75", "[75 to 79] OR [94 to 95]": either answer scores (numericalAlternatives).
  * - "ABCD or BCD" on a one-or-more-correct question: either option set scores (correctIndicesAlternatives).
  * - "MARKS TO ALL": a bonus question, full marks to every candidate (bonusMarksToAll).
+ * - "Zero Marks to all": a dropped question, no marks to anyone (zeroMarksToAll).
  */
 
 const NUM = String.raw`-?\d+(?:\.\d+)?`
@@ -11,6 +12,15 @@ const PART_RE = new RegExp(String.raw`^\[?\s*(${NUM})\s*(?:(?:to|–|—)\s*(${N
 /** "MARKS TO ALL" printed where the key would be (2025 P2 Q20). */
 export const BONUS_MARKS_TO_ALL_RE =
   /(?:^|\n)[ \t]*(?:\\section\*?\{\s*)?(?:(?:FULL\s+)?MARKS\s+(?:AWARDED\s+)?TO\s+ALL|BONUS(?:\s+QUESTION)?)[ \t]*\}?[ \t]*(?=\n|$)/i
+
+/** "Zero Marks to all" printed where the key would be (JEE Advanced 2012 P2 Q23, Q60). */
+export const ZERO_MARKS_TO_ALL_RE =
+  /(?:^|\n)[ \t]*(?:\\section\*?\{\s*)?(?:(?:Official\s+)?Ans(?:wer)?s?\.?\s*[:.\-=]?\s*)?(?:ZERO|NO|0)\s+MARKS?\s+(?:AWARDED\s+)?TO\s+ALL[ \t.]*\}?[ \t]*(?=\n|$)/i
+
+/** Printed key text (Compare's printed answer, an edit box) saying no one scores. @param {unknown} raw */
+export function isZeroMarksToAllKey(raw) {
+  return /^\s*(?:(?:Official\s+)?Ans(?:wer)?s?\.?\s*[:.\-=]?\s*)?(?:zero|no|0)\s+marks?\s+(?:awarded\s+)?to\s+all\b/i.test(String(raw ?? ''))
+}
 
 /**
  * One numeric answer: "6", "0.75" or a band "[0.7 to 0.8]" (value ± tolerance).

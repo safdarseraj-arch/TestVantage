@@ -526,6 +526,7 @@ export function keepAdminEditedCards(next, prev) {
       numericalAlternatives: old.numericalAlternatives,
       correctIndicesAlternatives: old.correctIndicesAlternatives,
       bonusMarksToAll: old.bonusMarksToAll,
+      zeroMarksToAll: old.zeroMarksToAll,
       ...gridFieldsOf(old),
       solution: old.solution,
       adminEdited: true,
@@ -594,6 +595,7 @@ export function copyAnswersOntoCanonical(canonical, prev) {
       q.answerSource === 'from_paper' &&
       old.answerSource !== 'admin_edit' &&
       (q.bonusMarksToAll === true ||
+        q.zeroMarksToAll === true ||
         [q.correctIndex, q.correctInteger, q.correctNumerical].some((v) => v != null) ||
         (Array.isArray(q.correctIndices) && q.correctIndices.length > 0))
     return {
@@ -607,6 +609,7 @@ export function copyAnswersOntoCanonical(canonical, prev) {
       numericalAlternatives: printed || q.correctNumerical != null ? q.numericalAlternatives : old.numericalAlternatives,
       correctIndicesAlternatives: printed || q.correctIndices?.length ? q.correctIndicesAlternatives : old.correctIndicesAlternatives,
       bonusMarksToAll: printed ? q.bonusMarksToAll : q.bonusMarksToAll ?? old.bonusMarksToAll,
+      zeroMarksToAll: printed ? q.zeroMarksToAll : q.zeroMarksToAll ?? old.zeroMarksToAll,
       solution: stripEmptyFigureShells(
         stripEmptyImageMarkdown(
           String(old.solution ?? '').trim() ? old.solution : q.solution || '',

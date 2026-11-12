@@ -272,7 +272,7 @@ export function pickOtherPaperFinalId(card, ctx) {
 export function otherPaperUnansweredNumbers(paper) {
   const cards = Array.isArray(paper?.questions) ? paper.questions : []
   return cards
-    .map((q, i) => (String(q?.text ?? '').trim() && !hasAnswer(q) && q?.bonusMarksToAll !== true ? i + 1 : 0))
+    .map((q, i) => (String(q?.text ?? '').trim() && !hasAnswer(q) && q?.bonusMarksToAll !== true && q?.zeroMarksToAll !== true ? i + 1 : 0))
     .filter(Boolean)
 }
 

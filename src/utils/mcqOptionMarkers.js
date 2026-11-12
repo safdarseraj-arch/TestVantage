@@ -151,9 +151,14 @@ export function isFunctionStyleParen(text, index) {
   return /[A-Za-z0-9$\\]/.test(prev)
 }
 
+/** "Case (a) … Case (b)", "Fig. (a)": a named part of a passage or figure, not an option (2012 P2 Q13). */
+function isNamedPartLabel(text, index) {
+  return /\b(?:cases?|parts?|fig(?:ure)?s?\.?|statements?|situations?|conditions?)\s*$/i.test(text.slice(Math.max(0, index - 16), index))
+}
+
 /** @param {string} text @param {number} index — index of "(" before A */
 export function isMcqOptionBlockStart(text, index) {
-  if (isFunctionStyleParen(text, index)) return false
+  if (isFunctionStyleParen(text, index) || isNamedPartLabel(text, index)) return false
   const tail = text.slice(index, index + 800)
   const hasB = /\(\s*B\s*\)/i.test(tail)
   const hasC = /\(\s*C\s*\)/i.test(tail)
@@ -176,7 +181,7 @@ export function findOptionsBlockStart(text) {
   const reAlegacy = /\(\s*A\s*\)/gi
   while ((m = reAlegacy.exec(text)) !== null) {
     const tail = text.slice(m.index, m.index + 1200)
-    if (/\(\s*B\s*\)/i.test(tail) && !isFunctionStyleParen(text, m.index)) return m.index
+    if (/\(\s*B\s*\)/i.test(tail) && !isFunctionStyleParen(text, m.index) && !isNamedPartLabel(text, m.index)) return m.index
   }
 
   const re0 = /\(\s*0\s*\)/g

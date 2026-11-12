@@ -404,6 +404,14 @@ test('"1." numbering is only used when the paper has no "Q." markers and runs 1,
   assert.equal(labelNumberedQuestions(short), short)
 })
 
+/** 2014 P1 Q34 and Q36 draw their structures from the scan's SMILES codes; only the original page settles them. */
+const STRUCTURE_CODES_2014_P1 = [34, 36]
+function assertOnlyStructureCodesLeft(quality, goTo = STRUCTURE_CODES_2014_P1) {
+  const why = quality.lines.join(' | ')
+  assert.deepEqual([...quality.failedGoTo].sort((a, b) => a - b), goTo, why)
+  assert.ok(quality.lines.every((l) => /structure code \(SMILES\)/.test(l)), why)
+}
+
 test('2014 P1: 56 scrambled cards with duplicate machine fixes are rebuilt to 60 and pass', () => {
   globalThis.localStorage.clear()
   const { questions, ...rest } = p14Stored
@@ -412,7 +420,7 @@ test('2014 P1: 56 scrambled cards with duplicate machine fixes are rebuilt to 60
   assert.equal(pendingStore.getOfficialPyqPendingPaper(added.id).questions.length, 56)
   const saved = persistOfficialPyqQualityRun(pendingStore.getOfficialPyqPendingPaper(added.id))
   assert.equal(saved.questions.length, 60)
-  assert.equal(saved.localQuality.passed, true, saved.localQuality.lines.join(' | '))
+  assertOnlyStructureCodesLeft(saved.localQuality)
   assert.deepEqual(saved.questions.map((q) => q.printedNumber), Array.from({ length: 60 }, (_, i) => i + 1))
   const stems = saved.questions.map((q) => String(q.text).replace(/\s+/g, ' ').slice(0, 60))
   assert.equal(new Set(stems).size, 60, 'no question appears twice')
@@ -520,8 +528,8 @@ test('2014 P1: Auto-fix first rebuilds missing questions from the scan, then com
   assert.equal(autoFixOut.ok, true, autoFixOut.error)
   assert.deepEqual(autoFixOut.rebuilt, { from: 56, to: 60, expected: 60 })
   assert.equal(autoFixOut.paper.questions.length, 60)
-  assert.equal(autoFixOut.paper.localQuality.passed, true)
-  assert.equal(autoFixCompares, 0, 'no Gemini compare is spent on cards that were only out of place')
+  assertOnlyStructureCodesLeft(autoFixOut.paper.localQuality)
+  assert.equal(autoFixCompares, STRUCTURE_CODES_2014_P1.length, 'Gemini compares only the structure drawings, not cards that were only out of place')
 })
 
 const { confirmOfficialPyqPaperFacts } = await import('../src/utils/officialPyqAdminFactsApply.js')
@@ -553,6 +561,8 @@ globalThis.localStorage.clear()
   factsOut = await autoFixAfterOfficialPyqFactsConfirmed(added.id, countingOpts({ before: confirmed.before }))
   factsPaper = pendingStore.getOfficialPyqPendingPaper(added.id)
   factsOut.calls = { ...factsRun }
+  factsRun.compares = 0
+  factsRun.asked = 0
 
   // A card that still shows an alert after the free step: the paid step needs Compare and the admin's yes.
   pendingStore.updateOfficialPyqPendingPaper(added.id, { localQuality: { ...factsPaper.localQuality, passed: false, failedGoTo: [5] } })
@@ -572,15 +582,18 @@ globalThis.localStorage.clear()
 }
 globalThis.localStorage.clear()
 
-test('2014 P1: confirming facts (60) on 56 stored cards starts auto-fix, rebuilds to 60, no Gemini call', () => {
+test('2014 P1: confirming facts (60) on 56 stored cards starts auto-fix, rebuilds to 60, Gemini only for structure drawings', () => {
   assert.equal(factsOut.ok, true, factsOut.error)
   assert.equal(factsOut.mode, 'auto_fix')
   assert.deepEqual(factsOut.rebuilt, { from: 56, to: 60, expected: 60 })
-  assert.deepEqual(factsOut.todo, [])
-  assert.equal(factsOut.paid, false)
+  assert.deepEqual(factsOut.todo, STRUCTURE_CODES_2014_P1)
   assert.equal(factsPaper.questions.length, 60)
-  assert.equal(factsPaper.localQuality.passed, true, factsPaper.localQuality.lines.join(' | '))
-  assert.deepEqual(factsOut.calls, { compares: 0, asked: 0 }, 'no cost question and no Gemini request when the free rebuild fixes everything')
+  assertOnlyStructureCodesLeft(factsPaper.localQuality)
+  assert.deepEqual(
+    factsOut.calls,
+    { compares: STRUCTURE_CODES_2014_P1.length, asked: 1 },
+    'one cost question, and Gemini only for the structures the free rebuild cannot settle',
+  )
 })
 
 test('after confirm, a card still flagged is only sent to Gemini when Compare works and the admin agrees', () => {
@@ -687,6 +700,8 @@ test('2014 P2: auto-fix rebuilds 63 scrambled cards to the 60 printed questions,
 const SCAN_LOSS_2014_P2 = [22, 38, 57]
 // The scan also lost the printed keys of Q18 and Q21; Auto-fix reads them from the original page.
 const KEY_LOSS_2014_P2 = [18, 21]
+// Q23 (and Q31 in the stored 60-card copy) draw structures from SMILES codes; Auto-fix boxes the printed drawings.
+const STRUCTURE_CODES_2014_P2 = [23, 31]
 function assertOnlyScanLossLeft(quality, extra = []) {
   const why = quality.lines.join(' | ')
   assert.deepEqual(
@@ -726,13 +741,13 @@ test('2014 P2: 60 cards with the right count but a duplicate and stray numbers a
   assert.doesNotMatch(qs[50].text, /Choices/)
   // The machine fix of Q18 had List-I pictures on A and C; the scan's card puts them in the stem.
   assert.ok(qs[17].options.every((o) => !/cdn\.mathpix\.com/.test(o)), JSON.stringify(qs[17].options))
-  assertOnlyScanLossLeft(p14b60Rebuilt.localQuality, [31])
+  assertOnlyScanLossLeft(p14b60Rebuilt.localQuality, [31, ...STRUCTURE_CODES_2014_P2])
 })
 
 test('2014 P2: after the rebuild only genuine problems stay flagged', () => {
   const quality = p14bRebuilt.localQuality
   // Q31: the scan's OCR printed one option twice and lost option D.
-  assertOnlyScanLossLeft(quality, [31])
+  assertOnlyScanLossLeft(quality, [31, ...STRUCTURE_CODES_2014_P2])
   assert.ok(quality.lines.some((l) => /scan prints “Only one correct”/.test(l)), 'confirmed facts the scan contradicts stay flagged')
 })
 
@@ -775,7 +790,7 @@ test('2014 P2 (Q. N with answers): saved Q1 / Q18 / Q19 / Q20 damage is flagged 
   globalThis.localStorage.clear()
 
   assert.equal(rebuilt.questions.length, 60)
-  assertOnlyScanLossLeft(rebuilt.localQuality)
+  assertOnlyScanLossLeft(rebuilt.localQuality, [23])
   const [q1] = rebuilt.questions
   assert.doesNotMatch(q1.text, /cdn\.mathpix|includegraphics/, 'Q1 stem keeps no option pictures')
   assert.ok(q1.options.every((o) => /original\/crops/.test(o)), 'Q1 keeps its four picture options')
@@ -814,7 +829,7 @@ test('2014 P2 (Q. N with answers): saved code-only answers and Q60 with Q57 list
   pendingStore.updateOfficialPyqPendingPaper(added.id, { adminFacts, paperFacts })
   const rebuilt = persistOfficialPyqQualityRun(pendingStore.getOfficialPyqPendingPaper(added.id))
   globalThis.localStorage.clear()
-  assertOnlyScanLossLeft(rebuilt.localQuality)
+  assertOnlyScanLossLeft(rebuilt.localQuality, [23])
   for (const n of MATCH_LIST_QS) {
     const q = rebuilt.questions[n - 1]
     const parsed = parseLists.parseMatchingListForDisplay(q.text, q.options)

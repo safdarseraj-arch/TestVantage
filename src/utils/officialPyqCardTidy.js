@@ -389,6 +389,20 @@ export function stemWithoutScanPlaceholders(text) {
   return cleaned !== t.trim() ? cleaned : ''
 }
 
+const TRAILING_HEADING_BRACE_RE = /(?:\s*\n[ \t]*\{[ \t]*(?:(?:SECTION|PART|PAPER)\b[^\n{}]*)?)+\s*$/
+
+/**
+ * Lines a scan text rebuild left after the question from the "\section*{ANSWER: B}" and
+ * "\section*{SECTION II : …}" headings that follow it: a lone "{" or "{SECTION II :"
+ * (2012 P2 Q26, Q28). '' when there are none.
+ * @param {unknown} text
+ */
+export function stemWithoutHeadingBraces(text) {
+  const t = String(text ?? '')
+  const cleaned = t.replace(TRAILING_HEADING_BRACE_RE, '').trim()
+  return cleaned && cleaned !== t.trim() ? cleaned : ''
+}
+
 const PICTURE_ROW_RE = /^[ \t]*(?:\(\s*[A-Z1-9]\s*\)[ \t]*)?\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}[ \t]*$/
 const AXIS_LABEL_RE = /^[ \t]*\$[^$\n]{1,14}\$[ \t]*$/
 /** "(1) (T)" with the row's picture on the next line: a stray letter the scan read in a numbered row. */

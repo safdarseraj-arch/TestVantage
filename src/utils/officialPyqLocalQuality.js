@@ -60,6 +60,7 @@ import {
   textWithOriginalFigureCrops,
   stemWithoutOwnOptionLines,
   stemWithoutScanPlaceholders,
+  stemWithoutHeadingBraces,
   withGluedWordsSplit,
   withSpaceAfterComma,
   stemWithoutPrintedNumber,
@@ -69,6 +70,7 @@ import {
 import { officialPyqDrawnCutOff, officialPyqDrawnProblems } from './officialPyqDrawnCheck.js'
 import { officialPyqMatchListLayoutProblems, withoutHeadingOnRowLabel } from './matchListLayoutCheck.js'
 import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
+import { officialPyqScanStructureReason } from './officialPyqScanStructures.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
@@ -220,7 +222,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 39
+export const LOCAL_QUALITY_REVISION = 41
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -514,6 +516,48 @@ function textWithLostWords(card, fresh) {
 }
 
 const FIGURE_IN_TEXT_RE = /\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]*\)/
+const ORIGINAL_CROP_IN_TEXT_RE = /\/api\/official-pyq\/original\/crops\//
+
+/** Prose of a stem without pictures, math marks or spacing, to tell the same question. */
+function stemProse(text) {
+  return String(text ?? '')
+    .replace(new RegExp(FIGURE_IN_TEXT_RE.source, 'g'), ' ')
+    .replace(/<smiles\b[\s\S]*?<\/smiles>/gi, ' ')
+    .replace(/\\mathrm\{([^{}]*)\}/g, '$1')
+    .replace(/[\s$~{}\\]+/g, '')
+    .toLowerCase()
+}
+
+/**
+ * The card text with the scan pictures put back that the fresh split of the scan shows in this
+ * question and the card lost ("In the given circuit …" without its circuit — 2012 P2 Q4). '' when
+ * none. Pictures the card replaced with crops of the original page, or that repeat its option
+ * crops, stay out.
+ */
+function stemMissingScanFigures(card, fresh) {
+  if (!fresh || card?.adminEdited === true || card?.adminApproved === true || isMatrixGridCard(card)) return ''
+  const have = String(card?.text ?? '')
+  if (ORIGINAL_CROP_IN_TEXT_RE.test(have)) return ''
+  const parts = [have, card?.passageText, ...(Array.isArray(card?.options) ? card.options : [])].map((p) => String(p ?? ''))
+  const scanText = String(fresh?.text ?? '')
+  const mine = stemProse(have)
+  const theirs = stemProse(scanText)
+  if (mine.length < 30 || theirs.length < 30) return ''
+  const probe = Math.min(60, mine.length, theirs.length)
+  if (mine.slice(0, probe) !== theirs.slice(0, probe)) return ''
+  const owned = new Set(parts.flatMap((p) => extractMathpixImageUrls(p)))
+  const missing = [...scanText.matchAll(new RegExp(FIGURE_IN_TEXT_RE.source, 'g'))]
+    .map((m) => m[0])
+    .filter((token) => {
+      const urls = extractMathpixImageUrls(token)
+      return urls.length > 0 && urls.every((url) => !owned.has(url))
+    })
+  if (!missing.length) return ''
+  const restored = `${have.trim()}\n${missing.join('\n')}`
+  const kept = extractMathpixImageUrls(dropOptionFigureRepeatingStem({ ...card, text: restored }).text)
+  const added = missing.filter((token) => extractMathpixImageUrls(token).every((url) => kept.includes(url)))
+  return added.length ? `${have.trim()}\n${added.join('\n')}` : ''
+}
 
 function passageKey(q) {
   return String(q?.passageId || q?.passageGroup || '').trim()
@@ -852,6 +896,9 @@ function scanTidyReason(q, ocr) {
   if (stemWithoutScanPlaceholders(q?.text) || stemWithoutScanPlaceholders(q?.passageText)) {
     return 'The scan’s “[Figure]” placeholder is on the card; it is removed'
   }
+  if (stemWithoutHeadingBraces(q?.text) || stemWithoutHeadingBraces(q?.passageText)) {
+    return 'A piece of a page heading (“{” or “{SECTION II :”) is left at the end of the question; it is removed'
+  }
   if (stemWithJoinedFigurePieces(q?.text) || stemWithJoinedFigurePieces(q?.passageText)) {
     return 'A drawing is shown in pieces with its words as loose text between them; it is shown as one picture'
   }
@@ -920,6 +967,7 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, ite
   if (cut) return `The first word looks cut off (“${cut}”)`
   if (passageLostFigure) return 'The paragraph lost its figure; the other question under it has the figure'
   if (textWithLostWords(q, fresh)) return 'Words printed in the scan are missing from the card'
+  if (stemMissingScanFigures(q, fresh)) return 'The scan prints a figure for this question that the card lost; it is put back'
   if (optionsCutShortOfScan(q, fresh)) return 'An option is cut short; the scan prints more of it, which is put back'
   return (originalConfirmsWording(q) ? '' : scanLossReason(q)) || drawnReason(q)
 }
@@ -935,11 +983,16 @@ function originalConfirmsWording(q) {
   return compare?.textMatches === true || compare?.verdict === 'matches'
 }
 
+/** Structure codes are flagged only while the paper waits for review; approved papers keep their alerts as they were. */
+function structureCodeRules(paper) {
+  return String(paper?.status ?? '') === 'pending_review'
+}
+
 /**
  * Card damage the scan or a sibling card settles: index → reason. A card the admin approved
  * as shown is left alone.
  */
-function cardDamageReasons(questions, ocr, solutionRules = true) {
+function cardDamageReasons(questions, ocr, solutionRules = true, structureCodes = false) {
   const siblings = passagesMissingSiblingFigure(questions)
   const structure = officialPyqStructureDamage(questions, ocr)
   const items = freshCardsFromOcr(ocr)
@@ -950,6 +1003,7 @@ function cardDamageReasons(questions, ocr, solutionRules = true) {
     const reason =
       cardDamageReason(q, fresh, siblings.has(i), solutionRules, items, ocr) ||
       structure.get(i) ||
+      (structureCodes ? officialPyqScanStructureReason(q) : '') ||
       chapterReason(q) ||
       keyMissingReason(q, fresh, items)
     if (reason) out.set(i, reason)
@@ -972,6 +1026,7 @@ export function officialPyqCardDamageReason(paper, index) {
   const items = freshCardsFromOcr(ocr)
   return (
     cardDamageReason(q, fresh, passagesMissingSiblingFigure(questions).has(index), paper?.status !== 'published', items, ocr) ||
+    (structureCodeRules(paper) ? officialPyqScanStructureReason(q) : '') ||
     chapterReason(q) ||
     keyMissingReason(q, fresh, items)
   )
@@ -1005,6 +1060,8 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   for (const key of ['text', 'passageText']) {
     const unplaced = stemWithoutScanPlaceholders(next[key])
     if (unplaced) next = { ...next, [key]: unplaced }
+    const unheaded = stemWithoutHeadingBraces(next[key])
+    if (unheaded) next = { ...next, [key]: unheaded }
     const whole = stemWithJoinedFigurePieces(next[key])
     if (whole) next = { ...next, [key]: whole }
     const unlabelled = stemWithoutGraphAxisLeftovers(next[key])
@@ -1013,6 +1070,8 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   next = withEnglishSpacing(next, ocr)
   const found = textWithLostWords(next, fresh)
   if (found) next = { ...next, text: found }
+  const pictured = stemMissingScanFigures(next, fresh)
+  if (pictured) next = { ...next, text: pictured }
   const fuller = optionsCutShortOfScan(next, fresh)
   if (fuller) next = { ...next, options: fuller }
   for (const key of ['text', 'passageText']) {
@@ -1200,7 +1259,7 @@ export function localOfficialPyqQualityCheck(paper) {
   const ocr = stripHindiOcr(paper?.preparedText)
   /** @type {number[]} */
   const failedGoTo = []
-  const damage = cardDamageReasons(questions, ocr, paper?.status !== 'published')
+  const damage = cardDamageReasons(questions, ocr, paper?.status !== 'published', structureCodeRules(paper))
   questions.forEach((q, index) => {
     if (!q || isOfficialPyqPlaceholder(q)) return
     if (q.adminApproved === true) {
@@ -1498,11 +1557,14 @@ export function repairOfficialPyqUntilQuality(paper) {
     return shown[index]
   }
 
+  /** Go-to numbers flagged only for drawn structure codes: the PDF comparison fixes those, a scan text rebuild only adds page leftovers (2012 P2 Q26 "{"). */
+  const codeOnly = new Set()
+
   function failedNow() {
     /** @type {number[]} */
     const failed = []
     questions.forEach((_, index) => prepare(index))
-    const damage = cardDamageReasons(questions, ocr)
+    const damage = cardDamageReasons(questions, ocr, true, false)
     questions.forEach((q, index) => {
       if (!q || isOfficialPyqPlaceholder(q)) return
       if (q.adminApproved === true) {
@@ -1541,6 +1603,16 @@ export function repairOfficialPyqUntilQuality(paper) {
         failed.push(index + 1)
       }
     })
+    codeOnly.clear()
+    if (structureCodeRules(paper)) {
+      const flagged = new Set(failed)
+      questions.forEach((q, index) => {
+        if (!q || isOfficialPyqPlaceholder(q) || flagged.has(index + 1) || !officialPyqScanStructureReason(q)) return
+        failed.push(index + 1)
+        codeOnly.add(index + 1)
+      })
+      failed.sort((a, b) => a - b)
+    }
     return failed
   }
 
@@ -1549,7 +1621,7 @@ export function repairOfficialPyqUntilQuality(paper) {
     let changed = false
     for (const go of failedGoTo) {
       const index = go - 1
-      if (questions[index]?.adminApproved === true) continue
+      if (questions[index]?.adminApproved === true || codeOnly.has(go)) continue
       const repaired = repairFailingCard(questions[index], ocr)
       if (repaired !== questions[index]) {
         questions[index] = repaired
@@ -1572,7 +1644,7 @@ export function repairOfficialPyqUntilQuality(paper) {
     quality: {
       ...withAdminFactsScanNote(
         withAnswerDisagreementNote(
-          withHindiOnlyFlag(mergeQualityResults(failedGoTo, review, cardDamageReasons(questions, ocr)), ocr),
+          withHindiOnlyFlag(mergeQualityResults(failedGoTo, review, cardDamageReasons(questions, ocr, true, structureCodeRules(paper))), ocr),
           questions,
         ),
         paper,

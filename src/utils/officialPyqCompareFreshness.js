@@ -76,6 +76,8 @@ export function officialPyqCurrentCompare(card, opts = {}) {
 
 /**
  * Cards with stale compare reports removed; the same array when nothing was stale.
+ * An answer key the report read on the page is kept as `pageAnswerKey`: the page's key
+ * does not change when the card's wording is tidied (2025 P1 Q31).
  * @param {any[]} questions
  * @param {Iterable<number>} [flaggedGoTo] 1-based numbers the local check flags now
  */
@@ -87,6 +89,8 @@ export function dropStaleOfficialPyqCompares(questions, flaggedGoTo = []) {
     if (!q?.originalCompare || officialPyqCompareIsCurrent(q, { flagged: flagged.has(i + 1) })) return q
     changed = true
     const next = { ...q }
+    const printed = String(q.originalCompare.printedAnswer ?? '').trim()
+    if (printed) next.pageAnswerKey = printed
     delete next.originalCompare
     return next
   })

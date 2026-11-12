@@ -47,7 +47,8 @@ const {
   saveOfficialPyqCompareResult,
 } = await import('../src/utils/officialPyqOriginalCompare.js')
 const { officialPyqDrawnCutOff, officialPyqDrawnProblems } = await import('../src/utils/officialPyqDrawnCheck.js')
-const { localOfficialPyqQualityCheck } = await import('../src/utils/officialPyqLocalQuality.js')
+const { localOfficialPyqQualityCheck, repairOfficialPyqUntilQuality } = await import('../src/utils/officialPyqLocalQuality.js')
+const { withoutRepeatedListTwoText } = await import('../src/utils/matchListTidy.js')
 const { prepareTextForMathTextDisplay } = await import('../src/utils/prepareMathForRender.js')
 const { dedupeRepeatedStemPhrase } = await import('../src/utils/dedupeStemText.js')
 const { splitMathpixMediaSegments } = await import('../src/utils/mathpixMedia.js')
@@ -794,6 +795,12 @@ test('2013 P2 Q60: an answer marked "from the paper" where the scan prints no ke
     localOfficialPyqQualityCheck({ id: 'p-q60', officialPyq: true, preparedText: scan, questions: otherOnPage }).lines.join('\n'),
     /prints no answer/,
   )
+  // The report went stale after a wording tidy; the page key it read was kept on the card.
+  const keptKey = [cards[0], { ...cards[1], correctIndex: 0, answerSource: 'from_paper', pageAnswerKey: 'A' }]
+  assert.doesNotMatch(
+    localOfficialPyqQualityCheck({ id: 'p-q60', officialPyq: true, preparedText: scan, questions: keptKey }).lines.join('\n'),
+    /prints no answer/,
+  )
 })
 
 test('2025 P1 Q31: graph axis labels and a stray "(T)" between the list rows are removed', () => {
@@ -887,6 +894,41 @@ test('2013 P2 Q19: List II is not added again when the scan dropped its heading'
   assert.equal((String(enriched.text).match(/\n\(1\)/g) || []).length, 1)
   const doubled = { ...card, text: `${stem}\nList II\n${stem.split('\n').slice(5).join('\n')}` }
   assert.match(reviewOfficialPyqCards([doubled], '', null, { cardsOnly: true }).messages.join('\n'), /List II is shown twice/)
+})
+
+test('2023 P1 Q17: a second List-II that repeats the first is removed by the auto-fix', () => {
+  const lists = [
+    'Let $z$ be a complex number satisfying $|z|^{3}+2 z^{2}+4 \\bar{z}-8=0$. Let the imaginary part of $z$ be nonzero.',
+    'Match each entry in List-I to the correct entries in List-II.',
+    '',
+    'List-I',
+    '',
+    '(P)\n$|z|^{2}$ is equal to\n\n(Q)\n$|z-\\bar{z}|^{2}$ is equal to\n\n(R)\n$|z|^{2}+|z+\\bar{z}|^{2}$ is equal to\n\n(S)\n$|z+1|^{2}$ is equal to',
+    '',
+    'List-II',
+    '',
+    '(1)\n12\n\n(2)\n4\n\n(3)\n8\n\n(4)\n10\n\n(5)\n7',
+  ].join('\n')
+  const copy = '\n\nList-II\n(1) 12\n(2) 4\n(3) 8\n(4) 10\n(5) 7'
+  assert.equal(withoutRepeatedListTwoText(lists + copy), lists)
+  assert.equal(withoutRepeatedListTwoText(`${lists}${copy}\nChoose the correct option.`), `${lists}\n\nChoose the correct option.`)
+  const other = '\n\nList-II\n(1) 12\n(2) 4\n(3) 9\n(4) 10\n(5) 7'
+  assert.equal(withoutRepeatedListTwoText(lists + other), lists + other, 'a List-II with other rows is not a copy')
+  assert.equal(withoutRepeatedListTwoText(lists), lists)
+  const card = {
+    id: 'q17',
+    subject: 'mathematics',
+    questionType: 'matrix_match',
+    text: lists + copy,
+    options: ['(P) → (1) (Q) → (3) (R) → (5) (S) → (4)', '(P) → (2) (Q) → (1) (R) → (3) (S) → (5)', '(P) → (2) (Q) → (4) (R) → (5) (S) → (1)', '(P) → (2) (Q) → (3) (R) → (5) (S) → (4)'],
+    correctIndex: 3,
+    answerSource: 'unknown',
+  }
+  const paper = { id: 'p-q17', officialPyq: true, preparedText: '', questions: [card] }
+  assert.match(localOfficialPyqQualityCheck(paper).lines.join('\n'), /List II is shown twice/)
+  const repaired = repairOfficialPyqUntilQuality(paper)
+  assert.equal(repaired.paper.questions[0].text, lists)
+  assert.doesNotMatch(repaired.quality.lines.join('\n'), /List II is shown twice|printed twice/)
 })
 if (failed) {
   console.error(`\n${failed} official PYQ undo test(s) failed`)

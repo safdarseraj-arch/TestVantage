@@ -1312,6 +1312,17 @@ async def official_pyq_mathpix_picture(u: str = Query(..., max_length=600)) -> R
     return Response(content=data, media_type="image/png", headers={"Cache-Control": "no-cache"})
 
 
+@app.post("/api/official-pyq/original/mathpix-picture/keep", tags=["Official PYQ"])
+async def official_pyq_keep_mathpix_pictures(body: OfficialPyqMathpixCropsRequest) -> dict[str, Any]:
+    """Download Mathpix picture links while they still load and keep local copies (uploads with no original PDF)."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    result = await asyncio.to_thread(opc.keep_mathpix_pictures, body.urls)
+    return {"ok": True, "saved": len(result["saved"]), "kept": len(result["kept"]), "failed": result["failed"]}
+
+
 @app.get("/api/official-pyq/original/{paper_id}", tags=["Official PYQ"])
 async def official_pyq_original_status(paper_id: str) -> dict[str, Any]:
     """Is the original PDF / page image stored for this pending paper?"""

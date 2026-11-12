@@ -649,19 +649,14 @@ def crops_for_mathpix_links(paper_id: str, urls: list[str]) -> dict[str, Any]:
             )
             out[url] = _save_crop(paper_id, page, pdf_page, clip, _CROP_DPI / 72.0, box)["url"]
             keyed[str(_mathpix_key(url))] = out[url]
-    if keyed:
-        with _MATHPIX_LINKS_LOCK:
-            known = _read_mathpix_links()
-            known.update(keyed)
-            MATHPIX_LINKS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            tmp = MATHPIX_LINKS_FILE.with_suffix(".tmp")
-            tmp.write_text(json.dumps(known, ensure_ascii=False), encoding="utf-8")
-            tmp.replace(MATHPIX_LINKS_FILE)
+    _remember_mathpix_links(keyed)
     return {"crops": out, "skipped": skipped}
 
 
 MATHPIX_LINKS_FILE = CROPS_DIR / "mathpix-links.json"
 _MATHPIX_LINKS_LOCK = threading.Lock()
+_MAX_PICTURE_BYTES = 8 * 1024 * 1024
+_PICTURE_TIMEOUT_S = 20.0
 
 
 def _read_mathpix_links() -> dict[str, str]:
@@ -672,6 +667,24 @@ def _read_mathpix_links() -> dict[str, str]:
     return data if isinstance(data, dict) else {}
 
 
+def _remember_mathpix_links(keyed: dict[str, str]) -> None:
+    if not keyed:
+        return
+    with _MATHPIX_LINKS_LOCK:
+        known = _read_mathpix_links()
+        known.update(keyed)
+        MATHPIX_LINKS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = MATHPIX_LINKS_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(known, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(MATHPIX_LINKS_FILE)
+
+
+def _local_file_exists(local: Any) -> bool:
+    if not isinstance(local, str) or not local.startswith(CROP_URL_PREFIX):
+        return False
+    return (CROPS_DIR / local[len(CROP_URL_PREFIX) :].split("?", 1)[0]).is_file()
+
+
 def local_crop_for_mathpix(url: str) -> str | None:
     """The local copy recorded for this Mathpix link, while its file still exists."""
     key = _mathpix_key(url)
@@ -679,10 +692,71 @@ def local_crop_for_mathpix(url: str) -> str | None:
         return None
     with _MATHPIX_LINKS_LOCK:
         local = _read_mathpix_links().get(key)
-    if not isinstance(local, str) or not local.startswith(CROP_URL_PREFIX):
-        return None
-    name = local[len(CROP_URL_PREFIX) :].split("?", 1)[0]
-    return local if (CROPS_DIR / name).is_file() else None
+    return local if _local_file_exists(local) else None
+
+
+def _picture_png(data: bytes) -> bytes:
+    pix = fitz.Pixmap(data)
+    if pix.alpha:
+        pix = fitz.Pixmap(pix, 0)
+    if pix.n > 3:
+        pix = fitz.Pixmap(fitz.csRGB, pix)
+    if pix.width < 2 or pix.height < 2:
+        raise ValueError("Picture too small.")
+    return pix.tobytes("png")
+
+
+def keep_mathpix_pictures(urls: list[str], fetch: Any = None) -> dict[str, Any]:
+    """Download Mathpix picture links while they still load and keep them as local copies.
+
+    For uploads with no original PDF (Question Bank). A link that already has a local copy is left
+    as it is; only https://cdn.mathpix.com/cropped/ links are fetched.
+    """
+    with _MATHPIX_LINKS_LOCK:
+        known = _read_mathpix_links()
+    kept: list[str] = []
+    failed: list[str] = []
+    todo: list[tuple[str, str, str]] = []
+    for url in list(dict.fromkeys(str(u or "") for u in urls))[:_MAX_MATHPIX_URLS]:
+        clean = url.replace("\\&", "&").replace("&amp;", "&").strip()
+        key = _mathpix_key(clean)
+        if not key:
+            failed.append(url)
+        elif _local_file_exists(known.get(key)):
+            kept.append(url)
+        else:
+            todo.append((url, "https://" + clean.split("://", 1)[1], key))
+
+    saved: dict[str, str] = {}
+    keyed: dict[str, str] = {}
+    client = None if fetch else httpx.Client(timeout=_PICTURE_TIMEOUT_S, follow_redirects=False)
+    try:
+        for url, link, key in todo:
+            try:
+                if fetch:
+                    status, body = fetch(link)
+                else:
+                    resp = client.get(link)
+                    status, body = resp.status_code, resp.content
+                if status != 200 or not body or len(body) > _MAX_PICTURE_BYTES:
+                    raise ValueError(f"HTTP {status}")
+                data = _picture_png(body)
+            except Exception as exc:  # noqa: BLE001 - one dead link must not stop the rest
+                logger.info("Mathpix picture not kept (%s): %s", exc, link[:120])
+                failed.append(url)
+                continue
+            pic_id, page = key.split(":", 1)[0].rsplit("-", 1)
+            name = f"mathpix-{re.sub(r'[^A-Za-z0-9-]', '', pic_id)[:40]}-p{page}-{hashlib.sha1(data).hexdigest()[:16]}.png"
+            CROPS_DIR.mkdir(parents=True, exist_ok=True)
+            dest = CROPS_DIR / name
+            if not dest.exists():
+                dest.write_bytes(data)
+            saved[url] = keyed[key] = f"{CROP_URL_PREFIX}{name}"
+    finally:
+        if client is not None:
+            client.close()
+    _remember_mathpix_links(keyed)
+    return {"saved": saved, "kept": kept, "failed": failed}
 
 
 def read_crop(name: str) -> bytes:

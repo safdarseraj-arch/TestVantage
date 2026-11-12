@@ -39,7 +39,7 @@ import { numericalAlternativesOf } from './answerAlternatives.js'
 import { buildPaperFacts } from './officialPyqPaperFacts.js'
 import { ocrIsHindiOnly, stripHindiOcr } from './stripHindiOcr.js'
 import { dropStaleOfficialPyqCompares, officialPyqCurrentCompare } from './officialPyqCompareFreshness.js'
-import { codeOptionsAsPairs, tidyMatchListCard } from './matchListTidy.js'
+import { codeOptionsAsPairs, tidyMatchListCard, withoutRepeatedListTwoText } from './matchListTidy.js'
 import { parseMatchingListForDisplay } from './parseMatchingListDisplay.js'
 import {
   chapterIsNotAName,
@@ -220,7 +220,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 37
+export const LOCAL_QUALITY_REVISION = 38
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -570,7 +570,8 @@ function answerClaimsUnprintedKey(q, fresh, items = []) {
   if (fresh.answerSource === 'from_paper' || answerKeyOf(fresh).has || fresh.bonusMarksToAll === true) return false
   if (!items.some((item) => item?.answerSource === 'from_paper' && answerKeyOf(item).has)) return false
   const saved = answerKeyOf(q)
-  if (saved.letters && sameAsPageKey(saved.letters, q?.originalCompare?.printedAnswer)) return false
+  const pageKey = String(q?.originalCompare?.printedAnswer ?? '').trim() || q?.pageAnswerKey
+  if (saved.letters && sameAsPageKey(saved.letters, pageKey)) return false
   return saved.has
 }
 
@@ -772,6 +773,7 @@ function matchListReason(q, fresh, items) {
   if (tidy !== q && fullLists(listShape(tidy)) && listShape(tidy) !== listShape(q)) {
     return 'The list rows are not read right (row labels or List headings); they are put right'
   }
+  if (withoutRepeatedListTwoText(q?.text) !== String(q?.text ?? '')) return 'List-II is printed twice on this card; the copy is removed'
   if (listsDifferFromScan(q, fresh, items)) return "List rows of other questions are on this card; the scan's lists are put back"
   if (withoutHeadingOnRowLabel(q?.text) !== String(q?.text ?? '')) return 'A List heading is printed inside a list row; it is removed'
   if (scanListsWhenLayoutBroken(q, fresh)) return "The List-I / List-II rows are broken on this card; the scan's lists are put back"
@@ -784,6 +786,8 @@ function withMatchListsRepaired(q, fresh, items) {
   if (codeOptionsAsPairs(next.options, next.text)) next = tidyMatchListCard(next)
   const tidy = tidyMatchListCard(next)
   if (tidy !== next && fullLists(listShape(tidy)) && listShape(tidy) !== listShape(next)) next = tidy
+  const once = withoutRepeatedListTwoText(next.text)
+  if (once !== String(next.text ?? '')) next = { ...next, text: once }
   if (next.adminEdited !== true && listsDifferFromScan(next, fresh, items)) {
     next = { ...next, text: String(fresh.text ?? '') }
     const pairs = codeOptionsAsPairs(next.options, next.text)

@@ -124,6 +124,31 @@ function withoutRepeatedPictureRows(lines) {
   return out
 }
 
+const rowsKey = (lines) => lines.join('').replace(/\s+/g, '').replace(/\$/g, '')
+
+/**
+ * A second "List-II" heading whose rows repeat the first List-II word for word (2023 P1 Q17:
+ * "(1)\n12 … (5)\n7" then "List-II\n(1) 12 … (5) 7"): the copy is dropped. Lines after the
+ * copy stay.
+ */
+function withoutRepeatedListTwo(lines) {
+  const heads = lines.map((line, i) => (headingLevel(line) === 'II' ? i : -1)).filter((i) => i >= 0)
+  if (heads.length !== 2) return lines
+  const [a, b] = heads
+  const first = rowsKey(lines.slice(a + 1, b))
+  if (!/^\(1\)/.test(first)) return lines
+  for (let end = b + 1; end <= lines.length; end += 1) {
+    const copy = rowsKey(lines.slice(b + 1, end))
+    if (copy === first) {
+      const before = lines.slice(0, b)
+      if (end === lines.length) while (before.length && !before[before.length - 1].trim()) before.pop()
+      return [...before, ...lines.slice(end)]
+    }
+    if (copy.length > first.length || !first.startsWith(copy)) return lines
+  }
+  return lines
+}
+
 /**
  * List text with row letters, headings and row labels put right. Text without both List
  * headings is returned unchanged.
@@ -137,7 +162,16 @@ export function tidyMatchListText(text) {
   lines = moveLateListTwoHeading(lines)
   lines = labelListTwoRows(lines)
   lines = withoutRepeatedPictureRows(lines)
+  lines = withoutRepeatedListTwo(lines)
   return lines.join('\n').replace(/\n{3,}/g, '\n\n')
+}
+
+/** The text without a second List-II that repeats the first; the same text when there is none. @param {unknown} text */
+export function withoutRepeatedListTwoText(text) {
+  const t = String(text ?? '')
+  const lines = t.split('\n')
+  const kept = withoutRepeatedListTwo(lines)
+  return kept === lines ? t : kept.join('\n').replace(/\n{3,}/g, '\n\n')
 }
 
 const CODE_OPTION_RE = /^\(?\s*[1-5]\s*\)?(?:\s*[&,]?\s*\(?\s*[1-5]\s*\)?){3,4}$/

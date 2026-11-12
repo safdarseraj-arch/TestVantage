@@ -473,6 +473,12 @@ test('a compare report stays while the card is unchanged and goes once the wordi
   const changed = { ...stored, text: `${stored.text} (edited)` }
   assert.equal(officialPyqCompareIsCurrent(changed), false)
   assert.equal(dropStaleOfficialPyqCompares([changed])[0].originalCompare, undefined)
+  assert.equal(dropStaleOfficialPyqCompares([changed])[0].pageAnswerKey, undefined, 'no key read, none kept')
+  // 2025 P1 Q31: a tidy changed the wording; the key Compare read on the page still holds.
+  const keyed = { ...changed, originalCompare: { ...stored.originalCompare, printedAnswer: 'A' } }
+  const dropped = dropStaleOfficialPyqCompares([keyed])[0]
+  assert.equal(dropped.originalCompare, undefined)
+  assert.equal(dropped.pageAnswerKey, 'A')
   globalThis.localStorage.clear()
 })
 

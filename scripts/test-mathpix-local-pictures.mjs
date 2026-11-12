@@ -3,13 +3,21 @@
  * Run: node scripts/test-mathpix-local-pictures.mjs
  */
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
+  keepAllStoredMathpixPicturesLocal,
+  keepMathpixPicturesLocal,
   keepOfficialPyqPicturesLocal,
   localPictureOnErrorAttr,
   mathpixLocalPictureUrl,
+  mathpixPictureLinksIn,
   mathpixPictureLinksOfPaper,
   showLocalPictureOnError,
 } from '../src/utils/mathpixLocalPictures.js'
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 import { convertLatexTabularToArray } from '../src/utils/latexTabularDisplay.js'
 
 const LINK =
@@ -77,6 +85,7 @@ await test('sweep saves each paper once, notes papers without an original, stops
     calls.push(url)
     if (mode === 'down') throw new Error('refused')
     const { urls } = JSON.parse(init.body)
+    if (url.endsWith('/mathpix-picture/keep')) return { ok: true, json: async () => ({ saved: urls.length, kept: 0, failed: [] }) }
     if (url.includes('no-original')) {
       return { ok: false, status: 404, json: async () => ({ detail: { code: 'original_missing' } }) }
     }
@@ -91,8 +100,12 @@ await test('sweep saves each paper once, notes papers without an original, stops
   ]
   const deps = { papers, ocrTextOf: () => '', savePaperMeta: (m) => metas.push(m) }
   const out = await keepOfficialPyqPicturesLocal(deps)
-  assert.deepEqual(out, { kept: 1, noOriginal: ['no-original'] })
-  assert.equal(calls.length, 2)
+  assert.deepEqual(out, { kept: 2, noOriginal: ['no-original'] }, 'a paper without its PDF has its pictures downloaded instead')
+  assert.deepEqual(calls, [
+    '/api/official-pyq/original/p1/mathpix-crops',
+    '/api/official-pyq/original/no-original/mathpix-crops',
+    '/api/official-pyq/original/mathpix-picture/keep',
+  ])
   assert.equal(metas.length, 1)
   assert.equal(metas[0].p1.localPictures.saved, 1)
   assert.equal(metas[0]['no-original'].localPictures.noOriginal, true)
@@ -108,6 +121,47 @@ await test('sweep saves each paper once, notes papers without an original, stops
   assert.equal(calls.length, 1)
   assert.equal(metas.length, 0)
   assert.equal(down.kept, 0)
+})
+
+await test('Question Bank: every stored Mathpix link is downloaded once per session; helper down retries later', async () => {
+  const bankLink = LINK.replace('9deb824d', 'aaaa1111')
+  const LINK3 = LINK.replace('-21.jpg', '-23.jpg')
+  const store = new Map([
+    // Stored as JSON, so a LaTeX "\&" inside a link is written "\\&".
+    ['bank', JSON.stringify({ questions: [{ text: `\\includegraphics{${bankLink.replace(/&/g, '\\&')}}`, options: [`![](${LINK})`] }] })],
+    ['plain', `no json ${LINK3}`],
+    ['other', JSON.stringify({ a: 'no pictures' })],
+  ])
+  const storage = { get length() { return store.size }, key: (i) => [...store.keys()][i] ?? null, getItem: (k) => store.get(k) ?? null }
+  const sent = []
+  let down = true
+  globalThis.fetch = async (url, init) => {
+    if (down) throw new Error('refused')
+    const { urls } = JSON.parse(init.body)
+    sent.push(...urls)
+    return { ok: true, json: async () => ({ saved: urls.length - 1, kept: 1, failed: [] }) }
+  }
+  const first = await keepAllStoredMathpixPicturesLocal(storage)
+  assert.equal(first.ok, false, 'helper down: nothing marked done')
+  down = false
+  const second = await keepAllStoredMathpixPicturesLocal(storage)
+  assert.equal(second.ok, true)
+  assert.deepEqual(sent.sort(), [bankLink, LINK, LINK3].sort())
+  const third = await keepAllStoredMathpixPicturesLocal(storage)
+  assert.equal(third.ok, false, 'runs once per session')
+  assert.equal(sent.length, 3)
+  const again = await keepMathpixPicturesLocal([LINK, bankLink])
+  assert.deepEqual(again, { ok: true, saved: 0, kept: 0, failed: 0 }, 'links already answered are not sent again')
+  assert.deepEqual(mathpixPictureLinksIn([{ text: `x ${LINK}` }], `y ${LINK}`), [LINK])
+})
+
+await test('a Question Bank save hands its pictures to the helper', () => {
+  const src = fs.readFileSync(path.join(root, 'src/utils/questionBank.js'), 'utf8')
+  const save = src.slice(src.indexOf('export function saveQuestionBank'), src.indexOf('export function saveUploadSettings'))
+  assert.match(save, /keepQuestionPicturesLocalSoon\(bank\.questions\)/)
+  for (const page of ['src/pages/QuestionBank.jsx', 'src/pages/OfficialPyqPending.jsx']) {
+    assert.match(fs.readFileSync(path.join(root, page), 'utf8'), /keepAllStoredMathpixPicturesLocal\(\)/, page)
+  }
 })
 
 if (failed) {

@@ -400,6 +400,11 @@ export function saveQuestionBank(bank, opts = {}) {
         import('./bankIdbStore.js')
           .then((m) => m.writeBankJsonToIdb(json))
           .catch(() => {})
+        if (json.includes('cdn.mathpix.com')) {
+          import('./mathpixLocalPictures.js')
+            .then((m) => m.keepQuestionPicturesLocalSoon(bank.questions))
+            .catch(() => {})
+        }
       }
     }
   } catch (e) {

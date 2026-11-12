@@ -1606,6 +1606,11 @@ export default function QuestionBank() {
         )
       }
     })
+    setTimeout(() => {
+      void import('../utils/mathpixLocalPictures.js')
+        .then((m) => m.keepAllStoredMathpixPicturesLocal())
+        .catch(() => {})
+    }, 5000)
 // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

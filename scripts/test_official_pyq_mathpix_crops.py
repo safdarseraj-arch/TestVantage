@@ -70,4 +70,36 @@ with tempfile.TemporaryDirectory() as tmp:
     except opc.OriginalMissingError:
         check("paper without original is refused", True)
 
+    # Question Bank uploads have no original PDF: the picture is downloaded while its link still loads.
+    jpg = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 40, 20), False)
+    jpg.set_rect(jpg.irect, (10, 20, 30))
+    jpg_bytes = jpg.tobytes("jpg")
+    asked: list[str] = []
+
+    def fake_fetch(link: str) -> tuple[int, bytes]:
+        asked.append(link)
+        if "dead" in link:
+            return 404, b""
+        if "junk" in link:
+            return 200, b"not a picture"
+        return 200, jpg_bytes
+
+    bank = LINK.replace("9deb824d", "aaaa1111").replace("http://", "https://")
+    dead = LINK.replace("9deb824d", "dead2222")
+    junk = LINK.replace("9deb824d", "junk3333")
+    insecure = bank.replace("https://", "http://").replace("aaaa1111", "bbbb4444")
+    kept = opc.keep_mathpix_pictures([bank, bank, dead, junk, insecure, "https://example.com/x.jpg"], fetch=fake_fetch)
+    check("bank picture downloaded and kept; dead, junk and foreign links fail",
+          set(kept["saved"]) == {bank, insecure} and set(kept["failed"]) == {dead, junk, "https://example.com/x.jpg"})
+    check("only Mathpix links are fetched, over https, once each",
+          all(a.startswith("https://cdn.mathpix.com/cropped/") for a in asked) and len(asked) == 4)
+    local = opc.local_crop_for_mathpix(bank)
+    check("the download is found as the link's local copy", local == kept["saved"][bank])
+    stored = fitz.Pixmap(opc.read_crop(local[len(opc.CROP_URL_PREFIX):]))
+    check("the kept copy is the same picture, as PNG", (stored.width, stored.height) == (40, 20)
+          and stored.pixel(5, 5)[:3] == jpg.pixel(5, 5)[:3])
+    asked.clear()
+    again = opc.keep_mathpix_pictures([bank], fetch=fake_fetch)
+    check("a link with a local copy is not downloaded again", again["kept"] == [bank] and not asked)
+
 print("\nAll Mathpix crop tests passed")

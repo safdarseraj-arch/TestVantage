@@ -391,7 +391,11 @@ export default function OfficialPyqPending() {
     if (picturesKeptThisSession) return undefined
     const timer = setTimeout(() => {
       picturesKeptThisSession = true
-      void import('../utils/officialPyqOriginalCompare.js').then(({ keepPaperPicturesLocal }) => keepPaperPicturesLocal())
+      void import('../utils/officialPyqOriginalCompare.js')
+        .then(({ keepPaperPicturesLocal }) => keepPaperPicturesLocal())
+        .then(() => import('../utils/mathpixLocalPictures.js'))
+        .then(({ keepAllStoredMathpixPicturesLocal }) => keepAllStoredMathpixPicturesLocal())
+        .catch(() => {})
     }, 4000)
     return () => clearTimeout(timer)
   }, [])

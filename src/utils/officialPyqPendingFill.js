@@ -10,6 +10,7 @@ import { mapExamSlugToHybridLabel, mapSubjectSlugToHybridLabel } from './hybridM
 import { HYBRID_FILL_PART_SIZE, fillPaperQuestionByQuestion } from './officialPyqReplica.js'
 import {
   getOfficialPyqPendingPaper,
+  officialPyqAnswerKeyIsReleased,
   officialPyqCardIsAdminEdited,
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
@@ -82,6 +83,7 @@ function gridQuestionText(question) {
 
 /** The card's answer was printed on the paper or set by an admin, so Hybrid AI never answers it. @param {any} card */
 export function officialPyqCardAnswerIsKept(card) {
+  if (officialPyqAnswerKeyIsReleased(card)) return false
   const kept = KEPT_SOURCES.has(card?.answerSource) || card?.answerSource === 'admin_edit' || officialPyqCardIsAdminEdited(card)
   return Boolean(kept && (card?.bonusMarksToAll === true || currentAnswerText(card)))
 }
@@ -245,6 +247,7 @@ export function officialPyqCardIsFilled(q, paper) {
   if (!String(q?.section || q?.unit || '').trim() || !String(q?.topic || '').trim()) return false
   if (q?.toughnessLevel == null || q.toughnessLevel === '') return false
   if (paper?.printedAnswersAndSolutions === true) return true
+  if (officialPyqAnswerKeyIsReleased(q)) return false
   if (!solutionIsUsable(q) || !(currentAnswerText(q) || q?.bonusMarksToAll === true)) return false
   if (AI_SOLUTION_SOURCES.has(q?.solutionSource) && officialPyqCardAnswerIsKept(q)) {
     const reached = answerFromSolution(q.solution, q)
@@ -303,9 +306,10 @@ export function applyHybridPatchToCard(card, patch) {
   }
   if (Array.isArray(patch.examIds) && patch.examIds.length) next.examIds = patch.examIds
   const handEdited = officialPyqCardIsAdminEdited(card)
+  const answerHandSet = handEdited && !officialPyqAnswerKeyIsReleased(card)
   if (isMatrixGridCard(card)) {
     const answer = patch.matrixAnswerKey ? gridAnswerText(card, patch.matrixAnswerKey) : ''
-    if (!handEdited && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
+    if (!answerHandSet && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
       next.matrixAnswerKey = patch.matrixAnswerKey
       delete next.matrixAnswerAlternates
       next.answerSource = 'hybrid_ai'
@@ -313,7 +317,7 @@ export function applyHybridPatchToCard(card, patch) {
   }
   const answer = isMatrixGridCard(card) ? '' : currentAnswerText(patch)
   const printedBonus = card.bonusMarksToAll === true
-  if (!handEdited && !printedBonus && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
+  if (!answerHandSet && !printedBonus && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
     next.correctIndex = patch.correctIndex
     next.correctIndices = patch.correctIndices
     next.correctInteger = patch.correctInteger
@@ -323,7 +327,7 @@ export function applyHybridPatchToCard(card, patch) {
     delete next.correctIndicesAlternatives
     next.answerSource = 'hybrid_ai'
   }
-  if (answer && !printedBonus && answer !== currentAnswerText(card) && (handEdited || KEPT_SOURCES.has(card.answerSource))) {
+  if (answer && !printedBonus && answer !== currentAnswerText(card) && (answerHandSet || KEPT_SOURCES.has(card.answerSource))) {
     // The kept answer stays; the quality check asks for a look.
     if (!answersAgree(card, answer)) next.hybridAnswerDisagrees = answer
   } else if (answer) {

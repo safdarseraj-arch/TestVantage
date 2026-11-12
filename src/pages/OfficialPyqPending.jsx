@@ -1933,7 +1933,7 @@ export default function OfficialPyqPending() {
                     <ErrorBoundary compact title="Preview hit an error">
                       <OfficialPyqPreviewPager
                         paperId={selectedId}
-                        reloadToken={previewReload}
+                        reloadToken={`${previewReload}:${selected?.status ?? ''}`}
                         onMeta={onPreviewMeta}
                       />
                     </ErrorBoundary>

@@ -171,6 +171,48 @@ export function officialPyqCardIsAdminEdited(q) {
   return Boolean(q && typeof q === 'object' && /** @type {any} */ (q).adminEdited === true)
 }
 
+const FAKE_KEY_MIN_CARDS = 5
+
+/** @param {any} q */
+function hasTwoOptions(q) {
+  return Array.isArray(q?.options) && q.options.filter((o) => String(o ?? '').trim()).length >= 2
+}
+
+/** @param {any} q */
+function hasNumberOrGridAnswer(q) {
+  if ([q?.correctInteger, q?.correctNumerical].some((v) => v != null && v !== '')) return true
+  const grid = q?.matrixAnswerKey
+  return Boolean(grid && typeof grid === 'object' && Object.values(grid).some((row) => (Array.isArray(row) ? row.length : row != null && row !== '')))
+}
+
+/**
+ * Some older uploads (2018–2024) saved "(A), from the paper" on every question although those papers print
+ * no answer key. A real key is never A for every question, so such answers are marked unchecked
+ * (`answerKeyReleased`); Hybrid AI then solves them. A card whose answer came off the original page stays.
+ * @param {unknown[]} questions
+ * @returns {unknown[] | null} the corrected cards, or null when nothing changes
+ */
+export function releaseUnprintedAnswerKeys(questions) {
+  const list = Array.isArray(questions) ? questions : []
+  const claimed = list.filter(
+    (q) => /** @type {any} */ (q)?.answerSource === 'from_paper' && /** @type {any} */ (q)?.answerFromOriginalPage !== true,
+  )
+  const choice = claimed.filter(hasTwoOptions)
+  if (choice.length < FAKE_KEY_MIN_CARDS) return null
+  const onlyA = (/** @type {any} */ q) =>
+    Number(q.correctIndex) === 0 &&
+    !(Array.isArray(q.correctIndices) ? q.correctIndices : []).some((i) => Number(i) !== 0) &&
+    !(Array.isArray(q.correctIndicesAlternatives) && q.correctIndicesAlternatives.length)
+  if (!choice.every(onlyA)) return null
+  const fake = new Set(claimed.filter((q) => hasTwoOptions(q) || !hasNumberOrGridAnswer(q)))
+  return list.map((q) => (fake.has(q) ? { .../** @type {any} */ (q), answerSource: 'unknown', answerKeyReleased: true } : q))
+}
+
+/** The card's answer was marked unchecked by {@link releaseUnprintedAnswerKeys} and nobody has set it since. @param {any} q */
+export function officialPyqAnswerKeyIsReleased(q) {
+  return q?.answerKeyReleased === true && !['from_paper', 'manual', 'admin_edit'].includes(String(q?.answerSource ?? ''))
+}
+
 /** An admin approved this one card as shown: no quality alarms, nothing may change it. @param {unknown} q */
 export function officialPyqCardIsApproved(q) {
   return Boolean(q && typeof q === 'object' && /** @type {any} */ (q).adminApproved === true)
@@ -546,10 +588,11 @@ function pickPreferredPaper(a, b) {
  * @returns {OfficialPyqPendingPaper[]}
  */
 export function normalizeOfficialPyqPendingPapers(papers) {
-  const list = (Array.isArray(papers) ? papers : []).map((p) => ({
-    ...p,
-    status: knownOfficialPyqStatus(p.status),
-  }))
+  const list = (Array.isArray(papers) ? papers : []).map((p) => {
+    const status = knownOfficialPyqStatus(p.status)
+    const released = status === 'published' ? null : releaseUnprintedAnswerKeys(p.questions)
+    return released ? { ...p, status, questions: released } : { ...p, status }
+  })
   /** @type {Map<string, OfficialPyqPendingPaper>} */
   const byKey = new Map()
   for (const paper of list) {
@@ -634,7 +677,8 @@ function loadRoot() {
   memoryRoot = { papers, updatedAt: persisted.updatedAt || Date.now() }
   rebuildSummariesFromPapers(papers, memoryRoot.updatedAt)
   writeAllLightPapers(papers)
-  if (papers.length !== persisted.papers.length) {
+  const byId = new Map(persisted.papers.map((p) => [p?.id, p]))
+  if (papers.length !== persisted.papers.length || papers.some((p) => byId.get(p.id)?.questions !== p.questions)) {
     persistRoot(memoryRoot)
   }
   return memoryRoot

@@ -40,6 +40,7 @@ const {
   clearOfficialPyqPendingPapers,
   getOfficialPyqPendingPaper,
   officialPyqSittingKey,
+  releaseUnprintedAnswerKeys,
 } = await import('../src/utils/officialPyqPendingStore.js')
 
 assert.equal(
@@ -399,6 +400,7 @@ const {
   applyHybridPatchToCard,
   fillOfficialPyqApprovedPaperPartByPart,
   hybridFillRequestForQuestion,
+  officialPyqCardIsFilled,
   officialPyqFillAnswerProblem,
   withAnswerFromSolution,
   HYBRID_FILL_NEEDS_APPROVAL,
@@ -655,6 +657,30 @@ assert.match(officialPyqFillAnswerProblem(officialB, { step_by_step_solution: 'x
 assert.match(officialPyqFillAnswerProblem(mcq, { step_by_step_solution: 'Some working only.' }), /does not end with its answer/)
 assert.equal(withAnswerFromSolution(mcq, { correct_answer: 'D', step_by_step_solution: GOOD_SOLUTION }).correct_answer, 'B')
 assert.equal(withAnswerFromSolution(officialB, { correct_answer: 'D', step_by_step_solution: GOOD_SOLUTION }).correct_answer, 'D')
+// 2018–2024 uploads saved "(A), from the paper" on every question of papers that print no key.
+const fakeKeyCards = [
+  ...[1, 2, 3, 4, 5].map((n) => ({ text: `Q${n}`, ...mcq, correctIndex: 0, answerSource: 'from_paper', adminEdited: n === 1 })),
+  { text: 'Numeric', correctIndex: 0, answerSource: 'from_paper' },
+  { text: 'Numeric with value', correctInteger: 7, answerSource: 'from_paper' },
+  { text: 'Read off the page', ...mcq, correctIndex: 0, answerSource: 'from_paper', answerFromOriginalPage: true },
+]
+const releasedCards = releaseUnprintedAnswerKeys(fakeKeyCards)
+assert.deepEqual(
+  releasedCards.map((q) => q.answerSource),
+  ['unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'unknown', 'from_paper', 'from_paper'],
+)
+assert.equal(releasedCards[0].correctIndex, 0, 'the old letter stays until Hybrid AI replaces it')
+assert.equal(releaseUnprintedAnswerKeys(releasedCards), null, 'runs once')
+assert.equal(releaseUnprintedAnswerKeys(fakeKeyCards.slice(0, 4)), null, 'too few cards to tell')
+assert.equal(releaseUnprintedAnswerKeys(fakeKeyCards.map((q, i) => (i === 2 ? { ...q, correctIndex: 3 } : q))), null, 'a real key varies')
+assert.equal(officialPyqCardIsFilled({ ...releasedCards[1], chapter: 'C', section: 'S', topic: 'T', toughnessLevel: 3, solution: GOOD_SOLUTION }), false)
+const releasedRequest = hybridFillRequestForQuestion(releasedCards[0], 'jee-advanced')
+assert.equal(releasedRequest.answer_is_official, false, 'a hand-edited card with a released key is still solved by Hybrid AI')
+assert.equal(releasedRequest.answer, '')
+const releasedPatched = applyHybridPatchToCard(releasedCards[0], { correctIndex: 2, solution: GOOD_SOLUTION })
+assert.equal(releasedPatched.correctIndex, 2)
+assert.equal(releasedPatched.answerSource, 'hybrid_ai')
+
 const draftCard = { ...officialB, text: 'S', solution: '**Answer.** (B) Quick eliminations', solutionSource: 'draft' }
 assert.equal(hybridFillRequestForQuestion(draftCard, 'jee-advanced', { source: 'X' }).solution, '', 'a draft is not sent as a solution')
 assert.equal(hybridFillRequestForQuestion(draftCard, 'jee-advanced', { source: 'X' }).source, 'X')

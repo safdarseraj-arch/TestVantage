@@ -1454,11 +1454,31 @@ export function parseMatchingListForDisplay(text, options) {
   ) {
     parsed = null
   }
+  if (picturesReadAsOneRowLists(parsed, t)) parsed = null
   if (matchParseCache.size >= MATCH_PARSE_CACHE_MAX) {
     matchParseCache.delete(matchParseCache.keys().next().value)
   }
   matchParseCache.set(key, parsed)
   return parsed
+}
+
+const PICTURE_ONLY_ROW_RE = /^\s*(?:\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]*\))\s*$/
+const LIST_I_HEADING_LINE_RE =
+  /(?:^|\n)[ \t]*\**[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*I[ \t]*\**[ \t]*(?:\n|$)|\\caption\{\s*(?:List|Column)\s*[-–]?\s*I\s*\}/i
+
+/**
+ * Pictures read as row (P) and rows (1)… when the lists are named only in a sentence: the
+ * drawing above the table and the picture of the whole table (2020 P1 Q24). The words between
+ * them were dropped; the stem draws as written instead.
+ * @param {MatchingListDisplay | null} parsed
+ * @param {string} text
+ */
+function picturesReadAsOneRowLists(parsed, text) {
+  const listI = parsed?.listI ?? []
+  const listII = parsed?.listII ?? []
+  if (listI.length !== 1 || !listII.length) return false
+  if (![...listI, ...listII].every((row) => PICTURE_ONLY_ROW_RE.test(String(row?.text ?? '')))) return false
+  return !LIST_I_HEADING_LINE_RE.test(text)
 }
 
 /**

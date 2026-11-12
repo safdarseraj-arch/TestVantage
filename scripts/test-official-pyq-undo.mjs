@@ -840,6 +840,35 @@ test('2025 P1 Q31: graph axis labels and a stray "(T)" between the list rows are
   assert.equal(stemWithoutGraphAxisLeftovers(once), '', 'one short line after one picture is not an axis label')
 })
 
+test('2020 P1 Q24: the D-erythrose drawing and the table picture are not row (P) and row (1)', () => {
+  const crop = (hash, box) =>
+    `\\includegraphics{/api/official-pyq/original/crops/opyq-1793934592904-itk18sd-p14-${hash}.png?page=14&${box}}`
+  const drawing = crop('2d6b478686b68f46', 'x0=0.4841&y0=0.0887&x1=0.5896&y1=0.1876')
+  const table = crop('c8ec5a104eb47c7a', 'x0=0.3535&y0=0.2367&x1=0.7178&y1=0.5307')
+  const sentence =
+    'D-Erythrose and its isomers are listed as P, Q, R, and S in Column-I. Choose the correct relationship of P, Q, R, and S with D-erythrose from Column II.'
+  const card = {
+    text: ['The Fischer projection of D-erythrose is shown below.', drawing, sentence, table].join('\n'),
+    options: [
+      'P\\rightarrow 2, Q\\rightarrow 3, R\\rightarrow 2, S\\rightarrow 2',
+      'P\\rightarrow 3, Q\\rightarrow 1, R\\rightarrow 1, S\\rightarrow 2',
+      'P\\rightarrow 2, Q\\rightarrow 1, R\\rightarrow 1, S\\rightarrow 3',
+      'P\\rightarrow 2, Q\\rightarrow 3, R\\rightarrow 3, S\\rightarrow 1',
+    ],
+    questionType: 'single_correct',
+  }
+  assert.equal(parseMatchingListForDisplay(card.text, card.options), null, 'the stem draws as written, sentence included')
+  assert.equal(parseMatchingListForDisplay([card.text, crop('0000000000000000', 'page=14')].join('\n'), card.options), null)
+  assert.deepEqual(officialPyqDrawnProblems(card), [])
+
+  const textRows = { ...card, text: [card.text.replace(`\n${table}`, ''), '(1) Diastereomer', '(2) Identical', '(3) Enantiomer'].join('\n') }
+  assert.match(
+    officialPyqDrawnProblems(textRows).join('\n'),
+    /List-I is drawn as one row \(P\) and question words are not shown/,
+    'a one-row List-I that hides the sentence is flagged',
+  )
+})
+
 test('2013 P2 Q19: List II is not added again when the scan dropped its heading', () => {
   const stem = [
     'Match List I with List II and select the correct answer using the codes given below the lists:',

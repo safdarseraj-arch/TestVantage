@@ -2,7 +2,8 @@
  * How a match-the-list card lays out on screen, judged from the same List-I / List-II parse
  * the review page draws: question words lost above the lists (2013 P2 Q19), empty or repeated
  * rows, a row missing from a list, rows of one list inside the other, one picture under two
- * labels, and answer codes that name rows the lists do not have. Pure functions only.
+ * labels, answer codes that name rows the lists do not have, and a one-row List-I that hides the
+ * question's words (2020 P1 Q24: two pictures read as rows). Pure functions only.
  */
 
 import { extractMathpixImageUrls } from './mathpixMedia.js'
@@ -82,6 +83,14 @@ const rowKey = (text) =>
 
 const labelOf = (row) => String(row?.label ?? '').replace(/[()\s.]/g, '')
 
+/** Question words the drawn lists do not show anywhere. */
+function lostQuestionWords(text, parsed, rows, options) {
+  const drawn = plainWords(
+    [parsed?.intro, parsed?.outro, parsed?.listITitle, parsed?.listIITitle, ...rows.map((row) => row?.text), ...(options || [])].join('\n'),
+  )
+  return [...plainWords(text)].filter((w) => !drawn.has(w))
+}
+
 /** Left / right row labels the answer-code options name ("P-1, Q-3", "P → 2; Q → 4", "(I) (P)"). */
 function codeLabels(options) {
   const left = new Set()
@@ -116,6 +125,12 @@ export function officialPyqMatchListLayoutProblems(card) {
   const parsed = parseMatchingListForDisplay(text, card?.options)
   const listI = Array.isArray(parsed?.listI) ? parsed.listI : []
   const listII = Array.isArray(parsed?.listII) ? parsed.listII : []
+  if (listI.length === 1) {
+    const lost = lostQuestionWords(text, parsed, [...listI, ...listII], card?.options)
+    return lost.length >= LOST_WORDS_MIN
+      ? [`List-I is drawn as one row (${labelOf(listI[0])}) and question words are not shown (“${lost.slice(0, 4).join(' ')}”)`]
+      : []
+  }
   if (listI.length < 2) return []
   /** Rows read off the answer codes (no rows in the question text) are not a drawn list. */
   const inText = listI.filter((row) => {
@@ -126,12 +141,7 @@ export function officialPyqMatchListLayoutProblems(card) {
   const out = []
   const rows = [...listI.map((row) => ['List-I', row]), ...listII.map((row) => ['List-II', row])]
 
-  const drawn = plainWords(
-    [parsed.intro, parsed.outro, parsed.listITitle, parsed.listIITitle, ...rows.map(([, row]) => row?.text), ...(card?.options || [])].join(
-      '\n',
-    ),
-  )
-  const lost = [...plainWords(text)].filter((w) => !drawn.has(w))
+  const lost = lostQuestionWords(text, parsed, rows.map(([, row]) => row), card?.options)
   if (lost.length >= LOST_WORDS_MIN) {
     out.push(`question words are not shown with the lists (“${lost.slice(0, 4).join(' ')}”)`)
   }

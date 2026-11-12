@@ -61,6 +61,8 @@ for (const answers of [{}, { z1: 0 }, { z1: 3 }]) {
 // --- The saved 2012 P2 pending paper: Auto-fix reads Q9's key again; the quality run clears Q23/Q60 ---
 const paper = JSON.parse(readFileSync(new URL('./fixtures/jee-advanced-2012-p2-pending.json', import.meta.url), 'utf8'))
 assert.equal(paper.questions[8].autoFix?.keyTries, 1, 'fixture: Q9 had one key read that saw no key')
+/** Their structure-code alerts are test-official-pyq-2012-p2-cards.mjs's subject, not this one's. */
+for (const n of [26, 28, 33, 34, 40]) paper.questions[n - 1] = { ...paper.questions[n - 1], adminApproved: true }
 localStorage.setItem('testvantage-official-pyq-pending', JSON.stringify({ papers: [paper], updatedAt: Date.now() }))
 const { getOfficialPyqPendingPaper } = await import('../src/utils/officialPyqPendingStore.js')
 const { autoFixFlaggedOfficialPyqCards, officialPyqAutoFixTodo } = await import('../src/utils/officialPyqAutoFix.js')
@@ -82,10 +84,12 @@ const q9 = getOfficialPyqPendingPaper(paper.id).questions[8]
 assert.equal(q9.correctIndex, 2)
 assert.equal(q9.answerSource, 'from_paper')
 
+/** The panel's quality run comes first: it puts back what the scan settles (Q4's circuit, Q22's option D). */
+persistOfficialPyqQualityRun(getOfficialPyqPendingPaper(paper.id))
 const again = await autoFixFlaggedOfficialPyqCards(paper.id, {
-  compare: async () => assert.fail('a card whose key was read is not sent again'),
+  compare: async (_id, index) => assert.fail(`Q${index + 1}: a card whose key was read, or the scan fixes, is not sent again`),
 })
-assert.equal(again.ok, true)
+assert.equal(again.ok, true, again.error)
 
 persistOfficialPyqQualityRun(getOfficialPyqPendingPaper(paper.id))
 const after = getOfficialPyqPendingPaper(paper.id)

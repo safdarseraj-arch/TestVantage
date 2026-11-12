@@ -829,7 +829,10 @@ export function ocrQuestionBodyForCard(stem, source) {
       const start = Math.max(0, at - 1600)
       const window = src.slice(start, at + 4500)
       let clipped = clipOcrWindowToQuestion(window, at - start)
-      clipped = clipped.replace(/\n?\s*Answer\s*:[^\n]*/gi, '\n').replace(/\n{3,}/g, '\n\n').trim()
+      clipped = clipped
+        .replace(/\n?[ \t]*(?:\\section\*?\{\s*)?Answer\s*:[^\n]*/gi, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
       if (clipped.length < 60) continue
       const clipTokens = new Set(
         clipped
@@ -1090,6 +1093,8 @@ function dropStolenFigures(stem, source, printedNumber, map, { passage = false }
   const kept = extractMathpixImageUrls(next).filter((url) => !isOriginalCropUrl(url))
   if (!kept.length) return next
   if (stemMentionsFigure(next)) return next
+  /** The stem's math is rewritten ("\mathrm{C}" → "C"), so the probes below can miss; the card's own span already proves ownership (2012 P2 Q4). */
+  if (!passage && span && span.length >= 80 && spanUrls && kept.every((url) => spanUrls.has(url))) return next
   if (kept.length >= 2 && mathpixFiguresSupplyListI(next)) return next
   if (src.length >= 40) {
     const probes = uniqueStemProbes(stripMathpixImageMarkup(next))

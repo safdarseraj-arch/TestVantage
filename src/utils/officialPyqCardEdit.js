@@ -360,7 +360,8 @@ export function officialPyqDraftFromSuggestion(card, compare) {
     if (crops.length) return placeCropFigures(before, withoutFigurePlaceholders(suggested) ? suggested : '', crops)
     return withoutFigurePlaceholders(suggested) ? keepCardFigures(before, suggested) : before
   }
-  const printed = officialPyqPrintedAnswerPatch(card, compare)
+  /** The key is checked against the options this fix puts on the card: "C" for four new option pictures (2012 P2 Q9). */
+  const printed = officialPyqPrintedAnswerPatch({ ...card, options }, compare)
   /** A kept card picture must not come back on an option when it is the question's own figure (2013 P1 Q15). */
   return dropOptionFigureRepeatingStem({
     ...base,

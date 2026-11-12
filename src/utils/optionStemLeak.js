@@ -364,9 +364,14 @@ export function mergeSplitMathDollars(opt) {
   return o
 }
 
+/** The paper's key printed under the last option: "ANSWER: B", "\section*{ANSWER: C}", "Ans. (A)". */
+const TRAILING_PRINTED_KEY_RE =
+  /\s*(?:\\section\*?\{\s*)?(?:ANSWER|Ans(?:wer)?s?\.?)\s*[:.\-=]\s*(?:\(?\s*[A-D](?:\s*[,&]?\s*[A-D])*\s*\)?|-?\d+(?:\.\d+)?(?:\s*(?:to|-)\s*-?\d+(?:\.\d+)?)?)\s*\}?\s*$/i
+
 /** Drop English/OCR junk after math — never strip "is equal to $2\\sqrt{5}$" or "does not exist" tails. */
 export function trimTrailingProseAfterMath(opt) {
-  let o = mergeSplitMathDollars(String(opt ?? '').trim())
+  /** "$HNO_3$ and CO respectively. ANSWER: B" kept only "$HNO_3$" (2012 P2 Q22). */
+  let o = mergeSplitMathDollars(String(opt ?? '').trim().replace(TRAILING_PRINTED_KEY_RE, ''))
   if (!o) return o
 
   if (

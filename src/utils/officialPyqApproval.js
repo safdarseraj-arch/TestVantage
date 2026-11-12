@@ -45,12 +45,17 @@ import {
   removeOlderDuplicateOfficialPyqPublishes,
 } from './officialPyqPublishOnce.js'
 import {
+  OTHER_PAPER_BANK_SOURCE,
   officialPyqFinalIdContext,
   officialPyqKeptIdsWithCards,
   officialPyqRowBelongsToPaper,
+  otherPaperUnansweredNumbers,
   pickOfficialPyqFinalId,
+  pickOtherPaperFinalId,
   removeOfficialPyqStudentRows,
 } from './officialPyqPublishFlow.js'
+import { addCustomTest, removeCustomTest } from './customTests.js'
+import { createPublishSnapshot } from './paperPublish.js'
 import {
   addBulkUploadedQuestions,
   loadQuestionBank,
@@ -62,6 +67,7 @@ import { officialPyqReplicaChildId } from './officialPyqReplica.js'
 import { pyqId, stripFounderIdSuffixes } from './questionId.js'
 import {
   addOfficialPyqPendingPaper,
+  isOtherPaper,
   getOfficialPyqPendingPaper,
   getOfficialPyqPendingOcrText,
   loadOfficialPyqPendingPapers,
@@ -435,7 +441,7 @@ function officialPyqApproveCheck(paper, preHealed) {
     )
     if (missingList) errors.push(missingList)
     errors.push(...paperWideQualityBlockers(paper, filled))
-    if (paper.exam === 'jee-advanced') {
+    if (paper.exam === 'jee-advanced' && !isOtherPaper(paper)) {
       const min = pyqExtractLowCountThreshold('jee-advanced')
       const ocrExpected = expectedPyqPaperQuestionTarget(paper.exam, paper.session, paper.preparedText)
       if (filled < min) {
@@ -602,6 +608,14 @@ export function validateOfficialPyqForPublish(paper) {
   const blank = cards.filter((q) => !isOfficialPyqPlaceholder(q) && !String(q?.text ?? '').trim()).length
   if (blank) errors.push(`${blank} question(s) have no text.`)
   if (!paper.year || !paper.exam) errors.push('Exam and year must be set.')
+  if (isOtherPaper(paper)) {
+    const unanswered = otherPaperUnansweredNumbers(paper)
+    if (unanswered.length) {
+      errors.push(
+        `${unanswered.length} question(s) have no answer (Go to Q ${unanswered.slice(0, 24).join(', ')}). Fill them with Hybrid AI or set them with Edit, then Publish.`,
+      )
+    }
+  }
   errors.push(...paperWideQualityBlockers(paper, cards.length - reserved))
   return { ok: errors.length === 0, errors }
 }
@@ -691,6 +705,7 @@ function* officialPyqPublishStages(paperId, opts) {
   const paper = getOfficialPyqPendingPaper(paperId)
   const check = validateOfficialPyqForPublish(paper)
   if (!check.ok || !paper) return { ok: false, errors: check.errors, pyqCount: 0, bankCount: 0 }
+  if (isOtherPaper(paper)) return yield* otherPaperPublishStages(paper, opts)
 
   yield { pct: 5, label: 'Clearing any old student copy…' }
   try {
@@ -786,10 +801,128 @@ function* officialPyqPublishStages(paperId, opts) {
   }
 }
 
+/** @typedef {'other_institute' | 'own'} OtherPaperAudience */
+
+/**
+ * Question Bank row for a card of an uploaded other paper: named after the paper, not a PYQ.
+ * @param {OfficialPyqPendingPaper} paper
+ * @param {OfficialPyqPendingQuestion} card
+ * @param {number} index
+ * @param {OtherPaperAudience} audience
+ */
+function otherPaperBankRow(paper, card, index, audience) {
+  const name = String(paper.paperName || paper.paperLabel || '').trim()
+  const item = pendingQuestionToPyqItem(paper, card, index)
+  const {
+    pyqYear: _year,
+    pyqSession: _session,
+    pyqDate: _date,
+    pyqShift: _shift,
+    sub_bank_type: _subBank,
+    ...row
+  } = pyqItemToBankQuestion(paper, item, index)
+  return {
+    ...row,
+    id: String(card.id),
+    paperId: paper.paperId,
+    paperLabel: name,
+    paperName: name,
+    source: name,
+    tags: ['Uploaded paper', name, paper.exam].filter(Boolean),
+    officialPyq: false,
+    imported: false,
+    bankSource: OTHER_PAPER_BANK_SOURCE,
+    paperAudience: audience,
+  }
+}
+
+/**
+ * Publish an uploaded other paper. Its questions go to the Question Bank and are served to
+ * students one by one. `own`: the whole paper is also a test students see under Tests.
+ * `other_institute`: the paper itself is never shown to students.
+ * @param {OfficialPyqPendingPaper} paper
+ * @param {{ audience?: OtherPaperAudience }} opts
+ */
+function* otherPaperPublishStages(paper, opts) {
+  const audience = opts?.audience
+  if (audience !== 'own' && audience !== 'other_institute') {
+    return {
+      ok: false,
+      errors: ['Choose whether this paper is from another institute or your own, then Publish.'],
+      pyqCount: 0,
+      bankCount: 0,
+    }
+  }
+  yield { pct: 5, label: 'Clearing any old copy…' }
+  removeOfficialPyqStudentRows(paper)
+  if (paper.publishedTestId) removeCustomTest(paper.publishedTestId)
+
+  const cards = paper.questions
+  yield { pct: 20, label: `Giving ${cards.length} question(s) their final Question ID…` }
+  const ctx = officialPyqFinalIdContext(paper)
+  const finalCards = cards.map((card) => ({ ...card, id: pickOtherPaperFinalId(card, ctx) }))
+
+  yield { pct: 50, label: 'Preparing question cards…' }
+  const bankRows = linkOfficialPyqBankPassages(finalCards.map((q, i) => otherPaperBankRow(paper, q, i, audience)))
+
+  yield { pct: 70, label: 'Saving to the Question Bank…' }
+  const added = addBulkUploadedQuestions(bankRows)
+  const bankCount = publishUploadedQuestions(added.map((row) => row.id)).length
+
+  let testId = ''
+  if (audience === 'own') {
+    yield { pct: 88, label: 'Adding the paper to students’ Tests…' }
+    const byId = new Map(
+      (loadQuestionBank().questions || [])
+        .filter((row) => officialPyqRowBelongsToPaper(paper, row))
+        .map((row) => [String(row.id), row]),
+    )
+    const questions = bankRows.map((row) => byId.get(String(row.id)) || row)
+    const name = String(paper.paperName || paper.paperLabel || '').trim()
+    const config = {
+      title: name,
+      description: `${name} · ${questions.length} questions`,
+      examPatternId: paper.exam,
+      testTypeId: 'full',
+      questions,
+      antiCheatShuffle: true,
+      status: 'published',
+      uploadedPaperId: paper.id,
+    }
+    testId = addCustomTest({ ...config, ...createPublishSnapshot(config, questions) }).id
+  }
+
+  yield { pct: 96, label: 'Saving the published paper…' }
+  const saved = updateOfficialPyqPendingPaper(paper.id, {
+    questions: finalCards,
+    allowPublishedQuestionWrite: true,
+    status: 'published',
+    publishedAt: Date.now(),
+    publishAudience: audience,
+    publishedTestId: testId || undefined,
+  })
+  if (!saved || saved.status !== 'published') {
+    removeOfficialPyqStudentRows(paper)
+    if (testId) removeCustomTest(testId)
+    return { ok: false, errors: ['Could not save the published paper. Nothing was published.'], pyqCount: 0, bankCount: 0 }
+  }
+  return {
+    ok: true,
+    errors: [],
+    pyqCount: 0,
+    bankCount,
+    testId,
+    audience,
+    questionIds: finalCards.map((q) => String(q.id)),
+    paperId: paper.id,
+  }
+}
+
 /**
  * Publish an Approved paper: final question ids, student PYQ, Question Bank.
+ * An uploaded other paper needs `audience` and publishes as {@link otherPaperPublishStages}.
  * @param {string} paperId
- * @param {{ skipBank?: boolean }} [opts]
+ * @param {{ skipBank?: boolean, audience?: OtherPaperAudience }} [opts]
  */
 export function publishOfficialPyqPaper(paperId, opts = {}) {
   return runStagesSync(officialPyqPublishStages(paperId, opts))
@@ -799,6 +932,7 @@ export function publishOfficialPyqPaper(paperId, opts = {}) {
  * @param {string} paperId
  * @param {{
  *   skipBank?: boolean
+ *   audience?: OtherPaperAudience
  *   onProgress?: (pct: number, label: string) => void
  *   yieldFn?: () => Promise<void>
  * }} [opts]
@@ -907,11 +1041,13 @@ export function unpublishOfficialPyqPaper(paperId) {
     return { ok: false, error: 'Only an admin can unpublish a paper.' }
   }
   const { pyqRemoved, bankRemoved } = removeOfficialPyqStudentRows(paper)
+  if (paper.publishedTestId) removeCustomTest(paper.publishedTestId)
   const updated = updateOfficialPyqPendingPaper(paperId, {
     status: 'approved',
     publishedAt: undefined,
     unpublishedAt: Date.now(),
     keptPublishedIds: officialPyqKeptIdsWithCards(paper),
+    ...(isOtherPaper(paper) ? { publishAudience: undefined, publishedTestId: undefined } : {}),
   })
   if (!updated) {
     return {
@@ -1080,6 +1216,7 @@ export function importQuestionsToOfficialPyqPending(input) {
         ? expectedPyqPaperQuestionTarget(input.exam, input.session, '')
         : undefined
   const saved = addOfficialPyqPendingPaper({
+    ...(isOtherPaper(input) ? { paperKind: 'other', paperName: input.paperName } : {}),
     exam: input.exam,
     year: input.year,
     session: input.session,

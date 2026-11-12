@@ -48,7 +48,9 @@ function isSupportedOfficialPyqUpload(file) {
  *   sourceUrl: string
  *   sourceLabel: string
  *   paperLabel: string
- * }} meta
+ *   paperKind?: 'other'
+ *   paperName?: string
+ * }} meta paperKind 'other': a named paper from "Upload any paper"
  * @param {{
  *   onProgress?: (pct: number, label?: string) => void
  *   signal?: AbortSignal
@@ -57,6 +59,13 @@ function isSupportedOfficialPyqUpload(file) {
  */
 export async function importFileToPending(file, meta, io = {}) {
   const name = file.name.toLowerCase()
+  const other = meta.paperKind === 'other'
+  if (other && !String(meta.paperName ?? '').trim()) {
+    throw new Error('Type the name of this paper. It cannot be empty.')
+  }
+  const label = other
+    ? String(meta.paperName).replace(/\s+/g, ' ').trim()
+    : meta.paperLabel || `${getOfficialPyqExamLabel(meta.exam)} ${meta.year}`
   let questions
   let preparedText = ''
   let extractSummaryLine = ''
@@ -77,7 +86,7 @@ export async function importFileToPending(file, meta, io = {}) {
       exam: meta.exam,
       year: meta.year,
       session: meta.session,
-      paperLabel: meta.paperLabel,
+      paperLabel: other ? label : meta.paperLabel,
     })
     const built = questionsFromOfficialPyqExtract(extracted, {
       exam: meta.exam,
@@ -85,8 +94,8 @@ export async function importFileToPending(file, meta, io = {}) {
       session: meta.session,
       pyqDate: meta.pyqDate,
       pyqShift: meta.pyqShift,
-      paperLabel: meta.paperLabel || `${getOfficialPyqExamLabel(meta.exam)} ${meta.year}`,
-      sourceLabel: meta.sourceLabel,
+      paperLabel: label,
+      sourceLabel: meta.sourceLabel || (other ? label : undefined),
     })
     visionText = String(extracted?.visionText ?? '')
     pdfText = String(extracted?.pdfText ?? extracted?.localOcrText ?? '')
@@ -114,6 +123,7 @@ export async function importFileToPending(file, meta, io = {}) {
       )
     }
     if (
+      !other &&
       meta.exam === 'jee-advanced' &&
       questions.length > 0 &&
       questions.length < min &&
@@ -130,14 +140,15 @@ export async function importFileToPending(file, meta, io = {}) {
   }
 
   const paper = importQuestionsToOfficialPyqPending({
+    ...(other ? { paperKind: 'other', paperName: label } : {}),
     exam: meta.exam,
     year: meta.year,
-    session: meta.session || undefined,
-    pyqDate: meta.pyqDate,
-    pyqShift: meta.pyqShift,
-    paperLabel: meta.paperLabel || `${getOfficialPyqExamLabel(meta.exam)} ${meta.year}`,
+    session: other ? undefined : meta.session || undefined,
+    pyqDate: other ? undefined : meta.pyqDate,
+    pyqShift: other ? undefined : meta.pyqShift,
+    paperLabel: label,
     sourceUrl: meta.sourceUrl || undefined,
-    sourceLabel: meta.sourceLabel || 'Official source (uploaded)',
+    sourceLabel: meta.sourceLabel || (other ? label : 'Official source (uploaded)'),
     preparedText,
     notes: formatOfficialPyqStoredNotes({
       fileName: file.name,

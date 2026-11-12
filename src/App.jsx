@@ -84,7 +84,6 @@ const MeritStride = lazyPage(() => import('./pages/MeritStride'), 'Merit Stride'
 const StudyCircle = lazyPage(() => import('./pages/StudyCircle'), 'Study Circle')
 const Home = lazyPage(() => import('./pages/Home'), 'Home')
 const QuestionBank = lazyPage(() => import('./pages/QuestionBankRoute'), 'Question Bank')
-const AnyPaperPending = lazyPage(() => import('./pages/AnyPaperPending.jsx'), 'Upload any paper')
 const BankReview = lazyPage(() => import('./pages/BankReview'), 'Bank review')
 const QuestionReports = lazyPage(() => import('./pages/QuestionReports'), 'Question reports')
 const MergeBanks = lazyPage(() => import('./pages/MergeBanks'), 'Merge banks')
@@ -331,7 +330,7 @@ export default function App() {
           path="any-paper"
           element={
             <RequirePermission permission={PERMS.UPLOAD_QUESTIONS}>
-              {withSuspense(<AnyPaperPending />, 'Loading any paper…')}
+              <OfficialPyqPendingRoute kind="other" />
             </RequirePermission>
           }
         />

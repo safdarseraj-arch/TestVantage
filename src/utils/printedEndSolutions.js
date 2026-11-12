@@ -188,6 +188,35 @@ function readEndAnswerSectionOnce(raw) {
   return null
 }
 
+/**
+ * Answers and / or worked solutions printed in a file of their own (an answer-key PDF or a
+ * solutions booklet). Text before the first "ANSWER KEY" / "SOLUTIONS" heading is the file's
+ * title. A file with no such heading is read as worked solutions when most numbered blocks hold
+ * working, else as a key ("1. (B)  2. (C) …"). Same shape as {@link readEndAnswerSection}.
+ * @param {unknown} raw
+ */
+export function readAnswerFileSection(raw) {
+  const text = String(raw ?? '').replace(/\r\n?/g, '\n').trim()
+  if (!text) return null
+  const read = (sectionText) => {
+    const got = readSection(sectionText)
+    return got.entries.size ? { questionText: '', sectionText: sectionText.trim(), ...got } : null
+  }
+  const head = new RegExp(HEADING_SRC, 'im').exec(text)
+  if (head) {
+    const found = read(text.slice(head.index))
+    if (found) return found
+  }
+  const asKey = read(`ANSWER KEY\n${text}`)
+  const asSolutions = read(`SOLUTIONS\n${text}`)
+  if (!asSolutions) return asKey
+  const worked = [...asSolutions.entries.values()].filter((e) => String(e.solution ?? '').length >= 20).length
+  const keySize = asKey?.entries.size ?? 0
+  return worked >= Math.max(1, asSolutions.entries.size / 2) && asSolutions.entries.size >= keySize / 2
+    ? asSolutions
+    : asKey || asSolutions
+}
+
 /** Paper text without the printed answer / solution part at the end. @param {unknown} raw */
 export function stripEndAnswerSection(raw) {
   const end = readEndAnswerSection(raw)

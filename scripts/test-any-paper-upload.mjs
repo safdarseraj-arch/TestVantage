@@ -1,5 +1,6 @@
 /**
- * Any-paper: name required, same Official PYQ cleaner, approve after review.
+ * Any paper: same pipeline as Official PYQ (upload → review & approve → Hybrid fill → publish),
+ * plus the publish question: another institute's paper (questions only) or our own (also a test).
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -11,6 +12,10 @@ if (typeof globalThis.localStorage === 'undefined') {
     setItem: (k, v) => store.set(k, String(v)),
     removeItem: (k) => store.delete(k),
     clear: () => store.clear(),
+    get length() {
+      return store.size
+    },
+    key: (i) => [...store.keys()][i] ?? null,
   }
 }
 if (typeof globalThis.sessionStorage === 'undefined') {
@@ -29,173 +34,302 @@ if (typeof globalThis.window === 'undefined') {
 localStorage.clear()
 sessionStorage.clear()
 
-const { namedPaperTitleError, normalizeNamedPaperTitle } = await import(
-  '../src/utils/bankMathpixUpload.js'
-)
 const {
-  addAnyPaperPending,
-  clearAnyPaperPending,
-  countFilledAnyPaperQuestions,
-  getAnyPaperPending,
-} = await import('../src/utils/anyPaperPendingStore.js')
-const { applyAnyPaperExtract } = await import('../src/utils/anyPaperImport.js')
-const { approveAnyPaper, validateAnyPaperForApprove } = await import(
-  '../src/utils/anyPaperApproval.js'
-)
+  clearOfficialPyqPendingPapers,
+  getOfficialPyqPendingPaper,
+  updateOfficialPyqPendingPaper,
+  listOfficialPyqPendingSummaries,
+  countOfficialPyqPendingByStatus,
+  officialPyqSittingKey,
+  isOtherPaper,
+  addOfficialPyqPendingPaper,
+} = await import('../src/utils/officialPyqPendingStore.js')
+const {
+  importQuestionsToOfficialPyqPending,
+  validateOfficialPyqForApprove,
+  approveOfficialPyqPaper,
+  publishOfficialPyqPaper,
+  unpublishOfficialPyqPaper,
+} = await import('../src/utils/officialPyqApproval.js')
+const { otherPaperUnansweredNumbers } = await import('../src/utils/officialPyqPublishFlow.js')
+const { officialPyqPaperSourceName } = await import('../src/data/officialPyqSources.js')
+const { loadImportedPyqs, clearImportedPyqs } = await import('../src/utils/pyqStore.js')
 const { loadQuestionBank, clearQuestionBank } = await import('../src/utils/questionBank.js')
-const { listOfficialPyqPendingPapers, clearOfficialPyqPendingPapers } = await import(
-  '../src/utils/officialPyqPendingStore.js'
-)
-
-assert.equal(namedPaperTitleError('   '), 'Type the name of this paper. It cannot be empty.')
-assert.equal(normalizeNamedPaperTitle('  Class test  '), 'Class test')
-
-clearAnyPaperPending()
-assert.throws(() => applyAnyPaperExtract({ questions: [{ text: 'Hi', options: ['a', 'b', 'c', 'd'] }] }, { paperName: '  ' }), /name of this paper/i)
-
-const extracted = {
-  engine: 'mathpix',
-  text: 'Q.1 Let $x=1$. Then $x+1$ is\n(A) $1$\n(B) $2$\n(C) $3$\n(D) $4$\nQ.2 Let $y=2$. Then $y+1$ is\n(A) $1$\n(B) $2$\n(C) $3$\n(D) $4$',
-  questions: [
-    { stem: 'Let $x=1$. Then $x+1$ is', text: 'Let $x=1$. Then $x+1$ is', options: ['$1$', '$2$', '$3$', '$4$'] },
-    { stem: 'Let $y=2$. Then $y+1$ is', text: 'Let $y=2$. Then $y+1$ is', options: ['$1$', '$2$', '$3$', '$4$'] },
-  ],
-}
-
-const applied = applyAnyPaperExtract(extracted, { paperName: '  Class test 12 April  ', fileName: 'test.pdf' })
-assert.equal(applied.paper.paperName, 'Class test 12 April')
-assert.equal(applied.paper.officialPyq, false)
-assert.ok(applied.filled >= 1, 'extract must keep real cards')
-assert.equal(applied.paper.status, 'pending_review')
-assert.ok(applied.paper.questions.every((q) => q.officialPyq === false))
-assert.ok(
-  applied.paper.questions.every((q) => q.pyqYear == null && q.examPatternId == null),
-  'named papers must not keep an Official PYQ year',
-)
+const { loadCustomTests } = await import('../src/utils/customTests.js')
 
 clearOfficialPyqPendingPapers()
-assert.equal(listOfficialPyqPendingPapers().length, 0, 'any-paper must not write Official PYQ store')
+clearImportedPyqs()
+clearQuestionBank()
 
-const empty = addAnyPaperPending({ paperName: 'Empty shell', questions: [] })
-const emptyGate = validateAnyPaperForApprove(empty)
-assert.equal(emptyGate.ok, false)
-assert.match(emptyGate.errors.join(' '), /review|question/i)
-
-const emptyApprove = approveAnyPaper(empty.id)
-assert.equal(emptyApprove.ok, false, 'must not publish before there are cards to review')
-
-try {
-  clearQuestionBank()
-} catch {
-  /* optional */
+function withFacts(id) {
+  const paper = getOfficialPyqPendingPaper(id)
+  if (paper && paper.status === 'pending_review' && !paper.adminFacts?.confirmedAt) {
+    updateOfficialPyqPendingPaper(id, { adminFacts: { confirmedAt: Date.now(), confirmedBy: 'test' } })
+  }
+  return id
 }
 
-const before = loadQuestionBank().questions?.length ?? 0
-const published = approveAnyPaper(applied.paper.id)
-assert.equal(published.ok, true, published.errors?.join(' ') || 'approve should pass after review cards exist')
-assert.ok(published.bankCount >= 1)
-const after = loadQuestionBank()
-assert.ok((after.questions?.length ?? 0) > before)
-const saved = after.questions.filter((q) => q.bankSource === 'any_paper' || q.paperName === 'Class test 12 April')
-assert.ok(saved.length >= 1)
-assert.equal(saved[0].officialPyq, false)
-assert.equal(saved[0].imported, false)
-assert.equal(getAnyPaperPending(applied.paper.id)?.status, 'approved')
+function card(text, correctIndex, extra = {}) {
+  return {
+    text,
+    options: ['$1$', '$2$', '$3$', '$4$'],
+    correctIndex,
+    subject: 'mathematics',
+    section: 'Algebra',
+    chapter: 'Quadratic Equations',
+    answerSource: correctIndex == null ? 'unknown' : 'from_paper',
+    solution: correctIndex == null ? '' : 'Add one.',
+    solutionSource: correctIndex == null ? undefined : 'from_paper',
+    ...extra,
+  }
+}
 
-const second = approveAnyPaper(applied.paper.id)
-assert.equal(second.ok, false, 'a second Approve of a published paper stays refused')
-assert.match(second.errors.join(' '), /already published/i)
-assert.match(second.errors.join(' '), /unapprove/i)
+function otherPaper(name, questions) {
+  return importQuestionsToOfficialPyqPending({
+    paperKind: 'other',
+    paperName: name,
+    exam: 'jee-main',
+    year: 2026,
+    questions,
+  })
+}
 
-const poisoned = addAnyPaperPending({
-  paperName: 'Poisoned pass',
-  preparedText: 'Q.1 The scan says the value of x is 2. '.repeat(4),
-  questions: [
-    {
-      text: 'Raw LaTeX is still showing as code.',
-      options: ['$1$', '$2$', '$3$', '$4$'],
-      questionNumber: 1,
-      officialPyq: false,
-    },
-  ],
-  localQuality: {
-    passed: true,
-    failedGoTo: [],
-    revision: 5,
-    questionCount: 1,
-    by: 'local',
-    sameCheck: 'banner-v2',
-  },
+// --- 1. Upload: same store as Official PYQ, kept apart by kind ---
+assert.throws(() => addOfficialPyqPendingPaper({ paperKind: 'other', paperName: '  ', exam: 'jee-main', year: 2026 }), /name/i)
+
+const official = importQuestionsToOfficialPyqPending({
+  exam: 'jee-main',
+  year: 2024,
+  session: 'January Session · Shift 1',
+  pyqDate: '2024-01-24',
+  pyqShift: 1,
+  sourceLabel: 'Official NTA (test fixture)',
+  sourceUrl: 'https://nta.ac.in/Examination',
+  questions: [card('Official fixture: $1+1=$?', 1)],
 })
-const poisonedApprove = approveAnyPaper(poisoned.id)
-assert.equal(poisonedApprove.ok, false, 'a stored pass must not publish a failing card')
-assert.match(poisonedApprove.errors.join(' '), /not passed|Question 1|Go to Q 1/i)
+
+const outside = otherPaper('  Allen   Major Test 3 ', [
+  card('Let $x=1$. Then $x+1$ is', 1),
+  card('Let $y=2$. Then $y+1$ is', 2),
+])
+assert.equal(outside.status, 'pending_review')
+assert.equal(isOtherPaper(outside), true)
+assert.equal(outside.paperName, 'Allen Major Test 3')
+assert.equal(outside.paperLabel, 'Allen Major Test 3')
+assert.equal(outside.pyqDate, undefined)
+assert.equal(outside.pyqShift, undefined)
+assert.match(String(outside.paperId), /^other-/)
+assert.equal(officialPyqSittingKey(outside), 'other|allen major test 3')
+assert.equal(officialPyqPaperSourceName(outside), 'Allen Major Test 3', 'Hybrid fill sets Source to the paper name')
+
+const again = otherPaper('Allen Major  Test 3', [card('Let $x=1$. Then $x+1$ is', 1), card('Let $y=2$. Then $y+1$ is', 2)])
+assert.equal(again.id, outside.id, 'uploading the same paper name again replaces it, like an official sitting')
+
+assert.deepEqual(
+  listOfficialPyqPendingSummaries('all', 'other').map((p) => p.id),
+  [outside.id],
+  'Upload any paper lists only uploaded papers',
+)
 assert.equal(
-  (loadQuestionBank().questions ?? []).filter((q) => q.paperName === 'Poisoned pass').length,
-  0,
+  listOfficialPyqPendingSummaries('all', 'official').some((p) => p.id === outside.id),
+  false,
+  'Approve official papers never lists an uploaded paper',
 )
-assert.notEqual(getAnyPaperPending(poisoned.id)?.localQuality?.passed, true)
+assert.ok(listOfficialPyqPendingSummaries('all', 'official').some((p) => p.id === official.id))
+assert.equal(countOfficialPyqPendingByStatus('other').pending_review, 1)
+const otherSummary = listOfficialPyqPendingSummaries('pending_review', 'other')[0]
+assert.equal(otherSummary.paperKind, 'other')
+assert.equal(otherSummary.paperName, 'Allen Major Test 3')
 
-const importSrc = readFileSync(new URL('../src/utils/anyPaperImport.js', import.meta.url), 'utf8')
-assert.match(importSrc, /extractPyqFileWithGemini/)
-assert.match(importSrc, /questionsFromOfficialPyqExtract/)
-assert.match(importSrc, /repairOfficialPyqUntilQuality/)
-assert.equal(importSrc.includes('validateGeminiPyqExtractItem'), false)
-assert.equal(importSrc.includes('importQuestionsToOfficialPyqPending'), false)
-const approvalSrc = readFileSync(new URL('../src/utils/anyPaperApproval.js', import.meta.url), 'utf8')
-assert.match(approvalSrc, /healOfficialPyqPaperQuestions/)
-assert.match(approvalSrc, /localOfficialPyqQualityCheck/)
-assert.match(approvalSrc, /officialPyqContentReviewMessages/)
-assert.equal(approvalSrc.includes('healAnyPaperQuestions'), false)
+// --- 2. Review & approve: same checks as Official PYQ ---
+const noFacts = validateOfficialPyqForApprove(getOfficialPyqPendingPaper(outside.id))
+assert.equal(noFacts.ok, false)
+assert.match(noFacts.errors.join(' '), /Paper facts are not confirmed/)
 
-const pageSrc = readFileSync(new URL('../src/pages/AnyPaperPending.jsx', import.meta.url), 'utf8')
-assert.match(pageSrc, /Approve &amp; Publish|Approve & Publish/)
-assert.match(pageSrc, /any-paper-name-input/)
-assert.match(pageSrc, /not Official PYQ|not<\/strong> Official PYQ/)
+const beforeBank = (loadQuestionBank().questions ?? []).length
+const approved = approveOfficialPyqPaper(withFacts(outside.id))
+assert.equal(approved.ok, true, approved.errors?.join(' '))
+assert.equal(getOfficialPyqPendingPaper(outside.id).status, 'approved')
+assert.equal((loadQuestionBank().questions ?? []).length, beforeBank, 'approve alone reaches no student')
 
-const officialSrc = readFileSync(new URL('../src/pages/OfficialPyqPending.jsx', import.meta.url), 'utf8')
-assert.match(officialSrc, /Reviewed — Approve/)
-assert.match(officialSrc, /official-pyq-publish"/)
-assert.equal(officialSrc.includes('anyPaperImport'), false)
-assert.match(officialSrc, /Question Bank/)
-assert.match(officialSrc, /metatag/i)
+// --- 4. Publish asks whose paper it is ---
+const noAudience = publishOfficialPyqPaper(outside.id)
+assert.equal(noAudience.ok, false)
+assert.match(noAudience.errors.join(' '), /another institute or your own/i)
 
+const holes = otherPaper('Class test 12 April', [card('Let $z=3$. Then $z+1$ is', null), card('Let $w=1$. Then $w+2$ is', 2)])
+approveOfficialPyqPaper(withFacts(holes.id))
+assert.equal(getOfficialPyqPendingPaper(holes.id).status, 'approved')
+assert.deepEqual(otherPaperUnansweredNumbers(getOfficialPyqPendingPaper(holes.id)), [1])
+const blocked = publishOfficialPyqPaper(holes.id, { audience: 'own' })
+assert.equal(blocked.ok, false, 'a question with no answer blocks Publish')
+assert.match(blocked.errors.join(' '), /no answer/i)
+assert.match(blocked.errors.join(' '), /Go to Q 1/)
+
+// a. another institute's paper: questions in the bank, no test, nothing in PYQ
+const pyqBefore = loadImportedPyqs().length
+const testsBefore = loadCustomTests().length
+const pubOther = publishOfficialPyqPaper(outside.id, { audience: 'other_institute' })
+assert.equal(pubOther.ok, true, pubOther.errors?.join(' '))
+assert.equal(pubOther.pyqCount, 0)
+assert.equal(pubOther.bankCount, 2)
+assert.equal(pubOther.testId, '')
+assert.equal(loadImportedPyqs().length, pyqBefore, 'an uploaded paper is never a PYQ')
+assert.equal(loadCustomTests().length, testsBefore, "another institute's paper is not shown to students as a paper")
+const outsideRows = (loadQuestionBank().questions ?? []).filter((q) => q.paperId === outside.paperId)
+assert.equal(outsideRows.length, 2)
+for (const row of outsideRows) {
+  assert.equal(row.bankSource, 'any_paper')
+  assert.equal(row.officialPyq, false)
+  assert.equal(row.imported, false)
+  assert.equal(row.paperAudience, 'other_institute')
+  assert.equal(row.pyqYear, undefined)
+  assert.equal(row.source, 'Allen Major Test 3')
+  assert.match(String(row.id), /^[A-Z]{3}\d{5}$/, `plain classified id, got ${row.id}`)
+}
+const savedOther = getOfficialPyqPendingPaper(outside.id)
+assert.equal(savedOther.status, 'published')
+assert.equal(savedOther.publishAudience, 'other_institute')
+
+// b. our own paper: questions in the bank and the whole paper under Tests
+updateOfficialPyqPendingPaper(holes.id, {
+  questions: getOfficialPyqPendingPaper(holes.id).questions.map((q, i) =>
+    i === 0 ? { ...q, correctIndex: 3, answerSource: 'admin_edit' } : q,
+  ),
+  allowPublishedQuestionWrite: true,
+})
+const pubOwn = publishOfficialPyqPaper(holes.id, { audience: 'own' })
+assert.equal(pubOwn.ok, true, pubOwn.errors?.join(' '))
+assert.equal(pubOwn.bankCount, 2)
+assert.ok(pubOwn.testId, 'own paper becomes a student test')
+const test = loadCustomTests().find((t) => t.id === pubOwn.testId)
+assert.ok(test)
+assert.equal(test.title, 'Class test 12 April')
+assert.equal(test.status, 'published')
+assert.equal(test.uploadedPaperId, holes.id)
+assert.equal(test.questions.length, 2)
+assert.equal(getOfficialPyqPendingPaper(holes.id).publishedTestId, pubOwn.testId)
+assert.equal(getOfficialPyqPendingPaper(holes.id).publishAudience, 'own')
+
+const takenIds = new Set((loadQuestionBank().questions ?? []).map((q) => String(q.id)))
+assert.equal(takenIds.size, (loadQuestionBank().questions ?? []).length, 'no two bank rows share an id')
+
+// Unpublish: bank rows and the test both go; the paper is Approved again
+sessionStorage.setItem(
+  'testvantage-session',
+  JSON.stringify({ role: 'admin', email: 'admin@test', name: 'Admin', loggedInAt: 1 }),
+)
+const unpub = unpublishOfficialPyqPaper(holes.id)
+assert.equal(unpub.ok, true, unpub.error)
+assert.equal(unpub.paper.status, 'approved')
+assert.equal(unpub.paper.publishedTestId, undefined)
+assert.equal(unpub.paper.publishAudience, undefined)
+assert.equal(loadCustomTests().some((t) => t.id === pubOwn.testId), false)
+assert.equal((loadQuestionBank().questions ?? []).filter((q) => q.paperId === holes.paperId).length, 0)
+
+const republish = publishOfficialPyqPaper(holes.id, { audience: 'other_institute' })
+assert.equal(republish.ok, true, republish.errors?.join(' '))
+assert.deepEqual(republish.questionIds, pubOwn.questionIds, 'publishing again keeps the same ids')
+assert.equal(loadCustomTests().some((t) => t.uploadedPaperId === holes.id), false)
+
+// --- Where the answers and solutions are printed ---
+const { readAnswerFileSection } = await import('../src/utils/printedEndSolutions.js')
+const { applyAnswerFileToOfficialPyqPaper } = await import('../src/utils/officialPyqAnswerFile.js')
 const { paperItemsFromMathpixOcr } = await import('../src/utils/mathpixQuestionSplit.js')
-const nvqRaw = `
-SECTION 2
-This section contains TWO (02) questions.
-The answer to each question is a NUMERICAL VALUE.
-Paragraph for Questions 14 and 15
-Let $S=\\{1,2,3\\}$.
-\\item[Q.] 14 If $n(S)=k$ then $|k|$ is ______.
-\\item[Q.] 15 If $n(S)=2$ then the value is ______.
-`
-const nvqCards = paperItemsFromMathpixOcr(nvqRaw)
-const n14 = nvqCards.find((q) => Number(q.printedNumber || q.questionNumber) === 14)
-const n15 = nvqCards.find((q) => Number(q.printedNumber || q.questionNumber) === 15)
-assert.ok(n14 && n15, 'any-paper / official share the same Mathpix split + stamp')
-assert.equal(n14.questionType, 'numerical', 'same instruction stamp (NVQ)')
-assert.equal(n15.questionType, 'numerical')
-assert.match(String(n14.passageText ?? ''), /Let \$S=/)
-const nvqApplied = applyAnyPaperExtract(
-  {
-    engine: 'mathpix',
-    text: nvqRaw,
-    questions: [
-      { stem: n14.text, text: n14.text, options: n14.options, questionType: 'single_correct', number: 14 },
-      { stem: n15.text, text: n15.text, options: n15.options, questionType: 'single_correct', number: 15 },
-    ],
-  },
-  { paperName: 'Class NVQ check' },
-)
-assert.equal(nvqApplied.paper.officialPyq, false)
-assert.equal(listOfficialPyqPendingPapers().length, 0, 'second any-paper extract still stays off Official PYQ')
+const { officialPyqCardTagsOnly } = await import('../src/utils/officialPyqPendingFill.js')
+const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
-const bankView = readFileSync(new URL('../src/components/BankSavedView.jsx', import.meta.url), 'utf8')
-assert.match(bankView, /Passage number questions are NVQ/)
-assert.match(bankView, /Save metatags|Metatags/)
-const viewer = readFileSync(new URL('../src/components/SavedQuestionViewer.jsx', import.meta.url), 'utf8')
-assert.match(viewer, /bank-edit-gemini-metatags-hint/)
-assert.match(viewer, /If Gemini chose SCQ/)
+function printedCardsPaper(name, items) {
+  return otherPaper(
+    name,
+    items.map((q) => ({ ...q, subject: q.subject || 'physics', chapter: 'General' })),
+  )
+}
+
+// 1. No solution: nothing is invented on upload; Hybrid AI fills answer, solution and tags.
+const bare = printedCardsPaper('No solution test', [card('Let $a=1$. Then $a+1$ is', null), card('Let $b=1$. Then $b+2$ is', null)])
+assert.ok(bare.questions.every((q) => !String(q.solution ?? '').trim() && q.correctIndex == null))
+assert.ok(bare.questions.every((q) => !officialPyqCardTagsOnly(q, bare)), 'no printed answer: Hybrid AI fills everything')
+
+// 2. Solution after every question; 3. answers and solutions after the paper in the same PDF.
+for (const [layout, file] of [
+  ['inline', 'printed-inline-solutions-mathpix.txt'],
+  ['end', 'printed-end-solutions-mathpix.txt'],
+]) {
+  const paper = printedCardsPaper(`Printed ${layout} test`, paperItemsFromMathpixOcr(fixture(file)))
+  assert.equal(paper.questions.length, 6, `${layout}: card count`)
+  for (const q of paper.questions) {
+    assert.equal(q.answerSource, 'from_paper', `${layout}: printed answer kept`)
+    assert.equal(q.solutionSource, 'from_paper', `${layout}: printed solution kept`)
+    assert.equal(officialPyqCardTagsOnly(q, paper), true, `${layout}: Hybrid AI fills tags only`)
+  }
+}
+
+// 4. Answers and solutions in another file.
+const keyFile = String.raw`Allen Major Test 4 — Answer Key
+ANSWER KEY
+1. (B)  2. (C)  3. 7`
+const keyRead = readAnswerFileSection(keyFile)
+assert.ok(keyRead)
+assert.equal(keyRead.entries.size, 3)
+const oneLineKey = readAnswerFileSection('1. (B) 2. (C) 3. (A) 4. (D)')
+assert.equal(oneLineKey.entries.size, 4, 'a key with no heading on one line')
+const solutionsFile = String.raw`1. (B) By Newton's second law the acceleration is $a=F/m=5$.
+2. (C) The determinant of $2A$ is $2^{3} \det A = 16$ for this matrix.
+3. Ans. 7
+Adding the two roots gives seven.`
+const solRead = readAnswerFileSection(solutionsFile)
+assert.equal(solRead.entries.size, 3)
+assert.match(String([...solRead.entries.values()][0].solution), /Newton/)
+assert.equal(readAnswerFileSection('Thank you for taking the test.'), null)
+
+const later = otherPaper('Separate key test', [
+  card('Let $p=1$. Then $p+1$ is', null),
+  card('Let $q=2$. Then $q+1$ is', null),
+  { ...card('Let $r=3$. Then $r+4$ is', null), questionType: 'integer', options: [] },
+  card('Let $s=1$. Then $s+3$ is', null),
+])
+const noMatch = applyAnswerFileToOfficialPyqPaper(later.id, '41. (A) 42. (B) 43. (C)')
+assert.equal(noMatch.ok, false)
+assert.match(noMatch.error, /none of its question numbers matched/)
+const fromFile = applyAnswerFileToOfficialPyqPaper(later.id, solutionsFile, { fileName: 'solutions.pdf' })
+assert.equal(fromFile.ok, true, fromFile.error)
+assert.equal(fromFile.answers, 3)
+assert.equal(fromFile.solutions, 3)
+assert.deepEqual(fromFile.noAnswer, [4])
+const laterCards = getOfficialPyqPendingPaper(later.id).questions
+assert.equal(laterCards[0].correctIndex, 1)
+assert.equal(laterCards[1].correctIndex, 2)
+assert.equal(laterCards[2].correctInteger, 7)
+assert.ok(laterCards.slice(0, 3).every((q) => q.answerSource === 'from_paper' && q.solutionSource === 'from_paper'))
+assert.equal(getOfficialPyqPendingPaper(later.id).answerFileName, 'solutions.pdf')
+assert.equal(applyAnswerFileToOfficialPyqPaper(later.id, solutionsFile).unchanged, true, 'same file twice changes nothing')
+
+approveOfficialPyqPaper(withFacts(later.id))
+assert.equal(getOfficialPyqPendingPaper(later.id).status, 'approved')
+const keyAfterApprove = applyAnswerFileToOfficialPyqPaper(later.id, 'ANSWER KEY\n1. (B) 2. (C) 3. 7 4. (A)')
+assert.equal(keyAfterApprove.ok, true, keyAfterApprove.error)
+assert.equal(keyAfterApprove.answers, 1)
+assert.deepEqual(keyAfterApprove.noAnswer, [])
+assert.equal(getOfficialPyqPendingPaper(later.id).questions[3].correctIndex, 0)
+assert.equal(getOfficialPyqPendingPaper(later.id).questions[0].solutionSource, 'from_paper', 'a key file keeps the solutions')
+const pubLater = publishOfficialPyqPaper(later.id, { audience: 'other_institute' })
+assert.equal(pubLater.ok, true, pubLater.errors?.join(' '))
+const lockedFile = applyAnswerFileToOfficialPyqPaper(later.id, 'ANSWER KEY\n1. (A) 2. (A)')
+assert.equal(lockedFile.ok, false)
+assert.match(lockedFile.error, /Unpublish first/)
+
+// --- Page wiring ---
+const appSrc = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+assert.match(appSrc, /<OfficialPyqPendingRoute kind="other" \/>/)
+assert.equal(appSrc.includes('AnyPaperPending'), false)
+const pageSrc = readFileSync(new URL('../src/pages/OfficialPyqPending.jsx', import.meta.url), 'utf8')
+assert.match(pageSrc, /other-paper-publish-other-institute/)
+assert.match(pageSrc, /other-paper-publish-own/)
+assert.match(pageSrc, /paperKind: 'other'/)
+assert.match(pageSrc, /Reviewed — Approve/)
+assert.match(pageSrc, /OfficialPyqHybridFill/)
+const listSrc = readFileSync(new URL('../src/pages/OfficialPyqTabList.jsx', import.meta.url), 'utf8')
+assert.match(listSrc, /listOfficialPyqPendingSummaries\([^)]*, kind\)/)
 
 console.log('test-any-paper-upload: ok')

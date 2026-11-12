@@ -68,8 +68,37 @@ function knownOfficialPyqStatus(status) {
  *   notes?: string
  *   preparedText?: string
  *   questions: OfficialPyqPendingQuestion[]
+ *   paperKind?: 'other'
+ *   paperName?: string
+ *   publishAudience?: 'other_institute' | 'own'
+ *   publishedTestId?: string
  * }} OfficialPyqPendingPaper
  */
+
+/**
+ * A paper uploaded through "Upload any paper" (class test, mock, another institute's paper).
+ * It goes through the same upload, review, Approve, Hybrid AI fill and Publish as an official
+ * paper; only Publish differs (see officialPyqApproval.js).
+ * @param {{ paperKind?: unknown } | null | undefined} paper
+ */
+export function isOtherPaper(paper) {
+  return paper?.paperKind === 'other'
+}
+
+/**
+ * @param {{ paperKind?: unknown } | null | undefined} paper
+ * @param {'official' | 'other' | 'all' | undefined} kind
+ */
+export function officialPyqPaperKindMatches(paper, kind) {
+  if (kind === 'other') return isOtherPaper(paper)
+  if (kind === 'official') return !isOtherPaper(paper)
+  return true
+}
+
+/** @param {unknown} raw */
+export function normalizeOtherPaperName(raw) {
+  return String(raw ?? '').replace(/\s+/g, ' ').trim()
+}
 
 /** @type {{ papers: OfficialPyqPendingPaper[], updatedAt: number } | null} */
 let memoryRoot = null
@@ -356,12 +385,13 @@ export function findOfficialPyqSiblingWithQuestions(paper) {
   const exam = String(paper?.exam || '')
   const year = Number(paper?.year)
   const exclude = String(paper?.id || '')
-  if (!exam || !Number.isFinite(year) || year < 2000) return null
+  if (!exam || !Number.isFinite(year) || year < 2000 || isOtherPaper(paper)) return null
   const list = Array.isArray(memorySummaries) ? memorySummaries : listOfficialPyqPendingSummaries('all')
   return (
     list.find(
       (p) =>
         String(p.id) !== exclude &&
+        !isOtherPaper(p) &&
         String(p.exam) === exam &&
         Number(p.year) === year &&
         officialPyqPaperQuestionCount(p) >= 8,
@@ -411,6 +441,18 @@ function paperToLightRecord(paper) {
     ...(paper.replicaDifficultyOffset != null
       ? { replicaDifficultyOffset: Number(paper.replicaDifficultyOffset) }
       : {}),
+    ...otherPaperFields(paper),
+  }
+}
+
+/** @param {Partial<OfficialPyqPendingPaper> | null | undefined} paper */
+function otherPaperFields(paper) {
+  if (!isOtherPaper(paper)) return {}
+  return {
+    paperKind: 'other',
+    paperName: paper?.paperName,
+    ...(paper?.publishAudience ? { publishAudience: paper.publishAudience } : {}),
+    ...(paper?.publishedTestId ? { publishedTestId: paper.publishedTestId } : {}),
   }
 }
 
@@ -507,6 +549,7 @@ function paperToSummary(paper) {
       ? { factsConfirmedAt: paper.adminFacts?.confirmedAt || paper.factsConfirmedAt }
       : {}),
     ...(paper.aiReplicaPaper === true || paper.replicaParentPaperId ? { aiReplicaPaper: true } : {}),
+    ...otherPaperFields(paper),
   }
 }
 
@@ -551,6 +594,7 @@ export function officialPyqSittingKey(paper) {
   if (paper?.aiReplicaPaper === true || String(paper?.replicaParentPaperId || '').trim()) {
     return `replica|${String(paper.id || paper.paperId || '').trim()}`
   }
+  if (isOtherPaper(paper)) return `other|${normalizeOtherPaperName(paper?.paperName).toLowerCase()}`
   const exam = String(paper?.exam || '').trim().toLowerCase()
   const year = Number(paper?.year)
   if (exam === 'jee-main') {
@@ -779,9 +823,16 @@ export function hydrateOfficialPyqPendingSummariesIfEmpty() {
 /**
  * Tab list only — never JSON.parses full OCR/question bodies, never maps fat papers.
  * @param {OfficialPyqPaperStatus | 'all'} [status]
+ * @param {'official' | 'other' | 'all'} [kind] official papers, uploaded other papers, or both
  * @returns {OfficialPyqPendingSummary[]}
  */
-export function listOfficialPyqPendingSummaries(status = 'pending_review') {
+export function listOfficialPyqPendingSummaries(status = 'pending_review', kind = 'all') {
+  const list = allSummaries().filter((p) => officialPyqPaperKindMatches(p, kind))
+  if (status === 'all') return list
+  return list.filter((p) => p.status === status)
+}
+
+function allSummaries() {
   if (!memorySummaries) {
     memorySummaries = readSummaryCache()
   }
@@ -789,14 +840,15 @@ export function listOfficialPyqPendingSummaries(status = 'pending_review') {
   if (!Array.isArray(memorySummaries) || memorySummaries.length === 0) {
     hydrateOfficialPyqPendingSummariesIfEmpty()
   }
-  const list = Array.isArray(memorySummaries) ? memorySummaries : []
-  if (status === 'all') return list
-  return list.filter((p) => p.status === status)
+  return Array.isArray(memorySummaries) ? memorySummaries : []
 }
 
-/** One pass over the light cache — used by tab badges. */
-export function countOfficialPyqPendingByStatus() {
-  const all = listOfficialPyqPendingSummaries('all')
+/**
+ * One pass over the light cache — used by tab badges.
+ * @param {'official' | 'other' | 'all'} [kind]
+ */
+export function countOfficialPyqPendingByStatus(kind = 'all') {
+  const all = listOfficialPyqPendingSummaries('all', kind)
   const out = { pending_review: 0, approved: 0, published: 0, rejected: 0, all: all.length }
   for (const p of all) {
     if (p.status === 'approved') out.approved += 1
@@ -893,17 +945,23 @@ export function addOfficialPyqPendingPaper(input) {
   if (!Number.isFinite(year) || year < 2000) {
     throw new Error('Year is required (e.g. 2024).')
   }
+  const other = isOtherPaper(input)
+  const paperName = normalizeOtherPaperName(input.paperName)
+  if (other && !paperName) throw new Error('Type the name of this paper. It cannot be empty.')
   const questions = Array.isArray(input.questions) ? input.questions : []
   const uniq = `${now}-${Math.random().toString(36).slice(2, 9)}`
-  const session = input.session ? String(input.session) : undefined
+  const session = !other && input.session ? String(input.session) : undefined
   const paperId = String(
     input.paperId ||
-      `${exam}-${year}-${String(session || 'paper')
-        .toLowerCase()
-        .replace(/\s+/g, '-')}`,
+      (other
+        ? `other-${paperName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || uniq}`
+        : `${exam}-${year}-${String(session || 'paper')
+            .toLowerCase()
+            .replace(/\s+/g, '-')}`),
   )
   /** @type {OfficialPyqPendingPaper} */
   const draft = {
+    ...(other ? { paperKind: 'other', paperName } : {}),
     id: String(input.id ?? `opyq-${uniq}`),
     exam,
     year,
@@ -916,11 +974,14 @@ export function addOfficialPyqPendingPaper(input) {
           ? Number(input.pyqShift)
           : undefined,
     paperId,
-    paperLabel:
-      String(input.paperLabel || '').trim() ||
-      `${getOfficialPyqExamLabel(exam)} ${year}${session ? ` · ${session}` : ''}`,
+    paperLabel: other
+      ? paperName
+      : String(input.paperLabel || '').trim() ||
+        `${getOfficialPyqExamLabel(exam)} ${year}${session ? ` · ${session}` : ''}`,
     sourceUrl: input.sourceUrl ? String(input.sourceUrl) : undefined,
-    sourceLabel: String(input.sourceLabel || 'Official source').trim() || 'Official source',
+    sourceLabel: other
+      ? String(input.sourceLabel || '').trim() || paperName
+      : String(input.sourceLabel || 'Official source').trim() || 'Official source',
     sourceSlotId: input.sourceSlotId ? String(input.sourceSlotId) : undefined,
     status: input.status ?? 'pending_review',
     importedAt: input.importedAt ?? now,
@@ -1186,8 +1247,9 @@ export function reloadOfficialPyqPendingFromStorage() {
   return loadRoot()
 }
 
-export function countOfficialPyqPendingReview() {
-  return countOfficialPyqPendingByStatus().pending_review
+/** @param {'official' | 'other' | 'all'} [kind] */
+export function countOfficialPyqPendingReview(kind = 'all') {
+  return countOfficialPyqPendingByStatus(kind).pending_review
 }
 
 /**

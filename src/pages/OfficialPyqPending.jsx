@@ -29,6 +29,7 @@ import {
   recoverOfficialPyqQuestionsFromStore,
   findOfficialPyqSiblingWithQuestions,
   countFilledOfficialPyqQuestions,
+  isOtherPaper,
   officialPyqPaperQuestionCount,
 } from '../utils/officialPyqPendingStore'
 import ErrorBoundary from '../components/ErrorBoundary.jsx'
@@ -53,10 +54,13 @@ const OFFICIAL_PYQ_CARD_CHANGED_EVENT = 'testvantage:official-pyq-card-changed'
 
 
 const OFFICIAL_PYQ_UI_KEY = 'testvantage-official-pyq-ui'
+const ANY_PAPER_UI_KEY = 'testvantage-any-paper-ui'
+/** Open paper and tab are remembered apart for official papers and "Upload any paper". */
+let uiKey = OFFICIAL_PYQ_UI_KEY
 
 function readOfficialPyqUi() {
   try {
-    const raw = sessionStorage.getItem(OFFICIAL_PYQ_UI_KEY)
+    const raw = sessionStorage.getItem(uiKey)
     return raw ? JSON.parse(raw) : {}
   } catch {
     return {}
@@ -65,7 +69,7 @@ function readOfficialPyqUi() {
 
 function writeOfficialPyqUi(patch) {
   try {
-    sessionStorage.setItem(OFFICIAL_PYQ_UI_KEY, JSON.stringify({ ...readOfficialPyqUi(), ...patch }))
+    sessionStorage.setItem(uiKey, JSON.stringify({ ...readOfficialPyqUi(), ...patch }))
   } catch {
     /* ignore quota */
   }
@@ -118,8 +122,12 @@ function yieldToUi() {
   })
 }
 
-/** @param {'jee-main' | 'jee-advanced' | 'neet'} exam */
-function expectedMinOfficialPyqCount(exam) {
+/**
+ * @param {'jee-main' | 'jee-advanced' | 'neet'} exam
+ * @param {boolean} [other] an uploaded other paper (a class test can be short)
+ */
+function expectedMinOfficialPyqCount(exam, other = false) {
+  if (other) return 1
   if (exam === 'jee-advanced') return 40
   if (exam === 'jee-main') return 20
   if (exam === 'neet') return 30
@@ -198,12 +206,22 @@ function lookupSavedPaperSummary(id) {
   }
 }
 
-export default function OfficialPyqPending() {
+/**
+ * @param {{ kind?: 'official' | 'other' }} props
+ *   other: "Upload any paper" — a named paper (class test, mock, another institute's paper) through
+ *   the same upload, review, Approve, Hybrid AI fill and Publish.
+ */
+export default function OfficialPyqPending({ kind = 'official' } = {}) {
+  const otherMode = kind === 'other'
+  uiKey = otherMode ? ANY_PAPER_UI_KEY : OFFICIAL_PYQ_UI_KEY
   const [tick, setTick] = useState(0)
   const bump = useCallback(() => setTick((t) => t + 1), [])
 
-  const [exam, setExam] = useState(/** @type {'jee-main' | 'jee-advanced' | 'neet'} */ ('jee-advanced'))
-  const [year, setYear] = useState(2024)
+  const [exam, setExam] = useState(
+    /** @type {'jee-main' | 'jee-advanced' | 'neet'} */ (otherMode ? 'jee-main' : 'jee-advanced'),
+  )
+  const [year, setYear] = useState(() => (otherMode ? new Date().getFullYear() : 2024))
+  const [otherPaperName, setOtherPaperName] = useState('')
   const [session, setSession] = useState('Paper 1')
   const [pyqDate, setPyqDate] = useState('2024-01-27')
   const [pyqShift, setPyqShift] = useState(1)
@@ -229,6 +247,8 @@ export default function OfficialPyqPending() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [reParseBusy, setReParseBusy] = useState(false)
+  const [answerFileBusy, setAnswerFileBusy] = useState(false)
+  const [answerFilePct, setAnswerFilePct] = useState(0)
   const [qualityBusyId, setQualityBusyId] = useState('')
   const [progressPct, setProgressPct] = useState(0)
   const [progressLabel, setProgressLabel] = useState('')
@@ -318,6 +338,7 @@ export default function OfficialPyqPending() {
   }, [bump])
 
   useEffect(() => {
+    if (otherMode) return undefined
     let cancelled = false
     ;(async () => {
       try {
@@ -342,7 +363,7 @@ export default function OfficialPyqPending() {
     return () => {
       cancelled = true
     }
-  }, [bump])
+  }, [bump, otherMode])
 
   useEffect(() => {
     try {
@@ -453,11 +474,11 @@ export default function OfficialPyqPending() {
   const pendingCount = useMemo(() => {
     void tick
     try {
-      return countOfficialPyqPendingReview()
+      return countOfficialPyqPendingReview(kind)
     } catch {
       return 0
     }
-  }, [tick])
+  }, [tick, kind])
 
   const [mainDates, setMainDates] = useState(/** @type {string[]} */ ([]))
   const [formatPyqDate, setFormatPyqDate] = useState(/** @type {(d: string) => string} */ ((d) => d))
@@ -516,7 +537,7 @@ export default function OfficialPyqPending() {
       return
     }
     const filled = Number(previewMeta.filled) || 0
-    const min = expectedMinOfficialPyqCount(selected.exam)
+    const min = expectedMinOfficialPyqCount(selected.exam, isOtherPaper(selected))
     /** @type {string[]} */
     const errors = []
     if (!selected.aiReplicaPaper && !selected.factsConfirmedAt && !selected.adminFacts?.confirmedAt) {
@@ -858,6 +879,14 @@ export default function OfficialPyqPending() {
     const file = ev.target.files?.[0]
     ev.target.value = ''
     if (!file) return
+    const named =
+      otherPaperName.replace(/\s+/g, ' ').trim() ||
+      String(file.name || '').replace(/\.[^.]+$/, '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim()
+    if (otherMode && !named) {
+      setError('Type the name of this paper first.')
+      return
+    }
+    if (otherMode && named !== otherPaperName) setOtherPaperName(named)
     const uploadCtl = new AbortController()
     uploadAbortRef.current = uploadCtl
     uploadStalledRef.current = false
@@ -872,18 +901,21 @@ export default function OfficialPyqPending() {
           import('../utils/officialPyqImportFile.js'),
           loadOfficialPyqExtractHelpers(),
         ])
+      const uploadMeta = otherMode
+        ? { paperKind: 'other', paperName: named, exam, year, session: '', sourceUrl: '', sourceLabel: '', paperLabel: named }
+        : {
+            exam,
+            year,
+            session,
+            pyqDate: exam === 'jee-main' ? pyqDate : undefined,
+            pyqShift: exam === 'jee-main' ? pyqShift : undefined,
+            sourceUrl,
+            sourceLabel,
+            paperLabel,
+          }
       const { paper, summary, cloudNote } = await importFileToPending(
         file,
-        {
-          exam,
-          year,
-          session,
-          pyqDate: exam === 'jee-main' ? pyqDate : undefined,
-          pyqShift: exam === 'jee-main' ? pyqShift : undefined,
-          sourceUrl,
-          sourceLabel,
-          paperLabel,
-        },
+        uploadMeta,
         {
           signal: uploadCtl.signal,
           onProgress: (pct, label) => {
@@ -906,7 +938,7 @@ export default function OfficialPyqPending() {
       openOfficialPaper(paper)
       setExtractSummary(extractSummaryFromNotes(paper.notes) || (summary ? formatOfficialPyqExtractSummary(summary) : ''))
       const expected = Number(paper.expectedQuestionCount) || paper.questions.length
-      const min = expectedMinOfficialPyqCount(exam)
+      const min = expectedMinOfficialPyqCount(exam, otherMode)
       if (paper.questions.length < min) {
         setError(
           `Found only ${paper.questions.length} question(s) (this paper’s OCR count is ${expected}). Do not approve if under ${min}. Use Re-parse stored OCR if the PDF text was saved, or upload again.`,
@@ -1046,9 +1078,9 @@ export default function OfficialPyqPending() {
             ? `Re-parsed ${count} question(s) from stored OCR (was ${previousCount}). Local split done. Tags, answers, and solutions are filled after you approve.`
             : `Re-parsed ${count} question(s) from stored OCR (was ${previousCount}). Review the count before approving.`,
         )
-        if (count < expectedMinOfficialPyqCount(paperNow.exam)) {
+        if (count < expectedMinOfficialPyqCount(paperNow.exam, isOtherPaper(paperNow))) {
           setError(
-            `Do not approve: found ${count} question(s), need at least ${expectedMinOfficialPyqCount(paperNow.exam)} for a ${getOfficialPyqExamLabel(paperNow.exam)} paper (OCR shows ~${target}). Re-upload the official PDF or try Re-parse again.`,
+            `Do not approve: found ${count} question(s), need at least ${expectedMinOfficialPyqCount(paperNow.exam, isOtherPaper(paperNow))} for a ${getOfficialPyqExamLabel(paperNow.exam)} paper (OCR shows ~${target}). Re-upload the official PDF or try Re-parse again.`,
           )
         } else if (target > 0 && Math.abs(count - target) > 2) {
           setError(
@@ -1088,9 +1120,9 @@ export default function OfficialPyqPending() {
               ? `Local split needed help. Gemini flash-lite fallback saved ${gCount} question(s).`
               : `Re-parsed ${gCount} question(s) locally. Gemini not used.`,
           )
-          if (gCount < expectedMinOfficialPyqCount(paperNow.exam)) {
+          if (gCount < expectedMinOfficialPyqCount(paperNow.exam, isOtherPaper(paperNow))) {
             setError(
-              `Do not approve: found ${gCount} question(s), need at least ${expectedMinOfficialPyqCount(paperNow.exam)}.`,
+              `Do not approve: found ${gCount} question(s), need at least ${expectedMinOfficialPyqCount(paperNow.exam, isOtherPaper(paperNow))}.`,
             )
           } else {
             setError('')
@@ -1198,13 +1230,60 @@ export default function OfficialPyqPending() {
     }
   }
 
-  async function onPublish() {
+  /** Answers and / or solutions printed in a separate file (answer-key PDF or solutions booklet). */
+  async function onAnswerFile(ev) {
+    const file = ev.target.files?.[0]
+    ev.target.value = ''
+    if (!file || !selected || answerFileBusy) return
+    const paperId = selected.id
+    setAnswerFileBusy(true)
+    setError('')
+    setMessage('')
+    setAnswerFilePct(2)
+    try {
+      const { applyAnswerFileToOfficialPyqPaper, readAnswerFileText } = await import('../utils/officialPyqAnswerFile.js')
+      const text = await readAnswerFileText(file, (p) => setAnswerFilePct(Math.max(2, Math.min(95, Number(p) || 0))))
+      const result = applyAnswerFileToOfficialPyqPaper(paperId, text, { fileName: file.name })
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      if (result.paper?.status === 'pending_review') {
+        const { persistOfficialPyqQualityRun } = await import('../utils/officialPyqLocalQuality.js')
+        const fresh = getOfficialPyqPendingPaper(paperId)
+        if (fresh) persistOfficialPyqQualityRun(fresh)
+      }
+      const left = result.noAnswer.length
+        ? ` Still no answer: Q ${result.noAnswer.slice(0, 12).join(', ')}${result.noAnswer.length > 12 ? ' …' : ''} — Hybrid AI can fill them after Approve.`
+        : ' Every question now has an answer.'
+      setMessage(
+        result.unchanged
+          ? `“${file.name}” matches the answers already on this paper. Nothing new to add.${left}`
+          : `Read “${file.name}”: ${result.answers} answer(s) and ${result.solutions} solution(s) put on the questions, marked as printed on the paper.${left}`,
+      )
+      setPreviewReload((n) => n + 1)
+      bump()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not read the answer file.')
+    } finally {
+      setAnswerFileBusy(false)
+      setAnswerFilePct(0)
+    }
+  }
+
+  /** @param {'other_institute' | 'own'} [audience] who an uploaded other paper is for */
+  async function onPublish(audience) {
     if (!selected || selected.status !== 'approved' || approveBusy) return
     if (!isAdminLoggedIn()) {
       setError('Only an admin can publish a paper.')
       return
     }
-    const warn = `Publish “${selected.paperLabel}”? Every question gets its final Question ID and students can use the paper.`
+    const other = isOtherPaper(selected)
+    const warn = !other
+      ? `Publish “${selected.paperLabel}”? Every question gets its final Question ID and students can use the paper.`
+      : audience === 'own'
+        ? `Publish “${selected.paperLabel}” as your own paper? Its questions go to the Question Bank, and students see the whole paper under Tests.`
+        : `Publish “${selected.paperLabel}” as another institute's paper? Its questions go to the Question Bank and are served to students, but students never see the paper itself.`
     if (typeof window !== 'undefined' && !window.confirm(warn)) return
     setError('')
     setMessage('')
@@ -1215,6 +1294,7 @@ export default function OfficialPyqPending() {
     try {
       const { publishOfficialPyqPaperAsync } = await loadOfficialPyqApproval()
       const result = await publishOfficialPyqPaperAsync(selected.id, {
+        audience,
         onProgress: (pct, label) => {
           setApprovePct(pct)
           setApproveLabel(label)
@@ -1228,7 +1308,11 @@ export default function OfficialPyqPending() {
       writeOfficialPyqUi({ filter: 'published', openId: selected.id })
       setOpenedPaper(officialPyqPaperToSummary({ ...selected, status: 'published' }))
       setMessage(
-        `Published ${result.pyqCount} question(s) to PYQ and ${result.bankCount} to Question Bank, each with its final Question ID. Students can use them under Prepare → PYQ.`,
+        !other
+          ? `Published ${result.pyqCount} question(s) to PYQ and ${result.bankCount} to Question Bank, each with its final Question ID. Students can use them under Prepare → PYQ.`
+          : audience === 'own'
+            ? `Published ${result.bankCount} question(s) to the Question Bank. Students see the whole paper under Tests. Students in a class see it after you assign it to their class.`
+            : `Published ${result.bankCount} question(s) to the Question Bank. Students get these questions in practice; the paper itself is not shown to them.`,
       )
       bump()
     } catch (e) {
@@ -1370,13 +1454,23 @@ export default function OfficialPyqPending() {
   return (
     <div className="page official-pyq-page">
       <header className="page-header">
-        <h1>Approve official papers</h1>
-        <p className="form-hint">
-          Pull or upload <strong>official</strong> previous-year papers (NTA / JEE Advanced archive). They stay in
-          this separate bank. <strong>Reviewed — Approve</strong> checks a paper; then fill tags, answers, and
-          solutions; then <strong>Publish</strong> gives final Question IDs and sends it to student{' '}
-          <Link to="/pyq">PYQ Bank</Link> and Question Bank. Coaching-site scrapes are not allowed.
-        </p>
+        <h1>{otherMode ? 'Upload any paper' : 'Approve official papers'}</h1>
+        {otherMode ? (
+          <p className="form-hint">
+            Upload any question paper (yours or another institute&apos;s). It follows the same steps as official
+            papers: <strong>Reviewed — Approve</strong>, then <strong>Hybrid AI</strong> fills answers, solutions and
+            tags, then <strong>Publish</strong>. At Publish you choose: <strong>another institute&apos;s paper</strong>{' '}
+            (students get its questions, never the whole paper) or <strong>our own paper</strong> (students also see
+            the whole paper under <Link to="/tests">Tests</Link>).
+          </p>
+        ) : (
+          <p className="form-hint">
+            Pull or upload <strong>official</strong> previous-year papers (NTA / JEE Advanced archive). They stay in
+            this separate bank. <strong>Reviewed — Approve</strong> checks a paper; then fill tags, answers, and
+            solutions; then <strong>Publish</strong> gives final Question IDs and sends it to student{' '}
+            <Link to="/pyq">PYQ Bank</Link> and Question Bank. Coaching-site scrapes are not allowed.
+          </p>
+        )}
         <p className="form-hint">
           <Link to="/pyq">PYQ Bank</Link>
           {' · '}
@@ -1391,6 +1485,7 @@ export default function OfficialPyqPending() {
       {error && <p className="upload-error">{error}</p>}
       {message && <p className="form-hint upload-success-hint">{message}</p>}
 
+      {otherMode ? null : (
       <section className="card official-pyq-portals">
         <h2>Official portals</h2>
         <ul className="cc-official-ref-list">
@@ -1407,10 +1502,22 @@ export default function OfficialPyqPending() {
           Refresh source list from server
         </button>
       </section>
+      )}
 
       <section className="card official-pyq-import">
         <h2>1. Import into pending bank</h2>
         <div className="pyq-paper-setup-grid">
+          {otherMode ? (
+            <label className="pyq-paper-setup-wide">
+              Paper name
+              <input
+                type="text"
+                value={otherPaperName}
+                onChange={(e) => setOtherPaperName(e.target.value)}
+                placeholder="e.g. Allen Major Test 3 (empty = file name)"
+              />
+            </label>
+          ) : null}
           <label>
             Exam
             <select value={exam} onChange={(e) => setExam(/** @type {any} */ (e.target.value))}>
@@ -1431,7 +1538,7 @@ export default function OfficialPyqPending() {
               onChange={(e) => setYear(Number(e.target.value) || year)}
             />
           </label>
-          {exam === 'jee-main' ? (
+          {!otherMode && exam === 'jee-main' ? (
             <label>
               Date
               <select value={pyqDate} onChange={(e) => setPyqDate(e.target.value)}>
@@ -1443,7 +1550,7 @@ export default function OfficialPyqPending() {
               </select>
             </label>
           ) : null}
-          {exam === 'jee-main' ? (
+          {!otherMode && exam === 'jee-main' ? (
             <label>
               Shift
               <select value={String(pyqShift)} onChange={(e) => setPyqShift(Number(e.target.value))}>
@@ -1452,7 +1559,7 @@ export default function OfficialPyqPending() {
               </select>
             </label>
           ) : null}
-          {exam === 'jee-advanced' ? (
+          {!otherMode && exam === 'jee-advanced' ? (
             <label>
               Paper
               <select value={session} onChange={(e) => setSession(e.target.value)}>
@@ -1461,6 +1568,8 @@ export default function OfficialPyqPending() {
               </select>
             </label>
           ) : null}
+          {otherMode ? null : (
+          <>
           <label className="pyq-paper-setup-wide">
             Source label
             <input
@@ -1483,8 +1592,17 @@ export default function OfficialPyqPending() {
               placeholder="Auto from exam + year"
             />
           </label>
+          </>
+          )}
         </div>
 
+        {otherMode ? (
+          <p className="form-hint">
+            Upload the paper as PDF, Word, JSON or CSV. It stays <strong>Pending approval</strong> until you
+            approve it, and students see nothing until you publish. Answers and solutions printed on the paper are
+            kept; Hybrid AI can fill the rest after you approve.
+          </p>
+        ) : (
         <p className="form-hint">
           Download the official PDF from NTA / Advanced archive, then upload it here (or JSON/CSV).
           Stored OCR is split on this computer (Re-parse does not wait for Gemini).
@@ -1497,13 +1615,18 @@ export default function OfficialPyqPending() {
           {' '}
           (a full paper is about 51).
         </p>
+        )}
         <Suspense fallback={<p className="form-hint">Loading OCR options…</p>}>
           <OcrOutputFormatPicker id="official-pyq-ocr-format" />
         </Suspense>
 
         <div className="official-pyq-actions">
           <label className="btn btn-primary btn-sm">
-            {busy ? (progressLabel || 'Working…') : 'Upload official PDF / Word / JSON / CSV'}
+            {busy
+              ? (progressLabel || 'Working…')
+              : otherMode
+                ? 'Upload paper PDF / Word / JSON / CSV'
+                : 'Upload official PDF / Word / JSON / CSV'}
             <input
               type="file"
               accept=".pdf,.doc,.docx,.json,.csv,application/pdf,application/json,text/csv,image/*"
@@ -1520,7 +1643,7 @@ export default function OfficialPyqPending() {
           </p>
         ) : null}
 
-        {slots.length > 0 && (
+        {!otherMode && slots.length > 0 && (
           <div className="official-pyq-slots">
             <h3>Curated year slots</h3>
             <ul>
@@ -1568,6 +1691,8 @@ export default function OfficialPyqPending() {
           </p>
         ) : null}
         <OfficialPyqTabList
+          kind={kind}
+          uiKey={uiKey}
           selectedId={selectedId}
           listTick={tick}
           onOpen={openOfficialPaper}
@@ -1617,11 +1742,33 @@ export default function OfficialPyqPending() {
                         ? ` (detected ${previewExpected} in OCR/catalog)`
                         : ''}
                       {filledPreviewCount > 0 &&
-                      filledPreviewCount < expectedMinOfficialPyqCount(selected.exam)
-                        ? ` — Do not approve if under ${expectedMinOfficialPyqCount(selected.exam)}.`
+                      filledPreviewCount < expectedMinOfficialPyqCount(selected.exam, isOtherPaper(selected))
+                        ? ` — Do not approve if under ${expectedMinOfficialPyqCount(selected.exam, isOtherPaper(selected))}.`
                         : ''}
                       {extractSummary ? ` · ${extractSummary}` : ''}
                     </p>
+                    {selected.status === 'pending_review' || (selected.status === 'approved' && isAdminLoggedIn()) ? (
+                      <div className="official-pyq-actions" data-testid="official-pyq-answer-file">
+                        <p className="form-hint">
+                          Answers or solutions printed under each question, or after the last question, are read
+                          with the paper. If they are in a <strong>separate file</strong> (answer key or solutions
+                          PDF), add it here. They go on the questions by question number.
+                        </p>
+                        <label className="btn btn-ghost btn-sm">
+                          {answerFileBusy
+                            ? `Reading answer file… ${Math.round(answerFilePct)}%`
+                            : 'Add answers / solutions from another file'}
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.txt,application/pdf,text/plain,image/*"
+                            hidden
+                            disabled={answerFileBusy || busy || approveBusy}
+                            data-testid="official-pyq-answer-file-input"
+                            onChange={onAnswerFile}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
                     {selected.status === 'approved' ? (
                       <div className="official-pyq-actions" data-testid="official-pyq-approved-actions">
                         <p className="form-hint" data-testid="official-pyq-fix-tags-hint">
@@ -1635,7 +1782,11 @@ export default function OfficialPyqPending() {
                         {publishGaps && publishGaps.total > 0 ? (
                           <p className="form-hint" data-testid="official-pyq-publish-gaps">
                             {publishGaps.noChapter || publishGaps.noAnswer || publishGaps.noSolution
-                              ? `Still blank: ${publishGaps.noChapter} without a chapter, ${publishGaps.noAnswer} without an answer, ${publishGaps.noSolution} without a solution (of ${publishGaps.total}). You can still Publish.`
+                              ? `Still blank: ${publishGaps.noChapter} without a chapter, ${publishGaps.noAnswer} without an answer, ${publishGaps.noSolution} without a solution (of ${publishGaps.total}). ${
+                                  isOtherPaper(selected) && publishGaps.noAnswer
+                                    ? 'Every question needs an answer before Publish.'
+                                    : 'You can still Publish.'
+                                }`
                               : `All ${publishGaps.total} questions have a chapter, answer, and solution.`}
                           </p>
                         ) : null}
@@ -1648,7 +1799,33 @@ export default function OfficialPyqPending() {
                             }}
                           />
                         ) : null}
-                        {isAdminLoggedIn() ? (
+                        {isAdminLoggedIn() && isOtherPaper(selected) ? (
+                          <div className="official-pyq-publish-audience" data-testid="other-paper-publish-choice">
+                            <p className="form-hint">
+                              <strong>Publish — whose paper is this?</strong>
+                            </p>
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              data-testid="other-paper-publish-other-institute"
+                              disabled={approveBusy}
+                              aria-busy={approveBusy}
+                              onClick={() => void onPublish('other_institute')}
+                            >
+                              {approveBusy ? 'Publishing…' : "Another institute's paper — students get its questions only"}
+                            </button>{' '}
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              data-testid="other-paper-publish-own"
+                              disabled={approveBusy}
+                              aria-busy={approveBusy}
+                              onClick={() => void onPublish('own')}
+                            >
+                              {approveBusy ? 'Publishing…' : 'Our own paper — students also see the whole paper under Tests'}
+                            </button>
+                          </div>
+                        ) : isAdminLoggedIn() ? (
                           <button
                             type="button"
                             className="btn btn-primary"
@@ -1680,11 +1857,20 @@ export default function OfficialPyqPending() {
                     ) : null}
                     {selected.status === 'published' ? (
                       <div className="official-pyq-actions" data-testid="official-pyq-published-actions">
+                        {isOtherPaper(selected) ? (
+                          <p className="form-hint" data-testid="other-paper-published-audience">
+                            {selected.publishAudience === 'own'
+                              ? 'Published as our own paper — its questions are in the Question Bank and students see the whole paper under Tests.'
+                              : "Published as another institute's paper — its questions are in the Question Bank and served to students; the paper itself is hidden from them."}{' '}
+                            To change anything, press Unpublish first.
+                          </p>
+                        ) : (
                         <p className="form-hint">
                           Published — students can use this paper and every question has its final
                           Question ID. To change tags, answers, or solutions, press Unpublish first.
                         </p>
-                        {isAdminLoggedIn() ? (
+                        )}
+                        {isAdminLoggedIn() && !isOtherPaper(selected) ? (
                         <OfficialPyqReplicaControls
                           paper={selected}
                           onCreated={(paper, all) => {

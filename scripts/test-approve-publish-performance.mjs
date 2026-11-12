@@ -1,5 +1,5 @@
 /**
- * Approve & Publish must finish a 51-card paper in Node (not freeze at 8%),
+ * Approve, then Publish, must finish a 51-card paper in Node (not freeze at 8%),
  * keep unique numbers 1..51, and still refuse a genuinely short paper.
  */
 import assert from 'node:assert/strict'
@@ -46,6 +46,7 @@ const { assignUniqueOfficialPyqNumbers } = await import('../src/utils/officialPy
 const {
   importQuestionsToOfficialPyqPending,
   approveOfficialPyqPaperAsync,
+  publishOfficialPyqPaperAsync,
   validateOfficialPyqForApprove,
   officialPyqHealProgressPercent,
 } = await import('../src/utils/officialPyqApproval.js')
@@ -161,7 +162,6 @@ updateOfficialPyqPendingPaper(pending.id, { expectedQuestionCount: 51 })
 const ticks = []
 const clickT0 = Date.now()
 const result = await approveOfficialPyqPaperAsync(withFacts(pending.id), {
-  skipBank: true,
   onProgress: (pct, label) => {
     ticks.push({ pct, label, ms: Date.now() - clickT0 })
   },
@@ -169,7 +169,7 @@ const result = await approveOfficialPyqPaperAsync(withFacts(pending.id), {
 })
 const clickMs = Date.now() - clickT0
 assert.equal(result.ok, true, `approve failed: ${(result.errors || []).join(' | ')}`)
-assert.equal(result.pyqCount, 51)
+assert.equal(result.questionCount, 51)
 assert.ok(clickMs < CLICK_BUDGET_MS, `whole Approve click ${clickMs}ms (budget ${CLICK_BUDGET_MS})`)
 assert.ok(
   ticks.some((t) => t.pct > 8 && t.pct < 100),
@@ -192,8 +192,23 @@ assert.ok(
 )
 assert.ok(ticks.some((t) => t.pct >= 100) || result.ok, 'must reach done')
 
+assert.equal(getOfficialPyqPendingPaper(pending.id).status, 'approved')
+
+const publishT0 = Date.now()
+const publishTicks = []
+const publishResult = await publishOfficialPyqPaperAsync(pending.id, {
+  skipBank: true,
+  onProgress: (pct) => publishTicks.push(pct),
+  yieldFn: () => Promise.resolve(),
+})
+const publishMs = Date.now() - publishT0
+assert.equal(publishResult.ok, true, `publish failed: ${(publishResult.errors || []).join(' | ')}`)
+assert.equal(publishResult.pyqCount, 51)
+assert.ok(publishMs < CLICK_BUDGET_MS, `whole Publish click ${publishMs}ms (budget ${CLICK_BUDGET_MS})`)
+assert.ok(publishTicks.every((pct, i) => i === 0 || pct >= publishTicks[i - 1]), 'publish percent must not jump backwards')
 const published = getOfficialPyqPendingPaper(pending.id)
-assert.equal(published.status, 'approved')
+assert.equal(published.status, 'published')
+assert.equal(new Set(publishResult.questionIds).size, 51, 'every published question gets its own final id')
 
 for (const slot of PHYSICS_MATCH_SLOTS) {
   const q = paperHealed[slot - 1]

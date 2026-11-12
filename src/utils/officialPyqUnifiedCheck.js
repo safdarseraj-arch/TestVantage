@@ -2,19 +2,94 @@ import { buildPaperFacts } from './officialPyqPaperFacts.js'
 import { mathDrawFailure } from './mathDrawCheck.js'
 import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 import { looksLikeMatchingListStem, parseMatchingListForDisplay } from './parseMatchingListDisplay.js'
+import { missingStructureLabels } from './structureLabels.js'
+import { SCRAP_OPTION_RE } from './labelledFigureOptions.js'
+import { bilingualLeftoversOnCard } from './bilingualScanLeftovers.js'
+import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
+import {
+  MATRIX_GRID_DEFAULT_COLS,
+  MATRIX_GRID_DEFAULT_ROWS,
+  MATRIX_GRID_FACT_TYPE,
+  factTypeOfCard,
+  isMatrixGridCard,
+} from './matrixGridPyq.js'
 
 const OPENING = /^Then\b/
 
 function filled(options) {
-  return (Array.isArray(options) ? options : []).map((o) => String(o ?? '').trim()).filter(Boolean)
+  return (Array.isArray(options) ? options : [])
+    .map((o) => String(o ?? '').trim())
+    .filter((o) => !SCRAP_OPTION_RE.test(o))
+}
+
+/** Row "(1)" comes back after the (P) … rows a second time: List II was added under itself. */
+function listTwoShownTwice(text) {
+  const t = String(text ?? '')
+  const firstRow = t.search(/(?:^|\n)[ \t]*\(\s*P\s*\)/)
+  if (firstRow < 0) return false
+  return [...t.slice(firstRow).matchAll(/\n[ \t]*\(\s*1\s*\)/g)].length >= 2
+}
+
+/** S, T, U drawn as one SMILES: the scan dropped the wedges that make them different isomers (2013 P2 Q36). */
+function sameDrawingUnderTwoLabels(text) {
+  const labelOf = new Map()
+  for (const m of String(text ?? '').matchAll(/<smiles>([^<]*)<\/smiles>\s*(\$[^$\n]{1,40}\$|\(?\s*[IVX]{1,4}\s*\)?(?=\s*(?:\n|$)))/g)) {
+    const code = m[1].trim()
+    const label = m[2].replace(/\s+/g, '')
+    if (labelOf.has(code) && labelOf.get(code) !== label) return true
+    labelOf.set(code, label)
+  }
+  return false
 }
 
 function norm(text) {
   return String(text ?? '').replace(/\s+/g, '').toLowerCase()
 }
 
+/** Case counts inside math and molecules: c1 (aromatic) and C1 are different SMILES. */
+function optionKey(text) {
+  return String(text ?? '')
+    .split(/(<smiles>[\s\S]*?<\/smiles>|\$[^$]*\$)/i)
+    .map((part, i) => (i % 2 ? part : part.toLowerCase()))
+    .join('')
+    .replace(/\s+/g, '')
+}
+
 function cardBlob(q) {
-  return [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])].join('\n')
+  return [
+    q?.text,
+    q?.passageText,
+    ...(Array.isArray(q?.options) ? q.options : []),
+    ...(Array.isArray(q?.matrixRows) ? q.matrixRows : []),
+    ...(Array.isArray(q?.matrixCols) ? q.matrixCols : []),
+  ].join('\n')
+}
+
+/**
+ * A grid card needs both lists at the size the facts give (Column I 4, Column II 5 by
+ * default) and no options: its answer is a grid of ticks.
+ */
+function matrixGridReasons(q, size) {
+  const reasons = []
+  const rows = (Array.isArray(q?.matrixRows) ? q.matrixRows : []).filter((r) => String(r ?? '').trim()).length
+  const cols = (Array.isArray(q?.matrixCols) ? q.matrixCols : []).filter((c) => String(c ?? '').trim()).length
+  if (!rows || !cols) reasons.push('Column I or Column II is missing')
+  else if (rows !== size.rows || cols !== size.cols) {
+    reasons.push(`Column I should have ${size.rows} rows and Column II ${size.cols} rows`)
+  }
+  if (filled(q?.options).length) reasons.push('A grid question should have no options')
+  return reasons
+}
+
+function gridSizeFromFacts(factCard, slot) {
+  if (slot?.type === MATRIX_GRID_FACT_TYPE && slot.listI > 0 && slot.listII > 0) {
+    return { rows: slot.listI, cols: slot.listII }
+  }
+  const read = (factCard?.sections || []).find((s) => s.type === MATRIX_GRID_FACT_TYPE && s.listI > 0)
+  return {
+    rows: read?.listI || MATRIX_GRID_DEFAULT_ROWS,
+    cols: read?.listII || MATRIX_GRID_DEFAULT_COLS,
+  }
 }
 
 /** An image, a saved question image, or a diagram the display draws from the text. */
@@ -29,23 +104,49 @@ function cardHasFigure(q) {
   }
 }
 
+/** Where one question's scan text ends: the next Q number, a section heading, the next stem/paragraph, or the printed "Answer: [0.7 to 0.8]" key. */
+const QUESTION_END =
+  /\b[Qq]\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*[Qq]|\\section\*?\{|\bQuestion Stem\b|\b(?:Paragraph|PARAGRAPH)\b|\b(?:Answer|Ans)\s*[:.]\s*(?:\[|\(|\$|-?\d|[A-D]\b)/
+
+/**
+ * Two questions can open with the same words ("One mole of a monatomic ideal gas undergoes…"),
+ * so pick the occurrence whose next words still match this card.
+ */
+function probeOccurrence(flat, stem, probe) {
+  const first = flat.indexOf(probe)
+  if (first < 0 || flat.indexOf(probe, first + 1) < 0) return first
+  for (const len of [160, 120, 80, 56]) {
+    if (stem.length < len) continue
+    const at = flat.indexOf(stem.slice(0, len))
+    if (at >= 0) return at
+  }
+  return first
+}
+
 function nothingLost(q, ocr) {
   const src = String(ocr ?? '')
   const stem = String(q?.text ?? '').replace(/\s+/g, ' ').trim()
   if (src.length < 80 || stem.length < 24) return ''
   const probe = stem.slice(0, 40)
-  const at = src.replace(/\s+/g, ' ').indexOf(probe)
-  if (at < 0) return ''
   const flat = src.replace(/\s+/g, ' ')
-  const next = flat.slice(at + probe.length).search(/\bQ\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*Q/i)
-  const span = flat.slice(at, next > 20 ? at + probe.length + next : at + 900)
+  const at = probeOccurrence(flat, stem, probe)
+  if (at < 0) return ''
+  const next = flat.slice(at + probe.length).search(QUESTION_END)
+  const span = flat.slice(at, next >= 0 ? at + probe.length + next : at + 900)
   const card = norm(cardBlob(q))
   const missing = []
   for (const num of span.match(/\d+\.\d+/g) || []) {
-    if (!card.includes(num.replace(/\s+/g, ''))) missing.push(num)
+    if (card.includes(num.replace(/\s+/g, ''))) continue
+    // "3.1" printed as List-II row 3 with value 1 is "(3) 1" on the card.
+    const [row, value] = num.split('.')
+    if (/^[1-5]$/.test(row) && (card.includes(`(${row})${value}`) || card.includes(`${row}.${value}`))) continue
+    missing.push(num)
   }
   const optionLetters = new Set((span.match(/\(\s*[A-D]\s*\)/g) || []).map((l) => l.replace(/\s+/g, '')))
-  if (optionLetters.size > filled(q?.options).length) missing.push(`${optionLetters.size} options in the scan`)
+  const numerical = ['numerical', 'integer', 'passage_integer'].includes(String(q?.questionType ?? ''))
+  if (!numerical && optionLetters.size >= 2 && optionLetters.size > filled(q?.options).length) {
+    missing.push(`${optionLetters.size} options in the scan`)
+  }
   const labels = span.match(/\(\s*[PQRS]\s*\)|\(\s*[1-5]\s*\)/g) || []
   for (const label of labels) {
     const compact = label.replace(/\s+/g, '')
@@ -66,7 +167,7 @@ function optionLabelMissing(q) {
   ])
   const used = new Set()
   for (const opt of filled(q.options)) {
-    for (const m of opt.matchAll(/\(\s*([PQRS1-5])\s*\)/gi)) used.add(m[1].toUpperCase())
+    for (const m of opt.matchAll(/\(\s*([PQRSTpqrst1-5]|I{1,3}|IV)\s*\)/g)) used.add(m[1].toUpperCase())
   }
   const missing = [...used].filter((label) => !have.has(label))
   if (!missing.length) return ''
@@ -98,7 +199,7 @@ function adminFactReasons(q, slot) {
   if (slot.subject && String(q?.subject || '') !== slot.subject) {
     reasons.push('The subject does not match the paper facts')
   }
-  if (slot.type && String(q?.questionType || '') !== slot.type) {
+  if (slot.type && factTypeOfCard(q) !== slot.type) {
     reasons.push('The question type does not match the paper facts')
   }
   if (MCQ_TYPES.has(slot.type) && slot.options > 0 && opts.length !== slot.options) {
@@ -179,7 +280,7 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
   /** @type {{ n: number, reason: string }[]} */
   const fails = []
   list.forEach((q, index) => {
-    if (!q || q.placeholder === true) return
+    if (!q || q.placeholder === true || q.adminApproved === true) return
     const n =
       typeof checkOpts?.indexOf === 'function' ? Number(checkOpts.indexOf(q, index)) + 1 || index + 1 : index + 1
     const text = String(q.text ?? '')
@@ -187,6 +288,20 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     const opts = filled(q.options)
     const type = String(q.questionType || '')
     const reasons = []
+    const slot = slotsLineUp ? adminSlots[index] : null
+    if (isMatrixGridCard(q)) {
+      for (const part of [text, passage, ...(q.matrixRows || []), ...(q.matrixCols || [])]) {
+        const draw = mathDrawFailure(String(part ?? ''))
+        if (draw) {
+          reasons.push(draw === 'draw failure' ? 'The math did not draw' : draw === 'leftover TeX' ? 'TeX is still showing after drawing' : draw)
+          break
+        }
+      }
+      reasons.push(...matrixGridReasons(q, gridSizeFromFacts(factCard, slot)))
+      if (adminSlots) reasons.push(...adminFactReasons(q, slot))
+      if (reasons.length) fails.push({ n, reason: reasons[0] })
+      return
+    }
     for (const part of [text, passage, ...opts]) {
       const draw = mathDrawFailure(part)
       if (draw) {
@@ -197,23 +312,37 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     const lost = nothingLost(q, ocr)
     if (lost) reasons.push(lost)
     if (/single_correct|multiple_correct|matrix_match/.test(type)) {
-      if (opts.length < 2) reasons.push('An MCQ option is empty')
+      // Confirmed paper facts name the option count; their own message says it.
+      if (opts.length < 4 && !(slot?.options > 0)) reasons.push('An MCQ option is empty')
+      if (opts.some((opt) => /<smiles>\s*<\/smiles>/i.test(opt))) {
+        reasons.push('An option has an empty structure (the scan lost the drawing)')
+      }
       const seen = new Set()
       for (const opt of opts) {
-        const key = norm(opt)
+        const key = optionKey(opt)
         if (seen.has(key)) reasons.push('Two options are the same')
         seen.add(key)
       }
     }
     const label = optionLabelMissing(q)
     if (label) reasons.push(label)
+    const unlabelled = missingStructureLabels(q)
+    if (unlabelled.length) {
+      reasons.push(`The options name structures ${unlabelled.join(', ')}, and the drawings have no such label`)
+    }
+    reasons.push(...bilingualLeftoversOnCard(q).map((r) => r.charAt(0).toUpperCase() + r.slice(1)))
+    if (dropOptionFigureRepeatingStem(q) !== q) reasons.push("An option repeats the question's figure")
+    if (listTwoShownTwice(text)) reasons.push('List II is shown twice')
+    if (sameDrawingUnderTwoLabels(text) || sameDrawingUnderTwoLabels(passage)) {
+      reasons.push('Two labelled drawings show the same structure (the scan lost how they differ)')
+    }
     if (!adminSlots && OPENING.test(text.trim()) && !passage) reasons.push('This question has no passage')
     if (/shown in the figure/i.test(text) && !cardHasFigure(q)) {
       reasons.push('The question says shown in the figure, and there is no figure')
     }
     const answer = answerNotInOptions(q)
     if (answer) reasons.push(answer)
-    if (adminSlots) reasons.push(...adminFactReasons(q, slotsLineUp ? adminSlots[index] : null))
+    if (adminSlots) reasons.push(...adminFactReasons(q, slot))
     if (reasons.length) fails.push({ n, reason: reasons[0] })
   })
   const messages = cardsOnly ? [] : paperLevelMessages(list, factCard, adminSlots)

@@ -15,16 +15,16 @@ import {
 } from './mathpixMedia.js'
 
 /** @typedef {{ label: string, text: string }} MatchListItem */
-/** @typedef {{ intro: string, listITitle: string, listIITitle: string, listI: MatchListItem[], listII: MatchListItem[] }} MatchingListDisplay */
+/** @typedef {{ intro: string, listITitle: string, listIITitle: string, listI: MatchListItem[], listII: MatchListItem[], outro?: string }} MatchingListDisplay */
 
-const LIST_I_RE = /(?:\*{0,2}\s*)?(?:List|Column)\s*[-–]?\s*I(?!I)\s*(?:\*{0,2})/gi
+const LIST_I_RE = /(?:\*{0,2}\s*)?(?:List|Column)\s*[-–]?\s*I(?!I)\b\s*(?:\*{0,2})/gi
 const LIST_II_RE = /(?:\*{0,2}\s*)?(?:List|Column)\s*[-–]?\s*II\s*(?:\*{0,2})/gi
 
 const MATCH_HINT =
-  /match\s+each\s+entry|match\s+(?:the\s+)?(?:column|list)|(?:List|Column)\s*[-–]?\s*I(?!I)/i
+  /match\s+each\s+entry|match\s+(?:the\s+)?(?:column|list)|(?:List|Column)\s*[-–]?\s*I(?!I)\b/i
 
 const TABULAR_BEGIN =
-  /\\(?:begin|text\s*\{\s*begin\s*\})\s*\{\s*tabular\s*\}(?:\s*\{[^}]*\})?/i
+  /\\(?:begin|text\s*\{\s*begin\s*\})\s*\{\s*tabular\s*\}(?:\s*\[[^\]]*\])?(?:\s*\{[^}]*\})?/i
 const TABULAR_END = /\\(?:end|text\s*\{\s*end\s*\})\s*\{\s*tabular\s*\}/i
 
 /**
@@ -227,8 +227,15 @@ export function separateInterleavedMatchColumns(text) {
       return ''
     }).trim()
     const short = value.length < 80 && !/the number of elements|the value of|passes through/i.test(value)
-    if (!displays.length || !short) continue
-    item.body = [value, ...displays].filter(Boolean).join('\n').trim()
+    if (!displays.length || !short || !value) continue
+    item.body = value
+    for (const block of displays) {
+      if (lastLetter && !/\$\$/.test(lastLetter.body)) {
+        lastLetter.body = `${lastLetter.body}\n${block}`.trim()
+      } else {
+        orphans.push(block)
+      }
+    }
   }
 
   let intro = src.slice(0, stream[0].start)
@@ -342,7 +349,8 @@ export function unwrapMathrmListLabels(text) {
   return String(text ?? '')
     .replace(/\$\s*\(\\mathrm\{([A-D1-5PQRS])\}\)\s*\$/g, '($1)')
     .replace(/\(\\mathrm\{([A-D1-5PQRS])\}\)/g, '($1)')
-    .replace(/\\mathrm\{([A-D1-5PQRS])\}/g, '$1')
+    // 9~\mu\mathrm{C}: a letter glued to the command before it would make the unknown \muC.
+    .replace(/(\\[A-Za-z]+)?\\mathrm\{([A-D1-5PQRS])\}/g, (_, cmd, label) => (cmd ? `${cmd} ${label}` : label))
 }
 
 /**
@@ -390,8 +398,10 @@ export function rewriteCaptionCommands(text) {
     const inner = s.slice(j + 1, k - 1).trim()
     if (/^List-I{1,2}$/i.test(inner)) out += `\n${inner}\n`
     else {
-      const labeled = inner.match(/(?:\\item\s*\[\s*)?\(\s*([PQRSABCD1-5])\s*\)/i)
-      if (labeled) out += `\n(${String(labeled[1]).toUpperCase()})\n`
+      const roman = inner.match(/^\(\s*(I{1,3}|IV|V)\s*\)$/)
+      const labeled = inner.match(/(?:\\item\s*\[\s*)?\(\s*([PQRSTABCD1-5])\s*\)/i)
+      if (roman) out += `\n(${roman[1]})\n`
+      else if (labeled) out += `\n(${String(labeled[1]).toUpperCase()})\n`
       else {
         let dumped = inner
         if (/\\(?:mathrm|ce|text)\b/.test(dumped) && /\$\$/.test(dumped)) {
@@ -418,11 +428,13 @@ export function rewriteLatexItemLabels(text) {
     .replace(/\\section\*?\{\s*(\(\s*[1-5]\s*\))\s*\$([^$]*)\$\s*\}/g, '\n$1 $$$2$$\n')
     .replace(/\\begin\{(?:itemize|enumerate)\}/gi, '\n')
     .replace(/\\end\{(?:itemize|enumerate)\}/gi, '\n')
-    .replace(/\\item\s*\[\s*Q[^\]]*\]/gi, ' ')
+    .replace(/\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\](?=\s*\$?\s*\d))/gi, ' ')
     .replace(/\\item\s*\[\s*-\s*\]/gi, ' ')
     .replace(/\\item\s*\[\s*\]/gi, ' ')
+    .replace(/\\item\s*\[\s*\(\s*(I{1,3}|IV|VI?)\s*\)\s*\]/g, '\n($1) ')
+    .replace(/\\item\s*\[\s*\(\s*(i{1,3}|iv|vi?)\s*\)\s*\]/g, '\n($1) ')
     .replace(
-      /\\item\s*\[\s*(\(\s*[PQRSABCD1-5]\s*\)|[PQRSABCD1-5]\s*[.:]?)\s*\]/gi,
+      /\\item\s*\[\s*(\(\s*[PQRSTUVWABCD1-6]\s*\)|[PQRSTUVWABCD1-6]\s*[.:]?)\s*\]/gi,
       (_, inner) => {
         const letter = String(inner ?? '')
           .replace(/[().:.\s]/g, '')
@@ -444,7 +456,9 @@ function cleanTabularCell(cell) {
       .replace(/\\hline\b/gi, '')
       .replace(/^\s*\\(?:centering|raggedright|raggedleft)\b/i, '')
       .replace(/\s+/g, ' ')
-      .trim(),
+      .trim()
+      // "\textbf{P.} In process I" / "\textbf{1.} $8$" cells: the bold "P." is the row label.
+      .replace(/^([PQRSTU]|[1-6])\s*[.:]\s+/, '($1) '),
   )
 }
 
@@ -470,6 +484,8 @@ function classifyTabularMatchCell(cell, side, leftCell) {
 export function flattenTabularMatchLists(text) {
   let s = String(text ?? '').replace(/\r\n/g, '\n')
   if (!s.trim()) return s
+  // TeX en dash: "LIST--I" is the heading "LIST-I".
+  s = s.replace(/\b(List|Column)\s*--\s*(?=I)/gi, '$1-')
   s = s.replace(/\\text\s*\{\s*begin\s*\}\s*\{\s*tabular\s*\}/gi, '\\begin{tabular}')
   s = s.replace(/\\text\s*\{\s*end\s*\}\s*\{\s*tabular\s*\}/gi, '\\end{tabular}')
   const beginAt = s.search(TABULAR_BEGIN)
@@ -494,6 +510,10 @@ export function flattenTabularMatchLists(text) {
   }
   const body = rest.slice(0, endRel)
   const intro = s.slice(0, beginAt).trim()
+
+  // Second column labelled (i)…(iv) is not a (1)…(5) List-II: keep the paper's table.
+  const romanRight = (body.match(/&\s*\(\s*(?:i{1,3}|iv|vi{0,3}|ix|x)\s*\)/gi) || []).length
+  if (endRel < rest.length && romanRight >= 2 && !/&\s*\(\s*[1-5]\s*\)/.test(body)) return s
 
   let rows = splitTopLevelLatex(body, '\\\\')
   if (rows.length < 3) {
@@ -581,6 +601,34 @@ function countMarkers(text, letters) {
   return letters.filter((L) => new RegExp(`\\(\\s*${escapeRe(L)}\\s*\\)`).test(text)).length
 }
 
+/** JEE Advanced 2022+: List-I (I)–(IV) × List-II (P)–(T). */
+const ROMAN_LIST_I = ['I', 'II', 'III', 'IV']
+
+/** @param {unknown} text */
+function hasRomanListI(text) {
+  return countMarkers(String(text ?? ''), ROMAN_LIST_I) >= 2
+}
+
+const ALPHA_LIST_I = ['A', 'B', 'C', 'D']
+
+const ANSWER_KEY_ROW_RE = /\(\s*[A-D]\s*\)[^\n]{0,30}?(?:\\mathrm\{\s*)?[A-DPQRS]\s*\}?\s*(?:\\rightarrow|\\to\b|→|->)\s*(?:\\mathrm\{\s*)?\(?\s*[1-5IV]/g
+
+/** List-I lettered (A)–(D) with List-II (1)–(5), and no (P)–(S) rows. */
+function hasAlphaListI(text) {
+  const t = String(text ?? '').replace(ANSWER_KEY_ROW_RE, ' ')
+  return countMarkers(t, ALPHA_LIST_I) >= 2 && countMarkers(t, ['P', 'Q', 'R', 'S']) < 2
+}
+
+/** @param {{ label?: string }[] | null | undefined} rows */
+function rowsAreAlpha(rows) {
+  return (rows || []).some((r) => /^\(\s*[A-D]\s*\)$/.test(String(r?.label ?? '')))
+}
+
+/** @param {{ label?: string }[] | null | undefined} rows */
+function rowsAreRoman(rows) {
+  return (rows || []).some((r) => /^\(\s*(?:I{1,3}|IV)\s*\)$/.test(String(r?.label ?? '')))
+}
+
 /** @param {string} s */
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -628,8 +676,8 @@ export function stripMarkdownBoldOutsideMath(text) {
 /** @param {string} after */
 function listBodyFollows(after) {
   const s = String(after ?? '')
-  if (/^\s*\(\s*[APQR1]\s*\)/.test(s)) return true
-  if (/^\s*\*+\s*\(\s*[APQR1]\s*\)/.test(s)) return true
+  if (/^\s*\(\s*(?:[APQR1]|I{1,3}|IV)\s*\)/.test(s)) return true
+  if (/^\s*\*+\s*\(\s*(?:[APQR1]|I{1,3}|IV)\s*\)/.test(s)) return true
   if (/^\s*\n/.test(s)) return true
   if (/^\s*\}/.test(s) && /\\end\{figure\}/i.test(s.slice(0, 48))) return true
   const nextHeader = s.slice(1).search(/(?:List|Column)\s*[-–]?\s*I{1,2}\b/i)
@@ -666,7 +714,8 @@ function listTwoBlockLooksUsable(block) {
   const t = String(block ?? '')
   if (!t.trim()) return false
   const labels = t.match(/\(\s*[1-5]\s*\)/g) || []
-  if (labels.length < 4) return false
+  const letterLabels = t.match(/\(\s*[PQRSTU]\s*\)/g) || []
+  if (labels.length < 4 && letterLabels.length < 4) return false
   // $3 C_{0\n$} style smash
   if (/\$[^$\n]{0,80}\n\s*\$/.test(t.slice(0, 320))) return false
   // Mapping keys glued into List-II values
@@ -706,7 +755,8 @@ export function optionsLookLikeMatchAnswers(options) {
   if (opts.length < 2) return false
   const mapping = opts.filter((o) =>
     /\(\s*P\s*\)\s*\$?\s*(?:\\rightarrow|→|->)/i.test(o) ||
-    /\bP\s*\$?\s*(?:\\rightarrow|→|->)\s*\$?\s*\(?[1-5QRS]/i.test(o) ||
+    /(?:^|[\s(;,])I\s*\)?\s*\$?\s*(?:\\rightarrow|→|->)[\s\S]*\bII\s*\)?\s*\$?\s*(?:\\rightarrow|→|->)/.test(o) ||
+    /\bP\s*\}?\s*\$?\s*(?:\\rightarrow|→|->)\s*\$?\s*\(?[1-5QRS]/i.test(o) ||
     /\bP\s*[-–]\s*[1-5]\b/i.test(o) && /\bQ\s*[-–]\s*[1-5]\b/i.test(o),
   )
   return mapping.length >= 2
@@ -892,6 +942,29 @@ function recoverMatchListIntro(raw, intro, listIHeadIndex) {
   return out
 }
 
+/**
+ * "Match List I of the nuclear processes with List II …" with no List-I heading line
+ * (2013 P2 Q19): the List-I found is a word in the sentence, so the whole sentence up to
+ * the first row is the intro, not just "Match". '' when the List-I found is a heading.
+ * @param {string} raw
+ * @param {{ index: number, end: number } | null | undefined} head
+ */
+function sentenceIntroAroundListWord(raw, head) {
+  if (!head) return ''
+  const src = String(raw ?? '')
+  const lineStart = src.lastIndexOf('\n', head.index - 1) + 1
+  const lineEndAt = src.indexOf('\n', head.end)
+  const lineEnd = lineEndAt < 0 ? src.length : lineEndAt
+  const before = src.slice(lineStart, head.index)
+  const after = src.slice(head.end, lineEnd)
+  if (!/[A-Za-z]/.test(before)) return ''
+  if (!/^[ \t]*[,:]?[ \t]*[A-Za-z]+[ \t]+[A-Za-z]+/.test(after)) return ''
+  if (LIST_ROW_MARKER_RE.test(after)) return ''
+  const rowAt = src.slice(lineEnd).search(/\n[ \t]*\(\s*(?:[PQRSTABCD1-5]|I{1,3}|IV)\s*\)/)
+  const cut = rowAt < 0 ? lineEnd : lineEnd + rowAt
+  return src.slice(0, cut).trim()
+}
+
 /** Keep the Mathpix figure that sits above \caption{List-I} / \caption{List-II}. */
 function includePrecedingFigure(text, head) {
   if (!head) return head
@@ -913,6 +986,12 @@ function includePrecedingFigure(text, head) {
     /\bas shown in (?:the )?(?:figure|P-T|P-V|diagram)/i.test(
       text.slice(Math.max(0, at - 160), at),
     )
+  ) {
+    return head
+  }
+  if (
+    /\bas shown in the figure\b(?!s)/i.test(text.slice(0, at)) &&
+    extractMathpixImageUrls(before).length === 1
   ) {
     return head
   }
@@ -971,7 +1050,7 @@ export function splitMatchListItems(block, letters) {
     if (echo >= 0) body = body.slice(0, echo).trim()
     return { label: `(${h.letter})`, text: body }
   })
-  return letters.every((L) => /^[1-5]$/.test(L)) ? peelTrailingListFigures(rows, letters) : rows
+  return letters.every((L) => /^[1-6]$/.test(L)) ? peelTrailingListFigures(rows, letters) : rows
 }
 
 /**
@@ -995,8 +1074,10 @@ function peelTrailingListFigures(items, letters) {
     const head = text.slice(0, cut).trim()
     const tail = text.slice(cut).trim()
     const tailIsFigure = /^(?:\\includegraphics\{[^}]+\}\s*|!\[[^\]]*\]\([^)]+\)\s*)+$/.test(tail)
+    // A multi-line row ("Scheme IV" with its reaction steps) owns the picture under it.
     const headIsValue =
       head.length < 160 &&
+      !head.includes('\n') &&
       !/includegraphics|<smiles>/i.test(head) &&
       (/\\frac|\\sqrt|\\mathrm/.test(head) || looksLikePhysicsListTwoValue(head))
     if (!tailIsFigure || !headIsValue) {
@@ -1078,14 +1159,23 @@ export function itemsFromMathpixFigures(block, labels = ['1', '2', '3', '4', '5'
 const MEDIA_TOKEN_RE =
   /(?:List|Column)\s*[-–]?\s*II\b|(?:List|Column)\s*[-–]?\s*I(?!I)\b|\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[\s*[^\]]*\]\s*\(\s*https?:\/\/cdn\.mathpix\.com[^\s)]+\)?|<smiles>[\s\S]*?<\/smiles>|\(\s*[PQRS1-5]\s*\)/gi
 
-function mediaTokenKind(tok) {
+const MEDIA_TOKEN_ROMAN_RE =
+  /(?:[Ll][Ii][Ss][Tt]|[Cc]olumn|COLUMN)\s*[-–]?\s*II\b|(?:[Ll][Ii][Ss][Tt]|[Cc]olumn|COLUMN)\s*[-–]?\s*I(?!I)\b|\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[\s*[^\]]*\]\s*\(\s*https?:\/\/cdn\.mathpix\.com[^\s)]+\)?|<smiles>[\s\S]*?<\/smiles>|\(\s*(?:[PQRSTU]|I{1,3}|IV)\s*\)/g
+
+const MEDIA_TOKEN_ALPHA_RE = new RegExp(MEDIA_TOKEN_RE.source.replace('[PQRS1-5]', '[A-D1-5]'), 'gi')
+
+function mediaTokenKind(tok, roman = false, alpha = false) {
   const t = String(tok ?? '')
   if (/^(?:List|Column)\s*[-–]?\s*II\b/i.test(t)) return 'ii'
   if (/^(?:List|Column)\s*[-–]?\s*I(?!I)\b/i.test(t)) return 'i'
   if (/^\\includegraphics|^!\[|<smiles>/i.test(t)) return 'media'
-  const L = t.match(/^\(\s*([PQRS1-5])\s*\)$/i)?.[1]
+  if (roman) {
+    if (/^\(\s*(?:I{1,3}|IV)\s*\)$/.test(t)) return 'labI'
+    return /^\(\s*[PQRSTU]\s*\)$/.test(t) ? 'labII' : 'other'
+  }
+  const L = t.match(alpha ? /^\(\s*([A-D1-5])\s*\)$/i : /^\(\s*([PQRS1-5])\s*\)$/i)?.[1]
   if (!L) return 'other'
-  return /[PQRS]/i.test(L) ? 'labI' : 'labII'
+  return /\d/.test(L) ? 'labII' : 'labI'
 }
 
 function tokenToMediaText(tok) {
@@ -1104,7 +1194,11 @@ function tokenToMediaText(tok) {
 export function parseMediaMatchLists(text) {
   const raw = normalizeBrokenMathpixGraphics(String(text ?? ''))
   if (!/\\includegraphics|cdn\.mathpix\.com|<smiles>/i.test(raw)) return null
-  const tokens = [...raw.matchAll(MEDIA_TOKEN_RE)]
+  const roman = hasRomanListI(raw)
+  const alpha = !roman && hasAlphaListI(raw)
+  const lettersI = roman ? ROMAN_LIST_I : alpha ? ALPHA_LIST_I : ['P', 'Q', 'R', 'S']
+  const lettersII = roman ? ['P', 'Q', 'R', 'S', 'T', 'U'] : ['1', '2', '3', '4', '5']
+  const tokens = [...raw.matchAll(roman ? MEDIA_TOKEN_ROMAN_RE : alpha ? MEDIA_TOKEN_ALPHA_RE : MEDIA_TOKEN_RE)]
   if (tokens.length < 3) return null
   /** @type {Record<string, string>} */
   const rowsI = {}
@@ -1120,9 +1214,18 @@ export function parseMediaMatchLists(text) {
   const seenLabelsI = new Set()
   let side = 'I'
   let introEnd = tokens[0]?.index ?? 0
-  for (const m of tokens) {
+  // "<smiles>…</smiles>\n$+\mathrm{HNO}_{2}$": the reagent after a drawing belongs to that row.
+  const reagentAfter = (at) => {
+    const m = tokens[at]
+    const end = (m.index ?? 0) + m[0].length
+    const stop = tokens[at + 1]?.index ?? raw.length
+    const gap = raw.slice(end, stop).split(/\n[ \t]*\n/)[0].trim()
+    if (!gap || gap.length > 120) return ''
+    return /^(?:\$\s*)?\+|^\$?\s*\\(?:longrightarrow|xrightarrow|rightarrow)\b/.test(gap) ? gap : ''
+  }
+  for (const [at, m] of tokens.entries()) {
     const tok = m[0]
-    const kind = mediaTokenKind(tok)
+    const kind = mediaTokenKind(tok, roman, alpha)
     if (kind === 'i') {
       side = 'I'
       pendingQueueII.length = 0
@@ -1147,8 +1250,9 @@ export function parseMediaMatchLists(text) {
       continue
     }
     if (kind !== 'media') continue
-    const body = tokenToMediaText(tok)
-    if (!body) continue
+    const drawn = tokenToMediaText(tok)
+    if (!drawn) continue
+    const body = [drawn, reagentAfter(at)].filter(Boolean).join('\n')
     if (side === 'II' && pendingQueueII.length) {
       const L = pendingQueueII.pop()
       rowsII[L] = [rowsII[L], body].filter(Boolean).join('\n')
@@ -1172,12 +1276,12 @@ export function parseMediaMatchLists(text) {
       }
     }
   }
-  fill(rowsI, unlabeledI, ['P', 'Q', 'R', 'S'])
-  fill(rowsII, unlabeledII, ['1', '2', '3', '4', '5'])
-  const listI = ['P', 'Q', 'R', 'S']
+  fill(rowsI, unlabeledI, lettersI)
+  fill(rowsII, unlabeledII, lettersII)
+  const listI = lettersI
     .filter((L) => rowsI[L] || seenLabelsI.has(L))
     .map((L) => ({ label: `(${L})`, text: rowsI[L] || '' }))
-  const listII = ['1', '2', '3', '4', '5']
+  const listII = lettersII
     .filter((L) => rowsII[L])
     .map((L) => ({ label: `(${L})`, text: rowsII[L] }))
   if (listI.length < 2) return null
@@ -1230,13 +1334,37 @@ function fillEmptyMatchRows(parsedRows, mediaRows, order) {
 function preferRicherMatchParse(parsed, media) {
   if (!media?.listI?.length) return parsed
   if (!parsed?.listI?.length) return media
-  const parsedS = parsed.listI.some((x) => x.label === '(S)')
-  const mediaS = media.listI.some((x) => x.label === '(S)')
+  const roman = rowsAreRoman(parsed.listI) || rowsAreRoman(media.listI)
+  if (roman && rowsAreRoman(parsed.listI) !== rowsAreRoman(media.listI)) {
+    return rowsAreRoman(parsed.listI) ? parsed : media
+  }
+  const alpha = !roman && rowsAreAlpha(media.listI)
+  const lettersI = roman ? ROMAN_LIST_I : alpha ? ALPHA_LIST_I : ['P', 'Q', 'R', 'S']
+  const lettersII = roman ? ['P', 'Q', 'R', 'S', 'T', 'U'] : ['1', '2', '3', '4', '5']
+  const lastI = `(${lettersI[lettersI.length - 1]})`
+  const parsedS = parsed.listI.some((x) => x.label === lastI)
+  const mediaS = media.listI.some((x) => x.label === lastI)
+  // Media rows win when they add rows; text rows ((P) $$…$$ beside a picture (S)) still fill their blanks.
   const listI =
     media.listI.length > parsed.listI.length || (mediaS && !parsedS)
-      ? media.listI
-      : fillEmptyMatchRows(parsed.listI, media.listI, ['P', 'Q', 'R', 'S'])
-  let listII = fillEmptyMatchRows(parsed.listII, media.listII, ['1', '2', '3', '4', '5'])
+      ? fillEmptyMatchRows(media.listI, parsed.listI, lettersI)
+      : fillEmptyMatchRows(parsed.listI, media.listI, lettersI)
+  let listII = fillEmptyMatchRows(parsed.listII, media.listII, lettersII)
+  // A picture the text rows or the intro already show ("Scheme IV" with its reaction, the
+  // pathway drawings above List-I) is not an extra List-II row (2014 P2 Q37/Q38).
+  const parsedII = (parsed.listII || []).filter((row) => String(row.text ?? '').trim())
+  if (parsedII.length >= 4) {
+    const shown = new Set(
+      [parsed.intro, ...(parsed.listI || []).map((row) => row.text), ...parsedII.map((row) => row.text)]
+        .flatMap((t) => extractMathpixImageUrls(String(t ?? ''))),
+    )
+    const own = new Set(parsedII.map((row) => row.label))
+    listII = listII.filter((row) => {
+      if (own.has(row.label)) return true
+      const urls = extractMathpixImageUrls(String(row.text ?? ''))
+      return !urls.length || !urls.every((u) => shown.has(u))
+    })
+  }
   const listIMedia = new Set(
     listI
       .map((row) => String(row.text ?? ''))
@@ -1254,6 +1382,31 @@ function preferRicherMatchParse(parsed, media) {
     listI,
     listII,
   }
+}
+
+const MATCH_OUTRO_RE =
+  /\n\s*(?=Which (?:one )?of the following\b|Match (?:each|the)\b|\[?\s*Given\s*:|The correct (?:option|match)\b|Choose the correct\b)/i
+
+/** The question line printed under the lists, not part of the last row. */
+function peelRowOutro(rows) {
+  const list = Array.isArray(rows) ? rows : []
+  const last = list[list.length - 1]
+  const t = String(last?.text ?? '')
+  const at = t.search(MATCH_OUTRO_RE)
+  if (at <= 0 || !t.slice(0, at).trim()) return { rows: list, outro: '' }
+  return {
+    rows: [...list.slice(0, -1), { ...last, text: t.slice(0, at).trim() }],
+    outro: t.slice(at).trim(),
+  }
+}
+
+function withMatchListOutro(parsed) {
+  if (!parsed?.listI?.length) return parsed
+  const a = peelRowOutro(parsed.listI)
+  const b = peelRowOutro(parsed.listII)
+  const outro = [parsed.outro, a.outro, b.outro].filter(Boolean).join('\n\n')
+  if (!outro) return parsed
+  return { ...parsed, listI: a.rows, listII: b.rows, outro }
 }
 
 const MATCH_PARSE_MAX_CHARS = 24_000
@@ -1283,12 +1436,67 @@ export function parseMatchingListForDisplay(text, options) {
       : String(options)
   const key = `${optKey}\u0000${t}`
   if (matchParseCache.has(key)) return matchParseCache.get(key) ?? null
-  const parsed = parseMatchingListForDisplayNoCache(t, options)
+  let parsed = parseMatchingListForDisplayNoCache(t, options)
+  const rowCount = (p) => (p?.listI?.length ?? 0) + (p?.listII?.length ?? 0)
+  // Picture rows "(P)" with a bare "1." List-II (2014 P2 Q18) parse List-I alone; read the bare labels too.
+  if (!parsed || (parsed.listI?.length ?? 0) < 2 || (parsed.listII?.length ?? 0) < 2) {
+    const labelled = labelBareListRows(t)
+    if (labelled !== t) {
+      const again = parseMatchingListForDisplayNoCache(labelled, options)
+      if (again && rowCount(again) > rowCount(parsed)) parsed = again
+    }
+  }
+  // One original-page picture of both lists is the whole table, not row (P) of List-I.
+  if (
+    parsed?.listI?.length === 1 &&
+    !parsed.listII?.length &&
+    /^\s*\\includegraphics(?:\[[^\]]*\])?\{\s*\/api\/official-pyq\/original\/crops\/[^}]*\}\s*$/.test(String(parsed.listI[0]?.text ?? ''))
+  ) {
+    parsed = null
+  }
+  if (picturesReadAsOneRowLists(parsed, t)) parsed = null
   if (matchParseCache.size >= MATCH_PARSE_CACHE_MAX) {
     matchParseCache.delete(matchParseCache.keys().next().value)
   }
   matchParseCache.set(key, parsed)
   return parsed
+}
+
+const PICTURE_ONLY_ROW_RE = /^\s*(?:\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]*\))\s*$/
+const LIST_I_HEADING_LINE_RE =
+  /(?:^|\n)[ \t]*\**[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*I[ \t]*\**[ \t]*(?:\n|$)|\\caption\{\s*(?:List|Column)\s*[-–]?\s*I\s*\}/i
+
+/**
+ * Pictures read as row (P) and rows (1)… when the lists are named only in a sentence: the
+ * drawing above the table and the picture of the whole table (2020 P1 Q24). The words between
+ * them were dropped; the stem draws as written instead.
+ * @param {MatchingListDisplay | null} parsed
+ * @param {string} text
+ */
+function picturesReadAsOneRowLists(parsed, text) {
+  const listI = parsed?.listI ?? []
+  const listII = parsed?.listII ?? []
+  if (listI.length !== 1 || !listII.length) return false
+  if (![...listI, ...listII].every((row) => PICTURE_ONLY_ROW_RE.test(String(row?.text ?? '')))) return false
+  return !LIST_I_HEADING_LINE_RE.test(text)
+}
+
+/**
+ * "LIST-I / P. The function f1 is" and "LIST-II / 1. NOT continuous / (2) <newline> continuous":
+ * bare "P." / "1." row labels and a label alone on its line become "(P) …" / "(2) …".
+ * Only between standalone List-I and List-II heading lines.
+ * @param {string} text
+ */
+function labelBareListRows(text) {
+  const t = String(text ?? '')
+  const one = t.match(/(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]*[ \t]*I[ \t]*(?=\n)/i)
+  const two = t.match(/(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]*[ \t]*II[ \t]*(?=\n)/i)
+  if (!one || !two || (two.index ?? 0) <= (one.index ?? 0)) return t
+  const joinLoneLabels = (s) => s.replace(/(^|\n)[ \t]*\(\s*([PQRSTU]|[1-6])\s*\)[ \t]*\n+[ \t]*(?=[^\s(])/g, '$1($2) ')
+  const head = t.slice(0, one.index)
+  const listOne = joinLoneLabels(t.slice(one.index, two.index).replace(/(^|\n)[ \t]*([PQRSTU])\.[ \t]+/g, '$1($2) '))
+  const listTwo = joinLoneLabels(t.slice(two.index).replace(/(^|\n)[ \t]*([1-6])\.[ \t]+/g, '$1($2) '))
+  return `${head}${listOne}${listTwo}`
 }
 
 function parseMatchingListForDisplayNoCache(text, options) {
@@ -1375,6 +1583,25 @@ function parseMatchingListForDisplayUnsafe(text, options) {
     return null
   }
 
+  // "List-I  List-II" printed side by side: both lists' rows follow the two headings.
+  // Each heading alone on its line, so "…considering List-I and List-II?" before the
+  // answer choices is not mistaken for the pair.
+  const stackedHeads = raw.match(
+    /(?:^|\n)[ \t]*\**[ \t]*((?:List|Column)[ \t]*[-–]?[ \t]*I)[ \t]*\**[ \t]*\n[ \t]*\**[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*II[ \t]*\**[ \t]*\n/i,
+  )
+  if (stackedHeads && stackedHeads.index != null) {
+    const rows = raw.slice(stackedHeads.index + stackedHeads[0].length)
+    const firstP = rows.search(/\(\s*P\s*\)/)
+    if (firstP > 0 && countMarkers(rows.slice(0, firstP), ROMAN_LIST_I) >= 2) {
+      const column = /column/i.test(stackedHeads[1])
+      intro = raw.slice(0, stackedHeads.index)
+      listITitle = column ? 'Column I' : 'List-I'
+      listIITitle = column ? 'Column II' : 'List-II'
+      listIBlock = `${listITitle}\n${rows.slice(0, firstP)}`
+      listIIBlock = `${listIITitle}\n${rows.slice(firstP)}`
+    }
+  }
+
   const optGlue = listIIBlock.search(/\(\s*A\s*\)\s*(?:\(|P|\\)/)
   if (optGlue > 8) listIIBlock = listIIBlock.slice(0, optGlue)
   const keyGlue = listIIBlock.search(
@@ -1419,14 +1646,17 @@ function parseMatchingListForDisplayUnsafe(text, options) {
 
   const pqrs = countMarkers(listIBlock, ['P', 'Q', 'R', 'S'])
   const abcd = countMarkers(listIBlock, ['A', 'B', 'C', 'D'])
+  const romanI = countMarkers(listIBlock, ROMAN_LIST_I)
   const mappingAbcd =
     abcd >= 2 &&
     /\(\s*A\s*\)\s*P\s*(?:\\rightarrow|→|->)|\(\s*A\s*\)\s*P\s*→/i.test(listIBlock)
-  const listILetters = mappingAbcd
-    ? ['P', 'Q', 'R', 'S']
-    : pqrs >= 3 && pqrs >= abcd
+  const listILetters = romanI >= 2 && romanI >= pqrs
+    ? ROMAN_LIST_I
+    : mappingAbcd
       ? ['P', 'Q', 'R', 'S']
-      : ['A', 'B', 'C', 'D']
+      : pqrs >= 3 && pqrs >= abcd
+        ? ['P', 'Q', 'R', 'S']
+        : ['A', 'B', 'C', 'D']
 
   let itemsI = splitMatchListItems(listIBlock, listILetters).filter((x) => String(x.text).trim())
   const mappingI =
@@ -1464,8 +1694,9 @@ function parseMatchingListForDisplayUnsafe(text, options) {
 
   const numCount = countMarkers(listIIBlock, ['1', '2', '3', '4'])
   const colPQ = countMarkers(listIIBlock, ['P', 'Q', 'R', 'S'])
+  /** List-II can run to (6) (2018 P2 Q33, Q51, Q52). */
   const listIILetters =
-    numCount >= 2 && numCount >= colPQ ? ['1', '2', '3', '4', '5'] : ['P', 'Q', 'R', 'S', 'T']
+    numCount >= 2 && numCount >= colPQ ? ['1', '2', '3', '4', '5', '6'] : ['P', 'Q', 'R', 'S', 'T', 'U']
 
   let itemsII = splitMatchListItems(listIIBlock, listIILetters).filter((x) => String(x.text).trim())
   // Labels present but bodies empty (missing figs) — do not steal List-I media.
@@ -1502,6 +1733,8 @@ function parseMatchingListForDisplayUnsafe(text, options) {
     return true
   })
 
+  const sentence = sentenceIntroAroundListWord(raw, listIHead)
+  if (sentence.length > intro.trim().length) intro = sentence
   intro = recoverMatchListIntro(
     raw,
     intro
@@ -1513,16 +1746,93 @@ function parseMatchingListForDisplayUnsafe(text, options) {
     listIHead?.index,
   )
 
-  return preferRicherMatchParse(
-    {
-      intro,
-      listITitle,
-      listIITitle,
-      listI: itemsI,
-      listII: itemsII,
-    },
-    media,
+  const parsed = withMatchListOutro(
+    preferRicherMatchParse(
+      {
+        intro,
+        listITitle,
+        listIITitle,
+        listI: itemsI,
+        listII: itemsII,
+      },
+      media,
+    ),
   )
+  return placeSchemeAboveLists(raw, withHeadingFiguresKept(parsed, [listIBlock, listIIBlock]))
+}
+
+const LIST_ROW_MARKER_RE = /\(\s*(?:[PQRSTUABCD1-6]|i{1,3}|iv|I{1,3}|IV)\s*\)/
+const FIGURE_CODE_RE = /\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]+\)/g
+
+const FIGURE_ONLY_RE = /\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]+\)/g
+
+/**
+ * The scheme sits above List-I, and the picture after row (S) is List-II (2014 P2 Q37).
+ * A picture that belongs on row (S) itself is left there.
+ * @param {string} raw
+ * @param {MatchingListDisplay | null} parsed
+ */
+function placeSchemeAboveLists(raw, parsed) {
+  if (!parsed?.listI?.length) return parsed
+  const listAt = String(raw).search(/(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*I(?!I)\b/i)
+  const scheme = listAt > 0 ? extractMathpixImageUrls(String(raw).slice(0, listAt)) : []
+  const bareScheme = (row) => {
+    const urls = extractMathpixImageUrls(row?.text)
+    const bare = !String(row?.text ?? '').replace(FIGURE_ONLY_RE, '').trim()
+    return bare && urls.length > 0 && urls.every((url) => scheme.includes(url))
+  }
+  const listI = parsed.listI.map((row) => ({ ...row }))
+  let listII = (parsed.listII || []).map((row) => ({ ...row }))
+  const last = listI[listI.length - 1]
+  const lastText = String(last?.text ?? '')
+  const lastUrls = extractMathpixImageUrls(lastText)
+  const words = lastText.replace(FIGURE_ONLY_RE, '').replace(/\s+/g, ' ').trim()
+  const rightIsScheme = listII.length === 1 && bareScheme(listII[0])
+  if (last && (listII.length === 0 || rightIsScheme) && lastUrls.length === 1 && words && words.length < lastText.trim().length) {
+    listI[listI.length - 1] = { ...last, text: words }
+    listII = [...listII, { label: '(1)', text: `\\includegraphics{${lastUrls[0]}}` }]
+  }
+  let intro = String(parsed.intro ?? '')
+  if (scheme.length && listII.length > 1) {
+    const kept = []
+    for (const row of listII) {
+      if (!bareScheme(row)) {
+        kept.push(row)
+        continue
+      }
+      if (!extractMathpixImageUrls(intro).some((url) => scheme.includes(url))) {
+        intro = `${intro}\n${scheme.map((url) => `\\includegraphics{${url}}`).join('\n')}`.trim()
+      }
+    }
+    listII = kept
+  }
+  return { ...parsed, intro, listI, listII }
+}
+
+/**
+ * A question drawing printed just above "List-I" (2014 P2 Q17 charges, Q19 incline) is pulled into
+ * the list block with the heading; when no row shows it, it stays under the question text.
+ */
+function withHeadingFiguresKept(parsed, blocks) {
+  if (!parsed?.listI?.length) return parsed
+  const shown = new Set(
+    [parsed.intro, parsed.outro, ...[...(parsed.listI || []), ...(parsed.listII || [])].map((row) => row?.text)]
+      .flatMap((t) => extractMathpixImageUrls(String(t ?? ''))),
+  )
+  const lost = []
+  for (const block of blocks) {
+    const text = String(block ?? '')
+    const first = text.search(LIST_ROW_MARKER_RE)
+    for (const code of (first < 0 ? '' : text.slice(0, first)).match(FIGURE_CODE_RE) || []) {
+      const urls = extractMathpixImageUrls(code)
+      if (urls.length && urls.every((u) => !shown.has(u))) {
+        urls.forEach((u) => shown.add(u))
+        lost.push(code)
+      }
+    }
+  }
+  if (!lost.length) return parsed
+  return { ...parsed, intro: [String(parsed.intro ?? '').trim(), ...lost].filter(Boolean).join('\n') }
 }
 
 /** Keep (4) on row 4 when (2) and (3) are absent. Do not slide later numbers up. */

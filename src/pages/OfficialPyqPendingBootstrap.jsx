@@ -36,7 +36,9 @@ function officialPyqStatusLabel(status) {
     case 'pending_review':
       return 'Pending approval'
     case 'approved':
-      return 'Published PYQ'
+      return 'Approved'
+    case 'published':
+      return 'Published'
     case 'rejected':
       return 'Rejected'
     default:
@@ -69,7 +71,7 @@ export default function OfficialPyqPendingBootstrap({
   const bump = useCallback(() => setTick((t) => t + 1), [])
   const [filter, setFilter] = useState(() => {
     const saved = readOfficialPyqUi().filter
-    return saved === 'all' || saved === 'approved' || saved === 'rejected' || saved === 'pending_review'
+    return saved === 'all' || saved === 'approved' || saved === 'published' || saved === 'rejected' || saved === 'pending_review'
       ? saved
       : 'pending_review'
   })
@@ -142,7 +144,8 @@ export default function OfficialPyqPendingBootstrap({
         <h1>Approve official papers</h1>
         <p className="form-hint">
           Pull or upload <strong>official</strong> previous-year papers (NTA / JEE Advanced archive). They stay in
-          this separate bank until you <strong>Approve &amp; publish</strong> — then they go to student{' '}
+          this separate bank. <strong>Reviewed — Approve</strong> checks a paper; then fill tags, answers, and
+          solutions; then <strong>Publish</strong> gives final Question IDs and sends it to student{' '}
           <Link to="/pyq">PYQ Bank</Link> and Question Bank. Coaching-site scrapes are not allowed.
         </p>
         <p className="form-hint">
@@ -201,7 +204,8 @@ export default function OfficialPyqPendingBootstrap({
         <div className="bank-tabs official-pyq-list-tabs" role="tablist" aria-label="Paper lists">
           {[
             ['pending_review', 'Pending approval'],
-            ['approved', 'Published PYQ'],
+            ['approved', 'Approved'],
+            ['published', 'Published'],
             ['rejected', 'Rejected'],
             ['all', 'All'],
           ].map(([id, label]) => (

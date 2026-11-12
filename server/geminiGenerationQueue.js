@@ -1,4 +1,4 @@
-﻿/**
+/**
  * One-at-a-time Gemini generation queue — stays near free-tier ~10 RPM.
  */
 

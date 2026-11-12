@@ -192,6 +192,11 @@ const NEXT_QUESTION_RE =
   /\s+(?:\d{1,3}\.\s*)?If\s+(?:\\vec|\$\\vec|\$?\\hat)|\s+(?:Let|Given)\s+\\vec\{|\s+If\s+\$\\vec\{|\s+If\s+\$\\hat\{/i
 
 const BULK_NEXT_RE = /\n\s*(?:Q\s*\d|Question\s*\d|\d{1,3}\.\s*If\s|r\s+r\s*\^)/i
+/** Last option before a page break: "7/3 \end{itemize} PHYSICS \begin{itemize}". */
+const LIST_PAGE_TAIL_RE =
+  /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}(?:\s*(?:\\(?:begin|end)\{(?:itemize|enumerate)\}|\\section\*?\{[^{}]*\}|(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\b))*\s*$/
+/** A line break left after an option sentence: "… is zero. \\" (2025 P2 Q23). */
+const TRAILING_LINE_BREAK_RE = /(?:\s*\\\\)+\s*$/
 
 /** Stem phrases that indicate duplicated question text — NOT "is equal to" (valid in options). */
 const STEM_TAIL_LEAK_RE =
@@ -275,8 +280,14 @@ export function stripNextSubQuestionFromOption(opt) {
   const valueLeak = o.search(/\s+Value\s+of\s+(?:\$|\\frac|\\sum|\\dfrac)/i)
   if (valueLeak > 4 && /^[\d$\\]/.test(o)) o = o.slice(0, valueLeak).trim()
 
+  const numbered = [...o.matchAll(/\s+\d{1,2}([.)])\s+/g)].find((m) => {
+    if (m[1] !== ')') return true
+    /** "(-2, 7) lies in" — the ")" closes the point, it does not number a new question (2018 P2 Q38). */
+    const before = o.slice(0, m.index)
+    return (before.match(/\(/g) || []).length <= (before.match(/\)/g) || []).length
+  })
+  if (numbered) o = o.slice(0, numbered.index)
   o = o
-    .replace(/\s+\d{1,2}[\.\)]\s+.*$/s, '')
     .replace(/\s+Value\s+of\b.*$/is, '')
     .replace(/\s*\(\s*A\s*\)\s*.*$/is, '')
     .trim()
@@ -298,7 +309,9 @@ export function stripNextQuestionFromOptions(options) {
 }
 
 export function trimQuestionLeakFromOption(opt, stem = '') {
-  let o = stripNextSubQuestionFromOption(String(opt ?? '').trim())
+  let o = stripNextSubQuestionFromOption(
+    String(opt ?? '').trim().replace(LIST_PAGE_TAIL_RE, '').replace(TRAILING_LINE_BREAK_RE, ''),
+  )
   if (!o) return o
 
   if (hasOptionEqualityAnswer(o) || hasMultiVectorOption(o)) {
@@ -377,12 +390,29 @@ export function trimTrailingProseAfterMath(opt) {
   }
   if (
     /^and\s+\$/.test(tail) ||
+    /** An oxidation state or phase after the formula: "$F e$ (III)" (2013 P1 Q26). */
+    /^\(\s*(?:[IVX]{1,4}|[+-]?\d[+-]?|aq|g|l|s)\s*\)\s*[.,]?$/.test(tail) ||
     hasOptionEqualityAnswer(tail) ||
-    hasMeaningfulOptionAnswerTail(tail)
+    hasMeaningfulOptionAnswerTail(tail) ||
+    isOptionClauseTail(tail)
   ) {
     return o
   }
   return m[1].trim()
+}
+
+/**
+ * "is increasing in $(0, \infty)$" or "in $(0, \infty)$" after the first formula is the
+ * option itself (2017 P2 Q46). A run-on ("is equal to"), a new sentence, or page chrome is not.
+ * @param {string} tail
+ */
+function isOptionClauseTail(tail) {
+  const t = String(tail ?? '').trim()
+  if (!t || t.length > 120 || !/^[a-z]/.test(t)) return false
+  if (/[.?!:]\s+[A-Z]|\bthen\b|rough\s+work|\bQ\s*\.\s*\d/i.test(t)) return false
+  const prose = t.replace(/\$[^$]*\$/g, ' $ ').trim()
+  if (/\b(?:to|of|is|are|the|a|an|and|or|that|by|for|with|in|on|at|from|as|than|where|which)\s*[.,]?$/i.test(prose)) return false
+  return prose.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length <= 10
 }
 
 /**

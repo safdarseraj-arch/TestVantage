@@ -195,6 +195,12 @@ export function stripTrailingPyqSectionHeader(text) {
     .replace(/\\section\*?\{[^}]*SECTION[\s\S]*$/i, '')
     .replace(/\\section\*?\{?\s*SECTION[\s\S]*$/i, '')
     .replace(/\n+\s*SECTION\s+[A-Z0-9()][\s\S]*$/i, '')
+    // $\$$\$ PART-II: the next part's heading, with OCR dollar junk, glued under the last stem.
+    .replace(/\n+[ \t]*[$\\]*[ \t]*PART\s*[-\u2013\u2014]?\s*(?:IV|I{1,3}|[1-3])\b[^\n]*$/i, '')
+    // "END OF PART I : PHYSICS" left above that heading (2016 P1 Q18, Q36).
+    .replace(/\n+[ \t]*(?:\\section\*?\{\s*)?END\s+OF\s+(?:PART\s*[-\u2013\u2014]?\s*(?:IV|I{1,3}|[1-4])\b|THE\s+QUESTION\s+PAPER\b)[^\n]*$/i, '')
+    // "JEE (ADVANCED) 2019 PAPER 2 PART-II CHEMISTRY": the next part's page heading glued onto option D.
+    .replace(/\s*(?:\\section\*?\{\s*)?JEE\s*\(\s*ADVANCED\s*\)\s*\d{4}\s*PAPER\s*[12]\b[^\n]*$/i, '')
     .replace(/\s+SECTION\s+\d+\s*(?:\(Maximum Marks:[^)]*\))?[\s\S]*$/i, '')
     .replace(/\bThis section contains\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)[\s\S]*$/i, '')
     // Trailing marking-scheme chrome glued after a real stem (OCR option leak).
@@ -507,7 +513,13 @@ export function looksLikePyqSectionInstructionStem(stem) {
     return false
   }
   if (/^\s*section\s+[a-z0-9()]/i.test(t)) return true
-  if (/\bsection\s+[a-z0-9()]/i.test(t.slice(0, 80)) && !/^\d{1,2}[\.\)]/.test(t)) return true
+  // "Area of the cross-section of a wire" is a question, not a SECTION header.
+  if (
+    /(?<![\w-])section\s*[-–]?\s*(?:\d+\b|[A-D]\b|\(\s*[A-D0-9]+\s*\)|[IVX]+\b)/i.test(t.slice(0, 80)) &&
+    !/^\d{1,2}[\.\)]/.test(t)
+  ) {
+    return true
+  }
   if (/\bmaximum marks\b/i.test(t) && !looksLikeQuestionBlock(t)) return true
   if (/\bthis section contains\b/i.test(inspect) && !looksLikeQuestionBlock(inspect)) return true
   if (/\bcontains\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)\s*(?:\(\d+\))?\s*(?:questions?|matching list)/i.test(t)) {

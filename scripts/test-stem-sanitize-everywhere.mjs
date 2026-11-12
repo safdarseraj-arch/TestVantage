@@ -25,8 +25,10 @@ import { normalizeStemForStorage } from '../src/utils/stemStorage.js'
 
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const previewMathSrc = readFileSync(join(SRC_ROOT, 'src/pages/OfficialPyqPreviewMath.jsx'), 'utf8')
+const cardAsShownSrc = readFileSync(join(SRC_ROOT, 'src/utils/officialPyqCardAsShown.js'), 'utf8')
+assert.match(previewMathSrc, /officialPyqCardAsShown\(q, sourceText\)/, 'Preview draws the shared card view')
 assert.match(
-  previewMathSrc,
+  cardAsShownSrc,
   /healUploadQuestionCard\(q, sourceText\)/,
   'Rejected/pending/published preview must apply the shared heal',
 )
@@ -210,8 +212,9 @@ assert.doesNotMatch(q51Sanitized, /!\[\]\(\$https/)
 const q51Parsed = parseMatchingListForDisplay(q51Sanitized)
 assert.ok(q51Parsed)
 assert.equal(q51Parsed.listI.length, 4)
-assert.match(q51Parsed.listI.find((x) => x.label === '(Q)').text, /width=756/)
-assert.match(q51Parsed.listI.find((x) => x.label === '(R)').text, /width=756/)
+assert.match(q51Parsed.listI.find((x) => x.label === '(Q)').text, /width=116&top_left_y=840/)
+assert.match(q51Parsed.listI.find((x) => x.label === '(R)').text, /width=183&top_left_y=1153/)
+assert.match(q51Parsed.listI.find((x) => x.label === '(S)').text, /width=756&top_left_y=1475/)
 
 const q46Saved = persistQuestionForBank({
   text: Q46,
@@ -313,7 +316,7 @@ assert.match(q50Parsed.intro, /reaction sequences/)
 assert.doesNotMatch(q50Parsed.intro, /^\s*$/)
 const q50San = sanitizeStemForDisplay(Q50_BODY)
 assert.match(q50San, /width=767/)
-assert.doesNotMatch(q50San, /width=119/)
+assert.match(q50San, /width=119&top_left_y=411/, 'List-I (P) figure keeps its OCR crop')
 
 const Q50_LIVE =
   Q50_BODY +
@@ -734,5 +737,22 @@ const recoveredYdse = recoverOfficialPyqPassageFromSource(
 )
 assert.match(String(recoveredYdse.passageText), /as shown in the figure/)
 assert.match(String(recoveredYdse.passageText), /ydse\.png/)
+
+const Q51_THEN =
+  'Consider $M$ with $r=\\frac{1025}{513}$. Let $k$ be the number of all those circles $C_{n}$ that are inside $M$. Then'
+assert.equal(stemLooksIncompleteOnDisplay(Q51_THEN), true, 'a lone "Then" with no options is torn')
+assert.equal(
+  stemLooksIncompleteOnDisplay(Q51_THEN, ['$k+2 l=22$', '$2 k+l=26$', '$2 k+3 l=34$', '$3 k+2 l=40$']),
+  false,
+  'options finish a stem that ends in "Then"',
+)
+
+const Q39_SETS =
+  'Let $$\\begin{gathered} S_{1}=\\{1\\}, \\\\ S_{2}=\\{2\\} \\end{gathered}$$ and $$S_{4}=\\{(i, j, k, l): i, j, k \\text { and } l \\text { are distinct elements in }\\{1,2, \\ldots, 10\\}\\} .$$ If the total number is $n_{r}$, then TRUE ?'
+const q39Prep = prepareTextForMathTextDisplay(sanitizeStemForDisplay(Q39_SETS))
+assert.match(q39Prep, /\$\$\\begin\{gathered\}/, 'stacked sets stay display math')
+assert.match(q39Prep, /\$\$S_\{4\}=/, 'a long set definition stays display math')
+const Q53_G = 'and\n$$g(x)=\\int_{0}^{x^{2}} \\sqrt{t} e^{-t} d t, \\quad x>0$$'
+assert.match(prepareTextForMathTextDisplay(Q53_G), /\$\$g\(x\)=\\int_/, 'an integral with limits stays display math')
 
 console.log('test-stem-sanitize-everywhere: ok')

@@ -3,6 +3,7 @@
  * KaTeX cannot render tabular; array + $$ is the permanent display path.
  */
 import katex from 'katex'
+import { localPictureOnErrorAttr } from './mathpixLocalPictures.js'
 
 /** Read one `{...}` group. Nested braces and `\{` stay inside. */
 function readBraceGroup(s, i) {
@@ -51,22 +52,47 @@ export function expandUnsupportedTableCommands(text) {
   return out + s.slice(last)
 }
 
+/** One \left / \right delimiter: \{ \| \langle \lVert \lfloor …, or ( [ | . / ) ]. */
+export const LATEX_FENCE = String.raw`(?:\\[a-zA-Z]+|\\[{}|]|[()[\]|./<>])`
+
 /** \left( and \right) inside a table cell clip the header. Plain parentheses stay. */
+const LEFT_BEFORE_FENCE = new RegExp(String.raw`\\left\s*(?=${LATEX_FENCE})`, 'g')
+const RIGHT_BEFORE_FENCE = new RegExp(String.raw`\\right\s*(?=${LATEX_FENCE})`, 'g')
+
+function dropLeftRight(s) {
+  return s.replace(LEFT_BEFORE_FENCE, '').replace(RIGHT_BEFORE_FENCE, '')
+}
+
 function softenLeftRightInTables(text) {
   return String(text ?? '').replace(
-    /\\begin\{(?:tabular|array)\}[\s\S]*?\\end\{(?:tabular|array)\}/gi,
-    (block) =>
-      block
-        .replace(/\\left\s*(?=[([|./])/g, '')
-        .replace(/\\right\s*(?=[)\]|./])/g, ''),
+    /\\begin\{(tabular|array)\}[\s\S]*?\\end\{\1\}/gi,
+    (block, env) => {
+      if (env.toLowerCase() !== 'array') return dropLeftRight(block)
+      // In a math array a \left … \right pair inside one cell draws fine; only a pair split across cells breaks.
+      return block
+        .split(/(&|\\\\)/)
+        .map((cell, i) => {
+          if (i % 2 === 1) return cell
+          const opens = (cell.match(/\\left\b/g) || []).length
+          const closes = (cell.match(/\\right\b/g) || []).length
+          return opens === closes ? cell : dropLeftRight(cell)
+        })
+        .join('')
+    },
   )
 }
 
 /** Cells are already in math once wrapped in $$ — leftover $…$ breaks KaTeX. */
-export function stripDollarsInsideLatexEnvs(text) {
+export function stripDollarsInsideLatexEnvs(text, { keepMatchListTabular = false } = {}) {
   return String(text ?? '').replace(
-    /(\\begin\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix)\}[\s\S]*?\\end\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix)\})/gi,
-    (block) => block.replace(/\$+/g, ''),
+    /(\\begin\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix|aligned|align\*?|gathered|split)\}[\s\S]*?\\end\{(?:array|cases|tabular|bmatrix|pmatrix|vmatrix|matrix|aligned|align\*?|gathered|split)\})/gi,
+    (block) =>
+      // A List-I / List-II table holds prose cells; its $...$ are later flattened into rows, not typeset as one array.
+      keepMatchListTabular &&
+      /^\\begin\{tabular\}/i.test(block) &&
+      /(?:List|Column)\s*[-–]*\s*(?:I|1)\b/i.test(block)
+        ? block
+        : block.replace(/\$+/g, ''),
   )
 }
 
@@ -83,14 +109,104 @@ function scriptDigits(token, map) {
   return [...String(token ?? '')].map((ch) => map[ch] || ch).join('')
 }
 
+const CELL_SYMBOLS = {
+  equiv: '≡',
+  rightarrow: '→',
+  longrightarrow: '⟶',
+  leftarrow: '←',
+  rightleftharpoons: '⇌',
+  times: '×',
+  cdot: '·',
+  circ: '°',
+  bullet: '•',
+  pm: '±',
+  leq: '≤',
+  geq: '≥',
+  neq: '≠',
+  approx: '≈',
+  infty: '∞',
+  degree: '°',
+  alpha: 'α',
+  beta: 'β',
+  gamma: 'γ',
+  delta: 'δ',
+  epsilon: 'ε',
+  varepsilon: 'ε',
+  eta: 'η',
+  theta: 'θ',
+  kappa: 'κ',
+  lambda: 'λ',
+  mu: 'μ',
+  nu: 'ν',
+  pi: 'π',
+  rho: 'ρ',
+  sigma: 'σ',
+  tau: 'τ',
+  phi: 'φ',
+  varphi: 'φ',
+  chi: 'χ',
+  psi: 'ψ',
+  omega: 'ω',
+  Gamma: 'Γ',
+  Delta: 'Δ',
+  Theta: 'Θ',
+  Lambda: 'Λ',
+  Pi: 'Π',
+  Sigma: 'Σ',
+  Phi: 'Φ',
+  Psi: 'Ψ',
+  Omega: 'Ω',
+}
+
+/**
+ * A tabular inside a tabular cell (Mathpix two-line headers: "Column J \\ Molecule")
+ * ends the outer table at the inner \end{tabular}. Fold each inner one into its cell text.
+ * @param {unknown} text
+ */
+export function flattenNestedTabulars(text) {
+  let s = String(text ?? '')
+  const innermost = /\\begin\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?((?:(?!\\begin\{tabular\})[\s\S])*?)\\end\{tabular\}/g
+  for (let guard = 0; guard < 20; guard += 1) {
+    let changed = false
+    s = s.replace(innermost, (full, body, offset, whole) => {
+      const before = whole.slice(0, offset)
+      const opens = (before.match(/\\begin\{tabular\}/g) || []).length
+      const closes = (before.match(/\\end\{tabular\}/g) || []).length
+      if (opens <= closes) return full
+      changed = true
+      return String(body)
+        .replace(/\\hline\b/g, ' ')
+        .replace(/\\\\/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    })
+    if (!changed) break
+  }
+  return s
+}
+
+const SUP_OPEN = '\u0004'
+const SUP_CLOSE = '\u0005'
+const SUB_OPEN = '\u0006'
+const SUB_CLOSE = '\u0007'
+
+/** Unicode has no raised "n", so `Z^{n+}` would read "Zn⁺" (zinc). HTML cells raise the whole script. */
+function scriptText(token, map, open, close, html) {
+  const t = String(token ?? '').trim()
+  if (!html || [...t].every((ch) => map[ch])) return scriptDigits(t, map)
+  return `${open}${t.replace(/-/g, '−')}${close}`
+}
+
 /** Table cell as upright words, with the spaces and subscripts the paper shows. */
-function cellPlain(raw) {
+function cellPlain(raw, { html = false } = {}) {
   let s = String(raw ?? '')
   s = s.replace(/\\(?:mathrm|mathbf|text|operatorname)\s*\{([^{}]*)\}/g, '$1')
+  s = s.replace(/\\([a-zA-Z]+)/g, (m, name) => (CELL_SYMBOLS[name] ? CELL_SYMBOLS[name] : m))
+  s = s.replace(/\s*≡\s*/g, '≡')
   s = s.replace(/\\,/g, ' ').replace(/~/g, ' ')
-  s = s.replace(/\^\{([^{}]+)\}/g, (_, n) => scriptDigits(n, SUPER_DIGIT))
-  s = s.replace(/\^(\d)/g, (_, n) => SUPER_DIGIT[n] || n)
-  s = s.replace(/_\{([^{}]+)\}/g, (_, n) => scriptDigits(n, SUB_DIGIT))
+  s = s.replace(/\^\{([^{}]+)\}/g, (_, n) => scriptText(n, SUPER_DIGIT, SUP_OPEN, SUP_CLOSE, html))
+  s = s.replace(/\^([\d+-])/g, (_, n) => SUPER_DIGIT[n] || n)
+  s = s.replace(/_\{([^{}]+)\}/g, (_, n) => scriptText(n, SUB_DIGIT, SUB_OPEN, SUB_CLOSE, html))
   s = s.replace(/_(\d)/g, (_, n) => SUB_DIGIT[n] || n)
   s = s.replace(/\\[a-zA-Z]+/g, '')
   s = s.replace(/[{}$]/g, '')
@@ -102,6 +218,50 @@ function escapeCell(text) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+}
+
+const BOLD_OPEN = '\u0001'
+const BOLD_CLOSE = '\u0002'
+const BOND_DASH = '\u0003'
+
+/**
+ * Cell HTML: bold atoms stay bold ("C–H bonds shown in bold"), formulas stay unbroken.
+ * The bond dash is an entity: later OCR clean folds a literal en dash back to "-".
+ */
+function cellHtml(raw) {
+  let s = String(raw ?? '')
+  s = s.replace(/(\}|[A-Za-z])\s*-\s*(?=\\math(?:rm|bf)\s*\{|[A-Z])/g, `$1${BOND_DASH}`)
+  s = s.replace(/(_\{[^{}]*\}|_\d)\s+(?=\\math(?:rm|bf)\s*\{[A-Z])/g, '$1')
+  s = s.replace(/\\mathbf\s*\{([^{}]*)\}/g, `${BOLD_OPEN}$1${BOLD_CLOSE}`)
+  const plain = cellPlain(s, { html: true }).replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
+  return escapeCell(plain)
+    .replace(new RegExp(`${BOLD_CLOSE}(\\s*${BOND_DASH}\\s*)${BOLD_OPEN}`, 'g'), '$1')
+    .replace(new RegExp(BOLD_OPEN, 'g'), '<b>')
+    .replace(new RegExp(BOLD_CLOSE, 'g'), '</b>')
+    .replace(new RegExp(BOND_DASH, 'g'), '&ndash;')
+    .replace(new RegExp(SUP_OPEN, 'g'), '<sup>')
+    .replace(new RegExp(SUP_CLOSE, 'g'), '</sup>')
+    .replace(new RegExp(SUB_OPEN, 'g'), '<sub>')
+    .replace(new RegExp(SUB_CLOSE, 'g'), '</sub>')
+}
+
+/** "Column J Molecule" is two printed lines: the column name, then what it lists. */
+function headerCellHtml(raw) {
+  const html = cellHtml(raw).replace(/([A-Za-z]{2,})\((?=[a-z])/g, '$1 (')
+  const m = html.match(
+    /^((?:Column|List)\s*(?:-|–|&ndash;)?\s*(?:<b>\s*(?:I{1,3}|IV|[A-Z])\s*<\/b>|(?:I{1,3}|IV|[A-Z])\b))\s+(\S[\s\S]*)$/,
+  )
+  return m ? `${m[1]}<br>${m[2]}` : html
+}
+
+function isColumnHeaderRow(row) {
+  return row.filter((cell) => /^(?:Column|List)\b/i.test(cellPlain(cell.text))).length >= 2
+}
+
+function columnAligns(spec) {
+  return (String(spec || '').match(/[lcr]/gi) || []).map((ch) =>
+    ch.toLowerCase() === 'l' ? 'left' : ch.toLowerCase() === 'r' ? 'right' : 'center',
+  )
 }
 
 function splitRowCells(line) {
@@ -232,20 +392,30 @@ function isPaperDataTabular(block) {
 function tabularToPaperTableHtml(spec, body) {
   const rows = layoutPaperDataRows(parseTabularRows(body), columnCountOf(spec, parseTabularRows(body)))
   if (rows.length < 2) return ''
+  const aligns = columnAligns(spec)
   let html =
     '<table class="paper-data-table" style="border-collapse:collapse;margin:0.75rem auto;font-style:normal;color:inherit">'
-  for (const row of rows) {
+  rows.forEach((row, rowIndex) => {
+    const header = rowIndex === 0 && isColumnHeaderRow(row)
     html += '<tr>'
+    let col = 0
     for (const cell of row) {
-      if (cell.omit) continue
-      const text = escapeCell(cellPlain(cell.text))
+      if (cell.omit) {
+        col += cell.colspan || 1
+        continue
+      }
+      const text = header ? headerCellHtml(cell.text) : cellHtml(cell.text)
+      const align = header || (cell.colspan || 1) > 1 ? 'center' : aligns[col] || 'center'
+      col += cell.colspan || 1
       const style = [
         'border:1px solid #4b5563',
         'padding:0.4rem 0.75rem',
-        'text-align:center',
+        `text-align:${align}`,
         'vertical-align:middle',
         'font-style:normal',
-        text.length > 28 ? 'max-width:11rem;white-space:normal' : 'white-space:nowrap',
+        text.replace(/<[^>]+>/g, '').length > 28 && !header
+          ? 'max-width:11rem;white-space:normal'
+          : 'white-space:nowrap',
       ].join(';')
       const span = [
         cell.colspan > 1 ? ` colspan="${cell.colspan}"` : '',
@@ -254,20 +424,256 @@ function tabularToPaperTableHtml(spec, body) {
       html += `<td${span} style="${style}">${text}</td>`
     }
     html += '</tr>'
-  }
+  })
   html += '</table>'
   return html
 }
 
-function replacePaperDataTabulars(text) {
-  return String(text ?? '').replace(
-    /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*?)\\end\{tabular\}(?:\s*\$+)?/gi,
-    (full, _pos, spec, body) => {
-      if (!isPaperDataTabular(full)) return full
-      const html = tabularToPaperTableHtml(spec, body)
-      return html || full
-    },
+/** Split at `\\` (rows) or `&` (cells) that sit outside $…$ math and braces. */
+function splitOutsideMath(text, sep) {
+  const s = String(text ?? '')
+  const out = []
+  let buf = ''
+  let depth = 0
+  let math = ''
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i]
+    if (ch === '\\' && s[i + 1] === '$') {
+      buf += '\\$'
+      i += 1
+      continue
+    }
+    const image = !math && ch === '!' ? s.slice(i).match(/^!\[[^\]]*\]\([^)\s]*\)/) : null
+    if (image) {
+      buf += image[0]
+      i += image[0].length - 1
+      continue
+    }
+    if (ch === '$') {
+      const run = s[i + 1] === '$' ? '$$' : '$'
+      if (!math) math = run
+      else if (math === run) math = ''
+      buf += run
+      i += run.length - 1
+      continue
+    }
+    if (!math) {
+      if (ch === '{') depth += 1
+      else if (ch === '}') depth = Math.max(0, depth - 1)
+      else if (depth === 0 && sep === 'row' && ch === '\\' && s[i + 1] === '\\') {
+        out.push(buf)
+        buf = ''
+        i += 1
+        continue
+      } else if (depth === 0 && sep === 'cell' && ch === '&' && s[i - 1] !== '\\') {
+        out.push(buf)
+        buf = ''
+        continue
+      }
+    }
+    buf += ch
+  }
+  out.push(buf)
+  return out
+}
+
+const MATCH_LABEL_ONLY_RE = /^\(\s*(?:[IVX]{1,4}|[ivx]{1,4}|[A-Z]|\d{1,2})\s*\)$/
+const MATCH_ROW_LABEL_RE = /^\(\s*(?:[IVX]{1,4}|[ivx]{1,4}|[A-Z]|\d{1,2})\s*\)/
+
+function isMatchHeaderRow(row) {
+  return row.filter((cell) => /^(?:Column|List)\b/i.test(cellPlain(cell.text))).length >= 2
+}
+
+/** Some OCR puts "(I)" in its own cell; the paper prints it at the start of the item's cell. */
+function mergeLabelOnlyCells(row) {
+  const out = []
+  for (let i = 0; i < row.length; i += 1) {
+    const label = row[i].text.trim()
+    const next = row[i + 1]
+    if (MATCH_LABEL_ONLY_RE.test(label) && next && !MATCH_ROW_LABEL_RE.test(next.text.trim())) {
+      out.push({ ...next, text: `${label} ${next.text.trim()}`.trim(), colspan: 1 })
+      i += 1
+      continue
+    }
+    out.push(row[i])
+  }
+  return out
+}
+
+/**
+ * "Column 1 | Column 2 | Column 3" with (I)/(i)/(P) rows, laid out as the paper prints it:
+ * any lead-in row spans the table, then one row per (I)/(i)/(P) with one cell per column.
+ * @returns {{ intro: string[], header: string[], rows: string[][] } | null}
+ */
+export function matchColumnTableLayout(body) {
+  const flat = String(body ?? '').replace(
+    /\\begin\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?([\s\S]*?)\\end\{tabular\}/g,
+    (_, inner) => inner.replace(/\\hline\b/g, ' ').replace(/\\\\/g, ' ').replace(/\s+/g, ' ').trim(),
   )
+  const rows = splitOutsideMath(flat, 'row')
+    .map((line) => line.replace(/\\hline\b/g, ' ').trim())
+    .filter(Boolean)
+    .map((line) => splitOutsideMath(line, 'cell').map(parseTableCell))
+  const headerAt = rows.findIndex(isMatchHeaderRow)
+  if (headerAt < 0) return null
+  const header = rows[headerAt]
+    .map((cell) => cellPlain(cell.text))
+    .filter(Boolean)
+  const cols = header.length
+  const data = rows.slice(headerAt + 1).map((row) => {
+    const cells = mergeLabelOnlyCells(row).map((cell) => cell.text.trim())
+    while (cells.length > cols && !cells[cells.length - 1]) cells.pop()
+    while (cells.length < cols) cells.push('')
+    return cells
+  })
+  if (data.filter((cells) => MATCH_ROW_LABEL_RE.test(cells[0])).length < 2) return null
+  if (data.some((cells) => cells.length !== cols)) return null
+  const intro = rows
+    .slice(0, headerAt)
+    .map((row) => row.map((cell) => cell.text.trim()).filter(Boolean).join(' '))
+    .filter(Boolean)
+  return { intro, header, rows: data }
+}
+
+function matchCellMathHtml(tex) {
+  try {
+    const html = katex.renderToString(String(tex).trim(), { throwOnError: false, output: 'html' })
+    if (html && !/katex-error/.test(html)) return html
+  } catch {
+    /* plain cell text below */
+  }
+  return cellHtml(tex)
+}
+
+/** Prose around math. If the OCR lost a cell's dollars, the run from the first command to the last is math. */
+function matchCellProseHtml(text) {
+  const s = String(text ?? '')
+  if (!/\\[a-zA-Z]|[_^]\{/.test(s)) return escapeCell(s)
+  const words = s.split(/(\s+)/)
+  const mathy = (w) => /\\[a-zA-Z]|[_^{}=]/.test(w)
+  const first = words.findIndex(mathy)
+  let last = words.length - 1
+  while (last > first && !mathy(words[last])) last -= 1
+  return (
+    escapeCell(words.slice(0, first).join('')) +
+    matchCellMathHtml(words.slice(first, last + 1).join('')) +
+    escapeCell(words.slice(last + 1).join(''))
+  )
+}
+
+function matchCellHtml(raw) {
+  const src = String(raw ?? '').replace(/\\(?:begin|end)\{itemize\}/g, ' ')
+  if (/\\item\b/.test(src)) {
+    const [lead, ...items] = src.split(/\\item\s*(?:\[[^\]]*\])?/)
+    return [matchCellHtml(lead), ...items.map((item) => `• ${matchCellHtml(item)}`)].filter((h) => h.trim()).join('<br>')
+  }
+  const s = src.replace(/\s+/g, ' ').trim()
+  const re = /!\[[^\]]*\]\(([^)\s]+)\)|\\includegraphics(?:\[[^\]]*\])?\{([^}]*)\}|\$\$([\s\S]+?)\$\$|\$([^$]+?)\$/g
+  let html = ''
+  let last = 0
+  for (const m of s.matchAll(re)) {
+    html += matchCellProseHtml(s.slice(last, m.index))
+    const src = m[1] || m[2]
+    html += src
+      ? `<img src="${escapeHtml(src)}" alt="" style="display:block;max-width:10rem;height:auto;margin:0.3rem 0"${localPictureOnErrorAttr(src)}>`
+      : matchCellMathHtml(m[3] ?? m[4])
+    last = m.index + m[0].length
+  }
+  return html + matchCellProseHtml(s.slice(last))
+}
+
+const MATCH_CELL_STYLE = 'border:1px solid #4b5563;padding:0.45rem 0.6rem;vertical-align:top;font-style:normal'
+
+function matchColumnTableHtml(layout) {
+  const cols = layout.header.length
+  const width = `${(100 / cols).toFixed(2)}%`
+  let html =
+    '<table class="paper-data-table match-columns-table" style="border-collapse:collapse;width:100%;margin:0.75rem 0;font-style:normal;color:inherit">'
+  for (const line of layout.intro) {
+    html += `<tr><td colspan="${cols}" style="${MATCH_CELL_STYLE};text-align:left">${matchCellHtml(line)}</td></tr>`
+  }
+  html += '<tr>'
+  for (const name of layout.header) {
+    html += `<th style="${MATCH_CELL_STYLE};text-align:center;font-weight:600;width:${width}">${escapeCell(name)}</th>`
+  }
+  html += '</tr>'
+  for (const cells of layout.rows) {
+    html += '<tr>'
+    for (const cell of cells) html += `<td style="${MATCH_CELL_STYLE};text-align:left">${matchCellHtml(cell)}</td>`
+    html += '</tr>'
+  }
+  return `${html}</table>`
+}
+
+/** Outermost tabulars with their bodies; an inner tabular stays inside its cell. */
+function outerTabulars(src) {
+  const blocks = []
+  const re = /\\(begin|end)\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?/g
+  let depth = 0
+  let start = -1
+  let bodyStart = -1
+  for (const m of src.matchAll(re)) {
+    if (m[1] === 'begin') {
+      if (depth === 0) {
+        start = m.index
+        bodyStart = m.index + m[0].length
+      }
+      depth += 1
+    } else if (depth > 0) {
+      depth -= 1
+      if (depth === 0) blocks.push({ start, end: m.index + '\\end{tabular}'.length, body: src.slice(bodyStart, m.index) })
+    }
+  }
+  return blocks
+}
+
+/**
+ * Pull "Column 1 / Column 2 / Column 3" match tables out of text as drawn HTML, so pictures
+ * and formulas stay inside their cells. Returns null when the text has no such table.
+ * @param {unknown} text
+ * @returns {Array<{ kind: 'text' | 'html', value: string }> | null}
+ */
+export function splitMatchColumnTables(text) {
+  const src = String(text ?? '')
+  if (!/\\begin\{tabular\}/.test(src) || !/(?:Column|List)/i.test(src)) return null
+  const parts = []
+  let last = 0
+  for (const block of outerTabulars(src)) {
+    const layout = matchColumnTableLayout(block.body)
+    if (!layout) continue
+    if (block.start > last) parts.push({ kind: 'text', value: src.slice(last, block.start) })
+    parts.push({ kind: 'html', value: matchColumnTableHtml(layout) })
+    last = block.end
+  }
+  if (!parts.length) return null
+  if (last < src.length) parts.push({ kind: 'text', value: src.slice(last) })
+  return parts
+}
+
+const TABULAR_WITH_CLOSER_RE = /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*?)\\end\{tabular\}(\s*\$+)?/gi
+
+/**
+ * Dollars after \end{tabular} close a `$…tabular…$` wrapper only when the table opened inside math.
+ * In "\end{tabular}\n$\lambda^{0}$ is …" the dollar opens the next line's math and must stay.
+ */
+function tabularCloserToKeep(full, closer, offset, whole) {
+  if (!closer) return ''
+  const src = String(whole)
+  const before = src.slice(0, offset)
+  const insideMath = /\$\s*$/.test(before) || (before.match(/(?<!\\)\$/g) || []).length % 2 === 1
+  if (insideMath) return ''
+  const after = src.slice(offset + full.length)
+  const run = closer.trim()
+  const opensMath = run === '$' ? /^[^\n$]*[^\s$][^\n$]*(?<!\\)\$/.test(after) : run === '$$' && /^[^$]*[^\s$][^$]*\$\$/.test(after)
+  return opensMath ? closer : ''
+}
+
+function replacePaperDataTabulars(text) {
+  return String(text ?? '').replace(TABULAR_WITH_CLOSER_RE, (full, _pos, spec, body, closer, offset, whole) => {
+    if (!isPaperDataTabular(full)) return full
+    const html = tabularToPaperTableHtml(spec, body)
+    return html ? `${html}${tabularCloserToKeep(full, closer, offset, whole)}` : full
+  })
 }
 
 function escapeHtml(text) {
@@ -451,6 +857,7 @@ function reactionLinesFromBody(body) {
     .flatMap((cell) => cell.split(/\n+/))
     .map((cell) => cell.replace(/\\hline\b/g, ' ').replace(/\\multirow\s*\{[^{}]*\}\s*\{[^{}]*\}\s*\{[^{}]*\}/g, ' ').trim())
     .filter(Boolean)
+  if (lines.filter((line) => /^\(\s*[PQRS]\s*\)/.test(line)).length >= 2) return null
   const steps = lines.filter(isReactionStepLine)
   const reactants = lines.filter((line) => !isReactionStepLine(line) && !isReactionArrow(line) && !isReactionCondition(line))
   if (steps.length < 2 || reactants.length < 1) return null
@@ -579,25 +986,22 @@ export function unwrapReactionStepTables(text) {
 }
 
 export function convertLatexTabularToArray(text) {
-  let s = renderSideBySideSheetConfigs(softenLeftRightInTables(String(text ?? '')))
+  let s = renderSideBySideSheetConfigs(softenLeftRightInTables(flattenNestedTabulars(text)))
   s = unwrapReactionStepTables(s)
   s = replacePaperDataTabulars(s)
   s = expandUnsupportedTableCommands(s)
   if (!/tabular/i.test(s)) return stripDollarsInsideLatexEnvs(s)
   s = s.replace(/\\text\s*\{\s*begin\s*\}\s*\{\s*tabular\s*\}/gi, '\\begin{tabular}')
   s = s.replace(/\\text\s*\{\s*end\s*\}\s*\{\s*tabular\s*\}/gi, '\\end{tabular}')
-  s = s.replace(
-    /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*?)\\end\{tabular\}(?:\s*\$+)?/gi,
-    (full, _pos, spec, body) => {
-      const cleaned = String(body ?? '').replace(/\\\\\$+/g, '\\\\')
-      if (/\$\$\s*\\begin\{tabular\}/i.test(full)) {
-        return stripDollarsInsideLatexEnvs(
-          full.replace(body, cleaned).replace(/tabular/gi, 'array').replace(/\$+$/, ''),
-        )
-      }
-      return arrayFromTabularBody(spec, cleaned)
-    },
-  )
+  s = s.replace(TABULAR_WITH_CLOSER_RE, (full, _pos, spec, body, closer, offset, whole) => {
+    const cleaned = String(body ?? '').replace(/\\\\\$+/g, '\\\\')
+    if (/\$\$\s*\\begin\{tabular\}/i.test(full)) {
+      return stripDollarsInsideLatexEnvs(
+        full.replace(body, cleaned).replace(/tabular/gi, 'array').replace(/\$+$/, ''),
+      )
+    }
+    return `${arrayFromTabularBody(spec, cleaned)}${tabularCloserToKeep(full, closer, offset, whole)}`
+  })
   // OCR often drops \\end{tabular}. Still show a table, not raw \\begin{tabular}.
   s = s.replace(
     /\\begin\{tabular\}(\[[^\]]*\])?(\{[^}]*\})?([\s\S]*)$/gi,

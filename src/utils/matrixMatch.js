@@ -1,3 +1,5 @@
+import { acceptedGridSets, formatMatrixGridKey } from './matrixGridPyq.js'
+
 /** @typedef {'grid' | 'options'} MatrixResponseMode */
 /** @typedef {Record<number, number | number[]>} MatrixAnswerKey */
 
@@ -119,7 +121,8 @@ export function matrixAnswersEqual(answer, q) {
   for (let i = 0; i < rows.length; i++) {
     const a = [...(map[i] ?? [])].sort((x, y) => x - y).join(',')
     const k = [...(key[i] ?? [])].sort((x, y) => x - y).join(',')
-    if (a !== k) return false
+    if (a === k) continue
+    if (!acceptedGridSets(q, i).some((set) => set.join(',') === a)) return false
   }
   return true
 }
@@ -157,6 +160,7 @@ export function formatMatrixCorrectAnswer(q) {
       ? `${String.fromCharCode(65 + idx)}) ${q.options[idx]}`
       : String.fromCharCode(65 + idx)
   }
+  if (q.matrixAnswerAlternates && Object.keys(q.matrixAnswerAlternates).length) return formatMatrixGridKey(q)
   return formatMatrixUserAnswer(q.matrixAnswerKey, q)
 }
 
@@ -184,6 +188,8 @@ export function isMatrixAnswerAttempted(answer, q) {
   }
   const map = normalizeMatrixAnswerKey(/** @type {MatrixAnswerKey} */ (answer))
   const rows = q.matrixRows ?? []
-  if (!rows.length) return Object.keys(map).length > 0
+  if (!rows.length || q.matrixMarking?.perRow === true) {
+    return Object.values(map).some((cols) => cols.length > 0)
+  }
   return rows.every((_, i) => (map[i]?.length ?? 0) > 0)
 }

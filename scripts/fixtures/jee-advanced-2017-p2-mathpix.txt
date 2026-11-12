@@ -1,0 +1,778 @@
+\section*{PART I : PHYSICS}
+
+SECTION 1 (Maximum Marks: 21)
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened
+Zero Marks : 0 If none of the bubbles is darkened
+Negative Marks: -1 In all other cases
+\item[Q.] 1 Consider an expanding sphere of instantaneous radius $R$ whose total mass remains constant. The expansion is such that the instantaneous density $\rho$ remains uniform throughout the volume. The rate of fractional change in density $\left(\frac{1}{\rho} \frac{d \rho}{d t}\right)$ is constant. The velocity $v$ of any point on the surface of the expanding sphere is proportional to
+[A] $R$
+[B] $R^{3}$
+[C] $\frac{1}{R}$
+[D] $R^{2 / 3}$
+\end{itemize}
+
+Space for rough work
+
+Answer for the above question
+Ans for Q.1: (A)
+\begin{itemize}
+\item[Q.] 2 Consider regular polygons with number of sides $n=3,4,5 \ldots \ldots$ as shown in the figure. The center of mass of all the polygons is at height $h$ from the ground. They roll on a horizontal surface about the leading vertex without slipping and sliding as depicted. The maximum increase in height of the locus of the center of mass for each polygon is $\Delta$. Then $\Delta$ depends on $n$ and $h$ as
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-02.jpg?height=343&width=535&top_left_y=636&top_left_x=350)
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-02.jpg?height=265&width=449&top_left_y=713&top_left_x=937)
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-02.jpg?height=224&width=380&top_left_y=752&top_left_x=1423)
+[A] $\Delta=h \sin ^{2}\left(\frac{\pi}{n}\right)$
+[B] $\Delta=h\left(\frac{1}{\cos \left(\frac{\pi}{n}\right)}-1\right)$
+[C] $\Delta=h \sin \left(\frac{2 \pi}{n}\right)$
+[D] $\Delta=h \tan ^{2}\left(\frac{\pi}{2 n}\right)$
+\end{itemize}
+
+Space for rough work
+
+Answer for the above question
+Ans for Q.2: (B)
+\begin{itemize}
+\item[Q.] 3 A photoelectric material having work-function $\phi_{0}$ is illuminated with light of wavelength $\lambda\left(\lambda<\frac{h c}{\phi_{0}}\right)$. The fastest photoelectron has a de Broglie wavelength $\lambda_{d}$. A change in wavelength of the incident light by $\Delta \lambda$ results in a change $\Delta \lambda_{d}$ in $\lambda_{d}$. Then the ratio $\Delta \lambda_{d} / \Delta \lambda$ is proportional to
+[A] $\lambda_{d} / \lambda$
+[B] $\lambda_{d}^{2} / \lambda^{2}$
+[C] $\lambda_{d}^{3} / \lambda$
+[D] $\lambda_{d}^{3} / \lambda^{2}$
+\item[Q.] 4 A symmetric star shaped conducting wire loop is carrying a steady state current $I$ as shown in the figure. The distance between the diametrically opposite vertices of the star is $4 a$. The magnitude of the magnetic field at the center of the loop is
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-03.jpg?height=351&width=417&top_left_y=853&top_left_x=859)
+[A] $\frac{\mu_{0} I}{4 \pi a} 6[\sqrt{3}-1]$
+[B] $\frac{\mu_{0} I}{4 \pi a} 6[\sqrt{3}+1]$
+[C] $\frac{\mu_{0} I}{4 \pi a} 3[\sqrt{3}-1]$
+[D] $\frac{\mu_{0} I}{4 \pi a} 3[2-\sqrt{3}]$
+\end{itemize}
+
+Space for rough work
+
+Answers for the above questions
+Ans for Q.3: (D) Ans for Q.4: (A)
+\begin{itemize}
+\item[Q.] 5 Three vectors $\vec{P}, \vec{Q}$ and $\vec{R}$ are shown in the figure. Let $S$ be any point on the vector $\vec{R}$. The distance between the points $P$ and $S$ is $b|\vec{R}|$. The general relation among vectors $\vec{P}, \vec{Q}$ and $\vec{S}$ is
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-04.jpg?height=554&width=582&top_left_y=503&top_left_x=790)
+[A] $\vec{S}=(1-b) \vec{P}+b \vec{Q}$
+[B] $\vec{S}=(b-1) \vec{P}+b \vec{Q}$
+[C] $\vec{S}=\left(1-b^{2}\right) \vec{P}+b \vec{Q}$
+[D] $\vec{S}=(1-b) \vec{P}+b^{2} \vec{Q}$
+\end{itemize}
+
+Space for rough work
+
+Answer for the above question
+Ans for Q.5: (A)
+\begin{itemize}
+\item[Q.] 6 A rocket is launched normal to the surface of the Earth, away from the Sun, along the line joining the Sun and the Earth. The Sun is $3 \times 10^{5}$ times heavier than the Earth and is at a distance $2.5 \times 10^{4}$ times larger than the radius of the Earth. The escape velocity from Earth's gravitational field is $v_{e}=11.2 \mathrm{~km} \mathrm{~s}^{-1}$. The minimum initial velocity $\left(v_{S}\right)$ required for the rocket to be able to leave the Sun-Earth system is closest to
+(Ignore the rotation and revolution of the Earth and the presence of any other planet)
+[A] $v_{S}=22 \mathrm{~km} \mathrm{~s}^{-1}$
+[B] $v_{S}=42 \mathrm{~km} \mathrm{~s}^{-1}$
+[C] $v_{S}=62 \mathrm{~km} \mathrm{~s}^{-1}$
+[D] $v_{S}=72 \mathrm{~km} \mathrm{~s}^{-1}$
+\item[Q.] 7 A person measures the depth of a well by measuring the time interval between dropping a stone and receiving the sound of impact with the bottom of the well. The error in his measurement of time is $\delta T=0.01$ seconds and he measures the depth of the well to be $L=20$ meters. Take the acceleration due to gravity $g=10 \mathrm{~ms}^{-2}$ and the velocity of sound is $300 \mathrm{~ms}^{-1}$. Then the fractional error in the measurement, $\delta L / L$, is closest to
+[A] 0.2\%
+[B] 1\%
+[C] 3\%
+[D] 5\%
+\end{itemize}
+
+Space for rough work
+
+\section*{Answers for the above questions}
+
+Ans for Q.6: (B) Ans for Q.7: (B)
+
+\section*{SECTION 2 (Maximum Marks: 28)}
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONE OR MORE THAN ONE of these four options is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened \\
+\hline Negative Marks & : -2 & In all other cases \\
+\hline
+\end{tabular}
+\item[-] For example, if [A], [C] and [D] are all the correct options for a question, darkening all these three will get +4 marks; darkening only [A] and [D] will get +2 marks; and darkening [A] and [B] will get -2 marks, as a wrong option is also darkened
+\end{itemize}
+
+\section*{Space for rough work}
+\begin{itemize}
+\item[Q.] 8 A uniform magnetic field $B$ exists in the region between $x=0$ and $x=\frac{3 R}{2}$ (region 2 in the figure) pointing normally into the plane of the paper. A particle with charge $+Q$ and momentum $p$ directed along $x$-axis enters region 2 from region 1 at point $P_{1}(y=-R)$. Which of the following option(s) is/are correct?
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-07.jpg?height=706&width=583&top_left_y=558&top_left_x=784)
+\begin{itemize}
+\item[] [A] For $B>\frac{2}{3} \frac{p}{Q R}$, the particle will re-enter region 1
+\item[] [B] For $B=\frac{8}{13} \frac{p}{Q R}$, the particle will enter region 3 through the point $P_{2}$ on $x$-axis
+\item[] [C] When the particle re-enters region 1 through the longest possible path in region 2, the magnitude of the change in its linear momentum between point $P_{1}$ and the farthest point from $y$-axis is $p / \sqrt{2}$
+\item[] [D] For a fixed $B$, particles of same charge $Q$ and same velocity $v$, the distance between the point $P_{1}$ and the point of re-entry into region 1 is inversely proportional to the mass of the particle
+\end{itemize}
+\end{itemize}
+
+Space for rough work
+
+\section*{Answer for the above question}
+
+Ans for Q.8: (A) and (B)
+\begin{itemize}
+\item[Q.] 9 The instantaneous voltages at three terminals marked $X, Y$ and $Z$ are given by
+$$\begin{aligned}
+& V_{X}=V_{0} \sin \omega t, \\
+& V_{Y}=V_{0} \sin \left(\omega t+\frac{2 \pi}{3}\right) \text { and } \\
+& V_{Z}=V_{0} \sin \left(\omega t+\frac{4 \pi}{3}\right) .
+\end{aligned}$$
+An ideal voltmeter is configured to read $r m s$ value of the potential difference between its terminals. It is connected between points $X$ and $Y$ and then between $Y$ and $Z$. The reading(s) of the voltmeter will be
+\begin{itemize}
+\item[] [A] $V_{X Y}^{r m s}=V_{0} \sqrt{\frac{3}{2}}$
+\item[] [B] $V_{Y Z}^{r m s}=V_{0} \sqrt{\frac{1}{2}}$
+\item[] [C] $V_{X Y}^{r m s}=V_{0}$
+\item[] [D] independent of the choice of the two terminals
+\end{itemize}
+\item[Q.] 10 A point charge $+Q$ is placed just outside an imaginary hemispherical surface of radius R as shown in the figure. Which of the following statements is/are correct?
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-08.jpg?height=355&width=514&top_left_y=1357&top_left_x=820)
+\begin{itemize}
+\item[] [A] The electric flux passing through the curved surface of the hemisphere is $-\frac{Q}{2 \varepsilon_{0}}\left(1-\frac{1}{\sqrt{2}}\right)$
+\item[] [B] Total flux through the curved and the flat surfaces is $\frac{Q}{\varepsilon_{0}}$
+\item[] [C] The component of the electric field normal to the flat surface is constant over the surface
+\item[] [D] The circumference of the flat surface is an equipotential
+\end{itemize}
+\end{itemize}
+
+Space for rough work
+Answers for the above questions
+Ans for Q.9: (A) and (D) Ans for Q.10: (A) and (D)
+\begin{itemize}
+\item[Q.] 11 Two coherent monochromatic point sources $S_{1}$ and $S_{2}$ of wavelength $\lambda=600 \mathrm{~nm}$ are placed symmetrically on either side of the center of the circle as shown. The sources are separated by a distance $d=1.8 \mathrm{~mm}$. This arrangement produces interference fringes visible as alternate bright and dark spots on the circumference of the circle. The angular separation between two consecutive bright spots is $\Delta \theta$. Which of the following options is/are correct?
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-09.jpg?height=517&width=523&top_left_y=641&top_left_x=828)
+\begin{itemize}
+\item[] [A] A dark spot will be formed at the point $P_{2}$
+\item[] [B] At $P_{2}$ the order of the fringe will be maximum
+\item[] [C] The total number of fringes produced between $P_{1}$ and $P_{2}$ in the first quadrant is close to 3000
+\item[] [D] The angular separation between two consecutive bright spots decreases as we move from $P_{1}$ to $P_{2}$ along the first quadrant
+\end{itemize}
+\end{itemize}
+
+Space for rough work
+
+Answer for the above question
+Ans for Q.11: (B) and (C)
+\begin{itemize}
+\item[Q.] 12 A source of constant voltage $V$ is connected to a resistance $R$ and two ideal inductors $L_{1}$ and $L_{2}$ through a switch $S$ as shown. There is no mutual inductance between the two inductors. The switch $S$ is initially open. At $t=0$, the switch is closed and current begins to flow. Which of the following options is/are correct?
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-10.jpg?height=333&width=714&top_left_y=545&top_left_x=725)
+\begin{itemize}
+\item[] [A] After a long time, the current through $L_{1}$ will be $\frac{V}{R} \frac{L_{2}}{L_{1}+L_{2}}$
+\item[] [B] After a long time, the current through $L_{2}$ will be $\frac{V}{R} \frac{L_{1}}{L_{1}+L_{2}}$
+\item[] [C] The ratio of the currents through $L_{1}$ and $L_{2}$ is fixed at all times $(t>0)$
+\item[] [D] At $t=0$, the current through the resistance $R$ is $\frac{V}{R}$
+\end{itemize}
+\item[Q.] 13 A rigid uniform bar AB of length $L$ is slipping from its vertical position on a frictionless floor (as shown in the figure). At some instant of time, the angle made by the bar with the vertical is $\theta$. Which of the following statements about its motion is/are correct?
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-10.jpg?height=474&width=600&top_left_y=1522&top_left_x=779)
+\begin{itemize}
+\item[] [A] The midpoint of the bar will fall vertically downward
+\item[] [B] The trajectory of the point $A$ is a parabola
+\item[] [C] Instantaneous torque about the point in contact with the floor is proportional to $\sin \theta$
+\item[] [D] When the bar makes an angle $\theta$ with the vertical, the displacement of its midpoint from the initial position is proportional to $(1-\cos \theta)$
+\end{itemize}
+\end{itemize}
+
+Answers for the above questions
+Ans for Q.12: (A), (B), and (C) Ans for Q.13: (A), (C), and (D)
+\begin{itemize}
+\item[Q.] 14 A wheel of radius $R$ and mass $M$ is placed at the bottom of a fixed step of height $R$ as shown in the figure. A constant force is continuously applied on the surface of the wheel so that it just climbs the step without slipping. Consider the torque $\tau$ about an axis normal to the plane of the paper passing through the point $Q$. Which of the following options is/are correct?
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-11.jpg?height=568&width=809&top_left_y=574&top_left_x=763)
+\begin{itemize}
+\item[] [A] If the force is applied at point $P$ tangentially then $\tau$ decreases continuously as the wheel climbs
+\item[] [B] If the force is applied normal to the circumference at point $X$ then $\tau$ is constant
+\item[] [C] If the force is applied normal to the circumference at point $P$ then $\tau$ is zero
+\item[] [D] If the force is applied tangentially at point $S$ then $\tau \neq 0$ but the wheel never climbs the step
+\end{itemize}
+\end{itemize}
+
+Space for rough work
+
+Answer for the above question
+Ans for Q.14: \{(C)\} or \{(C) and (D)\}
+
+\section*{SECTION 3 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains TWO paragraphs
+\item[-] Based on each paragraph, there are TWO questions
+\item[-] Each question has FOUR options [A], [B], [C], and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|}
+\hline Full Marks & : +3 If only the bubble corresponding to the correct option is darkened \\
+\hline Zero Marks & : 0 In all other cases \\
+\hline
+\end{tabular}
+
+\section*{Space for rough work}
+
+\section*{PARAGRAPH 1}
+
+Consider a simple $R C$ circuit as shown in Figure 1.
+Process 1: In the circuit the switch $S$ is closed at $t=0$ and the capacitor is fully charged to voltage $V_{0}$ (i.e., charging continues for time $T \gg R C$ ). In the process some dissipation $\left(E_{D}\right)$ occurs across the resistance $R$. The amount of energy finally stored in the fully charged capacitor is $E_{C}$.
+
+Process 2: In a different process the voltage is first set to $\frac{V_{0}}{3}$ and maintained for a charging time $T \gg R C$. Then the voltage is raised to $\frac{2 V_{0}}{3}$ without discharging the capacitor and again maintained for a time $T \gg R C$. The process is repeated one more time by raising the voltage to $V_{0}$ and the capacitor is charged to the same final voltage $V_{0}$ as in Process 1.
+
+These two processes are depicted in Figure 2.
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-13.jpg?height=330&width=667&top_left_y=1274&top_left_x=334}
+\captionsetup{labelformat=empty}
+\caption{Figure 1}
+\end{figure}
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-13.jpg?height=449&width=639&top_left_y=1145&top_left_x=1058}
+\captionsetup{labelformat=empty}
+\caption{Figure 2}
+\end{figure}
+\begin{itemize}
+\item[Q.] 15 In Process 1, the energy stored in the capacitor $E_{C}$ and heat dissipated across resistance $E_{D}$ are related by:
+[A] $E_{C}=E_{D}$
+[B] $E_{C}=E_{D} \ln 2$
+[C] $E_{C}=\frac{1}{2} E_{D}$
+[D] $E_{C}=2 E_{D}$
+\item[Q.] 16 In Process 2, total energy dissipated across the resistance $E_{D}$ is:
+[A] $E_{D}=\frac{1}{2} C V_{0}^{2}$
+[B] $E_{D}=3\left(\frac{1}{2} C V_{0}^{2}\right)$
+[C] $E_{D}=\frac{1}{3}\left(\frac{1}{2} C V_{0}^{2}\right)$
+[D] $E_{D}=3 C V_{0}^{2}$
+\end{itemize}
+
+\section*{Answers for the above questions}
+
+Ans for Q.15: (A) Ans for Q.16: (C)
+
+\section*{PARAGRAPH 2}
+
+One twirls a circular ring (of mass $M$ and radius $R$ ) near the tip of one's finger as shown in Figure 1. In the process the finger never loses contact with the inner rim of the ring. The finger traces out the surface of a cone, shown by the dotted line. The radius of the path traced out by the point where the ring and the finger is in contact is $r$. The finger rotates with an angular velocity $\omega_{0}$. The rotating ring rolls without slipping on the outside of a smaller circle described by the point where the ring and the finger is in contact (Figure 2). The coefficient of friction between the ring and the finger is $\mu$ and the acceleration due to gravity is $g$.
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-14.jpg?height=384&width=480&top_left_y=812&top_left_x=613}
+\captionsetup{labelformat=empty}
+\caption{Figure 1}
+\end{figure}
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-14.jpg?height=325&width=320&top_left_y=861&top_left_x=1155}
+\captionsetup{labelformat=empty}
+\caption{Figure 2}
+\end{figure}
+\begin{itemize}
+\item[Q.] 17 The total kinetic energy of the ring is
+[A] $M \omega_{0}^{2} R^{2}$
+[B] $\frac{1}{2} M \omega_{0}^{2}(R-r)^{2}$
+[C] $M \omega_{0}^{2}(R-r)^{2}$
+[D] $\frac{3}{2} M \omega_{0}^{2}(R-r)^{2}$
+\item[Q.] 18 The minimum value of $\omega_{0}$ below which the ring will drop down is
+[A] $\sqrt{\frac{g}{\mu(R-r)}}$
+[B] $\sqrt{\frac{2 g}{\mu(R-r)}}$
+[C] $\sqrt{\frac{3 g}{2 \mu(R-r)}}$
+[D] $\sqrt{\frac{g}{2 \mu(R-r)}}$
+\end{itemize}
+
+END OF PART I : PHYSICS
+
+\section*{Answers for the above questions}
+Q.17: Due to internal review, all candidates are awarded +3 marks.
+Ans for Q.18: (A)
+
+\section*{PART II : CHEMISTRY}
+
+\section*{SECTION 1 (Maximum Marks: 21)}
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened
+Zero Marks : 0 If none of the bubbles is darkened
+Negative Marks: -1 In all other cases
+\item[Q.] 19 Pure water freezes at 273 K and 1 bar. The addition of 34.5 g of ethanol to 500 g of water changes the freezing point of the solution. Use the freezing point depression constant of water as $2 \mathrm{~K} \mathrm{~kg} \mathrm{~mol}^{-1}$. The figures shown below represent plots of vapour pressure (V.P.) versus temperature (T). [molecular weight of ethanol is $46 \mathrm{~g} \mathrm{~mol}^{-1}$ ]
+Among the following, the option representing change in the freezing point is
+[A]
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-15.jpg?height=382&width=620&top_left_y=1464&top_left_x=392)
+[B]
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-15.jpg?height=384&width=622&top_left_y=1464&top_left_x=1167)
+[C]
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-15.jpg?height=385&width=622&top_left_y=1952&top_left_x=393)
+[D]
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-15.jpg?height=384&width=618&top_left_y=1952&top_left_x=1170)
+\end{itemize}
+
+Answer for the above question
+Ans for Q.19: (C)
+\begin{itemize}
+\item[Q.] 20 For the following cell,
+$$\mathrm{Zn}(s)\left|\mathrm{ZnSO}_{4}(a q) \| \mathrm{CuSO}_{4}(a q)\right| \mathrm{Cu}(s)$$
+when the concentration of $\mathrm{Zn}^{2+}$ is 10 times the concentration of $\mathrm{Cu}^{2+}$, the expression for $\Delta G$ (in $\mathrm{J} \mathrm{mol}^{-1}$ ) is
+[F is Faraday constant; R is gas constant; T is temperature; $E^{o}($ cell $)=1.1 \mathrm{~V}$ ]
+[A] 1.1F
+[B] 2.303RT-2.2F
+[C] 2.303RT + 1.1F
+[D] -2.2F
+\item[Q.] 21 The standard state Gibbs free energies of formation of C(graphite) and C(diamond) at $\mathrm{T}=298 \mathrm{~K}$ are
+$$\begin{gathered}
+\Delta_{f} G^{o}[\mathrm{C}(\text { graphite })]=0 \mathrm{~kJ} \mathrm{~mol}^{-1} \\
+\Delta_{f} G^{o}[\mathrm{C}(\text { diamond })]=2.9 \mathrm{~kJ} \mathrm{~mol}^{-1} .
+\end{gathered}$$
+The standard state means that the pressure should be 1 bar, and substance should be pure at a given temperature. The conversion of graphite [C(graphite)] to diamond [C(diamond)] reduces its volume by $2 \times 10^{-6} \mathrm{~m}^{3} \mathrm{~mol}^{-1}$. If C(graphite) is converted to C(diamond) isothermally at $\mathrm{T}=298 \mathrm{~K}$, the pressure at which C(graphite) is in equilibrium with C(diamond), is
+[Useful information: $1 \mathrm{~J}=1 \mathrm{~kg} \mathrm{~m}^{2} \mathrm{~s}^{-2} ; 1 \mathrm{~Pa}=1 \mathrm{~kg} \mathrm{~m}^{-1} \mathrm{~s}^{-2} ; 1$ bar $=10^{5} \mathrm{~Pa}$ ]
+[A] 14501 bar
+[B] 58001 bar
+[C] 1450 bar
+[D] 29001 bar
+\item[Q.] 22 Which of the following combination will produce $\mathrm{H}_{2}$ gas?
+\begin{itemize}
+\item[] [A] Fe metal and conc. $\mathrm{HNO}_{3}$
+\item[] [B] Cu metal and conc. $\mathrm{HNO}_{3}$
+\item[] [C] Zn metal and NaOH(aq)
+\item[] [D] Au metal and NaCN(aq) in the presence of air
+\end{itemize}
+\end{itemize}
+
+Space for rough work
+
+Answers for the above questions
+Ans for Q.20: (B) Ans for Q.21: (A) Ans for Q.22: (C)
+\begin{itemize}
+\item[Q.] 23 The order of the oxidation state of the phosphorus atom in $\mathrm{H}_{3} \mathrm{PO}_{2}, \mathrm{H}_{3} \mathrm{PO}_{4}, \mathrm{H}_{3} \mathrm{PO}_{3}$, and $\mathrm{H}_{4} \mathrm{P}_{2} \mathrm{O}_{6}$ is
+[A] $\mathrm{H}_{3} \mathrm{PO}_{3}>\mathrm{H}_{3} \mathrm{PO}_{2}>\mathrm{H}_{3} \mathrm{PO}_{4}>\mathrm{H}_{4} \mathrm{P}_{2} \mathrm{O}_{6}$
+[B] $\quad \mathrm{H}_{3} \mathrm{PO}_{4}>\mathrm{H}_{3} \mathrm{PO}_{2}>\mathrm{H}_{3} \mathrm{PO}_{3}>\mathrm{H}_{4} \mathrm{P}_{2} \mathrm{O}_{6}$
+[C] $\mathrm{H}_{3} \mathrm{PO}_{4}>\mathrm{H}_{4} \mathrm{P}_{2} \mathrm{O}_{6}>\mathrm{H}_{3} \mathrm{PO}_{3}>\mathrm{H}_{3} \mathrm{PO}_{2}$
+[D] $\mathrm{H}_{3} \mathrm{PO}_{2}>\mathrm{H}_{3} \mathrm{PO}_{3}>\mathrm{H}_{4} \mathrm{P}_{2} \mathrm{O}_{6}>\mathrm{H}_{3} \mathrm{PO}_{4}$
+\item[Q.] 24 The major product of the following reaction is
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-17.jpg?height=224&width=749&top_left_y=754&top_left_x=708)
+[A]
+<smiles>Oc1cccc(-c2ccccc2Cl)c1</smiles>
+[B]
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-17.jpg?height=238&width=336&top_left_y=1075&top_left_x=1305)
+[C]
+<smiles>Oc1ccc2nnc3ccccc3c2c1</smiles>
+[D]
+<smiles>Oc1cccc2c1nnc1ccccc12</smiles>
+\item[Q.] 25 The order of basicity among the following compounds is
+<smiles>CC(=N)N</smiles>
+
+I
+<smiles>C1=NCCN1</smiles>
+
+II
+<smiles>c1c[nH]cn1</smiles>
+
+III
+<smiles>N=C(N)N</smiles>
+
+IV
+[A] II $>$ I $>$ IV $>$ III
+[B] IV > II > III > I
+[C] IV $>$ I $>$ II $>$ III
+[D] I $>$ IV $>$ III $>$ II
+\end{itemize}
+
+\section*{Space for rough work}
+
+\section*{Answers for the above questions}
+
+Ans for Q.23: (C) Ans for Q.24: (C) Ans for Q.25: (C)
+
+\section*{SECTION 2 (Maximum Marks: 28)}
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONE OR MORE THAN ONE of these four options is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened \\
+\hline Negative Marks & : -2 & In all other cases \\
+\hline
+\end{tabular}
+\item[-] For example, if [A], [C] and [D] are all the correct options for a question, darkening all these three will get +4 marks; darkening only [A] and [D] will get +2 marks; and darkening [A] and [B] will get -2 marks, as a wrong option is also darkened
+\item[Q.] 26 The correct statement(s) about surface properties is(are)
+\begin{itemize}
+\item[] [A] Adsorption is accompanied by decrease in enthalpy and decrease in entropy of the system
+\item[] [B] The critical temperatures of ethane and nitrogen are 563 K and 126 K, respectively. The adsorption of ethane will be more than that of nitrogen on same amount of activated charcoal at a given temperature
+\item[] [C] Cloud is an emulsion type of colloid in which liquid is dispersed phase and gas is dispersion medium
+\item[] [D] Brownian motion of colloidal particles does not depend on the size of the particles but depends on viscosity of the solution
+\end{itemize}
+\end{itemize}
+
+Space for rough work
+Answer for the above question
+Ans for Q.26: (A) and (B)
+\begin{itemize}
+\item[Q.] 27 For a reaction taking place in a container in equilibrium with its surroundings, the effect of temperature on its equilibrium constant $K$ in terms of change in entropy is described by
+\begin{itemize}
+\item[] [A] With increase in temperature, the value of $K$ for exothermic reaction decreases because the entropy change of the system is positive
+\item[] [B] With increase in temperature, the value of $K$ for endothermic reaction increases because unfavourable change in entropy of the surroundings decreases
+\item[] [C] With increase in temperature, the value of $K$ for endothermic reaction increases because the entropy change of the system is negative
+\item[] [D] With increase in temperature, the value of $K$ for exothermic reaction decreases because favourable change in entropy of the surroundings decreases
+\end{itemize}
+\item[Q.] 28 In a bimolecular reaction, the steric factor P was experimentally determined to be 4.5. The correct option(s) among the following is(are)
+\begin{itemize}
+\item[] [A] The activation energy of the reaction is unaffected by the value of the steric factor
+\item[] [B] Experimentally determined value of frequency factor is higher than that predicted by Arrhenius equation
+\item[] [C] Since $\mathrm{P}=4.5$, the reaction will not proceed unless an effective catalyst is used
+\item[] [D] The value of frequency factor predicted by Arrhenius equation is higher than that determined experimentally
+\end{itemize}
+\end{itemize}
+
+Space for rough work
+
+Answers for the above questions
+Ans for Q.27: (B) and (D)
+Ans for Q.28: (A) and (B)
+\begin{itemize}
+\item[Q.] 29 For the following compounds, the correct statement(s) with respect to nucleophilic substitution reactions is(are)
+<smiles>BrCc1ccccc1</smiles>
+
+I
+<smiles>BrCC1CCCCC1</smiles>
+
+II
+<smiles>CC(C)(C)Br</smiles>
+
+III
+<smiles>CC(Br)c1ccccc1</smiles>
+
+IV
+\begin{itemize}
+\item[] [A] I and III follow $\mathrm{S}_{\mathrm{N}} 1$ mechanism
+\item[] [B] I and II follow $\mathrm{S}_{\mathrm{N}} 2$ mechanism
+\item[] [C] Compound IV undergoes inversion of configuration
+\item[] [D] The order of reactivity for I, III and IV is: IV $>$ I $>$ III
+\end{itemize}
+\item[Q.] 30 Among the following, the correct statement(s) is(are)
+\begin{itemize}
+\item[] [A] $\mathrm{Al}\left(\mathrm{CH}_{3}\right)_{3}$ has the three-centre two-electron bonds in its dimeric structure
+\item[] [B] $\mathrm{BH}_{3}$ has the three-centre two-electron bonds in its dimeric structure
+\item[] [C] $\mathrm{AlCl}_{3}$ has the three-centre two-electron bonds in its dimeric structure
+\item[] [D] The Lewis acidity of $\mathrm{BCl}_{3}$ is greater than that of $\mathrm{AlCl}_{3}$
+\end{itemize}
+\item[Q.] 31 The option(s) with only amphoteric oxides is(are)
+[A] $\mathrm{Cr}_{2} \mathrm{O}_{3}, \mathrm{BeO}, \mathrm{SnO}, \mathrm{SnO}_{2}$
+[B] $\mathrm{Cr}_{2} \mathrm{O}_{3}, \mathrm{CrO}, \mathrm{SnO}, \mathrm{PbO}$
+[C] $\mathrm{NO}, \mathrm{B}_{2} \mathrm{O}_{3}, \mathrm{PbO}, \mathrm{SnO}_{2}$
+[D] $\mathrm{ZnO}, \mathrm{Al}_{2} \mathrm{O}_{3}, \mathrm{PbO}, \mathrm{PbO}_{2}$
+\end{itemize}
+
+Space for rough work
+
+Answers for the above questions
+Ans for Q.29: \{(A), (B), and (C)\} or \{(A), (B), (C), and (D)\}
+
+Ans for Q.30: (A), (B), and (D) Ans for Q.31: (A) and (D)
+\begin{itemize}
+\item[Q.] 32 Compounds P and R upon ozonolysis produce Q and S, respectively. The molecular formula of Q and S is $\mathrm{C}_{8} \mathrm{H}_{8} \mathrm{O}$. Q undergoes Cannizzaro reaction but not haloform reaction, whereas S undergoes haloform reaction but not Cannizzaro reaction.
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-21.jpg?height=140&width=716&top_left_y=488&top_left_x=723)
+\item[(ii)]
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-21.jpg?height=128&width=614&top_left_y=719&top_left_x=822)
+\end{itemize}
+The option(s) with suitable combination of P and R, respectively, is(are)
+[A]
+<smiles>C=Cc1ccc(C)cc1</smiles>
+and
+<smiles>C=C(C)c1ccccc1</smiles>
+[B]
+<smiles>C/C=C/c1cccc(C)c1</smiles>
+and
+<smiles>CC(C)=C(C)c1ccccc1</smiles>
+[C]
+<smiles>CC(C)=Cc1ccccc1C</smiles>
+and
+<smiles>CC=C(C)c1ccccc1C</smiles>
+[D]
+<smiles>C=Cc1ccc(C)cc1</smiles>
+and
+<smiles>C=C(C)c1ccc(C)cc1</smiles>
+
+Space for rough work
+
+Answer for the above question
+Ans for Q.32: (A) and (B)
+
+\section*{SECTION 3 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains TWO paragraphs
+\item[-] Based on each paragraph, there are TWO questions
+\item[-] Each question has FOUR options [A], [B], [C], and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened
+Zero Marks : 0 In all other cases
+
+\section*{PARAGRAPH 1}
+
+Upon heating $\mathrm{KClO}_{3}$ in the presence of catalytic amount of $\mathrm{MnO}_{2}$, a gas W is formed. Excess amount of W reacts with white phosphorus to give X. The reaction of X with pure $\mathrm{HNO}_{3}$ gives Y and Z.
+Q. 33 W and X are, respectively
+[A] $\mathrm{O}_{3}$ and $\mathrm{P}_{4} \mathrm{O}_{6}$
+[B] $\mathrm{O}_{2}$ and $\mathrm{P}_{4} \mathrm{O}_{6}$
+[C] $\mathrm{O}_{2}$ and $\mathrm{P}_{4} \mathrm{O}_{10}$
+[D] $\mathrm{O}_{3}$ and $\mathrm{P}_{4} \mathrm{O}_{10}$
+Q. 34 Y and Z are, respectively
+[A] $\mathrm{N}_{2} \mathrm{O}_{3}$ and $\mathrm{H}_{3} \mathrm{PO}_{4}$
+[B] $\mathrm{N}_{2} \mathrm{O}_{5}$ and $\mathrm{HPO}_{3}$
+[C] $\mathrm{N}_{2} \mathrm{O}_{4}$ and $\mathrm{HPO}_{3}$
+[D] $\mathrm{N}_{2} \mathrm{O}_{4}$ and $\mathrm{H}_{3} \mathrm{PO}_{3}$
+
+Space for rough work
+
+Answers for the above questions
+Ans for Q.33: (C) Ans for Q.34: (B)
+
+\section*{PARAGRAPH 2}
+
+The reaction of compound P with $\mathrm{CH}_{3} \mathrm{MgBr}$ (excess) in $\left(\mathrm{C}_{2} \mathrm{H}_{5}\right)_{2} \mathrm{O}$ followed by addition of $\mathrm{H}_{2} \mathrm{O}$ gives Q. The compound Q on treatment with $\mathrm{H}_{2} \mathrm{SO}_{4}$ at 0°C gives R. The reaction of R with $\mathrm{CH}_{3} \mathrm{COCl}$ in the presence of anhydrous $\mathrm{AlCl}_{3}$ in $\mathrm{CH}_{2} \mathrm{Cl}_{2}$ followed by treatment with $\mathrm{H}_{2} \mathrm{O}$ produces compound S. [Et in compound P is ethyl group]
+![](https://cdn.mathpix.com/cropped/48639ff3-a2f7-475c-9a5a-45e17255da06-23.jpg?height=171&width=1287&top_left_y=659&top_left_x=391)
+Q. 35 The product S is
+[A]
+<smiles>CC(=O)c1cc(C(C)(C)C)cc2c1CCC2(C)C</smiles>
+[B]
+<smiles>CC(=O)c1c(C(C)(C)C)ccc2c1C1=C(C)CC=C12</smiles>
+[C]
+<smiles>COC(=O)c1cc(CC=C(C)C)ccc1C(C)(C)C</smiles>
+[D]
+<smiles>CC(=O)CCc1cc([As](=O)(O)c2cccc(C(C)(C)C)c2)c(C(C)=O)cc1C(C)=O</smiles>
+Q. 36 The reactions, Q to R and R to S, are
+\begin{itemize}
+\item[] [A] Dehydration and Friedel-Crafts acylation
+\item[] [B] Aromatic sulfonation and Friedel-Crafts acylation
+\item[] [C] Friedel-Crafts alkylation, dehydration and Friedel-Crafts acylation
+\item[] [D] Friedel-Crafts alkylation and Friedel-Crafts acylation
+\end{itemize}
+
+END OF PART II : CHEMISTRY
+Space for rough work
+
+Answers for the above questions
+Ans for Q.35: (A) Ans for Q.36: (D)
+
+\section*{PART III : MATHEMATICS}
+
+\section*{SECTION 1 (Maximum Marks: 21)}
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened
+Zero Marks : 0 If none of the bubbles is darkened
+Negative Marks: -1 In all other cases
+\item[Q.] 37 The equation of the plane passing through the point (1, 1, 1) and perpendicular to the planes $2 x+y-2 z=5$ and $3 x-6 y-2 z=7$, is
+[A] $14 x+2 y-15 z=1$
+[B] $14 x-2 y+15 z=27$
+[C] $14 x+2 y+15 z=31$
+[D] $-14 x+2 y+15 z=3$
+\item[Q.] 38 Let $O$ be the origin and let $P Q R$ be an arbitrary triangle. The point $S$ is such that
+$$\overrightarrow{O P} \cdot \overrightarrow{O Q}+\overrightarrow{O R} \cdot \overrightarrow{O S}=\overrightarrow{O R} \cdot \overrightarrow{O P}+\overrightarrow{O Q} \cdot \overrightarrow{O S}=\overrightarrow{O Q} \cdot \overrightarrow{O R}+\overrightarrow{O P} \cdot \overrightarrow{O S}$$
+Then the triangle $P Q R$ has $S$ as its
+[A] centroid
+[B] circumcentre
+[C] incentre
+[D] orthocenter
+\end{itemize}
+
+\section*{Space for rough work}
+
+\section*{Answers for the above questions}
+
+Ans for Q.37: (C) Ans for Q.38: (D)
+\begin{itemize}
+\item[Q.] 39 If $y=y(x)$ satisfies the differential equation
+$$8 \sqrt{x}(\sqrt{9+\sqrt{x}}) d y=(\sqrt{4+\sqrt{9+\sqrt{x}}})^{-1} d x, \quad x>0$$
+and $y(0)=\sqrt{7}$, then $y(256)=$
+[A] 3
+[B] 9
+[C] 16
+[D] 80
+\item[Q.] 40 If $f: \mathbb{R} \rightarrow \mathbb{R}$ is a twice differentiable function such that $f^{\prime \prime}(x)>0$ for all $x \in \mathbb{R}$, and $f\left(\frac{1}{2}\right)=\frac{1}{2}, f(1)=1$, then
+[A] $f^{\prime}(1) \leq 0$
+[B] $0<f^{\prime}(1) \leq \frac{1}{2}$
+[C] $\frac{1}{2}<f^{\prime}(1) \leq 1$
+[D] $f^{\prime}(1)>1$
+\end{itemize}
+
+Space for rough work
+
+Answers for the above questions
+Ans for Q.39: (A) Ans for Q.40: (D)
+\begin{itemize}
+\item[Q.] 41 How many $3 \times 3$ matrices $M$ with entries from \{0, 1, 2\} are there, for which the sum of the diagonal entries of $M^{T} M$ is 5?
+[A] 126
+[B] 198
+[C] 162
+[D] 135
+\item[Q.] 42 Let $S=\{1,2,3, \ldots, 9\}$. For $k=1,2, \ldots, 5$, let $N_{k}$ be the number of subsets of $S$, each containing five elements out of which exactly $k$ are odd. Then $N_{1}+N_{2}+N_{3}+N_{4}+N_{5}=$
+[A] 210
+[B] 252
+[C] 125
+[D] 126
+\item[Q.] 43 Three randomly chosen nonnegative integers $x, y$ and $z$ are found to satisfy the equation $x+y+z=10$. Then the probability that $z$ is even, is
+[A] $\frac{36}{55}$
+[B] $\frac{6}{11}$
+[C] $\frac{1}{2}$
+[D] $\frac{5}{11}$
+\end{itemize}
+
+Space for rough work
+
+\section*{Answers for the above questions}
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Ans for Q.41: (B) & Ans for Q.42: (D) & Ans for Q.43: (B) \\
+\hline
+\end{tabular}
+
+\section*{SECTION 2 (Maximum Marks: 28)}
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONE OR MORE THAN ONE of these four options is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened \\
+\hline Negative Marks & : -2 & In all other cases \\
+\hline
+\end{tabular}
+\item[-] For example, if [A], [C] and [D] are all the correct options for a question, darkening all these three will get +4 marks; darkening only [A] and [D] will get +2 marks; and darkening [A] and [B] will get -2 marks, as a wrong option is also darkened
+\end{itemize}
+Q. 44 If $g(x)=\int_{\sin x}^{\sin (2 x)} \sin ^{-1}(t) d t$, then
+[A] $g^{\prime}\left(\frac{\pi}{2}\right)=-2 \pi$
+[C] $g^{\prime}\left(\frac{\pi}{2}\right)=2 \pi$
+[B] $g^{\prime}\left(-\frac{\pi}{2}\right)=2 \pi$
+[D] $g^{\prime}\left(-\frac{\pi}{2}\right)=-2 \pi$
+\begin{itemize}
+\item[Q.] 45 Let $\alpha$ and $\beta$ be nonzero real numbers such that $2(\cos \beta-\cos \alpha)+\cos \alpha \cos \beta=1$. Then which of the following is/are true?
+[A] $\tan \left(\frac{\alpha}{2}\right)+\sqrt{3} \tan \left(\frac{\beta}{2}\right)=0$
+[C] $\tan \left(\frac{\alpha}{2}\right)-\sqrt{3} \tan \left(\frac{\beta}{2}\right)=0$
+[B] $\sqrt{3} \tan \left(\frac{\alpha}{2}\right)+\tan \left(\frac{\beta}{2}\right)=0$
+[D] $\sqrt{3} \tan \left(\frac{\alpha}{2}\right)-\tan \left(\frac{\beta}{2}\right)=0$
+\end{itemize}
+
+Answers for the above questions
+Q.44: Due to internal review, all candidates are awarded +4 marks.
+Q.45: Due to internal review, all candidates are awarded +4 marks.
+\begin{itemize}
+\item[Q.] 46 If $f: \mathbb{R} \rightarrow \mathbb{R}$ is a differentiable function such that $f^{\prime}(x)>2 f(x)$ for all $x \in \mathbb{R}$, and $f(0)=1$, then
+[A] $f(x)$ is increasing in $(0, \infty)$
+[B] $f(x)$ is decreasing in $(0, \infty)$
+[C] $f(x)>e^{2 x}$ in $(0, \infty)$
+[D] $f^{\prime}(x)<e^{2 x}$ in $(0, \infty)$
+\item[Q.] 47 Let $f(x)=\frac{1-x(1+|1-x|)}{|1-x|} \cos \left(\frac{1}{1-x}\right)$ for $x \neq 1$. Then
+[A] $\lim _{x \rightarrow 1^{-}} f(x)=0$
+[B] $\lim _{x \rightarrow 1^{-}} f(x)$ does not exist
+[C] $\lim _{x \rightarrow 1^{+}} f(x)=0$
+[D] $\lim _{x \rightarrow 1^{+}} f(x)$ does not exist
+\item[Q.] 48 If $f(x)=\left|\begin{array}{ccc}\cos (2 x) & \cos (2 x) & \sin (2 x) \\ -\cos x & \cos x & -\sin x \\ \sin x & \sin x & \cos x\end{array}\right|$, then
+\begin{itemize}
+\item[] [A] $f^{\prime}(x)=0$ at exactly three points in $(-\pi, \pi)$
+\item[] [B] $f^{\prime}(x)=0$ at more than three points in $(-\pi, \pi)$
+\item[] [C] $f(x)$ attains its maximum at $x=0$
+\item[] [D] $f(x)$ attains its minimum at $x=0$
+\end{itemize}
+\end{itemize}
+
+Space for rough work
+
+\section*{Answers for the above questions}
+
+Ans for Q.46: (A) and (C)
+Ans for Q.47: (A) and (D)
+Ans for Q.48: (B) and (C)
+\begin{itemize}
+\item[Q.] 49 If the line $x=\alpha$ divides the area of region $R=\left\{(x, y) \in \mathbb{R}^{2}: x^{3} \leq y \leq x, 0 \leq x \leq 1\right\}$ into two equal parts, then
+[A] $0<\alpha \leq \frac{1}{2}$
+[B] $\frac{1}{2}<\alpha<1$
+[C] $2 \alpha^{4}-4 \alpha^{2}+1=0$
+[D] $\alpha^{4}+4 \alpha^{2}-1=0$
+\item[Q.] 50 If $I=\sum_{k=1}^{98} \int_{k}^{k+1} \frac{k+1}{x(x+1)} d x$, then
+[A] $I>\log _{e} 99$
+[B] $I<\log _{e} 99$
+[C] $I<\frac{49}{50}$
+[D] $I>\frac{49}{50}$
+\end{itemize}
+
+Space for rough work
+
+Answers for the above questions
+Ans for Q.49: (B) and (C) Ans for Q.50: (B) and (D)
+
+\section*{SECTION 3 (Maximum Marks: 12)}
+\begin{itemize}
+\item[-] This section contains TWO paragraphs
+\item[-] Based on each paragraph, there are TWO questions
+\item[-] Each question has FOUR options [A], [B], [C], and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+$$\begin{aligned}
+& \text { Full Marks : +3 If only the bubble corresponding to the correct option is darkened } \\
+& \text { Zero Marks : } 0 \text { In all other cases }
+\end{aligned}$$
+
+\section*{PARAGRAPH 1}
+
+Let $O$ be the origin, and $\overrightarrow{O X}, \overrightarrow{O Y}, \overrightarrow{O Z}$ be three unit vectors in the directions of the sides $\overrightarrow{Q R}, \overrightarrow{R P}$, $\overrightarrow{P Q}$, respectively, of a triangle $P Q R$.
+Q. $51|\overrightarrow{O X} \times \overrightarrow{O Y}|=$
+[A] $\sin (P+Q)$
+[B] $\sin 2 R$
+[C] $\sin (P+R)$
+[D] $\sin (Q+R)$
+Q. 52 If the triangle $P Q R$ varies, then the minimum value of
+$$\cos (P+Q)+\cos (Q+R)+\cos (R+P)$$
+is
+[A] $-\frac{5}{3}$
+[B] $-\frac{3}{2}$
+[C] $\frac{3}{2}$
+[D] $\frac{5}{3}$
+
+Space for rough work
+
+\section*{Answers for the above questions}
+
+Ans for Q.51: (A) Ans for Q.52: (B)
+
+\section*{PARAGRAPH 2}
+
+Let $p, q$ be integers and let $\alpha, \beta$ be the roots of the equation, $x^{2}-x-1=0$, where $\alpha \neq \beta$. For $n=0,1,2, \ldots$, let $a_{n}=p \alpha^{n}+q \beta^{n}$.
+
+FACT: If $a$ and $b$ are rational numbers and $a+b \sqrt{5}=0$, then $a=0=b$.
+\begin{itemize}
+\item[Q.] $53 a_{12}=$
+[A] $a_{11}-a_{10}$
+[B] $a_{11}+a_{10}$
+[C] $2 a_{11}+a_{10}$
+[D] $a_{11}+2 a_{10}$
+\item[Q.] 54 If $a_{4}=28$, then $p+2 q=$
+[A] 21
+[B] 14
+[C] 7
+[D] 12
+\end{itemize}
+
+END OF THE QUESTION PAPER
+Space for rough work
+
+\section*{Answers for the above questions}
+
+Ans for Q.53: (B) Ans for Q.54: (D)
+
+SPACE FOR ROUGH WORK

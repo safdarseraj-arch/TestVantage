@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 p = Path("ai_generator.py")
 text = p.read_text(encoding="utf-8")
 old = """def _draft_question_sync(params: dict[str, Any], target_model: str) -> QuestionOutput:

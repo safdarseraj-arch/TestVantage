@@ -137,6 +137,25 @@ function reactantChainStart(body, arrowAt) {
   return i
 }
 
+/** End of `\xrightarrow[below]{above}` including its optional and brace arguments. */
+function arrowArgsEnd(body, arrow) {
+  let i = arrow.index + arrow[0].length
+  for (;;) {
+    let j = i
+    while (/\s/.test(body[j] ?? '')) j += 1
+    const open = body[j]
+    if (open !== '{' && open !== '[') return i
+    const close = open === '{' ? '}' : ']'
+    let depth = 0
+    for (; j < body.length; j += 1) {
+      if (body[j] === open) depth += 1
+      else if (body[j] === close && (depth -= 1) === 0) break
+    }
+    if (j >= body.length) return i
+    i = j + 1
+  }
+}
+
 function splitMultiArrowChem(body) {
   const arrows = [...String(body ?? '').matchAll(/\\(?:longrightarrow|xrightarrow)/g)]
   if (arrows.length < 2) return null
@@ -144,6 +163,13 @@ function splitMultiArrowChem(body) {
   for (let n = 1; n < arrows.length; n += 1) {
     const at = reactantChainStart(body, arrows[n].index)
     if (at <= cuts[cuts.length - 1] || at >= arrows[n].index) return null
+    // A decay chain "U → ^{234}_{90}Th → …": only the next nucleus' mass/atomic numbers
+    // sit between the arrow and the cut, so the product is the next step's start.
+    const gap = body
+      .slice(arrowArgsEnd(body, arrows[n - 1]), at)
+      .replace(/\{\s*\}|[_^]\s*(?:\{[^{}]*\}|\w)/g, '')
+      .trim()
+    if (!gap) return null
     cuts.push(at)
   }
   const parts = cuts.map((c, i) => body.slice(c, cuts[i + 1] ?? body.length).trim())

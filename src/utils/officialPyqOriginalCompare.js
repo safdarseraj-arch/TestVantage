@@ -6,18 +6,35 @@
  * question box. The "Show original page" picture is local (no Gemini).
  */
 
-import katex from 'katex'
+import { officialPyqDrawnCutOff, officialPyqDrawnRawCode, officialPyqDrawnText } from './officialPyqDrawnCheck.js'
+import { officialPyqMatchListLayoutProblems } from './matchListLayoutCheck.js'
 import {
+  getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
+  loadOfficialPyqPendingPapers,
   updateOfficialPyqPendingPaper,
+  updateOfficialPyqPendingPapersMeta,
 } from './officialPyqPendingStore.js'
+import { numberingPrintedInOcr, subjectLocalNumbers } from './officialPyqAdminFacts.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
-import { formatOfficialPyqAnswerKey, notifyOfficialPyqCardChanged } from './officialPyqCardEdit.js'
+import { officialPyqCompareCardKey } from './officialPyqCompareFreshness.js'
+import {
+  formatOfficialPyqAnswerKey,
+  notifyOfficialPyqCardChanged,
+  officialPyqCardForAdmin,
+  officialPyqCompareHasSuggestion,
+  officialPyqPrintedAnswerPatch,
+  officialPyqSuggestedFigures,
+} from './officialPyqCardEdit.js'
 
 export const ORIGINAL_MISSING_MESSAGE = 'Original paper not available for this paper'
 export const GEMINI_KEY_MISSING_MESSAGE = 'Gemini key missing'
-const MAX_RETRIES = 2
-const COMPARE_TIMEOUT_MS = 150_000
+const MAX_RETRIES = 1
+/** Above the server's own Gemini limits (2 × 50 s per compare call, 150 s for the one-time page map). */
+const COMPARE_TIMEOUT_MS = 170_000
+const NO_ANSWER_MESSAGE = 'Gemini did not answer in time. Click Compare this question again.'
+/** The server already retried these; another round only keeps the card on "Comparing" for minutes. */
+const SERVER_ALREADY_RETRIED = new Set(['gemini_timeout', 'gemini_connection'])
 
 class CompareStopError extends Error {
   /** @param {string} code @param {string} message */
@@ -50,17 +67,26 @@ async function readError(res) {
   if (res.status === 503 && !code) {
     return new CompareStopError('api_down', 'Hybrid AI (port 8000) is not running. Press F5, then try again.')
   }
-  return new Error(message || `Compare failed (${res.status}).`)
+  const err = new Error(message || `Compare failed (${res.status}).`)
+  if (SERVER_ALREADY_RETRIED.has(code)) err.noRetry = true
+  return err
 }
 
 /** @param {string} url @param {RequestInit} init @param {AbortSignal | undefined} signal */
 async function fetchWithTimeout(url, init, signal) {
   const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), COMPARE_TIMEOUT_MS)
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    ctl.abort()
+  }, COMPARE_TIMEOUT_MS)
   const onAbort = () => ctl.abort()
   signal?.addEventListener('abort', onAbort)
   try {
     return await fetch(url, { ...init, signal: ctl.signal })
+  } catch (err) {
+    if (timedOut && !signal?.aborted) throw new Error(NO_ANSWER_MESSAGE)
+    throw err
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', onAbort)
@@ -88,7 +114,28 @@ export async function uploadOfficialPyqOriginal(paperId, file, fileName) {
     undefined,
   )
   if (!res.ok) throw await readError(res)
-  return res.json()
+  const stored = await res.json()
+  void keepPaperPicturesLocal(paperId)
+  return stored
+}
+
+/**
+ * Local copies of the paper's Mathpix pictures, cut from its stored original PDF.
+ * @param {string} [paperId] one paper; every stored paper when omitted
+ */
+export async function keepPaperPicturesLocal(paperId) {
+  try {
+    const { keepOfficialPyqPicturesLocal } = await import('./mathpixLocalPictures.js')
+    return await keepOfficialPyqPicturesLocal({
+      papers: loadOfficialPyqPendingPapers(),
+      ocrTextOf: getOfficialPyqPendingOcrText,
+      savePaperMeta: updateOfficialPyqPendingPapersMeta,
+      onlyPaperId: paperId,
+      force: Boolean(paperId),
+    })
+  } catch {
+    return { kept: 0, noOriginal: [] }
+  }
 }
 
 /** Printed number on the original paper for this card. @param {any} q @param {number} index */
@@ -97,36 +144,128 @@ export function officialPyqPrintedNumber(q, index) {
   return Number.isFinite(n) && n > 0 ? n : index + 1
 }
 
-const HTML_ENTITIES = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'" }
+/**
+ * Which of the cards with this printed number this one is. With numbering that
+ * restarts per subject, chemistry Q11 is the 2nd of three Q11s.
+ * @param {string} paperId @param {number} index @param {any} q
+ */
+export function officialPyqPrintedNumberPlace(paperId, index, q) {
+  const paper = getOfficialPyqPendingPaper(paperId)
+  const questions = Array.isArray(paper?.questions) ? paper.questions : []
+  const numbers = numbersPrintedOnPage(paper, questions)
+  const n = numbers[index] ?? officialPyqPrintedNumber(q, index)
+  let occurrence = 0
+  let sameNumberCount = 0
+  questions.forEach((card, i) => {
+    if (!card || isOfficialPyqPlaceholder(card) || numbers[i] !== n) return
+    sameNumberCount += 1
+    if (i < index) occurrence += 1
+  })
+  return { number: n, occurrence, sameNumberCount: Math.max(sameNumberCount, occurrence + 1) }
+}
 
 /**
- * Card text as students see it: each $…$ drawn by KaTeX and flattened to
- * plain text. KaTeX drops spaces inside math, so `$0.03 \mathrm{M} \mathrm{KMnO}_4$`
- * reads "0.03MKMnO4" here — the stored LaTeX alone hides that.
- * @param {unknown} text
+ * The number the original page prints for each card. Cards numbered straight
+ * through (Chemistry Q39) on a paper whose scan starts again at Q.1 in each
+ * subject get their place inside the subject (Chemistry Q.3).
+ * @param {any} paper @param {any[]} questions
  */
-export function officialPyqDrawnText(text) {
-  const raw = String(text ?? '')
-  if (!raw.includes('$')) return raw
-  return raw.replace(/\$\$([\s\S]*?)\$\$|\$([^$\n]*)\$/g, (whole, display, inline) => {
-    const latex = String(display ?? inline ?? '').trim()
-    if (!latex) return ''
-    try {
-      const html = katex.renderToString(latex, {
-        output: 'html',
-        displayMode: display != null,
-        throwOnError: false,
-        strict: 'ignore',
-      })
-      if (html.includes('katex-error')) return whole
-      return html
-        .replace(/<[^>]+>/g, '')
-        .replace(/&[a-z#0-9]+;/gi, (m) => HTML_ENTITIES[m.toLowerCase()] ?? ' ')
-        .replace(/[\u200b\u2061]/g, '')
-    } catch {
-      return whole
-    }
-  })
+function numbersPrintedOnPage(paper, questions) {
+  const stored = questions.map((card, i) => officialPyqPrintedNumber(card, i))
+  const local = subjectLocalNumbers(questions)
+  const perSubject = Math.max(0, ...local)
+  if (Math.max(0, ...stored) <= perSubject + 2) return stored
+  const ocr = getOfficialPyqPendingOcrText(paper?.id) || String(paper?.preparedText ?? '')
+  return numberingPrintedInOcr(ocr, perSubject) === 'restart' ? local : stored
+}
+
+export { officialPyqDrawnRawCode, officialPyqDrawnText }
+
+/** "Go to Q 6, 44. Reason." lines from the local check that name this question. */
+function qualityReasonsFor(paper, goTo) {
+  const lines = Array.isArray(paper?.localQuality?.lines) ? paper.localQuality.lines : []
+  const out = []
+  for (const line of lines) {
+    const m = String(line ?? '').match(/^Go to Q ([\d,\s]+)\.\s*(.*)$/)
+    if (!m) continue
+    if (!m[1].split(',').map((n) => Number(n.trim())).includes(goTo)) continue
+    if (m[2].trim()) out.push(m[2].trim().replace(/\.$/, ''))
+  }
+  return out
+}
+
+/**
+ * Problems a student would see on this card right now, from the local quality
+ * check and from the drawn text (raw code, an option cut off after "and").
+ * A Compare "matches" must not hide them.
+ * @param {any} paper @param {number} index
+ * @param {{ text?: string, passage?: string, options?: string[] }} drawn
+ * @returns {string[]}
+ */
+export function officialPyqCardScreenProblems(paper, index, drawn) {
+  const goTo = index + 1
+  const out = []
+  const flagged = (Array.isArray(paper?.localQuality?.failedGoTo) ? paper.localQuality.failedGoTo : [])
+    .map(Number)
+    .includes(goTo)
+  if (flagged) {
+    const reasons = qualityReasonsFor(paper, goTo)
+    out.push(
+      reasons.length
+        ? `the quality check flags Q${goTo}: ${reasons.slice(0, 2).join('; ')}`
+        : `the quality check flags Q${goTo} (see the red banner)`,
+    )
+  }
+  const options = Array.isArray(drawn?.options) ? drawn.options.map((o) => String(o ?? '')) : []
+  const parts = [drawn?.passage, drawn?.text, ...options]
+  for (const hit of officialPyqDrawnRawCode(parts.map((p) => String(p ?? '')).join('\n'))) out.push(hit)
+  out.push(...officialPyqDrawnCutOff(null, { text: String(drawn?.text ?? ''), options }))
+  const card = paper?.questions?.[index]
+  if (card) out.push(...officialPyqMatchListLayoutProblems(card).map((p) => `in the List-I / List-II layout, ${p}`))
+  return out
+}
+
+/**
+ * Gemini compares words with the page. When the words match but the card still
+ * shows a problem, the result says so instead of "matches".
+ * @param {any} result @param {string[]} problems
+ */
+export function honestOfficialPyqCompareResult(result, problems) {
+  if (String(result?.verdict ?? '') !== 'matches' || !problems?.length) return result
+  return {
+    ...result,
+    verdict: 'differs',
+    textMatches: true,
+    differences: problems.slice(0, 4).map((p) => ({
+      kind: 'card_problem',
+      detail: `The words match the original, but ${p}. Fix: Edit question (or Undo last edit), then compare again.`,
+    })),
+    suggested_text: '',
+    suggested_options: [],
+    suggested_passage: '',
+    suggested_figures: undefined,
+  }
+}
+
+/**
+ * The page prints an answer key the card lacks or contradicts: Compare cannot say "matches"
+ * (2013 P1 Q2 — the scan lost "ANSWER : A" at the foot of the page).
+ * @param {any} result @param {any} card the card as sent
+ */
+export function withPrintedAnswerDifference(result, card) {
+  const verdict = String(result?.verdict ?? '')
+  if (verdict !== 'matches' && verdict !== 'differs') return result
+  const patch = officialPyqPrintedAnswerPatch(card, result)
+  if (!patch) return result
+  const onCard = formatOfficialPyqAnswerKey(card)
+  const detail = onCard
+    ? `The page prints answer ${String(result.printed_answer).trim()}; the card says ${onCard}.`
+    : `The page prints answer ${String(result.printed_answer).trim()}; the card has no answer.`
+  const differences = Array.isArray(result?.differences) ? result.differences : []
+  if (verdict === 'matches') {
+    return { ...result, verdict: 'differs', textMatches: true, differences: [{ kind: 'wrong_answer', detail }] }
+  }
+  return { ...result, differences: [...differences, { kind: 'wrong_answer', detail }] }
 }
 
 /** @param {any} q */
@@ -141,14 +280,18 @@ function cardHasFigure(q) {
  * One card, up to 2 retries. Stops at once for a missing original / key.
  * @param {string} paperId @param {number} index @param {any} q @param {{ signal?: AbortSignal }} [opts]
  */
-export async function compareOfficialPyqCardRemote(paperId, index, q, { signal } = {}) {
+export async function compareOfficialPyqCardRemote(paperId, index, stored, { signal } = {}) {
+  const q = officialPyqCardForAdmin(paperId, stored)
+  const place = officialPyqPrintedNumberPlace(paperId, index, stored)
   const body = {
     paper_id: paperId,
     go_to: index + 1,
-    printed_number: officialPyqPrintedNumber(q, index),
+    printed_number: place.number,
     card_text: String(q?.text ?? q?.stem ?? ''),
     passage_text: String(q?.passageText ?? ''),
     subject: String(q?.subject ?? ''),
+    occurrence: place.occurrence,
+    same_number_count: place.sameNumberCount,
     options: Array.isArray(q?.options) ? q.options.map((o) => String(o ?? '')) : [],
     answer_key: formatOfficialPyqAnswerKey(q) || null,
     has_figure: cardHasFigure(q),
@@ -156,6 +299,12 @@ export async function compareOfficialPyqCardRemote(paperId, index, q, { signal }
   body.drawn_text = officialPyqDrawnText(body.card_text)
   body.drawn_passage = officialPyqDrawnText(body.passage_text)
   body.drawn_options = body.options.map((o) => officialPyqDrawnText(o))
+  const problems = officialPyqCardScreenProblems(getOfficialPyqPendingPaper(paperId), index, {
+    text: body.drawn_text,
+    passage: body.drawn_passage,
+    options: body.drawn_options,
+  })
+  body.screen_problems = problems
   let lastError = null
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -166,11 +315,12 @@ export async function compareOfficialPyqCardRemote(paperId, index, q, { signal }
         signal,
       )
       if (!res.ok) throw await readError(res)
-      return await res.json()
+      return withPrintedAnswerDifference(honestOfficialPyqCompareResult(await res.json(), problems), q)
     } catch (err) {
       if (err instanceof CompareStopError) throw err
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
       lastError = err
+      if (err?.noRetry || err?.message === NO_ANSWER_MESSAGE) break
     }
   }
   const msg = lastError instanceof Error ? lastError.message : 'Compare failed.'
@@ -181,8 +331,9 @@ export async function compareOfficialPyqCardRemote(paperId, index, q, { signal }
  * Store a compare result on the card and refresh the list status.
  * Only touches `originalCompare` — question text stays as it is.
  * @param {string} paperId @param {number} index @param {any} result
+ * @param {any} [comparedCard] the card as it was sent (defaults to the stored card)
  */
-export function saveOfficialPyqCompareResult(paperId, index, result) {
+export function saveOfficialPyqCompareResult(paperId, index, result, comparedCard) {
   const paper = getOfficialPyqPendingPaper(paperId)
   if (!paper || String(paper.status) !== 'pending_review') return null
   const questions = Array.isArray(paper.questions) ? paper.questions.slice() : []
@@ -191,11 +342,13 @@ export function saveOfficialPyqCompareResult(paperId, index, result) {
   const verdict = ['matches', 'differs', 'not_found', 'error'].includes(String(result?.verdict))
     ? String(result.verdict)
     : 'error'
+  const figures = officialPyqSuggestedFigures(result?.suggested_figures)
   questions[index] = {
     ...card,
     originalCompare: {
       verdict: verdict === 'not_found' ? 'differs' : verdict,
       notFound: verdict === 'not_found' || undefined,
+      textMatches: result?.textMatches === true || result?.text_matches === true || undefined,
       differences: (Array.isArray(result?.differences) ? result.differences : [])
         .slice(0, 8)
         .map((d) => ({ kind: String(d?.kind ?? 'other'), detail: String(d?.detail ?? '') })),
@@ -204,10 +357,13 @@ export function saveOfficialPyqCompareResult(paperId, index, result) {
       suggestedOptions: Array.isArray(result?.suggested_options)
         ? result.suggested_options.map((o) => String(o ?? ''))
         : [],
+      suggestedFigures: officialPyqCompareHasSuggestion({ suggestedFigures: figures }) ? figures : undefined,
+      printedAnswer: typeof result?.printed_answer === 'string' ? result.printed_answer.trim() : undefined,
       pages: Array.isArray(result?.pages) ? result.pages : [],
       error: result?.error ? String(result.error) : undefined,
       checkedAt: Date.now(),
       model: String(result?.model ?? 'gemini-3.7-flash'),
+      cardKey: officialPyqCompareCardKey(comparedCard ?? card),
     },
   }
   const saved = updateOfficialPyqPendingPaper(paper.id, { questions })
@@ -225,7 +381,7 @@ export async function compareOneOfficialPyqCard(paperId, index, opts = {}) {
   if (!card || isOfficialPyqPlaceholder(card)) return { ok: false, error: 'No question on this card.' }
   try {
     const result = await compareOfficialPyqCardRemote(paperId, index, card, opts)
-    const saved = saveOfficialPyqCompareResult(paperId, index, result)
+    const saved = saveOfficialPyqCompareResult(paperId, index, result, card)
     return { ok: true, result, card: saved?.questions?.[index] ?? null }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
@@ -254,9 +410,12 @@ export function officialPyqFlaggedGoTo(paper) {
  * @returns {Promise<{ available: boolean, pageCount: number, pages: number[], kind: string, fileName?: string }>}
  */
 export async function locateOfficialPyqOriginalPage(paperId, index, q) {
+  const place = officialPyqPrintedNumberPlace(paperId, index, q)
   const params = new URLSearchParams({
-    printed_number: String(officialPyqPrintedNumber(q, index)),
+    printed_number: String(place.number),
     card_text: `${String(q?.passageText ?? '')}\n${String(q?.text ?? q?.stem ?? '')}`.trim().slice(0, 1500),
+    occurrence: String(place.occurrence),
+    same_number_count: String(place.sameNumberCount),
   })
   const res = await fetchWithTimeout(
     `/api/official-pyq/original/${encodeURIComponent(paperId)}/locate?${params}`,
@@ -270,6 +429,27 @@ export async function locateOfficialPyqOriginalPage(paperId, index, q) {
 /** Picture of one original page, drawn locally on the server. @param {string} paperId @param {number} page 1-based */
 export function officialPyqOriginalPageUrl(paperId, page) {
   return `/api/official-pyq/original/${encodeURIComponent(paperId)}/page/${Math.max(1, Math.floor(page))}`
+}
+
+/**
+ * Cut a box out of one original page; the server copies the pixels (no Gemini).
+ * @param {string} paperId
+ * @param {number} page 1-based
+ * @param {{ x0: number, y0: number, x1: number, y1: number }} box fractions of the page (0..1)
+ * @returns {Promise<{ url: string, width: number, height: number }>}
+ */
+export async function cropOfficialPyqOriginalPage(paperId, page, box) {
+  const res = await fetchWithTimeout(
+    `/api/official-pyq/original/${encodeURIComponent(paperId)}/crop`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: Math.max(1, Math.floor(page)), ...box }),
+    },
+    undefined,
+  )
+  if (!res.ok) throw await readError(res)
+  return res.json()
 }
 
 /**
@@ -313,7 +493,7 @@ export async function compareWholeOfficialPyqPaper(paperId, { signal, onProgress
       if (err instanceof CompareStopError) return { ok: false, error: err.message, code: err.code, tally, count }
       result = { verdict: 'error', error: err instanceof Error ? err.message : 'Compare failed.' }
     }
-    saveOfficialPyqCompareResult(paperId, index, result)
+    saveOfficialPyqCompareResult(paperId, index, result, fresh)
     if (result.verdict === 'matches') tally.matches += 1
     else if (result.verdict === 'error') {
       tally.error += 1

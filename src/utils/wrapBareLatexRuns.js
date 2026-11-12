@@ -18,7 +18,13 @@
  */
 
 import { clipIncompleteFracRun, normalizeSmashedChemDollars, splitGluedChemDisplayEquations } from './healTruncatedLatex.js'
-import { stripDollarsInsideLatexEnvs } from './latexTabularDisplay.js'
+import { LATEX_FENCE, stripDollarsInsideLatexEnvs } from './latexTabularDisplay.js'
+
+const LEFT_FENCE_AT_END = new RegExp(String.raw`\\left\s*${LATEX_FENCE}\s*$`)
+const BARE_FENCED_ARRAY = new RegExp(
+  String.raw`\\left\s*${LATEX_FENCE}\s*\\begin\{array\}[\s\S]{0,1200}?\\end\{array\}\s*\\right\s*${LATEX_FENCE}(?:\s*[\^_](?:\{[^{}$]*\}|\\?[A-Za-z0-9]))*`,
+  'g',
+)
 import {
   consumeIncludeGraphics,
   guardDollarsAroundFigures,
@@ -164,11 +170,13 @@ function mathRunEnd(text, start) {
       if (DISPLAY_MATRIX_ENV.test(text.slice(i))) hasDisplayMatrix = true
       // LaTeX row break `\\` belongs in aligned/array, not inline $…$.
       if (cmd === '\\\\') break
+      // A picture or page command after a blank ("is \_\_\_\_" then the figure) is not math (2025 P2 Q27).
+      if (i > start && /^\\(?:includegraphics|section|item|caption|begin\{figure)/.test(text.slice(i))) break
       sawCommand = true
       i = cmdEnd
       // \left / \right take a following delimiter (optionally backslash-escaped)
       if (/^\\(?:left|right)$/.test(cmd)) {
-        if (text[i] === '\\') i += 2
+        if (text[i] === '\\') i = readCommand(text, i)
         else if (i < text.length && /[([\]|./)]|\{|\}/.test(text[i])) i += 1
       }
       continue
@@ -319,21 +327,38 @@ export function stripStrayMathDelimiters(text) {
       // $\mathrm{NaNH}_{2}$ (2 equivalents) and trans- $\mathrm{CH}$ are real
       // closers/openers. "(" and "-" are English here, not stray math.
       // `$...$ )` closes a unit such as (in $\mathrm{J}...$). ")" is English here.
-      const closedGroupThenParen = left === '}' && (right === '(' || right === '[' || right === ')')
+      const closedGroupThenParen =
+        (left === '}' && (right === '(' || right === '[' || right === ')')) ||
+        (right === '(' && /\s/.test(t[i + 1] || '') && /^\(\s*[A-Za-z]{3,}\b/.test(t.slice(j)))
       const hyphenBeforeCommand =
         (left === '-' || left === '\u2013' || left === '\u2014') && right === '\\'
+      // $\beta^{-}$-decay and $x$-axis: a hyphen and a word after the closer are English.
+      const closerBeforeHyphenWord = right === '-' && t[i + 1] === '-' && /^-[A-Za-z]{2,}\b/.test(t.slice(j))
       // [Given: $9^{1/3}=2.08$ ] and $...mol^{-1}$ ] — the bracket is English.
       const closerBeforeEnglishBracket =
         (right === ']' || right === ')') && (left === '}' || left === ')' || /[0-9]/.test(left))
       // ( $\mathrm{M}_{1}$ and ( $2 a, 2 b$ ) — the dollar after "(" opens a real formula.
-      const openerBeforeCommand = right === '\\' || left === '(' || left === '['
+      // "(… produced in plant $T_{1}$ ) $=10 P$": a spaced ")" closes English words, so the $ opens.
+      const openerAfterEnglishParen = /\s\)\s+$/.test(out) && !/\s/.test(t[i + dl] || '')
+      const openerBeforeCommand = right === '\\' || left === '(' || left === '[' || openerAfterEnglishParen
+      // (P)\n$|z|^{2}$ — a $ that starts a line or follows a row label opens a formula.
+      const lineEdge = /\n[ \t]*$/.test(out) || /^[ \t]*\n/.test(t.slice(i + dl))
+      const afterRowLabel = /(?:^|\s)\(\s*(?:[A-Z]|[IVX]{1,4}|\d{1,2})\s*\)\s*$/.test(out)
+      const beforeRowLabel = /^\s*\(\s*(?:[A-Z]|[IVX]{1,4}|\d{1,2})\s*\)(?:\s|$)/.test(t.slice(i + dl))
+      // $\epsilon_{r} =$ ________ — an answer blank after the closer is English, not a subscript.
+      const answerBlankAfter = /^_{2,}/.test(t.slice(j))
       if (
         leftMath &&
         rightMath &&
+        !answerBlankAfter &&
         !closedGroupThenParen &&
         !hyphenBeforeCommand &&
+        !closerBeforeHyphenWord &&
         !closerBeforeEnglishBracket &&
-        !openerBeforeCommand
+        !openerBeforeCommand &&
+        !lineEdge &&
+        !afterRowLabel &&
+        !beforeRowLabel
       ) {
         i += dl // drop the stray delimiter
         continue
@@ -528,11 +553,12 @@ export function repairOrphanPiecewiseArray(text) {
 
   // Mathpix smash: $$M=\left[$$\begin{array}...\end{array}$$$\right]$$ or \left\{…\right.
   // Only strip $ that sit between \left… and \begin{array}, not a real $$ wrap.
-  s = s.replace(/(\\left(?:\\\{|\[|\())\s*\$+\s*(?=\\begin\{array\})/gi, '$1')
-  s = s.replace(/(\\end\{array\})\s*\${2,}(\s*\\right[\].)])/gi, '$1$2')
-  s = s.replace(/(\\end\{array\})\s*\$+(?=\s*\\right[\].)])/gi, '$1')
-  // Collapse excess $$ after a closed \right] / \right. matrix
-  s = s.replace(/(\\right[\].])\${3,}/gi, '$1$$')
+  // Determinant bars too: \left|$$\begin{array}…\end{array}$$\right|.
+  s = s.replace(new RegExp(String.raw`(\\left\s*${LATEX_FENCE})\s*\$+\s*(?=\\begin\{array\})`, 'gi'), '$1')
+  s = s.replace(new RegExp(String.raw`(\\end\{array\})\s*\${2,}(\s*\\right\s*${LATEX_FENCE})`, 'gi'), '$1$2')
+  s = s.replace(new RegExp(String.raw`(\\end\{array\})\s*\$+(?=\s*\\right\s*${LATEX_FENCE})`, 'gi'), '$1')
+  // Collapse excess $$ after a closed \right] / \right. / \right| matrix
+  s = s.replace(/(\\right[\].|])\${3,}/gi, '$1$$')
   s = s.replace(/(\\right\.)\${3,}/gi, '$1$$')
 
   if (!/\\end\{array\}/i.test(s)) return s
@@ -594,7 +620,7 @@ export function repairOrphanPiecewiseArray(text) {
 export function wrapOrDropLeftoverArray(text) {
   let s = String(text ?? '')
   if (!/\\end\{array\}/i.test(s) && !/\\begin\{array\}/i.test(s)) return s
-  s = s.replace(/\$\s*(\\begin\{array\})/gi, '$1')
+  s = s.replace(/(?<!\$)\$\s*(\\begin\{array\})/gi, '$1')
   if (/\\end\{array\}/i.test(s) && !/\\begin\{array\}/i.test(s)) {
     s = s.replace(
       /(=\s*\\?\{[\s\S]{8,700}?)\\end\{array\}/i,
@@ -623,13 +649,22 @@ export function wrapOrDropLeftoverArray(text) {
     }
     return inInline
   }
+  const insideDisplayDollar = (offset) =>
+    ((s.slice(0, offset).replace(/\\\$/g, '').match(/\$\$/g) || []).length % 2) === 1
+  // A bare \left<fence> array \right<fence> outside math is one display formula;
+  // wrapping only the array leaves \left|$$ … $$\right| smashes.
+  s = s.replace(BARE_FENCED_ARRAY, (span, offset) =>
+    insideInlineDollar(offset) || insideDisplayDollar(offset) ? span : `$$${span}$$`,
+  )
   s = s.replace(/(\\begin\{array\}[\s\S]*?\\end\{array\})/gi, (block, _, offset) => {
     const before = s.slice(0, offset)
     const after = s.slice(offset + block.length)
     // Already a balanced $$…$$ display block.
     if (/\$\$$/.test(before)) return block
+    // A determinant or matrix inside an open $$ … $$ formula (f(θ)=½|array|+|array|).
+    if (insideDisplayDollar(offset) && /\$\$/.test(after)) return block
     // Inside \left( / \left\{ … \right. inline math (Q10 set notation).
-    if (/\\left\\\{\s*$/.test(before) || /\\left\(\s*$/.test(before)) return block
+    if (LEFT_FENCE_AT_END.test(before) && (insideInlineDollar(offset) || insideDisplayDollar(offset))) return block
     if (insideInlineDollar(offset)) {
       const nextDollar = after.search(/\$/)
       // Clean $…\begin{array}…\end{array}…$ — leave alone.
@@ -794,7 +829,7 @@ export function rejoinSplitMathEnvironments(text) {
   let s = splitGluedChemDisplayEquations(String(text ?? ''))
   s = s.replace(/\${3,}/g, () => '$$')
   const leftEnv = new RegExp(
-    String.raw`(\\left\s*(?:\\\{|\(|\[))\s*\$\$(\\begin\{(?:${SPLIT_ENV})\}[\s\S]{0,700}?\\end\{(?:${SPLIT_ENV})\})\s*\$\$`,
+    String.raw`(\\left\s*${LATEX_FENCE})\s*\$\$(\\begin\{(?:${SPLIT_ENV})\}[\s\S]{0,700}?\\end\{(?:${SPLIT_ENV})\})\s*\$\$`,
     'gi',
   )
   for (let n = 0; n < 6; n += 1) {
@@ -812,7 +847,7 @@ export function rejoinSplitMathEnvironments(text) {
     s = s.replace(/(\$[^$\n]{1,180})\s*\]\s*$/, (_, inner) => `${inner}$ ]`)
   }
   s = guardDollarsAroundFigures(s)
-  return stripDollarsInsideLatexEnvs(s)
+  return stripDollarsInsideLatexEnvs(s, { keepMatchListTabular: true })
 }
 
 /** @param {string} text */

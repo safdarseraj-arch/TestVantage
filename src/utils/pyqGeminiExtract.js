@@ -59,11 +59,19 @@ import {
   stripMathpixQuestionMarker,
   extractMathpixQuestionNumber,
 } from './mathpixQuestionSplit.js'
+import { textIsMostlyHindi } from './stripHindiOcr.js'
 import { parseQuestionText } from './parseQuestionText.js'
 import { hasMathpixMedia } from './mathpixMedia.js'
 import { diagnoseLocalUploadSplit } from './uploadLocalFirstPipeline.js'
 import { getQuestionType } from '../data/questionTypes.js'
 import { parsePaperSectionMap } from './parsePaperSectionMap.js'
+import {
+  applyPrintedAnswerKey,
+  formatStoredPrintedAnswerKey,
+  readPrintedAnswerKey,
+  stripPrintedAnswerBoxes,
+} from './printedAnswerKey.js'
+import { applyEndAnswerSection, readEndAnswerSection } from './printedEndSolutions.js'
 
 export const PYQ_GEMINI_JSON_SCHEMA_HINT = `Return ONLY this JSON (no markdown fences, no extra commentary):
 {
@@ -371,6 +379,7 @@ export function validateGeminiPyqExtractItem(item) {
     item: {
       stem,
       options,
+      answerKeyVisible: printedKey,
       correctIndex: correctIndex == null ? undefined : correctIndex,
       solution: solution || undefined,
       toughness: item.toughnessLevel != null || item.toughness != null
@@ -845,9 +854,43 @@ export function officialPyqPaperDefaults(paperMeta) {
  * Prefers structured questions[] so local OCR polish cannot smash Gemini LaTeX.
  * @param {unknown} extracted
  * @param {Parameters<typeof officialPyqPaperDefaults>[0]} paperMeta
- * @param {{ existingQuestionCount?: number }} [opts]
+ * @param {{ existingQuestionCount?: number, printedAnswerKey?: Map<number, string> }} [opts]
+ *   `printedAnswerKey` is read from stored text that was already cleaned of its answer boxes.
+ *   An upload's `extracted.printedAnswerKey` was read from the raw OCR before cleaning.
  */
 export function questionsFromOfficialPyqExtract(extracted, paperMeta, opts = {}) {
+  const raw = coercePyqExtractPayload(extracted).text
+  /** Answers / solutions printed after the last question: split without them, then put them on the cards. */
+  const end = readEndAnswerSection(raw)
+  if (end) {
+    const input = typeof extracted === 'string' ? end.questionText : { ...extracted, text: end.questionText, raw: undefined }
+    const built = questionsFromOfficialPyqExtract(input, paperMeta, opts)
+    return {
+      ...built,
+      questions: applyEndAnswerSection(built.questions ?? [], end, { fillOnly: true }),
+      preparedText: `${String(built.preparedText ?? '').trimEnd()}\n\n${end.sectionText}\n`,
+    }
+  }
+  const fromText = readPrintedAnswerKey(raw)
+  const given = [opts.printedAnswerKey, extracted?.printedAnswerKey].find((k) => k instanceof Map && k.size)
+  const printedKey = fromText.size ? fromText : given || fromText
+  if (!printedKey.size) return questionsFromOfficialPyqExtractText(extracted, paperMeta, opts)
+  const text = stripPrintedAnswerBoxes(raw)
+  const input = typeof extracted === 'string' ? text : { ...extracted, text, raw: undefined }
+  const built = questionsFromOfficialPyqExtractText(input, paperMeta, opts)
+  return {
+    ...built,
+    questions: applyPrintedAnswerKey(built.questions ?? [], printedKey),
+    preparedText: `${String(built.preparedText ?? '').trimEnd()}${formatStoredPrintedAnswerKey(printedKey)}`,
+  }
+}
+
+/**
+ * @param {unknown} extracted
+ * @param {Parameters<typeof officialPyqPaperDefaults>[0]} paperMeta
+ * @param {{ existingQuestionCount?: number }} [opts]
+ */
+function questionsFromOfficialPyqExtractText(extracted, paperMeta, opts = {}) {
   const payload = coercePyqExtractPayload(extracted)
   const defaults = officialPyqPaperDefaults(paperMeta)
   const exam = defaults.examPatternId
@@ -869,18 +912,31 @@ export function questionsFromOfficialPyqExtract(extracted, paperMeta, opts = {})
       rejected.push(`Q${i + 1}: ${v.error}`)
       return
     }
+    if (textIsMostlyHindi(v.item.stem)) {
+      rejected.push(`Q${i + 1}: Hindi copy of a question (English is kept)`)
+      return
+    }
+    // Upload is the split only. Tags, AI answers, and solutions come from the
+    // Hybrid AI fill after Approve; an answer printed on the paper stays.
+    const printed = v.item.answerKeyVisible || raw?.answerSource === 'from_paper'
     structured.push({
       text: v.item.stem,
       options: v.item.options,
-      correctIndex: v.item.correctIndex,
-      correctInteger: v.item.correctInteger,
-      correctNumerical: v.item.correctNumerical,
-      solution: v.item.solution,
+      ...(printed
+        ? {
+            correctIndex: v.item.correctIndex,
+            correctInteger: v.item.correctInteger,
+            correctNumerical: v.item.correctNumerical,
+          }
+        : {}),
+      ...((raw?.solutionSource === 'from_paper' || raw?.solutionPrinted === true || raw?.solution_printed === true) &&
+      v.item.solution
+        ? { solution: v.item.solution, solutionSource: 'from_paper' }
+        : {}),
       subject: v.item.subject || defaults.subject || 'physics',
-      chapter: v.item.chapter || defaults.chapter || 'General',
+      chapter: defaults.chapter || 'General',
       questionType: v.item.questionType || 'single_correct',
       questionNumber: v.item.number ?? i + 1,
-      toughnessLevel: v.item.toughness,
     })
   })
 
@@ -1141,7 +1197,10 @@ export function formatOfficialPyqUploadError(err, extra = {}) {
   const aborted = extra.aborted === true
   const raw = err instanceof Error ? err.message : String(err ?? 'Import failed.')
   const code = err && typeof err === 'object' ? err.code : ''
-  if (code === 'PYQ_VISION_REQUIRED' || code === 'PYQ_API_DOWN' || code === 'PYQ_PDF_OPEN_TIMEOUT' || code === 'PYQ_MATHPIX_REQUIRED' || code === 'MATHPIX_NOT_CONFIGURED' || code === 'MATHPIX_TIMEOUT' || code === 'GEMINI_STRUCTURE_TIMEOUT') return raw
+  if (code === 'PYQ_VISION_REQUIRED' || code === 'PYQ_API_DOWN' || code === 'PYQ_PDF_OPEN_TIMEOUT' || code === 'PYQ_MATHPIX_REQUIRED' || code === 'MATHPIX_NOT_CONFIGURED' || code === 'MATHPIX_TIMEOUT' || code === 'MATHPIX_NETWORK' || code === 'GEMINI_STRUCTURE_TIMEOUT') return raw
+  if (/^\s*(fetch failed|socket hang up|other side closed)\s*\.?\s*$/i.test(raw) || /\b(ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN)\b/.test(raw)) {
+    return 'The internet connection dropped while the paper was being read, so nothing was saved and it is not in Pending approval. Check your internet, then upload the file again.'
+  }
   if (code === 'PYQ_EXTRACT_TIMEOUT' || /timed out/i.test(raw)) {
     return raw
   }
@@ -1285,7 +1344,7 @@ export async function extractPyqFileWithGemini(file, onProgress, opts = {}) {
   const labelForExtractPct = (p) => {
     if (p < 68) return 'Mathpix reading the PDF…'
     if (p < 88) return 'Local AI splitting questions…'
-    if (p < 96) return 'Gemini flash-lite tags, answers, solutions…'
+    if (p < 96) return 'Checking the split…'
     return 'Saving pending paper…'
   }
 
@@ -1303,6 +1362,7 @@ export async function extractPyqFileWithGemini(file, onProgress, opts = {}) {
         engine: local?.engine || 'word',
         text: localText,
         questions: Array.isArray(local?.questions) ? local.questions : [],
+        ...(local?.printedAnswerKey ? { printedAnswerKey: local.printedAnswerKey } : {}),
         localOcrText: localText,
         pdfText: localText,
         visionText: '',
@@ -1342,6 +1402,7 @@ export async function extractPyqFileWithGemini(file, onProgress, opts = {}) {
       engine: 'mathpix',
       text: parseText,
       questions,
+      ...(extracted?.printedAnswerKey ? { printedAnswerKey: extracted.printedAnswerKey } : {}),
       localOcrText: parseText,
       pdfText: parseText,
       visionText: parseText,

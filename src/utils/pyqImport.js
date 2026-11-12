@@ -156,6 +156,12 @@ export function parsedBulkToPyqItems(parsed, defaults, baseIndex = 0, slotMap = 
         },
         baseIndex + i,
       )
+      if (q && p.correctIndex == null) delete q.correctIndex
+      if (q && String(p.passageText ?? '').trim()) {
+        for (const key of ['passageText', 'passageGroup', 'passageId', 'passageRole', 'passageSource']) {
+          if (p[key] != null) q[key] = p[key]
+        }
+      }
       if (q) out.push(q)
     } catch {
       /* skip invalid rows in preview */

@@ -20,7 +20,7 @@ import {
   officialPyqNeedsAutoResplit,
   reExtractOfficialPyqPendingPaperLocal,
 } from '../src/utils/officialPyqLocalReparse.js'
-import { unpublishOfficialPyqPaper } from '../src/utils/officialPyqApproval.js'
+import { unapproveOfficialPyqPaper, unpublishOfficialPyqPaper } from '../src/utils/officialPyqApproval.js'
 import { officialYearPaperQuestions } from '../src/utils/pyqTests.js'
 import { healExamQuestionsForStudent } from '../src/utils/examQuestionHeal.js'
 
@@ -78,6 +78,10 @@ assert.equal(merged.papers.length, 1)
 assert.equal(merged.papers[0].status, 'approved')
 assert.equal(merged.papers[0].questions[0].text, lockedStem)
 assert.equal(merged.papers.filter((p) => p.status === 'pending_review').length, 0)
+const mergedPublished = mergeOfficialPyqSnapshotIntoPapers([{ ...published, status: 'published' }], [snapshotCopy])
+assert.equal(mergedPublished.skippedPublished, 1)
+assert.equal(mergedPublished.papers[0].status, 'published')
+assert.equal(mergedPublished.papers[0].questions[0].text, lockedStem)
 
 clearOfficialPyqPendingPapers()
 const paper = addOfficialPyqPendingPaper({
@@ -87,7 +91,7 @@ const paper = addOfficialPyqPendingPaper({
   paperLabel: 'JEE Advanced 2026 Paper 1',
   paperId: 'jee-advanced-2026-paper-1',
   sourceLabel: 'test',
-  status: 'approved',
+  status: 'published',
   preparedText: '\\item[Q.] 48 Match List-I with List-II.\n(A) one\n(B) two\n(C) three\n(D) four',
   questions: [
     {
@@ -104,7 +108,7 @@ const before = getOfficialPyqPendingPaper(paper.id).questions[0].text
 const reparse = reExtractOfficialPyqPendingPaperLocal(getOfficialPyqPendingPaper(paper.id))
 assert.equal(reparse.ok, false)
 assert.equal(getOfficialPyqPendingPaper(paper.id).questions[0].text, before)
-assert.equal(getOfficialPyqPendingPaper(paper.id).status, 'approved')
+assert.equal(getOfficialPyqPendingPaper(paper.id).status, 'published')
 
 globalThis.window = globalThis
 sessionStorage.setItem(
@@ -114,15 +118,19 @@ sessionStorage.setItem(
 const denied = unpublishOfficialPyqPaper(paper.id)
 assert.equal(denied.ok, false)
 assert.match(String(denied.error), /admin/i)
-assert.equal(getOfficialPyqPendingPaper(paper.id).status, 'approved')
+assert.equal(getOfficialPyqPendingPaper(paper.id).status, 'published')
 assert.equal(getOfficialPyqPendingPaper(paper.id).questions[0].text, before)
 
 sessionStorage.setItem(
   'testvantage-session',
   JSON.stringify({ role: 'admin', email: 'admin@test', name: 'Admin', loggedInAt: 1 }),
 )
-const sent = unpublishOfficialPyqPaper(paper.id)
-assert.equal(sent.ok, true)
+const unpublished = unpublishOfficialPyqPaper(paper.id)
+assert.equal(unpublished.ok, true, unpublished.error)
+assert.equal(unpublished.paper.status, 'approved')
+assert.equal(unpublished.paper.questions[0].text, before)
+const sent = unapproveOfficialPyqPaper(paper.id)
+assert.equal(sent.ok, true, sent.error)
 assert.equal(sent.paper.status, 'pending_review')
 assert.equal(sent.paper.returnedFromPublished, true)
 assert.equal(sent.paper.questions[0].text, before)

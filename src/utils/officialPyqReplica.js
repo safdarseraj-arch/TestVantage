@@ -12,6 +12,7 @@ import { findDuplicateQuestions, normalizeStemForDuplicate } from './detectDupli
 import { assignAiSimilarChildId, parseSimilarVariantIndex } from './questionFamily.js'
 import { hasStableOfficialPyqQuestionId } from './officialPyqPublishedMeta.js'
 import { loadQuestionBank } from './questionBank.js'
+import { isMatrixGridCard, parseMatrixGridAnswer } from './matrixGridPyq.js'
 
 /** Default similar-paper run: easier, same, then the two harder papers. */
 export const REPLICA_DIFFICULTY_ORDER = [-1, 0, 1, 2]
@@ -212,6 +213,27 @@ export function publishedMetaPatchFromHybridFill(question, filled) {
   const toughnessLevel = keptText(f.toughness_level, q.toughnessLevel)
   const source = keptText(f.source, q.source)
   const solution = String(f.step_by_step_solution || '').trim() || String(q.solution || '')
+  if (isMatrixGridCard(q)) {
+    const key = String(f.correct_answer || '').trim() ? parseMatrixGridAnswer(f.correct_answer, q) : null
+    return {
+      questionId: q.id,
+      expectText: String(q.text ?? q.stem ?? ''),
+      subject,
+      section,
+      chapter,
+      topic,
+      questionType: String(q.questionType || ''),
+      examIds,
+      toughnessLevel,
+      source,
+      solution,
+      correctIndex: '',
+      correctIndices: [],
+      correctInteger: '',
+      correctNumerical: '',
+      ...(key ? { matrixAnswerKey: key } : {}),
+    }
+  }
   const mapped = String(f.correct_answer || '').trim() ? answerFieldsFromHybrid(f.correct_answer) : null
   let correctIndex = q.correctIndex ?? ''
   let correctIndices = Array.isArray(q.correctIndices) ? q.correctIndices : []
@@ -283,12 +305,36 @@ export async function collectPaperHybridFills(questions, fillOne) {
   return rows
 }
 
+const HINT_OR_ESSAY_RE =
+  /\b(?:hint|think about|try (?:to|using)|you (?:should|can|need to)|let(?:'s| us) (?:think|consider|start|begin|recall)|first,? we need to understand|in this question,? we)\b/i
+
 /**
- * One fill request per question. The next question starts after this reply is applied.
+ * Why a Hybrid AI solution is not an exam solution yet: '' when it is fine.
+ * Official PYQ solutions are short exact working that ends in the result, not a hint or an essay.
+ * @param {unknown} text
+ */
+export function officialPyqSolutionProblem(text) {
+  const t = String(text ?? '').trim()
+  if (!t) return 'No solution came back.'
+  if (HINT_OR_ESSAY_RE.test(t)) return 'The solution reads like a hint, not worked steps.'
+  if (t.length > 1800) return 'The solution is an essay. It should be short worked steps.'
+  if (t.length < 25) return 'The solution is too short to show the working.'
+  return ''
+}
+
+/** Two questions in flight at a time; each is still its own Gemini request. */
+export const HYBRID_FILL_PART_SIZE = 2
+
+/**
+ * Hybrid AI fill, part by part: `concurrency` questions at a time (default 1),
+ * one request per question, so no request carries a whole paper and times out.
  * A failed question is tried up to 2 more times, then marked for a look.
+ * Each finished part is handed to `onApplied` before the next part starts.
+ * A `tagsOnly` question asks for metatags only, so its solution is never judged or retried.
+ * `answerProblem` judges the reply's answer (e.g. it misses the official one); a problem is retried like a weak solution.
  * @param {object[]} questions
  * @param {(question: object, index: number, attempt: number) => Promise<object>} fillOne
- * @param {{ onProgress?: Function, onApplied?: Function, isFatal?: (err: Error) => boolean }} [hooks]
+ * @param {{ onProgress?: Function, onApplied?: Function, isFatal?: (err: Error) => boolean, concurrency?: number, signal?: AbortSignal, skip?: (question: object, index: number) => boolean, tagsOnly?: (question: object, index: number) => boolean, answerProblem?: (question: object, filled: object) => string }} [hooks]
  */
 export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}) {
   const list = Array.isArray(questions) ? questions : []
@@ -297,41 +343,52 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
   const onProgress = hooks.onProgress
   const onApplied = hooks.onApplied
   const isFatal = typeof hooks.isFatal === 'function' ? hooks.isFatal : () => false
-  for (let index = 0; index < list.length; index += 1) {
+  const skip = typeof hooks.skip === 'function' ? hooks.skip : () => false
+  const tagsOnlyFor = typeof hooks.tagsOnly === 'function' ? hooks.tagsOnly : () => false
+  const answerProblem = typeof hooks.answerProblem === 'function' ? hooks.answerProblem : () => ''
+  const size = Math.max(1, Math.min(HYBRID_FILL_PART_SIZE, Number(hooks.concurrency) || 1))
+
+  async function fillAt(index) {
     const question = list[index]
-    if (!String(question?.text || question?.stem || '').trim()) {
-      const blank = { index, skipped: true, question }
-      rows.push(blank)
-      if (onApplied) onApplied(blank, rows.slice())
-      continue
+    if (!String(question?.text || question?.stem || '').trim() || skip(question, index)) {
+      return { index, skipped: true, question }
     }
+    const tagsOnly = Boolean(tagsOnlyFor(question, index))
     let filled = null
-    let failed = false
+    let problem = ''
     let error = ''
     for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (hooks.signal?.aborted) break
       if (onProgress) onProgress(index, total, attempt)
       try {
-        filled = await fillOne(question, index, attempt)
-        failed = false
-        break
+        const next = await fillOne(question, index, attempt)
+        const nextProblem = tagsOnly
+          ? ''
+          : officialPyqSolutionProblem(next?.step_by_step_solution) || answerProblem(question, next)
+        if (!filled || !nextProblem) {
+          filled = next
+          problem = nextProblem
+        }
+        error = ''
+        if (!problem) break
       } catch (err) {
-        failed = true
         error = err instanceof Error ? err.message : String(err || '')
         if (isFatal(err)) throw err
       }
     }
-    const row = failed || !filled
-      ? { index, skipped: false, needsLook: true, question, error, patch: null }
-      : {
-          index,
-          skipped: false,
-          needsLook: false,
-          question,
-          filled,
-          patch: publishedMetaPatchFromHybridFill(question, filled),
-        }
-    rows.push(row)
-    if (onApplied) onApplied(row, rows.slice())
+    if (!filled) return { index, skipped: false, needsLook: true, question, error: error || 'Stopped.', patch: null, tagsOnly }
+    const patch = publishedMetaPatchFromHybridFill(question, filled)
+    return { index, skipped: false, needsLook: Boolean(problem), problem, question, filled, patch, tagsOnly }
+  }
+
+  for (let start = 0; start < list.length; start += size) {
+    if (hooks.signal?.aborted) break
+    const part = []
+    for (let index = start; index < Math.min(start + size, list.length); index += 1) part.push(fillAt(index))
+    for (const row of await Promise.all(part)) {
+      rows.push(row)
+      if (onApplied) onApplied(row, rows.slice())
+    }
   }
   return rows
 }

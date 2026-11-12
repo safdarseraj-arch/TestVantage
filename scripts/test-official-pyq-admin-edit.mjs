@@ -22,7 +22,8 @@ const {
   keepAdminEditedOfficialPyqCards,
   updateOfficialPyqPendingPaper,
 } = await import('../src/utils/officialPyqPendingStore.js')
-const { saveOfficialPyqCardEdit, parseOfficialPyqAnswerKey } = await import('../src/utils/officialPyqCardEdit.js')
+const { saveOfficialPyqCardEdit, parseOfficialPyqAnswerKey, approveOfficialPyqCard, unapproveOfficialPyqCard } =
+  await import('../src/utils/officialPyqCardEdit.js')
 const { persistOfficialPyqQualityRun } = await import('../src/utils/officialPyqLocalQuality.js')
 const { mergeOfficialPyqSnapshotIntoPapers } = await import('../src/utils/applyOfficialPyqPublicSnapshot.js')
 const { saveOfficialPyqCompareResult, officialPyqFlaggedGoTo } = await import('../src/utils/officialPyqOriginalCompare.js')
@@ -117,6 +118,45 @@ updateOfficialPyqPendingPaper(paper.id, {
 })
 assert.deepEqual(officialPyqFlaggedGoTo(getOfficialPyqPendingPaper(paper.id)), [2, 5, 9])
 assert.deepEqual(officialPyqFlaggedGoTo({ questions: cards, localQuality: { passed: true, failedGoTo: [] } }), [])
+
+// Per-question Approve: alarms off, card frozen as shown, Undo brings the check back.
+const figText = 'Question 7: two loops lie in the plane as shown in the figure. Find the value of $x$ when $x + 6 = 8$.'
+updateOfficialPyqPendingPaper(paper.id, {
+  questions: getOfficialPyqPendingPaper(paper.id).questions.map((q, i) => (i === 6 ? { ...q, text: figText } : q)),
+})
+let run = persistOfficialPyqQualityRun(getOfficialPyqPendingPaper(paper.id))
+assert.ok(run.localQuality.failedGoTo.includes(7), 'no-figure card is flagged before approval')
+const flagsQ7 = (quality) => (quality?.lines || []).some((line) => /^Go to Q [\d, ]*\b7\b/.test(line))
+assert.ok(flagsQ7(run.localQuality))
+const approved = approveOfficialPyqCard(paper.id, 6)
+assert.equal(approved.ok, true, approved.error)
+saved = getOfficialPyqPendingPaper(paper.id)
+assert.equal(saved.questions[6].adminApproved, true)
+assert.equal(saved.questions[6].adminEdited, true)
+assert.ok(!saved.localQuality.failedGoTo.includes(7), 'approved card left the Go-to list')
+assert.ok(!flagsQ7(saved.localQuality), 'approved card left the banner lines')
+const frozen = saved.questions[6].text
+assert.match(frozen, /shown in the figure/)
+
+updateOfficialPyqPendingPaper(paper.id, { questions: cards.map((q) => ({ ...q, text: `${q.text} (re-parsed)` })) })
+saved = getOfficialPyqPendingPaper(paper.id)
+assert.equal(saved.questions[6].text, frozen, 're-parse did not change the approved card')
+assert.equal(saved.questions[6].adminApproved, true, 're-parse kept the approval')
+run = persistOfficialPyqQualityRun(saved)
+assert.ok(!run.localQuality.failedGoTo.includes(7), 'full quality run skips the approved card')
+assert.equal(getOfficialPyqPendingPaper(paper.id).questions[6].text, frozen, 'quality fix did not change it')
+
+const undone = unapproveOfficialPyqCard(paper.id, 6)
+assert.equal(undone.ok, true, undone.error)
+saved = getOfficialPyqPendingPaper(paper.id)
+assert.equal(saved.questions[6].adminApproved, undefined)
+assert.equal(saved.questions[6].text, frozen, 'undo keeps the saved text')
+assert.ok(saved.localQuality.failedGoTo.includes(7), 'undo brings the alarm back')
+
+assert.equal(approveOfficialPyqCard(paper.id, 6).ok, true)
+const reEdit = saveOfficialPyqCardEdit(paper.id, 6, { text: `${frozen} Edited.`, options: saved.questions[6].options })
+assert.equal(reEdit.ok, true, reEdit.error)
+assert.equal(getOfficialPyqPendingPaper(paper.id).questions[6].adminApproved, undefined, 'an edit needs a new approval')
 
 // Published papers: no stem edit.
 updateOfficialPyqPendingPaper(paper.id, { status: 'approved' })

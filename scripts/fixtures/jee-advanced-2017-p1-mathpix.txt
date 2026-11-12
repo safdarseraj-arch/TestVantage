@@ -1,0 +1,733 @@
+\section*{PART I : PHYSICS}
+
+SECTION 1 (Maximum Marks: 28)
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONE OR MORE THAN ONE of these four options is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened \\
+\hline Negative Marks & : -2 & In all other cases \\
+\hline
+\end{tabular}
+\item[-] For example, if [A], [C] and [D] are all the correct options for a question, darkening all these three will get +4 marks; darkening only [A] and [D] will get +2 marks; and darkening [A] and [B] will get -2 marks, as a wrong option is also darkened
+\item[Q.] 1 A flat plate is moving normal to its plane through a gas under the action of a constant force $F$. The gas is kept at a very low pressure. The speed of the plate $v$ is much less than the average speed $u$ of the gas molecules. Which of the following options is/are true?
+\begin{itemize}
+\item[] [A] The pressure difference between the leading and trailing faces of the plate is proportional to $u v$
+\item[] [B] The resistive force experienced by the plate is proportional to $v$
+\item[] [C] The plate will continue to move with constant non-zero acceleration, at all times
+\item[] [D] At a later time the external force $F$ balances the resistive force
+\end{itemize}
+\end{itemize}
+
+Answer for the above question
+Ans for Q.1: (A), (B), and (D)
+\begin{itemize}
+\item[Q.] 2 A block of mass $M$ has a circular cut with a frictionless surface as shown. The block rests on the horizontal frictionless surface of a fixed table. Initially the right edge of the block is at $x=0$, in a co-ordinate system fixed to the table. A point mass $m$ is released from rest at the topmost point of the path as shown and it slides down. When the mass loses contact with the block, its position is $x$ and the velocity is $v$. At that instant, which of the following options is/are correct?
+![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-02.jpg?height=341&width=725&top_left_y=615&top_left_x=716)
+\begin{itemize}
+\item[] [A] The position of the point mass $m$ is: $x=-\sqrt{2} \frac{m R}{M+m}$
+\item[] [B] The velocity of the point mass $m$ is: $v=\sqrt{\frac{2 g R}{1+\frac{m}{M}}}$
+\item[] [C] The $x$ component of displacement of the center of mass of the block $M$ is: $-\frac{m R}{M+m}$
+\item[] [D] The velocity of the block $M$ is: $V=-\frac{m}{M} \sqrt{2 g R}$
+\end{itemize}
+\end{itemize}
+
+Answer for the above question
+Ans for Q.2: (B) and (C)
+\begin{itemize}
+\item[Q.] 3 A block $M$ hangs vertically at the bottom end of a uniform rope of constant mass per unit length. The top end of the rope is attached to a fixed rigid support at $O$. A transverse wave pulse (Pulse 1) of wavelength $\lambda_{0}$ is produced at point $O$ on the rope. The pulse takes time $T_{O A}$ to reach point $A$. If the wave pulse of wavelength $\lambda_{0}$ is produced at point $A$ (Pulse 2) without disturbing the position of $M$ it takes time $T_{A O}$ to reach point $O$. Which of the following options is/are correct?
+![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-03.jpg?height=524&width=315&top_left_y=612&top_left_x=944)
+\begin{itemize}
+\item[] [A] The time $T_{A O}=T_{O A}$
+\item[] [B] The velocities of the two pulses (Pulse 1 and Pulse 2) are the same at the midpoint of rope
+\item[] [C] The wavelength of Pulse 1 becomes longer when it reaches point $A$
+\item[] [D] The velocity of any pulse along the rope is independent of its frequency and wavelength
+\end{itemize}
+\end{itemize}
+
+Answer for the above question
+Ans for Q.3: (A) and (D)
+\begin{itemize}
+\item[Q.] 4 A human body has a surface area of approximately $1 \mathrm{~m}^{2}$. The normal body temperature is 10 K above the surrounding room temperature $T_{0}$. Take the room temperature to be $T_{0}=300 \mathrm{~K}$. For $T_{0}=300 \mathrm{~K}$, the value of $\sigma T_{0}^{4}=460 \mathrm{Wm}^{-2}$ (where $\sigma$ is the Stefan-Boltzmann constant). Which of the following options is/are correct?
+\begin{itemize}
+\item[] [A] The amount of energy radiated by the body in 1 second is close to 60 Joules
+\item[] [B] If the surrounding temperature reduces by a small amount $\Delta T_{0} \ll T_{0}$, then to maintain the same body temperature the same (living) human being needs to radiate $\Delta W=4 \sigma T_{0}^{3} \Delta T_{0}$ more energy per unit time
+\item[] [C] Reducing the exposed surface area of the body (e.g. by curling up) allows humans to maintain the same body temperature while reducing the energy lost by radiation
+\item[] [D] If the body temperature rises significantly then the peak in the spectrum of electromagnetic radiation emitted by the body would shift to longer wavelengths
+\end{itemize}
+\end{itemize}
+
+\section*{Answer for the above question}
+
+Ans for Q.4: (C)
+\begin{itemize}
+\item[Q.] 5 A circular insulated copper wire loop is twisted to form two loops of area $A$ and $2 A$ as shown in the figure. At the point of crossing the wires remain electrically insulated from each other. The entire loop lies in the plane (of the paper). A uniform magnetic field $\vec{B}$ points into the plane of the paper. At $t=0$, the loop starts rotating about the common diameter as axis with a constant angular velocity $\omega$ in the magnetic field. Which of the following options is/are correct?
+![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-05.jpg?height=785&width=389&top_left_y=650&top_left_x=888)
+\begin{itemize}
+\item[] [A] The emf induced in the loop is proportional to the sum of the areas of the two loops
+\item[] [B] The amplitude of the maximum net emf induced due to both the loops is equal to the amplitude of maximum emf induced in the smaller loop alone
+\item[] [C] The net emf induced due to both the loops is proportional to cos $\omega t$
+\item[] [D] The rate of change of the flux is maximum when the plane of the loops is perpendicular to plane of the paper
+\end{itemize}
+\end{itemize}
+
+\section*{Answer for the above question}
+
+Ans for Q.5: (B) and (D)
+\begin{itemize}
+\item[Q.] 6 In the circuit shown, $L=1 \mu \mathrm{H}, C=1 \mu \mathrm{~F}$ and $R=1 k \Omega$. They are connected in series with an a.c. source $V=V_{0} \sin \omega t$ as shown. Which of the following options is/are correct?
+![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-06.jpg?height=260&width=564&top_left_y=428&top_left_x=802)
+\begin{itemize}
+\item[] [A] The current will be in phase with the voltage if $\omega=10^{4} \mathrm{rad} . \mathrm{s}^{-1}$
+\item[] [B] The frequency at which the current will be in phase with the voltage is independent of $R$
+\item[] [C] At $\omega \sim 0$ the current flowing through the circuit becomes nearly zero
+\item[] [D] At $\omega \gg 10^{6} \mathrm{rad} . \mathrm{s}^{-1}$, the circuit behaves like a capacitor
+\end{itemize}
+\item[Q.] 7 For an isosceles prism of angle $A$ and refractive index $\mu$, it is found that the angle of minimum deviation $\delta_{m}=A$. Which of the following options is/are correct?
+\begin{itemize}
+\item[] [A] For the angle of incidence $i_{1}=A$, the ray inside the prism is parallel to the base of the prism
+\item[] [B] For this prism, the refractive index $\mu$ and the angle of prism $A$ are related as $A=\frac{1}{2} \cos ^{-1}\left(\frac{\mu}{2}\right)$
+\item[] [C] At minimum deviation, the incident angle $i_{1}$ and the refracting angle $r_{1}$ at the first refracting surface are related by $r_{1}=\left(i_{1} / 2\right)$
+\item[] [D] For this prism, the emergent ray at the second surface will be tangential to the surface when the angle of incidence at the first surface is $i_{1}=\sin ^{-1}\left[\sin A \sqrt{4 \cos ^{2} \frac{A}{2}-1}-\cos A\right]$
+\end{itemize}
+\end{itemize}
+
+\section*{Answers for the above questions}
+
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.6: (B) and (C) & Ans for Q.7: (A), (C) and (D) \\
+\hline
+\end{tabular}
+
+SECTION 2 (Maximum Marks: 15)
+\begin{itemize}
+\item[-] This section contains FIVE questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+
+Full Marks : +3 If only the bubble corresponding to the correct answer is darkened
+Zero Marks : 0 In all other cases
+\begin{itemize}
+\item[Q.] 8 A drop of liquid of radius $\mathrm{R}=10^{-2} \mathrm{~m}$ having surface tension $\mathrm{S}=\frac{0.1}{4 \pi} \mathrm{Nm}^{-1}$ divides itself into $K$ identical drops. In this process the total change in the surface energy $\Delta U=10^{-3} \mathrm{~J}$. If $K=10^{\alpha}$ then the value of $\alpha$ is
+\item[Q.] 9 An electron in a hydrogen atom undergoes a transition from an orbit with quantum number $n_{i}$ to another with quantum number $n_{f} . V_{i}$ and $V_{f}$ are respectively the initial and final potential energies of the electron. If $\frac{V_{i}}{V_{f}}=6.25$, then the smallest possible $n_{f}$ is
+\end{itemize}
+
+Answers for the above questions
+
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.8: (6) & Ans for Q.9: (5) \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[Q.] 10 A monochromatic light is travelling in a medium of refractive index $n=1.6$. It enters a stack of glass layers from the bottom side at an angle $\theta=30^{\circ}$. The interfaces of the glass layers are parallel to each other. The refractive indices of different glass layers are monotonically decreasing as $n_{m}=n-m \Delta n$, where $n_{m}$ is the refractive index of the $m^{\text {th }}$ slab and $\Delta n=0.1$ (see the figure). The ray is refracted out parallel to the interface between the $(m-1)^{\text {th }}$ and $m^{\text {th }}$ slabs from the right side of the stack. What is the value of $m$ ?
+
+\begin{figure}
+\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-08.jpg?height=520&width=715&top_left_y=669&top_left_x=723}
+\captionsetup{labelformat=empty}
+\caption{Space for rough work
+
+Answer for the above question
+Ans for Q.10: (8)}
+\end{figure}
+\end{itemize}
+\begin{itemize}
+\item[Q.] 11 A stationary source emits sound of frequency $f_{0}=492 \mathrm{~Hz}$. The sound is reflected by a large car approaching the source with a speed of $2 \mathrm{~ms}^{-1}$. The reflected signal is received by the source and superposed with the original. What will be the beat frequency of the resulting signal in Hz? (Given that the speed of sound in air is $330 \mathrm{~ms}^{-1}$ and the car reflects the sound at the frequency it has received).
+\item[Q.] 12 ${ }^{131}$ I is an isotope of Iodine that $\beta$ decays to an isotope of Xenon with a half-life of 8 days. A small amount of a serum labelled with ${ }^{131} \mathrm{I}$ is injected into the blood of a person. The activity of the amount of ${ }^{131} \mathrm{I}$ injected was $2.4 \times 10^{5}$ Becquerel (Bq). It is known that the injected serum will get distributed uniformly in the blood stream in less than half an hour. After 11.5 hours, 2.5 ml of blood is drawn from the person's body, and gives an activity of 115 Bq. The total volume of blood in the person's body, in liters is approximately (you may use $e^{x} \approx 1+x$ for $|x| \ll 1$ and $\ln 2 \approx 0.7$ ).
+\end{itemize}
+
+\begin{table}
+\captionsetup{labelformat=empty}
+\caption{Answers for the above questions}
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.11: (6) & Ans for Q.12: (5) \\
+\hline
+\end{tabular}
+\end{table}
+
+\section*{SECTION 3 (Maximum Marks: 18)}
+\begin{itemize}
+\item[-] This section contains SIX questions of matching type
+\item[-] This section contains TWO tables (each having 3 columns and 4 rows)
+\item[-] Based on each table, there are THREE questions
+\item[-] Each question has FOUR options [A], [B], [C], and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened
+Zero Marks : 0 If none of the bubbles is darkened
+Negative Marks: -1 In all other cases
+\end{itemize}
+
+\section*{Space for rough work}
+
+\begin{table}
+\captionsetup{labelformat=empty}
+\caption{Answer Q.13, Q. 14 and Q. 15 by appropriately matching the information given in the three columns of the following table.}
+\begin{tabular}[t]{|l|l|l|}
+\hline \multicolumn{3}{|l|}{A charged particle (electron or proton) is introduced at the origin $(x=0, y=0, z=0)$ with a given initial velocity $\vec{v}$. A uniform electric field $\vec{E}$ and a uniform magnetic field $\vec{B}$ exist everywhere. The velocity $\vec{v}$, electric field $\vec{E}$ and magnetic field $\vec{B}$ are given in columns 1, 2 and 3, respectively. The quantities $E_{0}, B_{0}$ are positive in magnitude.} \\
+\hline Column 1 & Column 2 & Column 3 \\
+\hline (I) Electron with $\vec{v}=2 \frac{E_{0}}{B_{0}} \hat{x}$ & (i) $\vec{E}=E_{0} \hat{Z}$ & (P) $\vec{B}=-B_{0} \hat{x}$ \\
+\hline (II) Electron with $\vec{v}=\frac{E_{0}}{B_{0}} \hat{y}$ & (ii) $\vec{E}=-E_{0} \hat{y}$ & (Q) $\vec{B}=B_{0} \hat{x}$ \\
+\hline (III) Proton with $\vec{v}=0$ & (iii) $\vec{E}=-E_{0} \hat{x}$ & (R) $\vec{B}=B_{0} \hat{y}$ \\
+\hline (IV) Proton with $\vec{v}=2 \frac{E_{0}}{B_{0}} \widehat{x}$ & (iv) $\vec{E}=E_{0} \hat{x}$ & (S) $\vec{B}=B_{0} \hat{Z}$ \\
+\hline
+\end{tabular}
+\end{table}
+Q. 13 In which case will the particle move in a straight line with constant velocity?
+[A] (III) (ii) (R)
+[B] (IV) (i) (S)
+[C] (III) (iii) (P)
+[D] (II) (iii) (S)
+Q. 14 In which case will the particle describe a helical path with axis along the positive $z$ direction?
+[A] (IV) (i) (S)
+[B] (II) (ii) (R)
+[C] (III) (iii) (P)
+[D] (IV) (ii) (R)
+Q. 15 In which case would the particle move in a straight line along the negative direction of $y$ axis (i.e., move along $-\hat{y}$ )?
+[A] (II) (iii) (Q)
+[B] (III) (ii) (R)
+[C] (IV) (ii) (S)
+[D] (III) (ii) (P)
+
+Answers for the above questions
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Ans for Q.13: (D) & Ans for Q.14: (A) & Ans for Q.15: (B) \\
+\hline
+\end{tabular}
+
+Answer Q.16, Q. 17 and Q. 18 by appropriately matching the information given in the three columns of the following table.
+
+\begin{table}
+\begin{tabular}[t]{|l|l|l|}
+\hline \multicolumn{3}{|l|}{An ideal gas is undergoing a cyclic thermodynamic process in different ways as shown in the corresponding $P-V$ diagrams in column 3 of the table. Consider only the path from state 1 to state 2. $W$ denotes the corresponding work done on the system. The equations and plots in the table have standard notations as used in thermodynamic processes. Here $\gamma$ is the ratio of heat capacities at constant pressure and constant volume. The number of moles in the gas is $n$.} \\
+\hline Column 1 & Column 2 & Column 3 \\
+\hline (I)
+$$W_{1 \rightarrow 2}=\frac{1}{\gamma-1}\left(P_{2} V_{2}-P_{1} V_{1}\right)$$ &
+\begin{tabular}[t]{l}
+(i) \\
+Isothermal
+\end{tabular} & (P)![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-12.jpg?height=253&width=292&top_left_y=828&top_left_x=1381) \\
+\hline (II)
+$$W_{1 \rightarrow 2}=-P V_{2}+P V_{1}$$ &
+\begin{tabular}[t]{l}
+(ii) \\
+Isochoric
+\end{tabular} & (Q)![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-12.jpg?height=230&width=275&top_left_y=1146&top_left_x=1389) \\
+\hline (III)
+$$W_{1 \rightarrow 2}=0$$ &
+\begin{tabular}[t]{l}
+(iii) \\
+Isobaric
+\end{tabular} & (R)![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-12.jpg?height=233&width=271&top_left_y=1436&top_left_x=1389) \\
+\hline (IV)
+$$W_{1 \rightarrow 2}=-n R T \ln \left(\frac{V_{2}}{V_{1}}\right)$$ &
+\begin{tabular}[t]{l}
+(iv) \\
+Adiabatic
+\end{tabular} & (S)![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-12.jpg?height=213&width=244&top_left_y=1732&top_left_x=1374) \\
+\hline
+\end{tabular}
+\captionsetup{labelformat=empty}
+\caption{Space for rough work}
+\end{table}
+\begin{itemize}
+\item[Q.] 16 Which of the following options is the only correct representation of a process in which $\Delta U=\Delta Q-P \Delta V$ ?
+[A] (II) (iv) (R)
+[B] (III) (iii) (P)
+[C] (II) (iii) (S)
+[D] (II) (iii) (P)
+\item[Q.] 17 Which one of the following options is the correct combination?
+[A] (IV) (ii) (S)
+[B] (III) (ii) (S)
+[C] (II) (iv) (P)
+[D] (II) (iv) (R)
+\item[Q.] 18 Which one of the following options correctly represents a thermodynamic process that is used as a correction in the determination of the speed of sound in an ideal gas?
+[A] (I) (ii) (Q)
+[B] (IV) (ii) (R)
+[C] (III) (iv) (R)
+[D] (I) (iv) (Q)
+\end{itemize}
+
+\section*{END OF PART I : PHYSICS}
+
+\section*{Answers for the above questions}
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Ans for Q.16: (D) & Ans for Q.17: (B) & Ans for Q.18: (D) \\
+\hline
+\end{tabular}
+
+\section*{PART II : CHEMISTRY}
+
+SECTION 1 (Maximum Marks: 28)
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONE OR MORE THAN ONE of these four options is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened \\
+\hline Negative Marks & : -2 & In all other cases \\
+\hline
+\end{tabular}
+\item[-] For example, if [A], [C] and [D] are all the correct options for a question, darkening all these three will get +4 marks; darkening only [A] and [D] will get +2 marks; and darkening [A] and [B] will get -2 marks, as a wrong option is also darkened
+\item[Q.] 19 An ideal gas is expanded from $\left(\mathrm{p}_{1}, \mathrm{~V}_{1}, \mathrm{~T}_{1}\right)$ to $\left(\mathrm{p}_{2}, \mathrm{~V}_{2}, \mathrm{~T}_{2}\right)$ under different conditions. The correct statement(s) among the following is(are)
+\begin{itemize}
+\item[] [A] The work done on the gas is maximum when it is compressed irreversibly from $\left(\mathrm{p}_{2}, \mathrm{~V}_{2}\right)$ to $\left(\mathrm{p}_{1}, \mathrm{~V}_{1}\right)$ against constant pressure $\mathrm{p}_{1}$
+\item[] [B] If the expansion is carried out freely, it is simultaneously both isothermal as well as adiabatic
+\item[] [C] The work done by the gas is less when it is expanded reversibly from $\mathrm{V}_{1}$ to $\mathrm{V}_{2}$ under adiabatic conditions as compared to that when expanded reversibly from $\mathrm{V}_{1}$ to $\mathrm{V}_{2}$ under isothermal conditions
+\item[] [D] The change in internal energy of the gas is (i) zero, if it is expanded reversibly with $\mathrm{T}_{1}=\mathrm{T}_{2}$, and (ii) positive, if it is expanded reversibly under adiabatic conditions with $\mathrm{T}_{1} \neq \mathrm{T}_{2}$
+\end{itemize}
+\end{itemize}
+
+Answer for the above question
+Ans for Q.19: (A), (B), and (C)
+\begin{itemize}
+\item[Q.] 20 For a solution formed by mixing liquids $\mathbf{L}$ and $\mathbf{M}$, the vapour pressure of $\mathbf{L}$ plotted against the mole fraction of M in solution is shown in the following figure. Here $x_{\mathrm{L}}$ and $x_{\mathrm{M}}$ represent mole fractions of L and M, respectively, in the solution. The correct statement(s) applicable to this system is(are)
+![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-15.jpg?height=619&width=684&top_left_y=550&top_left_x=746)
+\begin{itemize}
+\item[] [A] The point $\boldsymbol{Z}$ represents vapour pressure of pure liquid M and Raoult's law is obeyed from $x_{\mathrm{L}}=0$ to $x_{\mathrm{L}}=1$
+\item[] [B] The point $\boldsymbol{Z}$ represents vapour pressure of pure liquid L and Raoult's law is obeyed when $x_{\mathrm{L}} \rightarrow 1$
+\item[] [C] The point $\boldsymbol{Z}$ represents vapour pressure of pure liquid M and Raoult's law is obeyed when $x_{\mathrm{L}} \rightarrow 0$
+\item[] [D] Attractive intermolecular interactions between L-L in pure liquid L and M-M in pure liquid M are stronger than those between L-M when mixed in solution
+\end{itemize}
+\end{itemize}
+
+Answer for the above question
+Ans for Q.20: (B) and (D)
+\begin{itemize}
+\item[Q.] 21 The correct statement(s) about the oxoacids, $\mathrm{HClO}_{4}$ and HClO, is(are)
+\begin{itemize}
+\item[] [A] The central atom in both $\mathrm{HClO}_{4}$ and HClO is $s p^{3}$ hybridized
+\item[] [B] $\mathrm{HClO}_{4}$ is more acidic than HClO because of the resonance stabilization of its anion
+\item[] [C] $\mathrm{HClO}_{4}$ is formed in the reaction between $\mathrm{Cl}_{2}$ and $\mathrm{H}_{2} \mathrm{O}$
+\item[] [D] The conjugate base of $\mathrm{HClO}_{4}$ is weaker base than $\mathrm{H}_{2} \mathrm{O}$
+\end{itemize}
+\item[Q.] 22 The colour of the $\mathrm{X}_{2}$ molecules of group 17 elements changes gradually from yellow to violet down the group. This is due to
+\begin{itemize}
+\item[] [A] the physical state of $\mathrm{X}_{2}$ at room temperature changes from gas to solid down the group
+\item[] [B] decrease in ionization energy down the group
+\item[] [C] decrease in $\pi^{*}-\sigma^{*}$ gap down the group
+\item[] [D] decrease in HOMO-LUMO gap down the group
+\end{itemize}
+\end{itemize}
+
+Answers for the above questions
+
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.21: (A), (B), and (D) & Ans for Q.22: (C) and (D) \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[Q.] 23 Addition of excess aqueous ammonia to a pink coloured aqueous solution of $\mathrm{MCl}_{2} \cdot 6 \mathrm{H}_{2} \mathrm{O}$ $(\mathbf{X})$ and $\mathrm{NH}_{4} \mathrm{Cl}$ gives an octahedral complex $\mathbf{Y}$ in the presence of air. In aqueous solution, complex $\mathbf{Y}$ behaves as 1:3 electrolyte. The reaction of $\mathbf{X}$ with excess HCl at room temperature results in the formation of a blue coloured complex Z. The calculated spin only magnetic moment of X and Z is 3.87 B.M., whereas it is zero for complex Y.
+Among the following options, which statement(s) is(are) correct?
+\begin{itemize}
+\item[] [A] Addition of silver nitrate to Y gives only two equivalents of silver chloride
+\item[] [B] The hybridization of the central metal ion in $\mathbf{Y}$ is $\mathrm{d}^{2} \mathrm{sp}^{3}$
+\item[] [C] Z is a tetrahedral complex
+\item[] [D] When X and Z are in equilibrium at 0°C, the colour of the solution is pink
+\end{itemize}
+\item[Q.] 24 The IUPAC name(s) of the following compound is(are)
+<smiles>Cc1ccc(Cl)cc1</smiles>
+[A] 1-chloro-4-methylbenzene
+[B] 4-chlorotoluene
+[C] 4-methylchlorobenzene
+[D] 1-methyl-4-chlorobenzene
+\end{itemize}
+
+Answers for the above questions
+
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.23: (B), (C), and (D) & Ans for Q.24: (A) and (B) \\
+\hline
+\end{tabular}
+Q. 25 The correct statement(s) for the following addition reactions is(are)
+\begin{itemize}
+\item[(i)]
+![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-18.jpg?height=141&width=835&top_left_y=419&top_left_x=711)
+\item[(ii)]
+![](https://cdn.mathpix.com/cropped/4b0a3cfd-1cc9-4a35-a5ca-3d739b7caf7f-18.jpg?height=136&width=823&top_left_y=657&top_left_x=713)
+\item[] [A] O and P are identical molecules
+\item[] [B] ( $\mathbf{M}$ and $\mathbf{O}$ ) and ( $\mathbf{N}$ and $\mathbf{P}$ ) are two pairs of diastereomers
+\item[] [C] ( $\mathbf{M}$ and $\mathbf{O}$ ) and ( $\mathbf{N}$ and $\mathbf{P}$ ) are two pairs of enantiomers
+\item[] [D] Bromination proceeds through trans-addition in both the reactions
+\end{itemize}
+
+Answer for the above question
+Ans for Q.25: (B) and (D)
+
+\section*{SECTION 2 (Maximum Marks: 15)}
+\begin{itemize}
+\item[-] This section contains FIVE questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+
+Full Marks : +3 If only the bubble corresponding to the correct answer is darkened
+Zero Marks : 0 In all other cases
+Q. 26 A crystalline solid of a pure substance has a face-centred cubic structure with a cell edge of 400 pm. If the density of the substance in the crystal is $8 \mathrm{~g} \mathrm{~cm}^{-3}$, then the number of atoms present in 256 g of the crystal is $N \times 10^{24}$. The value of $N$ is
+Q. 27 The conductance of a 0.0015 M aqueous solution of a weak monobasic acid was determined by using a conductivity cell consisting of platinized Pt electrodes. The distance between the electrodes is 120 cm with an area of cross section of $1 \mathrm{~cm}^{2}$. The conductance of this solution was found to be $5 \times 10^{-7} \mathrm{~S}$. The pH of the solution is 4. The value of limiting molar conductivity $\left(\Lambda_{m}^{o}\right)$ of this weak monobasic acid in aqueous solution is $Z \times 10^{2} \mathrm{~S} \mathrm{~cm}^{-1} \mathrm{~mol}^{-1}$. The value of $Z$ is
+
+Answers for the above questions
+
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.26: (2) & Ans for Q.27: (6) \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[Q.] 28 The sum of the number of lone pairs of electrons on each central atom in the following species is
+$$\left[\mathrm{TeBr}_{6}\right]^{2-},\left[\mathrm{BrF}_{2}\right]^{+}, \mathrm{SNF}_{3} \text {, and }\left[\mathrm{XeF}_{3}\right]^{-}$$
+(Atomic numbers: $\mathrm{N}=7, \mathrm{~F}=9, \mathrm{~S}=16, \mathrm{Br}=35, \mathrm{Te}=52, \mathrm{Xe}=54$ )
+\item[Q.] 29 Among $\mathrm{H}_{2}, \mathrm{He}_{2}{ }^{+}, \mathrm{Li}_{2}, \mathrm{Be}_{2}, \mathrm{~B}_{2}, \mathrm{C}_{2}, \mathrm{~N}_{2}, \mathrm{O}_{2}{ }^{-}$, and $\mathrm{F}_{2}$, the number of diamagnetic species is (Atomic numbers: $\mathrm{H}=1, \mathrm{He}=2, \mathrm{Li}=3, \mathrm{Be}=4, \mathrm{~B}=5, \mathrm{C}=6, \mathrm{~N}=7, \mathrm{O}=8, \mathrm{~F}=9$ )
+\item[Q.] 30 Among the following, the number of aromatic compound(s) is
+<smiles>C1=CC=CC=CC=C1</smiles>
+<smiles>[C-]1C=C1</smiles>
+<smiles>[C+]1C=C1</smiles>
+<smiles>C1=CCCC=C1</smiles>
+<smiles>[C+]1C=CC=CC=C1</smiles>
+<smiles>[C+]1C=CC=C1</smiles>
+<smiles>[C-]1C=CC=C1</smiles>
+<smiles>C1=CCC2=CCC=CC2=C1</smiles>
+<smiles>c1ccc2c(c1)ccc1ccccc12</smiles>
+\end{itemize}
+
+\section*{Answers for the above questions}
+
+Ans for Q.28: (6)
+Ans for Q.30: (5)
+
+Due to printing inconsistency in Q. 29 in Code1 of Paper1 (and the corresponding question in all other codes), +3 marks will be awarded to all candidates for this question.
+
+\section*{SECTION 3 (Maximum Marks: 18)}
+\begin{itemize}
+\item[-] This section contains SIX questions of matching type
+\item[-] This section contains TWO tables (each having 3 columns and 4 rows)
+\item[-] Based on each table, there are THREE questions
+\item[-] Each question has FOUR options [A], [B], [C], and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened
+Zero Marks : 0 If none of the bubbles is darkened
+Negative Marks: -1 In all other cases
+\end{itemize}
+
+\section*{Space for rough work}
+
+\section*{Answer Q.31, Q. 32 and Q. 33 by appropriately matching the information given in the three columns of the following table.}
+
+The wave function, $\psi_{n, l, m_{l}}$ is a mathematical function whose value depends upon spherical polar coordinates $(r, \theta, \phi)$ of the electron and characterized by the quantum numbers $n, l$ and $m_{l}$. Here $r$ is distance from nucleus, $\theta$ is colatitude and $\phi$ is azimuth. In the mathematical functions given in the Table, $Z$ is atomic number and $a_{o}$ is Bohr radius.
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Column 1 & Column 2 & Column 3 \\
+\hline (I) 1s orbital & (i) $\psi_{n, l, m_{l}} \propto\left(\frac{Z}{a_{o}}\right)^{\frac{3}{2}} e^{-\left(\frac{Z r}{a_{o}}\right)}$ & (P) \\
+\hline (II) 2s orbital & (ii) One radial node & (Q) Probability density at nucleus $\propto \frac{1}{a_{o}^{3}}$ \\
+\hline (III) $2 \mathrm{p}_{\mathrm{z}}$ orbital & (iii) $\psi_{n, l, m_{l}} \propto\left(\frac{Z}{a_{o}}\right)^{\frac{5}{2}} r e^{-\left(\frac{Z r}{2 a_{o}}\right)} \cos \theta$ & (R) Probability density is maximum at nucleus \\
+\hline (IV) $3 \mathrm{~d}_{\mathrm{z}}^{2}$ orbital & (iv) $x y$-plane is a nodal plane & (S) Energy needed to excite electron from $n=2$ state to $n=$ 4 state is $\frac{27}{32}$ times the energy needed to excite electron from $n=2$ state to $n=6$ state \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[Q.] 31 For the given orbital in Column 1, the only CORRECT combination for any hydrogen-like species is
+[A] (I) (ii) (S)
+[B] (IV) (iv) (R)
+[C] (II) (ii) (P)
+[D] (III) (iii) (P)
+\item[Q.] 32 For hydrogen atom, the only CORRECT combination is
+[A] (I) (i) (S)
+[B] (II) (i) (Q)
+[C] (I) (i) (P)
+[D] (I) (iv) (R)
+\item[Q.] 33 For $\mathrm{He}^{+}$ion, the only INCORRECT combination is
+[A] (I) (i) (R)
+[B] (II) (ii) (Q)
+[C] (I) (iii) (R)
+[D] (I) (i) (S)
+\end{itemize}
+
+\section*{Answers for the above questions}
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Ans for Q.31: (C) & Ans for Q.32: (A) & Ans for Q.33: (C) \\
+\hline
+\end{tabular}
+
+\begin{table}
+\captionsetup{labelformat=empty}
+\caption{Answer Q.34, Q. 35 and Q. 36 by appropriately matching the information given in the three columns of the following table.}
+\begin{tabular}[t]{|l|l|l|}
+\hline \multicolumn{3}{|l|}{Columns 1, 2 and 3 contain starting materials, reaction conditions, and type of reactions, respectively.} \\
+\hline Column 1 & Column 2 & Column 3 \\
+\hline (I) Toluene & (i) $\mathrm{NaOH} / \mathrm{Br}_{2}$ & (P) Condensation \\
+\hline (II) Acetophenone & (ii) $\mathrm{Br}_{2} / \mathrm{h} v$ & (Q) Carboxylation \\
+\hline (III) Benzaldehyde & (iii) $\left(\mathrm{CH}_{3} \mathrm{CO}\right)_{2} \mathrm{O} / \mathrm{CH}_{3} \mathrm{COOK}$ & (R) Substitution \\
+\hline (IV) Phenol & (iv) $\mathrm{NaOH} / \mathrm{CO}_{2}$ & (S) Haloform \\
+\hline
+\end{tabular}
+\end{table}
+\begin{itemize}
+\item[Q.] 34 For the synthesis of benzoic acid, the only CORRECT combination is
+[A] (II) (i) (S)
+[B] (IV) (ii) (P)
+[C] (I) (iv) (Q)
+[D] (III) (iv) (R)
+\item[Q.] 35 The only CORRECT combination that gives two different carboxylic acids is
+[A] (II) (iv) (R)
+[B] (IV) (iii) (Q)
+[C] (III) (iii) (P)
+[D] (I) (i) (S)
+\item[Q.] 36 The only CORRECT combination in which the reaction proceeds through radical mechanism is
+[A] (III) (ii) (P)
+[B] (IV) (i) (Q)
+[C] (II) (iii) (R)
+[D] (I) (ii) (R)
+END OF PART II : CHEMISTRY
+\end{itemize}
+
+\begin{table}
+\captionsetup{labelformat=empty}
+\caption{Answers for the above questions}
+\begin{tabular}[t]{|l|l|l|}
+\hline Ans for Q.34: (A) & Ans for Q.35: (C) & Ans for Q.36: (D) \\
+\hline
+\end{tabular}
+\end{table}
+
+\section*{PART III : MATHEMATICS}
+
+\section*{SECTION 1 (Maximum Marks: 28)}
+\begin{itemize}
+\item[-] This section contains SEVEN questions
+\item[-] Each question has FOUR options [A], [B], [C] and [D]. ONE OR MORE THAN ONE of these four options is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Full Marks & : +4 & If only the bubble(s) corresponding to all the correct option(s) is(are) darkened \\
+\hline Partial Marks & : +1 & For darkening a bubble corresponding to each correct option, provided NO incorrect option is darkened \\
+\hline Zero Marks & : 0 & If none of the bubbles is darkened \\
+\hline Negative Marks & : -2 & In all other cases \\
+\hline
+\end{tabular}
+\item[-] For example, if [A], [C] and [D] are all the correct options for a question, darkening all these three will get +4 marks; darkening only [A] and [D] will get +2 marks; and darkening [A] and [B] will get -2 marks, as a wrong option is also darkened
+\item[Q.] 37 If $2 x-y+1=0$ is a tangent to the hyperbola $\frac{x^{2}}{a^{2}}-\frac{y^{2}}{16}=1$, then which of the following CANNOT be sides of a right angled triangle?
+[A] a, 4, 1
+[B] a, 4, 2
+[C] $2 a, 8,1$
+[D] $2 a, 4,1$
+\item[Q.] 38 If a chord, which is not a tangent, of the parabola $y^{2}=16 x$ has the equation $2 x+y=p$, and midpoint $(h, k)$, then which of the following is(are) possible value(s) of $p, h$ and $k$ ?
+[A] $p=-2, h=2, k=-4$
+[B] $p=-1, h=1, k=-3$
+[C] $p=2, h=3, k=-4$
+[D] $p=5, h=4, k=-3$
+\end{itemize}
+
+\section*{Space for rough work}
+
+Answers for the above questions
+
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.37: (A), (B), and (C) & Ans for Q.38: (C) \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[Q.] 39 Let $[x]$ be the greatest integer less than or equals to $x$. Then, at which of the following point(s) the function $f(x)=x \cos (\pi(x+[x]))$ is discontinuous?
+[A] $x=-1$
+[B] $x=0$
+[C] $x=1$
+[D] $x=2$
+\item[Q.] 40 Let $f: \mathbb{R} \rightarrow(0,1)$ be a continuous function. Then, which of the following function(s) has(have) the value zero at some point in the interval (0, 1)?
+[A] $x^{9}-f(x)$
+[B] $x-\int_{0}^{\frac{\pi}{2}-x} f(t) \cos t d t$
+[C] $e^{x}-\int_{0}^{x} f(t) \sin t d t$
+[D] $f(x)+\int_{0}^{\frac{\pi}{2}} f(t) \sin t d t$
+\item[Q.] 41 Which of the following is(are) NOT the square of a 3×3 matrix with real entries?
+[A] $\left[\begin{array}{lll}1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 1\end{array}\right]$
+[B] $\left[\begin{array}{ccc}1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & -1\end{array}\right]$
+[C] $\left[\begin{array}{ccc}1 & 0 & 0 \\ 0 & -1 & 0 \\ 0 & 0 & -1\end{array}\right]$
+[D] $\left[\begin{array}{ccc}-1 & 0 & 0 \\ 0 & -1 & 0 \\ 0 & 0 & -1\end{array}\right]$
+\end{itemize}
+
+\section*{Answers for the above questions}
+
+Due to printing inconsistency in Q. 39 in Code1 of Paper1 (and the corresponding question in all other codes), +4 marks will be awarded to all candidates for this question.
+
+Ans for Q.40: (A) and (B)
+Ans for Q.41: (B) and (D)
+\begin{itemize}
+\item[Q.] 42 Let $a, b, x$ and $y$ be real numbers such that $a-b=1$ and $y \neq 0$. If the complex number $z=x+i y$ satisfies $\operatorname{Im}\left(\frac{a z+b}{z+1}\right)=\mathrm{y}$, then which of the following is(are) possible value(s) of $x$ ?
+[A] $-1+\sqrt{1-y^{2}}$
+[B] $-1-\sqrt{1-y^{2}}$
+[C] $1+\sqrt{1+y^{2}}$
+[D] $1-\sqrt{1+y^{2}}$
+\item[Q.] 43 Let $X$ and $Y$ be two events such that $P(X)=\frac{1}{3}, P(X \mid Y)=\frac{1}{2}$ and $P(Y \mid X)=\frac{2}{5}$. Then
+[A] $P(Y)=\frac{4}{15}$
+[B] $P\left(X^{\prime} \mid Y\right)=\frac{1}{2}$
+[C] $P(X \cap Y)=\frac{1}{5}$
+[D] $P(X \cup Y)=\frac{2}{5}$
+\end{itemize}
+
+Answers for the above questions
+
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.42: (A) and (B) & Ans for Q.43: (A) and (B) \\
+\hline
+\end{tabular}
+
+\section*{SECTION 2 (Maximum Marks: 15)}
+\begin{itemize}
+\item[-] This section contains FIVE questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+
+Full Marks : +3 If only the bubble corresponding to the correct answer is darkened
+Zero Marks : 0 In all other cases
+\begin{itemize}
+\item[Q.] 44 For how many values of $p$, the circle $x^{2}+y^{2}+2 x+4 y-p=0$ and the coordinate axes have exactly three common points?
+\item[Q.] 45 Let $f: \mathbb{R} \rightarrow \mathbb{R}$ be a differentiable function such that $f(0)=0, f\left(\frac{\pi}{2}\right)=3$ and $f^{\prime}(0)=1$. If
+$$g(x)=\int_{x}^{\frac{\pi}{2}}\left[f^{\prime}(t) \operatorname{cosec} t-\cot t \operatorname{cosec} t f(t)\right] d t$$
+for $x \in\left(0, \frac{\pi}{2}\right]$, then $\lim _{x \rightarrow 0} g(x)=$
+\end{itemize}
+
+\section*{Space for rough work}
+
+\section*{Answers for the above questions}
+
+\begin{tabular}[t]{|l|l|}
+\hline Ans for Q.44: (2) & Ans for Q.45: (2) \\
+\hline
+\end{tabular}
+\begin{itemize}
+\item[Q.] 46 For a real number $\alpha$, if the system
+$$\left[\begin{array}{ccc}
+1 & \alpha & \alpha^{2} \\
+\alpha & 1 & \alpha \\
+\alpha^{2} & \alpha & 1
+\end{array}\right]\left[\begin{array}{l}
+x \\
+y \\
+\end{array}\right]=\left[\begin{array}{r}
+1 \\
+-1 \\
+\end{array}\right]$$
+of linear equations, has infinitely many solutions, then $1+\alpha+\alpha^{2}=$
+\item[Q.] 47 Words of length 10 are formed using the letters A, B, C, D, E, F, G, H, I, J. Let $x$ be the number of such words where no letter is repeated; and let $y$ be the number of such words where exactly one letter is repeated twice and no other letter is repeated. Then, $\frac{y}{9 x}=$
+\item[Q.] 48 The sides of a right angled triangle are in arithmetic progression. If the triangle has area 24, then what is the length of its smallest side?
+\end{itemize}
+
+Answers for the above questions
+
+\begin{tabular}[t]{|l|l|l|}
+\hline Ans for Q.46: (1) & Ans for Q.47: (5) & Ans for Q.48: (6) \\
+\hline
+\end{tabular}
+
+\section*{SECTION 3 (Maximum Marks: 18)}
+\begin{itemize}
+\item[-] This section contains SIX questions of matching type
+\item[-] This section contains TWO tables (each having 3 columns and 4 rows)
+\item[-] Based on each table, there are THREE questions
+\item[-] Each question has FOUR options [A], [B], [C], and [D]. ONLY ONE of these four options is correct
+\item[-] For each question, darken the bubble corresponding to the correct option in the ORS
+\item[-] For each question, marks will be awarded in one of the following categories:
+\end{itemize}
+
+Full Marks : +3 If only the bubble corresponding to the correct option is darkened
+Zero Marks : 0 If none of the bubbles is darkened
+Negative Marks: -1 In all other cases
+
+\begin{table}
+\captionsetup{labelformat=empty}
+\caption{Answer Q.49, Q. 50 and Q. 51 by appropriately matching the information given in the three columns of the following table.}
+\begin{tabular}[t]{|l|l|l|}
+\hline \multicolumn{3}{|l|}{Columns 1, 2 and 3 contain conics, equations of tangents to the conics and points of contact, respectively.} \\
+\hline Column 1 & Column 2 & Column 3 \\
+\hline (I) $x^{2}+y^{2}=a^{2}$ & (i) $m y=m^{2} x+a$ & (P) $\left(\frac{a}{m^{2}}, \frac{2 a}{m}\right)$ \\
+\hline (II) $x^{2}+a^{2} y^{2}=a^{2}$ & (ii) $y=m x+a \sqrt{m^{2}+1}$ & (Q) $\left(\frac{-m a}{\sqrt{m^{2}+1}}, \frac{a}{\sqrt{m^{2}+1}}\right)$ \\
+\hline (III) $y^{2}=4 a x$ & (iii) $y=m x+\sqrt{a^{2} m^{2}-1}$ & (R) $\left(\frac{-a^{2} m}{\sqrt{a^{2} m^{2}+1}}, \frac{1}{\sqrt{a^{2} m^{2}+1}}\right)$ \\
+\hline (IV) $x^{2}-a^{2} y^{2}=a^{2}$ & (iv) $y=m x+\sqrt{a^{2} m^{2}+1}$ & (S) $\left(\frac{-a^{2} m}{\sqrt{a^{2} m^{2}-1}}, \frac{-1}{\sqrt{a^{2} m^{2}-1}}\right)$ \\
+\hline
+\end{tabular}
+\end{table}
+\begin{itemize}
+\item[Q.] 49 For $a=\sqrt{2}$, if a tangent is drawn to a suitable conic (Column 1) at the point of contact (-1, 1), then which of the following options is the only CORRECT combination for obtaining its equation?
+[A] (I) (i) (P)
+[B] (I) (ii) (Q)
+[C] (II) (ii) (Q)
+[D] (III) (i) (P)
+\item[Q.] 50 If a tangent to a suitable conic (Column 1) is found to be $y=x+8$ and its point of contact is (8, 16), then which of the following options is the only CORRECT combination?
+[A] (I) (ii) (Q)
+[B] (II) (iv) (R)
+[C] (III) (i) (P)
+[D] (III) (ii) (Q)
+\item[Q.] 51 The tangent to a suitable conic (Column 1) at $\left(\sqrt{3}, \frac{1}{2}\right)$ is found to be $\sqrt{3} x+2 y=4$, then which of the following options is the only CORRECT combination?
+[A] (IV) (iii) (S)
+[B] (IV) (iv) (S)
+[C] (II) (iii) (R)
+[D] (II) (iv) (R)
+\end{itemize}
+
+\begin{table}
+\captionsetup{labelformat=empty}
+\caption{Answers for the above questions}
+\begin{tabular}[t]{|l|l|l|}
+\hline Ans for Q.49: (B) & Ans for Q.50: (C) & Ans for Q.51: (D) \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}
+\captionsetup{labelformat=empty}
+\caption{Answer Q.52, Q. 53 and Q. 54 by appropriately matching the information given in the three columns of the following table.}
+\begin{tabular}[t]{|l|l|l|}
+\hline \multicolumn{3}{|c|}{Let $f(x)=x+\log _{\mathrm{e}} x-x \log _{\mathrm{e}} x, x \in(0, \infty)$.
+\begin{itemize}
+\item[-] Column 1 contains information about zeros of $f(x), f^{\prime}(x)$ and $f^{\prime \prime}(x)$.
+\item[-] Column 2 contains information about the limiting behavior of $f(x), f^{\prime}(x)$ and $f^{\prime \prime}(x)$ at infinity.
+\item[-] Column 3 contains information about increasing/decreasing nature of $f(x)$ and $f^{\prime}(x)$.
+\end{itemize}} \\
+\hline Column 1 & Column 2 & Column 3 \\
+\hline (I) $f(x)=0$ for some $x \in\left(1, e^{2}\right)$ & (i) $\lim _{x \rightarrow \infty} f(x)=0$ & (P) $f$ is increasing in $(0,1)$ \\
+\hline (II) $f^{\prime}(x)=0$ for some $x \in(1, e)$ & (ii) $\lim _{x \rightarrow \infty} f(x)=-\infty$ & (Q) $f$ is decreasing in $\left(e, e^{2}\right)$ \\
+\hline (III) $f^{\prime}(x)=0$ for some $x \in(0,1)$ & (iii) $\lim _{x \rightarrow \infty} f^{\prime}(x)=-\infty$ & (R) $f^{\prime}$ is increasing in $(0,1)$ \\
+\hline (IV) $f^{\prime \prime}(x)=0$ for some $x \in(1, e)$ & (iv) $\lim _{x \rightarrow \infty} f^{\prime \prime}(x)=0$ & (S) $f^{\prime}$ is decreasing in $\left(e, e^{2}\right)$ \\
+\hline
+\end{tabular}
+\end{table}
+Q. 52 Which of the following options is the only CORRECT combination?
+[A] (I) (i) (P)
+[B] (II) (ii) (Q)
+[C] (III) (iii) (R)
+[D] (IV) (iv) (S)
+Q. 53 Which of the following options is the only CORRECT combination?
+[A] (I) (ii) (R)
+[B] (II) (iii) (S)
+[C] (III) (iv) (P)
+[D] (IV) (i) (S)
+Q. 54 Which of the following options is the only INCORRECT combination?
+[A] (I) (iii) (P)
+[B] (II) (iv) (Q)
+[C] (III) (i) (R)
+[D] (II) (iii) (P)
+
+END OF THE QUESTION PAPER
+
+\begin{table}
+\captionsetup{labelformat=empty}
+\caption{Answers for the above questions}
+\begin{tabular}[t]{|l|l|l|}
+\hline Ans for Q.52: (B) & Ans for Q.53: (B) & Ans for Q.54: (C) \\
+\hline
+\end{tabular}
+\end{table}

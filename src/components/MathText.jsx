@@ -3,10 +3,17 @@ import 'katex/dist/katex.min.css'
 import 'katex/contrib/mhchem/mhchem.js'
 import { prepareTextForMathTextDisplay, stripLatexDisplayChrome, normalizeSplitMathDollars } from '../utils/prepareMathForRender'
 import { keepStructuredQuestionLines } from '../utils/repairMatrixStem.js'
-import { convertLatexTabularToArray, stripDollarsInsideLatexEnvs } from '../utils/latexTabularDisplay.js'
+import {
+  convertLatexTabularToArray,
+  splitMatchColumnTables,
+  stripDollarsInsideLatexEnvs,
+} from '../utils/latexTabularDisplay.js'
 import { wrapBareLatexRuns, repairOrphanAlignedBody } from '../utils/wrapBareLatexRuns.js'
 import { hasMathpixMedia, splitMathpixMediaSegments, stripMathpixFigureChrome } from '../utils/mathpixMedia'
+import { figureRowShare, groupSideBySideFigureSegments } from '../utils/figureLayout.js'
+import { showLocalPictureOnError } from '../utils/mathpixLocalPictures.js'
 import { splitSmilesDisplaySegments } from '../utils/smilesDisplay.js'
+import { displayMathStandsAlone } from '../utils/sanitizeMathDelimiters.js'
 import SmilesStructure from './SmilesStructure.jsx'
 import {
   embedInlineLatexInProse,
@@ -172,8 +179,9 @@ function renderPart(part, key, depth = 0) {
   const latex = isDisplay ? part.slice(2, -2) : part.slice(1, -1)
   const needsDisplayMatrix =
     /\\begin\{(?:bmatrix|pmatrix|matrix|vmatrix|array|cases|aligned|align\*?|eqnarray)\}/.test(latex)
+  const ownLine = isDisplay && displayMathStandsAlone(latex)
 
-  if (!needsDisplayMatrix) {
+  if (!needsDisplayMatrix && !ownLine) {
     const mixed = renderMixedProseMath(latex, key, depth)
     if (mixed) return mixed
   }
@@ -240,7 +248,7 @@ function renderPart(part, key, depth = 0) {
       <span
         key={key}
         className={
-          /\\begin\{(?:array|aligned|tabular)\}|\\hline\b|\\xrightarrow\b/.test(latex)
+          ownLine || /\\begin\{(?:array|aligned|tabular)\}|\\hline\b|\\xrightarrow\b/.test(latex)
             ? 'math-display math-display-block'
             : isDisplay || needsDisplayMatrix
               ? 'math-display'
@@ -394,6 +402,25 @@ function renderSegmentBody(part, key) {
 
 export default function MathText({ text, questionContext, optionLetter }) {
   const raw = String(text ?? '')
+  const matchTables = splitMatchColumnTables(raw)
+  if (matchTables) {
+    return (
+      <span className="math-text-flow">
+        {matchTables.map((part, i) =>
+          part.kind === 'html' ? (
+            <span
+              key={`mt-${i}`}
+              className="match-columns-table-wrap"
+              style={{ display: 'block', overflowX: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: part.value }}
+            />
+          ) : (
+            <MathText key={`tx-${i}`} text={part.value} questionContext={questionContext} optionLetter={optionLetter} />
+          ),
+        )}
+      </span>
+    )
+  }
   if (/<smiles>/i.test(raw)) {
     const segs = splitSmilesDisplaySegments(raw)
     const looping =
@@ -413,13 +440,12 @@ export default function MathText({ text, questionContext, optionLetter }) {
           seg.kind === 'smiles' ? (
             <SmilesStructure key={`smi-${i}`} smiles={seg.value} />
           ) : (
-            <span key={`tx-${i}`}>
-              {renderPreparedMath(
-                String(seg.value ?? '').replace(/<\/?smiles>/gi, ''),
-                questionContext,
-                optionLetter,
-              )}
-            </span>
+            <MathText
+              key={`tx-${i}`}
+              text={String(seg.value ?? '').replace(/<\/?smiles>/gi, '')}
+              questionContext={questionContext}
+              optionLetter={optionLetter}
+            />
           ),
         )}
       </span>
@@ -428,13 +454,27 @@ export default function MathText({ text, questionContext, optionLetter }) {
   if (hasMathpixMedia(raw)) {
     return (
       <span className="math-text-flow math-text-with-figures">
-        {splitMathpixMediaSegments(raw).map((seg, i) =>
-          seg.kind === 'img' ? (
+        {groupSideBySideFigureSegments(splitMathpixMediaSegments(raw), stripMathpixFigureChrome).map((seg, i) =>
+          seg.kind === 'row' ? (
+            <span key={`row-${i}`} className="mathpix-figure-row" data-testid="mathpix-figure-row">
+              {seg.value.map((fig, j) => (
+                <img
+                  key={`fig-${i}-${j}`}
+                  className="mathpix-paper-figure"
+                  src={fig.url}
+                  alt=""
+                  style={{ maxWidth: `calc(${figureRowShare(seg.value, j)}% - 0.75rem)` }}
+                  onError={showLocalPictureOnError}
+                />
+              ))}
+            </span>
+          ) : seg.kind === 'img' ? (
             <img
               key={`fig-${i}`}
               className="mathpix-paper-figure"
               src={seg.value}
               alt=""
+              onError={showLocalPictureOnError}
             />
           ) : (
             <span key={`tx-${i}`}>

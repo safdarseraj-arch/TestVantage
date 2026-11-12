@@ -3,7 +3,18 @@
  * Those are part of the question (List-I drawings, V-T graphs).
  */
 
-const MATHPIX_HOST = /cdn\.mathpix\.com/i
+/** Pictures the admin cut out of the original paper (served by the Hybrid AI helper). */
+export const ORIGINAL_CROP_URL_PREFIX = '/api/official-pyq/original/crops/'
+const MATHPIX_HOST = /cdn\.mathpix\.com|\/api\/official-pyq\/original\/crops\//i
+
+export function isOriginalCropUrl(url) {
+  return String(url ?? '').startsWith(ORIGINAL_CROP_URL_PREFIX)
+}
+
+/** A picture cut from the original page (Compare / Fix it now / admin crop) sits in this text. */
+export function hasOriginalPageCrop(text) {
+  return /\\includegraphics(?:\[[^\]]*\])?\{\/api\/official-pyq\/original\/crops\/[^}]+\}/.test(String(text ?? ''))
+}
 
 function mathStateBefore(str, offset) {
   const before = String(str ?? '').slice(0, offset)
@@ -331,7 +342,7 @@ export function extractMathpixImageUrls(raw) {
   const urls = []
   const push = (u) => {
     const clean = cleanMathpixImageUrl(u)
-    if (MATHPIX_HOST.test(clean) && /^https?:\/\//i.test(clean)) urls.push(clean)
+    if (MATHPIX_HOST.test(clean) && (/^https?:\/\//i.test(clean) || isOriginalCropUrl(clean))) urls.push(clean)
   }
   const md = /!\[\s*[^\]]*\]\s*\(\s*(https?:\/\/cdn\.mathpix\.com\/[^\s)]+)/gi
   let m
@@ -519,7 +530,8 @@ export function stripMathpixFigureChrome(raw) {
     .replace(/\\caption\{\s*(\([^)]+\))\s*\}/gi, '\n$1\n')
     .replace(/\\caption\{[^}]*\}/gi, ' ')
     // Keep match-list / MCQ labels; drop other \\item[…] chrome.
-    .replace(/\\item\s*\[\s*\(?\s*([PQRS1-5A-D])\s*\)?\s*\]/gi, '\n($1)\n')
+    .replace(/\\item\s*\[\s*\(\s*(I{1,3}|IV|V)\s*\)\s*\]/g, '\n($1)\n')
+    .replace(/\\item\s*\[\s*\(?\s*([PQRST1-5A-D])\s*[.:]?\s*\)?\s*\]/gi, '\n($1)\n')
     .replace(/\\item\s*\[[^\]]*\]/gi, ' ')
     .replace(/\\begin\{itemize\}/gi, '\n')
     .replace(/\\end\{itemize\}/gi, '\n')

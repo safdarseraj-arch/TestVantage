@@ -3,6 +3,20 @@ import { fixOcrBraceFractions } from './fixOcrMathSymbols.js'
 import { repairInlineMathDelimiters } from './repairInlineMathDelimiters.js'
 
 /**
+ * Display math the paper prints on its own line: stacked rows (gathered / aligned),
+ * an integral or sum with limits, or a formula too long to sit inside a sentence.
+ * @param {string} body latex between the $$
+ */
+export function displayMathStandsAlone(body) {
+  const t = String(body ?? '').trim()
+  if (/\\begin\{(?:gathered|gather\*?|aligned|align\*?|alignedat|split|multline\*?|eqnarray\*?)\}/.test(t)) {
+    return true
+  }
+  if (/\\(?:int|iint|oint|sum|prod)\s*_/.test(t)) return true
+  return t.length >= 80
+}
+
+/**
  * Clean broken $ delimiters and over-escaped LaTeX from OCR polish passes.
  * @param {string} text
  */
@@ -69,6 +83,7 @@ export function sanitizeMathDelimiters(text) {
       (offset === 0 || whole[offset - 1] === '\n') &&
       (offset + full.length >= whole.length || whole[offset + full.length] === '\n')
     if (ownLine && /\\(?:frac|dfrac)\b/.test(body)) return `$$${body}$$`
+    if (displayMathStandsAlone(body)) return `$$${body}$$`
     if (
       /\\begin\{(?:matrix|pmatrix|bmatrix|vmatrix|array|cases|tabular)\}/.test(body) ||
       /\\left\[\\begin\{/.test(body) ||

@@ -30,7 +30,7 @@ import {
   matchOptionsFoldedIntoLists,
   parseMatchingListForDisplay,
 } from './parseMatchingListDisplay.js'
-import { restoreMissingOptionGridGraphs, stripEmptyFigureShells, stripEmptyImageMarkdown } from './mathpixMedia.js'
+import { hasOriginalPageCrop, restoreMissingOptionGridGraphs, stripEmptyFigureShells, stripEmptyImageMarkdown } from './mathpixMedia.js'
 import { stripImageWatermarkOcr } from './stripImageWatermarkOcr.js'
 import { stripUploadUiOcr } from './stripUploadUiOcr.js'
 import { rejoinSplitMathEnvironments, unescapeAccidentalDoubleBackslash } from './wrapBareLatexRuns.js'
@@ -325,18 +325,16 @@ export function missingBracketedGivenLine(stem, ocrWindow) {
   if (/\[\s*Given\s*:/i.test(String(stem ?? ''))) return ''
   const window = String(ocrWindow ?? '')
   if (!window) return ''
-  const head = String(stem ?? '')
-    .split('$')[0]
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 48)
-  let region = window
-  if (head.length >= 12) {
-    const at = window.toLowerCase().indexOf(head.toLowerCase())
-    if (at < 0) return ''
-    region = window.slice(at)
-  }
-  const cut = region.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]|Q\.\s*\d+)/)
+  const plainBits = String(stem ?? '')
+    .split(/\\[a-zA-Z]+|\$+/)
+    .map((bit) => bit.replace(/\s+/g, ' ').trim())
+  /** A stem opening with math ("Among $[Co(CN)_4]$ …") anchors on its first plain run, never on the window start (the previous question's Given line — 2024 P2 Q46). */
+  const head = (plainBits[0].length >= 12 ? plainBits[0] : plainBits.find((bit) => bit.length >= 16) || '').slice(0, 48)
+  if (!head) return ''
+  const at = window.toLowerCase().indexOf(head.toLowerCase())
+  if (at < 0) return ''
+  let region = window.slice(at)
+  const cut = region.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d|Q\.\s*\d+)/)
   if (cut > 40) region = region.slice(0, cut)
   const match = region.match(/\[\s*Given\s*:[\s\S]*?\]/)
   if (!match) return ''
@@ -630,12 +628,49 @@ export function inlineSingleSymbolDisplayMath(text) {
   )
 }
 
+const LIST_TWO_HEADING_RE = /^[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*II[ \t]*$/i
+
+/**
+ * A "List II" heading printed beside List-I's first picture, with only row 1 under it and
+ * rows 2–4 after the last List-I row (2014 P2 Q18): the heading and row 1 move down to row 2.
+ */
+function regroupSplitListTwo(text) {
+  const lines = String(text).split('\n')
+  const head = lines.findIndex((line) => LIST_TWO_HEADING_RE.test(line))
+  if (head < 0) return text
+  let end = head + 1
+  while (end < lines.length && /^[ \t]*[1-5]\.[ \t]+\S/.test(lines[end])) end += 1
+  if (end === head + 1) return text
+  const after = lines.slice(end)
+  const nextRow = after.findIndex((line) => new RegExp(`^[ \\t]*${end - head}\\.[ \\t]+\\S`).test(line))
+  if (nextRow < 0) return text
+  const listOneAfter = after.slice(0, nextRow).some((line) => /^[ \t]*(?:\(\s*[QRST]\s*\)|[QRST]\.)/.test(line))
+  if (!listOneAfter) return text
+  const rest = [...lines.slice(0, head), ...after]
+  rest.splice(head + nextRow, 0, '', ...lines.slice(head, end))
+  return rest.join('\n').replace(/\n{3,}/g, '\n\n')
+}
+
+/** "2.r/2", "4.No water" and a lowercase "s." row under a P./Q./R. list are list row labels (2014 P2 Q18–Q20). */
+export function tidyMatchListRowLabels(text) {
+  const t = String(text ?? '')
+  if (!/(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*I/i.test(t)) return t
+  let out = t.replace(/^([ \t]*)([1-5])\.(?=[A-Za-z\\$(])/gm, '$1$2. ')
+  if (/^[ \t]*P\.[ \t]/m.test(out)) {
+    out = out.replace(/^([ \t]*)([qrst])\.(?=[ \t])/gm, (_, space, letter) => `${space}${letter.toUpperCase()}.`)
+  }
+  return regroupSplitListTwo(out)
+}
+
 export function cleanMathpixCardText(text) {
-  let t = htmlReactionsToMath(String(text ?? ''))
+  let t = tidyMatchListRowLabels(htmlReactionsToMath(String(text ?? '')))
   t = splitGluedChemDisplayEquations(t)
   t = inlineSingleSymbolDisplayMath(t)
   t = restoreDroppedMsOnGivenLine(t)
-  t = t.replace(/\$\$\s*(?=\\includegraphics\b)/g, '')
+  t = t.replace(/\$\$\s*(?=\\includegraphics\b)/g, (full, offset, whole) => {
+    const opensBefore = (String(whole).slice(0, offset).match(/\$\$/g) || []).length
+    return opensBefore % 2 === 1 ? full : ''
+  })
   t = healVisibleTableCommands(
     stripEmptyFigureShells(
       stripEmptyImageMarkdown(stripScannerNotesFromQuestionText(stripOcrJunkSymbols(t))),
@@ -646,10 +681,12 @@ export function cleanMathpixCardText(text) {
   t = unescapeAccidentalDoubleBackslash(t)
   t = canonicalizeBeginMatrixEnv(t)
   t = normalizeMatrixEnvironments(t)
-  t = stripDollarsInsideLatexEnvs(t)
+  t = stripDollarsInsideLatexEnvs(t, { keepMatchListTabular: true })
   t = ensureMatrixStemDelimiters(t)
   t = wrapBareMatrixEnvs(t)
   t = rejoinSplitMathEnvironments(t)
+  // An option cut just before the next list item keeps a dangling \item[ at its end.
+  t = t.replace(/\s*\\item\s*(?:\[\s*\]?)?\s*$/, '')
   return peelPrintedAnswerFromStem(dropBakedMatchListRowLabels(t))
 }
 
@@ -678,14 +715,25 @@ export function validateMathpixQuestion(q) {
     break
   }
 
-  if (looksLikeMatchingListStem(text)) {
+  // "LIST-I contains reactions…" with P → 1 choices is a match card even when the scan
+  // dropped every (P)/(1) label, so the lists cannot be told apart.
+  const mappedChoices =
+    (text.match(/(?:^|\n|&)[ \t]*(?:\\item\s*\[\s*|\\textbf\{\s*)?\(?\s*[PQRS]\s*[.):\]}]/g) || []).length < 2 &&
+    /(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*I[ \t]*(?:\n|$)/i.test(text) &&
+    /(?:^|\n)[ \t]*(?:List|Column)[ \t]*[-–]?[ \t]*II[ \t]*(?:\n|$)/i.test(text) &&
+    (Array.isArray(q?.options) ? q.options : []).filter((o) =>
+      /\bP\b[^;]{0,24}?(?:→|\\rightarrow|\\to\b)/.test(String(o ?? '')),
+    ).length >= 2
+  if (looksLikeMatchingListStem(text) || mappedChoices) {
     const parsed = parseMatchingListForDisplay(text, q.options)
-    if ((parsed?.listI?.length ?? 0) < 2) {
+    // A picture cut from the original page holds the lists the text does not.
+    const listsInPicture = hasOriginalPageCrop(text)
+    if (!listsInPicture && (parsed?.listI?.length ?? 0) < 2) {
       issues.push({
         code: 'missing_column',
         note: 'Match-the-column is missing List-I. Not inventing rows.',
       })
-    } else if ((parsed?.listII?.length ?? 0) < 2) {
+    } else if (!listsInPicture && (parsed?.listII?.length ?? 0) < 2) {
       issues.push({
         code: 'missing_column',
         note: 'Match-the-column is missing List-II. Not inventing rows.',

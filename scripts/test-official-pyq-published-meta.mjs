@@ -1,12 +1,13 @@
 /**
- * Published Official PYQ tag edits stay published and mint the founder PYQ id.
- * Pattern: Subject/Unit/Chapter letters + 5 digits + exam letter + year (MAM00001A2024).
+ * Tag, answer, and solution edits on an Approved Official PYQ paper stay Approved
+ * and never change the question id (Publish gives the final id). Published papers refuse them.
  */
 import assert from 'node:assert/strict'
 import {
   addOfficialPyqPendingPaper,
   clearOfficialPyqPendingPapers,
   getOfficialPyqPendingPaper,
+  updateOfficialPyqPendingPaper,
 } from '../src/utils/officialPyqPendingStore.js'
 import { applyOfficialPyqPublishedMeta } from '../src/utils/officialPyqPublishedMeta.js'
 
@@ -115,7 +116,7 @@ const saved = applyOfficialPyqPublishedMeta(paper.id, 0, {
 assert.equal(saved.ok, true)
 assert.equal(saved.status, 'approved')
 const row = getOfficialPyqPendingPaper(paper.id).questions[0]
-assert.match(row.id, /^MAM\d{5}A2024$/)
+assert.equal(row.id, 'opyq-meta-temp', 'saving tags does not make the final id')
 assert.equal(row.subject, 'mathematics')
 assert.equal(row.section, 'Algebra')
 assert.equal(row.chapter, 'Matrices & Determinants')
@@ -161,5 +162,17 @@ const kept = applyOfficialPyqPublishedMeta(paper.id, 1, {
 assert.equal(kept.ok, true)
 assert.equal(getOfficialPyqPendingPaper(paper.id).questions[1].id, 'MAM00007A2024')
 assert.equal(getOfficialPyqPendingPaper(paper.id).questions[1].text, 'Already numbered question.')
+
+updateOfficialPyqPendingPaper(paper.id, { status: 'published' })
+const locked = applyOfficialPyqPublishedMeta(paper.id, 0, {
+  questionId: row.id,
+  expectText: stem,
+  subject: 'mathematics',
+  section: 'Algebra',
+  chapter: 'Sets',
+})
+assert.equal(locked.ok, false)
+assert.match(String(locked.error), /Unpublish/)
+assert.equal(getOfficialPyqPendingPaper(paper.id).questions[0].section, 'Calculus')
 
 console.log('official pyq published meta ok', row.id)

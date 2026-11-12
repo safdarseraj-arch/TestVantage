@@ -13,7 +13,17 @@ export const OFFICIAL_PYQ_PENDING_LIST_KEY = 'testvantage-official-pyq-pending-l
 /** One paper’s questions (no OCR blob) so Open does not JSON.parse the fat store. */
 export const OFFICIAL_PYQ_PENDING_PAPER_KEY_PREFIX = 'testvantage-official-pyq-pending-item:'
 
-/** @typedef {'pending_review' | 'approved' | 'rejected'} OfficialPyqPaperStatus */
+/**
+ * pending_review → approved (reviewed, not shown to students) → published (final ids, served).
+ * @typedef {'pending_review' | 'approved' | 'published' | 'rejected'} OfficialPyqPaperStatus
+ */
+
+const OFFICIAL_PYQ_STATUSES = new Set(['pending_review', 'approved', 'published', 'rejected'])
+
+/** @param {unknown} status @returns {OfficialPyqPaperStatus} */
+function knownOfficialPyqStatus(status) {
+  return OFFICIAL_PYQ_STATUSES.has(String(status)) ? /** @type {OfficialPyqPaperStatus} */ (status) : 'pending_review'
+}
 
 /**
  * @typedef {{
@@ -136,16 +146,76 @@ export const OFFICIAL_PYQ_ADMIN_EDIT_FIELDS = [
   'correctIndices',
   'correctInteger',
   'correctNumerical',
+  'numericalTolerance',
+  'numericalAlternatives',
+  'correctIndicesAlternatives',
+  'bonusMarksToAll',
+  'matrixRows',
+  'matrixCols',
+  'matrixColLabels',
+  'matrixAnswerKey',
+  'matrixAnswerAlternates',
   'questionImage',
   'passageText',
   'passageSource',
   'adminEdited',
   'adminEditedAt',
+  'adminApproved',
+  'adminApprovedAt',
+  'editHistory',
+  'editSource',
 ]
 
 /** @param {unknown} q */
 export function officialPyqCardIsAdminEdited(q) {
   return Boolean(q && typeof q === 'object' && /** @type {any} */ (q).adminEdited === true)
+}
+
+const FAKE_KEY_MIN_CARDS = 5
+
+/** @param {any} q */
+function hasTwoOptions(q) {
+  return Array.isArray(q?.options) && q.options.filter((o) => String(o ?? '').trim()).length >= 2
+}
+
+/** @param {any} q */
+function hasNumberOrGridAnswer(q) {
+  if ([q?.correctInteger, q?.correctNumerical].some((v) => v != null && v !== '')) return true
+  const grid = q?.matrixAnswerKey
+  return Boolean(grid && typeof grid === 'object' && Object.values(grid).some((row) => (Array.isArray(row) ? row.length : row != null && row !== '')))
+}
+
+/**
+ * Some older uploads (2018–2024) saved "(A), from the paper" on every question although those papers print
+ * no answer key. A real key is never A for every question, so such answers are marked unchecked
+ * (`answerKeyReleased`); Hybrid AI then solves them. A card whose answer came off the original page stays.
+ * @param {unknown[]} questions
+ * @returns {unknown[] | null} the corrected cards, or null when nothing changes
+ */
+export function releaseUnprintedAnswerKeys(questions) {
+  const list = Array.isArray(questions) ? questions : []
+  const claimed = list.filter(
+    (q) => /** @type {any} */ (q)?.answerSource === 'from_paper' && /** @type {any} */ (q)?.answerFromOriginalPage !== true,
+  )
+  const choice = claimed.filter(hasTwoOptions)
+  if (choice.length < FAKE_KEY_MIN_CARDS) return null
+  const onlyA = (/** @type {any} */ q) =>
+    Number(q.correctIndex) === 0 &&
+    !(Array.isArray(q.correctIndices) ? q.correctIndices : []).some((i) => Number(i) !== 0) &&
+    !(Array.isArray(q.correctIndicesAlternatives) && q.correctIndicesAlternatives.length)
+  if (!choice.every(onlyA)) return null
+  const fake = new Set(claimed.filter((q) => hasTwoOptions(q) || !hasNumberOrGridAnswer(q)))
+  return list.map((q) => (fake.has(q) ? { .../** @type {any} */ (q), answerSource: 'unknown', answerKeyReleased: true } : q))
+}
+
+/** The card's answer was marked unchecked by {@link releaseUnprintedAnswerKeys} and nobody has set it since. @param {any} q */
+export function officialPyqAnswerKeyIsReleased(q) {
+  return q?.answerKeyReleased === true && !['from_paper', 'manual', 'admin_edit'].includes(String(q?.answerSource ?? ''))
+}
+
+/** An admin approved this one card as shown: no quality alarms, nothing may change it. @param {unknown} q */
+export function officialPyqCardIsApproved(q) {
+  return Boolean(q && typeof q === 'object' && /** @type {any} */ (q).adminApproved === true)
 }
 
 /** @param {any} q @param {number} index */
@@ -158,12 +228,16 @@ function officialPyqCardSlotKey(q, index) {
  * Re-parse, auto-heal, quality fix, snapshot restore and Gemini fill must never
  * overwrite a card an admin edited by hand. Matches cards by slot number.
  * A newer admin save (larger adminEditedAt) is the only thing that replaces one.
+ * `release` lists old card indexes the admin chose to undo (Undo last edit /
+ * Go back to the scanned version); those may be replaced.
  * @param {unknown[] | null | undefined} prevQuestions
  * @param {unknown[] | null | undefined} nextQuestions
+ * @param {{ release?: Iterable<number> }} [opts]
  * @returns {unknown[]}
  */
-export function keepAdminEditedOfficialPyqCards(prevQuestions, nextQuestions) {
-  const prev = Array.isArray(prevQuestions) ? prevQuestions : []
+export function keepAdminEditedOfficialPyqCards(prevQuestions, nextQuestions, opts = {}) {
+  const released = new Set(Array.from(opts?.release ?? [], Number))
+  const prev = (Array.isArray(prevQuestions) ? prevQuestions : []).map((q, i) => (released.has(i) ? null : q))
   const next = Array.isArray(nextQuestions) ? nextQuestions : []
   if (!next.length) return next
   /** @type {Map<string, number>} */
@@ -172,6 +246,11 @@ export function keepAdminEditedOfficialPyqCards(prevQuestions, nextQuestions) {
     const id = String(/** @type {any} */ (q)?.id ?? '').trim()
     if (id && !nextById.has(id)) nextById.set(id, i)
   })
+  const editedContent = new Set(
+    next
+      .filter((q) => officialPyqCardIsAdminEdited(q))
+      .map((q) => JSON.stringify([/** @type {any} */ (q).text ?? '', /** @type {any} */ (q).options ?? []])),
+  )
   const edited = new Map()
   /** @type {Map<number, any>} */
   const carried = new Map()
@@ -180,7 +259,9 @@ export function keepAdminEditedOfficialPyqCards(prevQuestions, nextQuestions) {
     // A card that moved slot (e.g. a passage card before it was removed) keeps its edit by id.
     const at = nextById.get(String(q?.id ?? '').trim())
     if (at != null && officialPyqCardIsAdminEdited(next[at])) carried.set(at, q)
-    else edited.set(officialPyqCardSlotKey(q, i), q)
+    else if (!editedContent.has(JSON.stringify([q.text ?? '', q.options ?? []]))) {
+      edited.set(officialPyqCardSlotKey(q, i), q)
+    }
   })
   if (!edited.size && !carried.size) return next
   let changed = false
@@ -314,6 +395,8 @@ function paperToLightRecord(paper) {
       .join('\n'),
     importedAt: paper.importedAt,
     reviewedAt: paper.reviewedAt,
+    ...(paper.publishedAt ? { publishedAt: paper.publishedAt } : {}),
+    ...(paper.keptPublishedIds ? { keptPublishedIds: paper.keptPublishedIds } : {}),
     rejectReason: paper.rejectReason,
     expectedQuestionCount: paper.expectedQuestionCount,
     hasOcr: paper.hasOcr === true || String(paper.preparedText ?? '').trim().length >= 80,
@@ -409,10 +492,7 @@ function paperToSummary(paper) {
     id: String(paper.id ?? ''),
     paperId: paper.paperId,
     paperLabel: String(paper.paperLabel || ''),
-    status:
-      paper.status === 'approved' || paper.status === 'rejected' || paper.status === 'pending_review'
-        ? paper.status
-        : 'pending_review',
+    status: knownOfficialPyqStatus(paper.status),
     year: Number(paper.year) || 0,
     exam: paper.exam,
     session: paper.session,
@@ -461,7 +541,7 @@ function rebuildSummariesFromPapers(papers, updatedAt) {
   return memorySummaries ?? []
 }
 
-const STATUS_RANK = { approved: 3, pending_review: 2, rejected: 1 }
+const STATUS_RANK = { published: 4, approved: 3, pending_review: 2, rejected: 1 }
 
 /**
  * One row per exam sitting (exam + year + paper/session/shift).
@@ -508,13 +588,11 @@ function pickPreferredPaper(a, b) {
  * @returns {OfficialPyqPendingPaper[]}
  */
 export function normalizeOfficialPyqPendingPapers(papers) {
-  const list = (Array.isArray(papers) ? papers : []).map((p) => ({
-    ...p,
-    status:
-      p.status === 'approved' || p.status === 'rejected' || p.status === 'pending_review'
-        ? p.status
-        : 'pending_review',
-  }))
+  const list = (Array.isArray(papers) ? papers : []).map((p) => {
+    const status = knownOfficialPyqStatus(p.status)
+    const released = status === 'published' ? null : releaseUnprintedAnswerKeys(p.questions)
+    return released ? { ...p, status, questions: released } : { ...p, status }
+  })
   /** @type {Map<string, OfficialPyqPendingPaper>} */
   const byKey = new Map()
   for (const paper of list) {
@@ -599,7 +677,8 @@ function loadRoot() {
   memoryRoot = { papers, updatedAt: persisted.updatedAt || Date.now() }
   rebuildSummariesFromPapers(papers, memoryRoot.updatedAt)
   writeAllLightPapers(papers)
-  if (papers.length !== persisted.papers.length) {
+  const byId = new Map(persisted.papers.map((p) => [p?.id, p]))
+  if (papers.length !== persisted.papers.length || papers.some((p) => byId.get(p.id)?.questions !== p.questions)) {
     persistRoot(memoryRoot)
   }
   return memoryRoot
@@ -718,9 +797,10 @@ export function listOfficialPyqPendingSummaries(status = 'pending_review') {
 /** One pass over the light cache — used by tab badges. */
 export function countOfficialPyqPendingByStatus() {
   const all = listOfficialPyqPendingSummaries('all')
-  const out = { pending_review: 0, approved: 0, rejected: 0, all: all.length }
+  const out = { pending_review: 0, approved: 0, published: 0, rejected: 0, all: all.length }
   for (const p of all) {
     if (p.status === 'approved') out.approved += 1
+    else if (p.status === 'published') out.published += 1
     else if (p.status === 'rejected') out.rejected += 1
     else out.pending_review += 1
   }
@@ -855,8 +935,11 @@ export function addOfficialPyqPendingPaper(input) {
 
   const existing = findOfficialPyqPendingBySittingKey(draft)
   if (existing) {
-    if (existing.status === 'approved') {
+    if (existing.status === 'published') {
       throw new Error(`“${existing.paperLabel}” is already published.`)
+    }
+    if (existing.status === 'approved') {
+      throw new Error(`“${existing.paperLabel}” is already approved. Send it back to Pending first to upload it again.`)
     }
     const updated = updateOfficialPyqPendingPaper(existing.id, {
       ...draft,
@@ -922,9 +1005,26 @@ export function addOfficialPyqReplicaPendingPaper(input) {
   return paper
 }
 
-/** True when Approve & Publish has locked this paper’s question bodies. */
+/**
+ * True once Approve has locked this paper’s question wording (Approved or Published).
+ * Approved papers still take tag, answer, and solution saves through
+ * allowPublishedQuestionWrite; Published papers take none.
+ */
 export function officialPyqQuestionsArePublishedLocked(paper) {
-  return String(paper?.status ?? '') === 'approved'
+  const status = String(paper?.status ?? '')
+  return status === 'approved' || status === 'published'
+}
+
+/** True when students are served this paper. */
+export function officialPyqPaperIsPublished(paper) {
+  return String(paper?.status ?? '') === 'published'
+}
+
+/** Why re-parse, heal, or a card edit cannot change this paper’s questions. */
+export function officialPyqWordingLockedMessage(paper) {
+  return officialPyqPaperIsPublished(paper)
+    ? 'This paper is published. Unpublish it and send it back for review before re-parse or heal can change its questions.'
+    : 'This paper is approved. Send it back for review before re-parse or heal can change its questions.'
 }
 
 /**
@@ -939,7 +1039,7 @@ export function officialPyqAutoRewriteBlocked(paper) {
 
 /**
  * @param {string} id
- * @param {Partial<OfficialPyqPendingPaper> & { allowPublishedQuestionWrite?: boolean }} updates
+ * @param {Partial<OfficialPyqPendingPaper> & { allowPublishedQuestionWrite?: boolean, releaseAdminEditIndexes?: number[] }} updates
  */
 export function updateOfficialPyqPendingPaper(id, updates) {
   const root = loadRoot()
@@ -949,14 +1049,14 @@ export function updateOfficialPyqPendingPaper(id, updates) {
   const unlocking =
     updates &&
     Object.prototype.hasOwnProperty.call(updates, 'status') &&
-    updates.status !== 'approved'
+    !officialPyqQuestionsArePublishedLocked({ status: updates.status })
   const wantsQuestions =
     updates && Object.prototype.hasOwnProperty.call(updates, 'questions')
   const publishedLocked =
     officialPyqQuestionsArePublishedLocked(prev) &&
     wantsQuestions &&
     !unlocking &&
-    updates.allowPublishedQuestionWrite !== true
+    !(updates.allowPublishedQuestionWrite === true && String(prev.status) === 'approved')
   let nextQuestions = publishedLocked
     ? prev.questions
     : wantsQuestions
@@ -965,11 +1065,13 @@ export function updateOfficialPyqPendingPaper(id, updates) {
           keepOfficialPyqQuestionsIfEmptied(prev, updates.questions, {
             allowEmpty: updates.allowEmptyQuestions === true,
           }),
+          { release: Array.isArray(updates.releaseAdminEditIndexes) ? updates.releaseAdminEditIndexes : [] },
         )
       : prev.questions
   const {
     allowEmptyQuestions: _allowEmptyQuestions,
     allowPublishedQuestionWrite: _allowPublishedQuestionWrite,
+    releaseAdminEditIndexes: _releaseAdminEditIndexes,
     ...safeUpdates
   } = updates || {}
   const adminFacts = Object.prototype.hasOwnProperty.call(safeUpdates, 'adminFacts')
@@ -991,6 +1093,26 @@ export function updateOfficialPyqPendingPaper(id, updates) {
   const saved = memoryRoot?.papers?.find((paper) => paper.id === prev.id) || root.papers[idx]
   writeLightPaper(saved)
   return saved
+}
+
+/**
+ * Paper-level fields for many papers in one save. Never touches questions, status, or id.
+ * @param {Record<string, Partial<OfficialPyqPendingPaper>>} patchById
+ * @returns {number} papers changed
+ */
+export function updateOfficialPyqPendingPapersMeta(patchById) {
+  const root = loadRoot()
+  let changed = 0
+  const papers = root.papers.map((paper) => {
+    const patch = patchById?.[paper.id]
+    if (!patch || typeof patch !== 'object') return paper
+    const { questions: _questions, status: _status, id: _id, ...safe } = patch
+    changed += 1
+    return { ...paper, ...safe }
+  })
+  if (!changed) return 0
+  saveRoot({ papers, updatedAt: Date.now() })
+  return changed
 }
 
 /** @param {string} id */

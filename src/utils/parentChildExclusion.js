@@ -1,4 +1,4 @@
-﻿export {
+export {
   enforce_parent_child_exclusion,
   enforceParentChildExclusion,
   isChildQuestion,

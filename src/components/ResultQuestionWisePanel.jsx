@@ -9,6 +9,8 @@ import { getQuestionType } from '../data/questionTypes'
 import { filterPerQuestionForSubject } from '../utils/testAnalysis.js'
 import ReportQuestionButton from './ReportQuestionModal.jsx'
 import AskDoubtButton from './AskDoubtButton.jsx'
+import MatrixGridView from './MatrixGridView.jsx'
+import { isMatrixGridCard } from '../utils/matrixGridPyq.js'
 
 const GRADE_ICON = {
   correct: '✓',
@@ -364,6 +366,7 @@ export default function ResultQuestionWisePanel({
                       }
                       hideTextWithImage={shouldHideStemTextWithImage(selected)}
                     />
+                    {isMatrixGridCard(selected) ? <MatrixGridView question={selected} /> : null}
                   </div>
                 )}
 
@@ -379,6 +382,9 @@ export default function ResultQuestionWisePanel({
                       <span className="rqw-answer-label">Correct answer</span>
                       <p>{selected.correctAnswerLabel || '—'}</p>
                     </div>
+                    {isMatrixGridCard(selected) ? (
+                      <MatrixGridView question={selected} answer={selected.userAnswer || {}} showKey />
+                    ) : null}
                     <QuestionPeerStatsBlock
                       peer={selectedPeer}
                       yourTimeSeconds={selected.timeSpentSeconds}

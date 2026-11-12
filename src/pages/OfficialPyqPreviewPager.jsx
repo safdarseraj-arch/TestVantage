@@ -97,6 +97,8 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
   const [showMath, setShowMath] = useState(false)
   const [sourceTick, setSourceTick] = useState(0)
   const [approved, setApproved] = useState(false)
+  const [published, setPublished] = useState(false)
+  const keptIdsRef = useRef(/** @type {Record<string, { id: string }>} */ ({}))
 
   useEffect(() => {
     let cancelled = false
@@ -108,6 +110,8 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
     setTotal(0)
     setSourceTick(0)
     setApproved(false)
+    setPublished(false)
+    keptIdsRef.current = {}
     pageRef.current = 0
     questionsRef.current = []
     sourceTextRef.current = ''
@@ -125,7 +129,9 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
       questionsRef.current = qs
       setTotal(qs.length)
       setCurrent(qs[0] ?? null)
-      setApproved(paper?.status === 'approved')
+      setApproved(paper?.status === 'approved' || paper?.status === 'published')
+      setPublished(paper?.status === 'published')
+      keptIdsRef.current = paper?.keptPublishedIds && typeof paper.keptPublishedIds === 'object' ? paper.keptPublishedIds : {}
       setReady(true)
       const metaFn = onMetaRef.current
       if (typeof metaFn === 'function') {
@@ -255,6 +261,8 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
                   paperId={paperId}
                   questionIndex={page}
                   question={current}
+                  published={published}
+                  keptId={String(keptIdsRef.current[String(current?.pyqSlot ?? current?.questionNumber ?? page + 1)]?.id ?? '')}
                   onSaved={(saved) => {
                     if (!saved) return
                     const list = questionsRef.current.slice()

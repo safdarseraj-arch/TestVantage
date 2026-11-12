@@ -5,6 +5,7 @@
 
 import { healPaperItemCards } from './mathpixQuestionSplit.js'
 import { applyUploadQualityGuards } from './uploadQualityGuards.js'
+import { solutionIsOnlyPrintedKeyLine } from './printedAnswerKey.js'
 
 const TYPE_ALIASES = {
   single: 'single_correct',
@@ -103,6 +104,48 @@ export function geminiStructuredItemToBankDraft(item, opts = {}) {
   const attachedInstructions = String(q.instructions ?? q.sectionInstructions ?? '').trim()
   const paperInstructions = String(opts.instructionText ?? '').trim()
   const year = Number(q.pyqYear ?? q.year ?? paper.year ?? paper.pyqYear)
+  if (opts.splitOnly === true) {
+    const printed = q.answerKeyVisible === true || q.answerSource === 'from_paper'
+    const solutionText = String(q.solution ?? '').trim()
+    const printedSolution =
+      (q.solutionSource === 'from_paper' || q.solutionPrinted === true) &&
+      Boolean(solutionText) &&
+      !solutionIsOnlyPrintedKeyLine(solutionText)
+    const pick = (v) => (printed && v != null && Number.isFinite(Number(v)) ? Number(v) : undefined)
+    const toughness = Number(paper.toughnessLevel)
+    return {
+      text,
+      options: options.slice(0, Math.max(4, options.length)),
+      questionType,
+      subject: normalizeSubject(paper.subject || q.subject),
+      section: String(paper.section || '').trim() || undefined,
+      chapter: String(paper.chapter || '').trim() || 'General',
+      topic: String(paper.topic || '').trim() || undefined,
+      examIds: examIds.length ? examIds : undefined,
+      examPatternId: examId || paper.examPatternId || undefined,
+      pyqYear: Number.isFinite(year) && year > 1900 ? year : undefined,
+      paperLabel: String(q.paperLabel || paper.paperLabel || '').trim() || undefined,
+      paperId: String(q.paperId || paper.paperId || '').trim() || undefined,
+      source: String(paper.sourceLabel || q.source || '').trim() || undefined,
+      toughnessLevel: Number.isFinite(toughness) && toughness > 0 ? clampToughness(toughness) : undefined,
+      marking,
+      correctIndex: pick(q.correctIndex),
+      correctIndices:
+        printed && Array.isArray(q.correctIndices)
+          ? q.correctIndices.map(Number).filter((n) => Number.isFinite(n))
+          : undefined,
+      correctInteger: pick(q.correctInteger),
+      correctNumerical: pick(q.correctNumerical),
+      solution: printedSolution ? solutionText : undefined,
+      passageText: String(q.passageText ?? '').trim() || undefined,
+      instructions: attachedInstructions || paperInstructions || undefined,
+      questionNumber: Number(q.number ?? q.questionNumber ?? (opts.index ?? 0) + 1) || undefined,
+      bankStatus: 'draft',
+      answerSource: printed ? 'from_paper' : 'unknown',
+      solutionSource: printedSolution ? 'from_paper' : undefined,
+      ocrEngine: 'mathpix',
+    }
+  }
   return {
     text,
     options: options.slice(0, Math.max(4, options.length)),
@@ -158,6 +201,7 @@ export function geminiStructureToBankDrafts(parsed, opts = {}) {
       paperMeta: opts.paperMeta,
       instructionText,
       index: i,
+      splitOnly: opts.splitOnly === true,
     })
     if (row) drafts.push(row)
   }

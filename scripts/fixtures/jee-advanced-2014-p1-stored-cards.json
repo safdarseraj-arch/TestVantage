@@ -1,0 +1,2836 @@
+{
+ "exam": "jee-advanced",
+ "year": 2014,
+ "session": "Paper 1",
+ "paperLabel": "JEE Advanced 2014",
+ "status": "pending_review",
+ "adminFacts": {
+  "version": 1,
+  "totalQuestions": 60,
+  "subjectOrder": [
+   "physics",
+   "chemistry",
+   "mathematics"
+  ],
+  "numbering": "continuous",
+  "samePattern": true,
+  "pattern": {
+   "rows": [
+    {
+     "from": 1,
+     "to": 10,
+     "type": "multiple_correct",
+     "options": 4,
+     "listI": "",
+     "listII": ""
+    },
+    {
+     "from": 11,
+     "to": 20,
+     "type": "integer",
+     "options": 0,
+     "listI": "",
+     "listII": ""
+    }
+   ],
+   "passages": ""
+  },
+  "bySubject": {
+   "physics": {
+    "rows": [
+     {
+      "from": 1,
+      "to": 10,
+      "type": "integer",
+      "options": 0,
+      "listI": "",
+      "listII": ""
+     }
+    ],
+    "passages": ""
+   },
+   "chemistry": {
+    "rows": [
+     {
+      "from": 1,
+      "to": "",
+      "type": "single_correct",
+      "options": 4,
+      "listI": "",
+      "listII": ""
+     }
+    ],
+    "passages": ""
+   },
+   "mathematics": {
+    "rows": [
+     {
+      "from": 1,
+      "to": "",
+      "type": "single_correct",
+      "options": 4,
+      "listI": "",
+      "listII": ""
+     }
+    ],
+    "passages": ""
+   }
+  },
+  "confirmedAt": 1794152816319,
+  "confirmedBy": "admin"
+ },
+ "paperFacts": {
+  "known": true,
+  "source": "admin",
+  "expectedQuestionCount": 60,
+  "sections": [],
+  "slots": [
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 1,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 2,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 3,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 4,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 5,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 6,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 7,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 8,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 9,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 10,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 11,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 12,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 13,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 14,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 15,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 16,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 17,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 18,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 19,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "physics",
+    "part": 0,
+    "printed": 20,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 21,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 22,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 23,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 24,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 25,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 26,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 27,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 28,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 29,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 30,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 31,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 32,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 33,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 34,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 35,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 36,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 37,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 38,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 39,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "chemistry",
+    "part": 1,
+    "printed": 40,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 41,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 42,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 43,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 44,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 45,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 46,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 47,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 48,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 49,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 50,
+    "type": "multiple_correct",
+    "options": 4,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 51,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 52,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 53,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 54,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 55,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 56,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 57,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 58,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 59,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   },
+   {
+    "subject": "mathematics",
+    "part": 2,
+    "printed": 60,
+    "type": "integer",
+    "options": 0,
+    "listI": 0,
+    "listII": 0,
+    "passage": ""
+   }
+  ],
+  "notes": []
+ },
+ "questions": [
+  {
+   "id": "pyq-imp-1794152748675-0",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "At time $t=0$, terminal A in the circuit shown in the figure is connected to B by a key and an alternating current $I(t)=I_{0} \\cos (\\omega t)$, with $I_{0}=1~\\mathrm{A}$ and $\\omega=500~\\mathrm{rad~s}^{-1}$ starts flowing in it with the initial direction shown in the figure. At $t=\\frac{7 \\pi}{6 \\omega}$, the key is switched from B to D. Now onwards only A and D are connected. A total charge $Q$ flows from the battery to charge the capacitor fully. If $C=20~\\mu \\mathrm{F}, R=10~\\Omega$ and the battery is ideal with emf of $50~\\mathrm{V}$, identify the correct statement (s).\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-01.jpg?height=399&width=636&top_left_y=1202&top_left_x=742}",
+   "options": [
+    "Magnitude of the maximum charge on the capacitor before $t=\\frac{7 \\pi}{6 \\omega}$ is $1 \\times 10^{-3} \\mathrm{C}$.",
+    "The current in the left part of the circuit just before $t=\\frac{7 \\pi}{6 \\omega}$ is clockwise.",
+    "Immediately after A is connected to D, the current in $R$ is $10 \\mathrm{A}$.",
+    "$Q=2 \\times 10^{-3} \\mathrm{C}$."
+   ],
+   "correctIndex": 2,
+   "chapter": "At time $t= 0$, terminal A in the circui",
+   "solution": "**Answer.** (C) ] Immediately after A is connected to D, the current in $R$ is $10 A$$. \\item[\n\n**Quick eliminations:**\n- **(A)** ] Magnitude of the maximum charge on the…\n- **(B)** ] The current in the left part of the ci…\n- **(D)** ]$$Q=2 \\times 10^{-3} C$. $\\end{itemize}$ …\n\n*(From printed key — replace with full working before publish if needed.)*\n\n**Correct:** (C)",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 1,
+   "imported": true,
+   "questionNumber": 1,
+   "printedNumber": 1,
+   "answerSource": "from_paper",
+   "answerConfidence": 85,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152787793,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152787794,
+     "card": {
+      "text": "the circuit shown in the figure is connected to B by a keyand an alternating current $I(t)=I_{0} \\cos (\\omega t)$, with $I_{0}=1$ Aand $\\omega=500 \\mathrm{rad} \\mathrm{s}^{-1}$ starts flowing in it with the initial direction shown in the figure. At $t=\\frac{7 \\pi}{6 \\omega}$, the key is switched from B to D. Now onwards only A and D are connected. A total charge $Q$ flows from the battery to charge the capacitor fully. If $C=20 \\mu F, R=10 \\Omega$ and the battery is ideal with emf of $50 V$, identify the correct statement (s).\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-01.jpg?height=399&width=636&top_left_y=1202&top_left_x=742}",
+      "options": [
+       ",",
+       "[",
+       "}",
+       ""
+      ],
+      "correctIndex": 2,
+      "answerSource": "from_paper"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "1094:1qohp48",
+     "714:1u7zsdo"
+    ],
+    "at": 1794152789707
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748675-1",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "A light source, which emits two wavelengths $\\lambda_{1}=400~\\mathrm{nm}$ and $\\lambda_{2}=600~\\mathrm{nm}$, is used in a Young's double slit experiment. If recorded fringe widths for $\\lambda_{1}$ and $\\lambda_{2}$ are $\\beta_{1}$ and $\\beta_{2}$ and number of fringes for them within a distance $y$ on one side of the central maximum are $m_{1}$ and $m_{2}$, respectively, then",
+   "options": [
+    "$\\beta_{2}>\\beta_{1}$",
+    "$m_{1}>m_{2}$",
+    "From the central maximum, $3^{\\mathrm{rd}}$ maximum of $\\lambda_{2}$ overlaps with $5^{\\mathrm{th}}$ minimum of $\\lambda_{1}$",
+    "The angular separation of fringes for $\\lambda_{1}$ is greater than $\\lambda_{2}$"
+   ],
+   "chapter": "which emits two wavelengths $\\lambda_{1}",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 2,
+   "imported": true,
+   "questionNumber": 2,
+   "printedNumber": 2,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152807347,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152807347,
+     "card": {
+      "text": "which emits two wavelengths $\\lambda_{1}=400 n m$ and $\\lambda_{2}=600 n m$, is used in a Young's double slit experiment. If recorded fringe widths for $\\lambda_{1}$ and $\\lambda_{2}$ are $\\beta_{1}$ and $\\beta_{2}$ © number of fringes for them within a distance $y$ on one side of the central maximum are $m_{1}$ and $m_{2}$, respectively, then\n$\\beta_{2}>\\beta_{1}$",
+      "options": [
+       "",
+       "[ $m_{1}>m_{2}$",
+       "[ From the central maximum, $3^{\\text {rd }}$ maximum of $\\lambda_{2}$ overlaps with $5^{\\text {th }}$ minimum of $\\lambda_{1}$ [ The angular separation of fringes for $\\lambda_{1}$ is greater th",
+       ""
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "656:eofk8f",
+     "612:1wk9107"
+    ],
+    "at": 1794152809181
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748675-2",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "One end of a taut string of length $3 m$ along the $x$ axis is fixed at $x= 0$. The speed of the waves in the string is $100 m s^{-1}$. The other end of the string is vibrating in the $y$ direction so that stationary waves are set up in the string. The possible waveform(s) of these stationary waves is(are)",
+   "options": [
+    "$y(t)=A \\sin \\frac{\\pi x}{6} \\cos \\frac{50 \\pi t}{3}$ [",
+    "$y(t)=A \\sin \\frac{\\pi x}{3} \\cos \\frac{100 \\pi t}{3}$ [",
+    "$y(t)=A \\sin \\frac{5 \\pi x}{6} \\cos \\frac{250 \\pi t}{3}$ [",
+    "$y(t)=A \\sin \\frac{5 \\pi x}{2} \\cos 250 \\pi t$ $ $ Answer:"
+   ],
+   "correctIndex": 0,
+   "chapter": "One end of a taut string of length $3 m$",
+   "solution": "**Answer.** (A) ] $y(t)=A \\sin \\frac{\\pi x}{6} \\cos \\frac{50 \\pi t}{3}$ $y(t)=A \\sin \\frac{\\pi x}{3} \\cos \\frac…\n- **(C)** ]$y(t)=A $\\sin \\frac{5 \\pi x}{6} \\cos \\fr$…\n- **(D)** ]$y(t)=A $\\sin $\\frac{5 \\pi x}{2} \\cos 250$…\n\n*(From printed key — replace with full working before publish if needed.)*\n\n**Correct:** (A)",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 3,
+   "imported": true,
+   "questionNumber": 3,
+   "printedNumber": 3,
+   "answerSource": "from_paper",
+   "answerConfidence": 85,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748675-3",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "A parallel plate capacitor has a dielectric slab of dielectric constant $K$ between its plates that covers $\\frac{1}{3}$ of the area of its plates, as shown in the figure. The total capacitance of the capacitor is $C$ while that of the portion with dielectric in between is $C_{1}$. When the capacitor is charged, the plate area covered by the dielectric gets charge $Q_{1}$ and the rest of the area gets charge $Q_{2}$. The electric field in the dielectric is $E_{1}$ and that in the other portion is $E_{2}$. Choose the correct option/options, ignoring edge effects.\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-03.jpg?height=325&width=253&top_left_y=664&top_left_x=672}",
+   "options": [
+    "$\\frac{E_{1}}{E_{2}}=1$ [",
+    "$\\frac{E_{1}}{E_{2}}=\\frac{1}{K}$ [",
+    "$\\frac{Q_{1}}{Q_{2}}=\\frac{3}{K}$ [",
+    "$\\frac{C}{C_{1}}=\\frac{2+K}{K}$ $ $ {Answer:"
+   ],
+   "chapter": "A parallel plate capacitor has a dielect",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 4,
+   "imported": true,
+   "questionNumber": 4,
+   "printedNumber": 4,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748675-4",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "Let $E_{1}(r)$, $E_{2}(r)$ and $E_{3}(r)$ be the respective electric fields at a distance $r$ from a point charge $Q$, an infinitely long wire with constant linear charge density $\\lambda$, and an infinite plane with uniform surface charge density $\\sigma$. If $E_{1}(r_{0})=E_{2}(r_{0})=E_{3}(r_{0})$ at a given distance $r_{0}$, then",
+   "options": [
+    "$Q=4 \\sigma \\pi r_{0}^{2}$",
+    "$r_{0}=\\frac{\\lambda}{2 \\pi \\sigma}$",
+    "$E_{1}(r_{0} / 2)=2 E_{2}(r_{0} / 2)$",
+    "$E_{2}(r_{0} / 2)=4 E_{3}(r_{0} / 2)$"
+   ],
+   "chapter": "Let $E_{1}(r), E_{2}(r)$ and $E_{3}(r)$ ",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 5,
+   "imported": true,
+   "questionNumber": 5,
+   "printedNumber": 5,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152832142,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152832143,
+     "card": {
+      "text": "Let $E_{1}(r), E_{2}(r)$ and $E_{3}(r)$ be the respective electric fields at a distance $r$ from a point charge $Q$, an infinitely long wire with constant linear charge density $\\lambda$, and an infinite plane with uniform surface charge density $\\sigma$. If $E_{1}\\left(r_{0}\\right)=E_{2}\\left(r_{0}\\right)=E_{3}\\left(r_{0}\\right)$ at a given distance $r_{0}$, then \n$(\\mathbf{A}) Q=4 \\sigma \\pi r_{0}^{2} E_{1}\\left(r_{0} / 2\\right)=2 E_{2}\\left(r_{0} / 2\\right)$\n(D) $E_{2}\\left(r_{0} / 2\\right)=4 E_{3}\\left(r_{0} / 2\\right)$ {Answer:",
+      "options": [
+       "$r_{0}=\\frac{\\lambda}{2 \\pi \\sigma}$ [}"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "500:hhvwpm",
+     "623:qp6fdn"
+    ],
+    "at": 1794152834206
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748675-5",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "A parallel plate capacitor has a dielectric slab of dielectric constant $K$ between its plates that covers 1/3 of the area of its plates, as shown in the figure. The total capacitance of the capacitor is $C$ while that of the portion with dielectric in between is $C_{1}$. When the capacitor is charged, the plate area covered by the dielectric gets charge $Q_{1}$ and the rest of the area gets charge $Q_{2}$. The electric field in the dielectric is $E_{1}$ and that in the other portion is $E_{2}$. Choose the correct option/options, ignoring edge effects. \\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-03.jpg?height=325&width=253&top_left_y=664&top_left_x=672}",
+   "options": [
+    "$\\frac{E_{1}}{E_{2}}=1$",
+    "$\\frac{E_{1}}{E_{2}}=\\frac{1}{K}$",
+    "$\\frac{Q_{1}}{Q_{2}}=\\frac{3}{K}$",
+    "$\\frac{C}{C_{1}}=\\frac{2+K}{K}$"
+   ],
+   "chapter": "A student is performing an experiment us",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 6,
+   "imported": true,
+   "questionNumber": 6,
+   "printedNumber": 6,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "differs",
+    "differences": [
+     {
+      "kind": "other",
+      "detail": "The card extracted question 4 from page 3 instead of question 6 from page 4."
+     }
+    ],
+    "suggestedText": "A student is performing an experiment using a resonance column and a tuning fork of frequency $244\\mathrm{s}^{-1}$. He is told that the air in the tube has been replaced by another gas (assume that the column remains filled with the gas). If the minimum height at which resonance occurs is $(0.350 \\pm 0.005)~m$, the gas in the tube is\n\n(\\textbf{Useful information: }$\\sqrt{167RT} = 640~\\mathrm{J}^{1/2}\\mathrm{mole}^{-1/2}; \\sqrt{140RT} = 590~\\mathrm{J}^{1/2}\\mathrm{mole}^{-1/2}$. The molar masses $M$ in grams are given in the options. Take the values of $\\sqrt{\\frac{10}{M}}$ for each gas as given there.)",
+    "suggestedPassage": "",
+    "suggestedOptions": [
+     "Neon $\\left(M=20, \\sqrt{\\frac{10}{20}} = \\frac{7}{10}\\right)$",
+     "Nitrogen $\\left(M=28, \\sqrt{\\frac{10}{28}} = \\frac{3}{5}\\right)$",
+     "Oxygen $\\left(M=32, \\sqrt{\\frac{10}{32}} = \\frac{9}{16}\\right)$",
+     "Argon $\\left(M=36, \\sqrt{\\frac{10}{36}} = \\frac{17}{32}\\right)$"
+    ],
+    "pages": [
+     3,
+     4
+    ],
+    "checkedAt": 1794152856652,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Correction not used: raw code shows on the card (\\textbf)",
+    "tried": [
+     "852:1ob8rc8"
+    ],
+    "at": 1794152857410
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748675-5",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "Let $E_{1}(r), E_{2}(r)$ and $E_{3}(r)$ be the respective electric fields at a distance $r$ from a point charge $Q$, an infinitely long wire with constant linear charge density $\\lambda$, and an infinite plane with uniform surface charge density $\\sigma$. If $E_{1}\\left(r_{0}\\right)=E_{2}\\left(r_{0}\\right)=E_{3}\\left(r_{0}\\right)$ at a given distance $r_{0}$, then",
+   "options": [
+    "$Q=4 \\sigma \\pi r_{0}^{2}$",
+    "$r_{0}=\\frac{\\lambda}{2 \\pi \\sigma}$",
+    "$E_{1}\\left(r_{0} / 2\\right)=2 E_{2}\\left(r_{0} / 2\\right)$",
+    "$E_{2}\\left(r_{0} / 2\\right)=4 E_{3}\\left(r_{0} / 2\\right)$"
+   ],
+   "chapter": "A student is performing an experiment us",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 7,
+   "imported": true,
+   "questionNumber": 7,
+   "printedNumber": 6,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152875216,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152875216,
+     "card": {
+      "text": "Let $E_{1}(r), E_{2}(r)$ and $E_{3}(r)$ be the respective electric fields at a distance $r$ from a point charge $Q$, an infinitely long wire with constant linear charge density $\\lambda$, and an infinite plane with uniform surface charge density $\\sigma$. If $E_{1}\\left(r_{0}\\right)=E_{2}\\left(r_{0}\\right)=E_{3}\\left(r_{0}\\right)$ at a given distance $r_{0}$, then $(\\mathbf{A}) Q=4 \\sigma \\pi r_{0}^{2}$",
+      "options": [
+       "$r_{0}=\\frac{\\lambda}{2 \\pi \\sigma}$",
+       "$E_{1}\\left(r_{0} / 2\\right)=2 E_{2}\\left(r_{0} / 2\\right)$",
+       "$E_{2}\\left(r_{0} / 2\\right)=4 E_{3}\\left(r_{0} / 2\\right)$"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "589:10ewqfb",
+     "601:1tdo6kz"
+    ],
+    "at": 1794152876847
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748675-5",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "A student is performing an experiment using a resonance column and a tuning fork of frequency $244\\mathrm{s}^{-1}$. He is told that the air in the tube has been replaced by another gas (assume that the column remains filled with the gas). If the minimum height at which resonance occurs is $(0.350 \\pm 0.005)~\\mathrm{m}$, the gas in the tube is\n\n(\\textbf{Useful information:} $\\sqrt{167RT} = 640~\\mathrm{J}^{1/2}\\mathrm{mole}^{-1/2}; \\sqrt{140RT} = 590~\\mathrm{J}^{1/2}\\mathrm{mole}^{-1/2}$. The molar masses $M$ in grams are given in the options. Take the values of $\\sqrt{\\frac{10}{M}}$ for each gas as given there.)\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-03.jpg?height=325&width=253&top_left_y=664&top_left_x=672}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-05.jpg?height=305&width=252&top_left_y=464&top_left_x=776}",
+   "options": [
+    "Neon$\\left(M=20, \\sqrt{\\frac{10}{20}}=\\frac{7}{10}\\right)$",
+    "Nitrogen$\\left(M=28, \\sqrt{\\frac{10}{28}}=\\frac{3}{5}\\right)$",
+    "Oxygen$\\left(M=32, \\sqrt{\\frac{10}{32}}=\\frac{9}{16}\\right)$",
+    "Argon$\\left(M=36, \\sqrt{\\frac{10}{36}}=\\frac{17}{32}\\right)$"
+   ],
+   "chapter": "A student is performing an experiment us",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 8,
+   "imported": true,
+   "questionNumber": 8,
+   "printedNumber": 6,
+   "cleanStatus": "incomplete_math",
+   "cleanNotes": "This math did not draw.",
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152887596,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152887596,
+     "card": {
+      "text": "A parallel plate capacitor has a dielectric slab of dielectric constant $K$ between its plates that covers 1/3 of the area of its plates, as shown in the figure. The total capacitance of the capacitor is $C$ while that of the portion with dielectric in between is $C_{1}$. When the capacitor is charged, the plate area covered by the dielectric gets charge $Q_{1}$ and the rest of the area gets charge $Q_{2}$. The electric field in the dielectric is $E_{1}$ and that in the other portion is $E_{2}$. Choose the correct option/options, ignoring edge effects.\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-03.jpg?height=325&width=253&top_left_y=664&top_left_x=672}\n\n(A) $\\frac{E_{1}}{E_{2}}=1$\n\n(B) $\\frac{E_{1}}{E_{2}}=\\frac{1}{K}$\n\n(C) $\\frac{Q_{1}}{Q_{2}}=\\frac{3}{K}$\n\n(D) $\\frac{C}{C_{1}}=\\frac{2+K}{K}$\n\n{\n\n5. Let $E_{1}(r), E_{2}(r)$ and $E_{3}(r)$ be the respective electric fields at a distance $r$ from a point charge $Q$, an infinitely long wire with constant linear charge density $\\lambda$, and an infinite plane with uniform surface charge density $\\sigma$. If $E_{1}\\left(r_{0}\\right)=E_{2}\\left(r_{0}\\right)=E_{3}\\left(r_{0}\\right)$ at a given distance $r_{0}$, then\n\n $(\\mathbf{A}) Q=4 \\sigma \\pi r_{0}^{2}$\n\n(B) $r_{0}=\\frac{\\lambda}{2 \\pi \\sigma}$\n\n(C) $E_{1}\\left(r_{0} / 2\\right)=2 E_{2}\\left(r_{0} / 2\\right)$\n\n(D) $E_{2}\\left(r_{0} / 2\\right)=4 E_{3}\\left(r_{0} / 2\\right)$\n\n{\n\n6. A student is performing an experiment using a resonance column and a tuning fork of frequency $244 s^{-1}$. He is told that the air in the tube has been replaced by another gas (assume that the column remains filled with the gas). If the minimum height at which resonance occurs is $(0.350 \\pm 0.005) m$, the gas in the tube is\n(Useful information: $\\sqrt{167 R T}=640 J^{1 / 2}$ mole $^{-1 / 2} ; \\sqrt{140 R T}=590 J^{1 / 2}$ mole $^{-1 / 2}$.The molar masses Min grams are given in the options. Take the values of $\\sqrt{\\frac{10}{M}}$ for each gas as given there.)\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-05.jpg?height=305&width=252&top_left_y=464&top_left_x=776}",
+      "options": [
+       "Neon$$\\left(M=20, \\sqrt{\\frac{10}{20}}=\\frac{7}{10}\\right)$$ [",
+       "Nitrogen$$\\left(M=28, \\sqrt{\\frac{10}{28}}=\\frac{3}{5}\\right)$$ [",
+       "Oxygen$$\\left(M=32, \\sqrt{\\frac{10}{32}}=\\frac{9}{16}\\right)$$ [",
+       "Argon$$\\left(M=36$, \\sqrt{$\\frac{10}{36}$}=$\\frac{17}{32}\\right)$$ $ $ {Answer:"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "1206:frh292",
+     "2531:10sevio"
+    ],
+    "at": 1794152889254
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748675-6",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "Heater of an electric kettle is made of a wire of length $L$ and diameter $d$. It takes 4 minutes to raise the temperature of $0.5\\mathrm{kg}$ water by $40\\mathrm{K}$. This heater is replaced by a new heater having two wires of the same material, each of length $L$ and diameter $2d$. The way these wires are connected is given in the options. How much time in minutes will it take to raise the temperature of the same amount of water by $40\\mathrm{K}$?",
+   "options": [
+    "4 if wires are in parallel",
+    "2 if wires are in series",
+    "1 if wires are in series",
+    "0.5 if wires are in parallel"
+   ],
+   "chapter": "Heater of an electric kettle is made of ",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 9,
+   "imported": true,
+   "questionNumber": 9,
+   "printedNumber": 7,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152901789,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152901789,
+     "card": {
+      "text": "Heater of an electric kettle is made of a wire of length $L$ and diameter $d$. It takes 4 minutes to raise the temperature o$f^0.5$kgwater by40$\\hat{k}$. This heater is replaced by a new heater having two wires of the same material, each of length $L$ and diameter $2 d$.The way these wires are connected is given in the options. How much time in minutes will it take to raise the temperature of the same amount of water by $40\\hat{k}$ ?\n4 if wires are in parallel",
+      "options": [
+       "[ 2 if wires are in series",
+       "[ 1 if wires are in series",
+       "[ 0.5"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "579:11ateke",
+     "542:1tdzfel"
+    ],
+    "at": 1794152903429
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-7",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "In the figure, a ladder of mass $m$ is shown leaning against a wall. It is in static equilibrium making an angle $\\theta$ with the horizontal floor. The coefficient of friction between the wall and the ladder is $\\mu_{1}$ and that between the floor and the ladder is $\\mu_{2}$. The normal reaction of the wall on the ladder is $N_{1}$ and that of the floor is $N_{2}$. If the ladder is about to slip, then\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-05.jpg?height=305&width=252&top_left_y=464&top_left_x=776}",
+   "options": [
+    "$\\mu_{1} = 0 \\quad \\mu_{2} \\neq 0 \\text{ and } N_{2} \\tan \\theta = \\frac{m g}{2}$",
+    "$\\mu_{1} \\neq 0 \\quad \\mu_{2} = 0 \\text{ and } N_{1} \\tan \\theta = \\frac{m g}{2}$",
+    "$\\mu_{1} \\neq 0 \\quad \\mu_{2} \\neq 0 \\text{ and } N_{2} = \\frac{m g}{1 + \\mu_{1} \\mu_{2}}$",
+    "$\\mu_{1} = 0 \\quad \\mu_{2} \\neq 0 \\text{ and } N_{1} \\tan \\theta = \\frac{m g}{2}$"
+   ],
+   "chapter": "In the figure, a ladder of mass $m$ is s",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 10,
+   "imported": true,
+   "questionNumber": 10,
+   "printedNumber": 8,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152912077,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152912077,
+     "card": {
+      "text": "In the figure, a ladder of mass $m$ is shown leaning against a wall. It is in static equilibrium making an angle $\\theta$ with the horizontal floor. The coefficient of friction between the wall and the ladder is $\\mu_{1}$ and that between the floor and the ladder is $\\mu_{2}$. The normal reaction of the wall on the ladder is $N_{1}$ and that of the floor is $N_{2}$. If the ladder is about to slip, then\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-05.jpg?height=305&width=252&top_left_y=464&top_left_x=776}",
+      "options": [
+       "$\\mu_{1}= 0 \\quad \\mu_{2} \\neq 0$ and $N_{2} \\tan \\theta=\\frac{m g}{2}$ [",
+       "$\\mu_{1} \\neq 0 \\quad \\mu_{2}= 0 \\operatorname{and} N_{1} \\tan \\theta=\\frac{m g}{2}$ [",
+       "$\\mu_{1} \\neq 0 \\quad \\mu_{2} \\neq 0$ and $N_{2}=\\frac{m g}{1+\\mu_{1} \\mu_{2}}$ [",
+       "$\\mu_{1}= 0 \\quad \\mu_{2} \\neq 0$ and $$N_{1} \\t"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "942:fbsga9",
+     "892:qtso0v"
+    ],
+    "at": 1794152913566
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-8",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "A transparent thin film of uniform thickness and refractive index $n_{1}=1.4$ is coated on the convex spherical surface of radius $R$ at one end of a long solid glass cylinder of refractive index $n_{2}=1.5$, as shown in the figure. Rays of light parallel to the axis of the cylinder traversing through the film from air to glass get focused at distance $f_{1}$ from the film, while rays of light traversing from glass to air get focused at distance $f_{2}$ from the film. Then\n\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p5-fd21ebcdbd8b8ad1.png?page=5&x0=0.3049&y0=0.5920&x1=0.5562&y1=0.7162}",
+   "options": [
+    "$\\left|f_{1}\\right|=3 R$",
+    "$\\left|f_{1}\\right|=2.8 R$",
+    "$\\left|f_{2}\\right|=2 R$",
+    "$\\left|f_{2}\\right|=1.4 R$"
+   ],
+   "chapter": "A transparent thin film of uniform thick",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 11,
+   "imported": true,
+   "questionNumber": 11,
+   "printedNumber": 9,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153099292,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153099292,
+     "card": {
+      "text": "A transparent thin film of uniform thickness and refractive index $n_{1}=1.4$ is coated on the convex spherical surface of radius Rat one end of a long solid glass cylinder of refractive index $n_{2}=1.5$, as shown in the figure. Rays of light parallel to the axis of the cylinder traversing through the film from air to glass get focused at distance $f_{1}$ from the film, while rays of light traversing from glass to air get focused at distance $f_{2}$ from the film. Then\n$\\left|f_{1}\\right|=3 R$\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-05.jpg?height=308&width=511&top_left_y=1643&top_left_x=658}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-06.jpg?height=454&width=310&top_left_y=360&top_left_x=674}",
+      "options": [
+       "[ $\\left|f_{1}\\right|=2.8 R$",
+       "[ $\\left|f_{2}\\right|=2 R$",
+       "[ $\\left|f_{2}\\right|=1.4 R$ {Answer:"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "757:7d9grg",
+     "912:19yn8wv"
+    ],
+    "at": 1794153100929
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-9",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "Two ideal batteries of emf $V_{1}$ and $V_{2}$ and three resistances $R_{1}$, $R_{2}$ and $R_{3}$ are connected as shown in the figure. The current in resistance $R_{2}$ would be zero if\n\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p6-b5a015c0431b7bdf.png?page=6&x0=0.3132&y0=0.1247&x1=0.4692&y1=0.3007}",
+   "options": [
+    "$V_{1} = V_{2}$ and $R_{1} = R_{2} = R_{3}$",
+    "$V_{1} = V_{2}$ and $R_{1} = 2 R_{2} = R_{3}$",
+    "$V_{1} = 2 V_{2}$ and $2 R_{1} = 2 R_{2} = R_{3}$",
+    "$2 V_{1} = V_{2}$ and $2 R_{1} = R_{2} = R_{3}$"
+   ],
+   "chapter": "Two ideal batteries of $e m f V_{1}$ and",
+   "solution": "**Answer.** (A) ] $V_{1}=V_{2}$ and $R_{1}=R_{2}=R_{3}$ $V_{1}=V_{2}$ and $R_{1}=2 R_{2}=R_{3}$…\n- **(C)** ]$V_{1}=2 V_{2}$ and $2 R_{1}=2 R_{2}=R_…\n- **(D)** ]$2 $V_{1}=V_{2}$$ and $2 $R_{1}=R_{2}=R_${3…\n\n*(From printed key — replace with full working before publish if needed.)*\n\n**Correct:** (A)",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 12,
+   "imported": true,
+   "questionNumber": 12,
+   "printedNumber": 10,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153111184,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153111184,
+     "card": {
+      "text": "Two ideal batteries of $e m f V_{1}$ and $V_{2}$ and three resistances $R_{1}, R_{2}$ and $R_{3}$ are connected as shown in the figure. The current in resistance $R_{2}$ would be zero if\n$V_{1}=V_{2}$ and $R_{1}=R_{2}=R_{3}$\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-06.jpg?height=454&width=310&top_left_y=360&top_left_x=674}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-07.jpg?height=397&width=811&top_left_y=800&top_left_x=495}",
+      "options": [
+       "[ $V_{1}=V_{2}$ and $R_{1}=2 R_{2}=R_{3}$",
+       "[ $V_{1}=2 V_{2}$ and $2 R_{1}=2 R_{2}=R_{3}$",
+       "[ $2 V_{1}=V_{2}$ and $2 R_{1}=R_{2}=R_{3}$ Answer:"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "542:knruhl",
+     "674:ceweja"
+    ],
+    "at": 1794153112789
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-10",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "Airplanes A and B are flying with constant velocity in the same vertical plane at angles $30^{\\circ}$ and $60^{\\circ}$ with respect to the horizontal respectively as shown in figure. The speed of A is $100 \\sqrt{3} m s^{-1}$. At time $t= 0 s$, an observer in A finds B at a distance of $500 m$. This observer sees B moving with a constant velocity perpendicular to the line of motion of A. If at $t=t_{0}, \\mathrm{~A}$ just escapes being hit by $B, t_{0}$ in seconds is\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-07.jpg?height=397&width=811&top_left_y=800&top_left_x=495}",
+   "options": [],
+   "chapter": "Airplanes A and B are flying with consta",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $5$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 13,
+   "imported": true,
+   "questionNumber": 13,
+   "printedNumber": 11,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-11",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "During Searle's experiment, zero of the Vernier scale lies between $3.20 \\times 10^{-2} m$ and $3.25 \\times 10^{-2} m$ of the main scale. The $20^{\\text {th }}$ division of the Vernier scale exactly coincides with one of the main scale divisions. When an additional load of $2\\hat{k} g$ is applied to the wire, the zero of the Vernier scale still lies between $3.20 \\times 10^{-2} m$ and $3.25 \\times 10^{-2} m$ of the main scale but now the $45^{\\text {th }}$ division of Vernier scale coincides with one of the main scale divisions. The length of the thin metallic wire is $2 m$ and its cross-sectional area is $8 \\times 10^{-7} m^{2}$. The least count of the Vernier scale is $1.0 \\times 10^{-5} m$. The maximum percentage error in the Young's modulus of the wire is",
+   "options": [],
+   "chapter": "During Searle's experiment, zero of the ",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $4$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 14,
+   "imported": true,
+   "questionNumber": 14,
+   "printedNumber": 12,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-12",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "A uniform circular disc of mass $1.5\\hat{k} g$ and radius $0.5 m$ is initially at rest on a horizontal frictionless surface. Three forces of equal magnitude $F= 0.5 N$ are applied simultaneously along the three sides of an equilateral triangle XYZ with its vertices on the perimeter of the disc (see figure). One second after applying the forces, the angular speed of the disc in $rads^{-1}$ is",
+   "options": [],
+   "chapter": "A uniform circular disc of mass $1.5\\hat",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $2$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 15,
+   "imported": true,
+   "questionNumber": 15,
+   "printedNumber": 13,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-13",
+   "subject": "physics",
+   "questionType": "numerical",
+   "text": "Two parallel wires in the plane of the paper are distance $X_{0}$ apart. A point charge is moving with speed $u$ between the wires in the same plane at a distance $X_{1}$ from one of the wires. When the wires carry current of magnitude $I$ in the same direction, the radius of curvature of the path of the point charge is $R_{1}$. In contrast, if the currents $I$ in the two wires have directions opposite to each other, the radius of curvature of the path is $R_{2}$. If $\\frac{X_{0}}{X_{1}}=3$, the value of $\\frac{R_{1}}{R_{2}}$ is",
+   "options": [],
+   "chapter": "Two parallel wires in the plane of the p",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $3$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 16,
+   "imported": true,
+   "questionNumber": 16,
+   "printedNumber": 14,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-14",
+   "subject": "physics",
+   "questionType": "numerical",
+   "text": "To find the distance $d$ over which a signal can be seen clearly in foggy conditions, a railways engineer uses dimensional analysis and assumes that the distance depends on the mass density $\\rho$ of the fog, intensity (power/area) $S$ of the light from the signal and its frequency $f$. The engineer finds that disproportionalto $S^{1 / n}$. The value of $n$ is",
+   "options": [],
+   "chapter": "To find the distance $d$ over which a si",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $3$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 17,
+   "imported": true,
+   "questionNumber": 17,
+   "printedNumber": 15,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-15",
+   "subject": "physics",
+   "questionType": "numerical",
+   "text": "A galvanometer gives full scale deflection with $0.006 A$ current. By connecting it to a $\\Omega$ resistance, it can be converted into a voltmeter of range $0-30 V$. If connected to a $\\frac{2 n}{249} \\Omega$ resistance, it becomes an ammeter of range $0-1.5 A$. The value of $n$ is",
+   "options": [],
+   "chapter": "A galvanometer gives full scale deflecti",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $5$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 18,
+   "imported": true,
+   "questionNumber": 18,
+   "printedNumber": 16,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-16",
+   "subject": "physics",
+   "questionType": "numerical",
+   "text": "Consider an elliptically shaped rail PQ in the vertical plane with $\\mathrm{OP}=3 m$ and $\\mathrm{OQ}=4 m$. A block of mass 1 kg is pulled along the rail from P to Q with a force of $18 N$, which is always parallel to line PQ (see the figure given). Assuming no frictional losses, the kinetic energy of the block when it reaches Q is $(n \\times 10)$ Joules. The value of $n$ is (take acceleration due to gravity = $10 m s^{-2}$ )\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-09.jpg?height=469&width=351&top_left_y=525&top_left_x=601}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-09.jpg?height=331&width=858&top_left_y=1675&top_left_x=610}",
+   "options": [],
+   "chapter": "Consider an elliptically shaped rail PQ ",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $5$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 19,
+   "imported": true,
+   "questionNumber": 19,
+   "printedNumber": 17,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-17",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "A rocket is moving in a gravity free space with a constant acceleration of $2~\\mathrm{m~s^{-2}}$ along $+x$ direction (see figure). The length of a chamber inside the rocket is $4~\\mathrm{m}$. A ball is thrown from the left end of the chamber in $+x$ direction with a speed of $0.3~\\mathrm{m~s^{-1}}$ relative to the rocket. At the same time, another ball is thrown in $-x$ direction with a speed of $0.2~\\mathrm{m~s^{-1}}$ from its right end relative to the rocket. The time in seconds when the two balls hit each other is\n\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p9-217aba9779f748c0.png?page=9&x0=0.2802&y0=0.6020&x1=0.6962&y1=0.7353}",
+   "options": [],
+   "chapter": "A rocket is moving in a gravity free spa",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 20,
+   "imported": true,
+   "questionNumber": 20,
+   "printedNumber": 18,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152923786,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152923786,
+     "card": {
+      "text": "A rocket is moving in a gravity free space with a constant acceleration of $2 m s^{-2}$ along $+x$ direction (see figure). The length of a chamber inside the rocket is $4 m$. A ball is thrown from the left end of the chamber in $+x$ direction with a speed of $0.3 m s^{-1}$ relative to the rocket. At the same time, another ball is thrown in $-x$ direction with a speed of $0.2 m s^{-1}$ from its right end relative to the rocket. The time in seconds when the two balls hit each other is\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-09.jpg?height=469&width=351&top_left_y=525&top_left_x=601}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-09.jpg?height=331&width=858&top_left_y=1675&top_left_x=610}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-10.jpg?height=232&width=461&top_left_y=702&top_left_x=701}",
+      "options": [],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "688:101k7ov",
+     "939:18u5nqj"
+    ],
+    "at": 1794152925523
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-18",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "A horizontal circular platform of radius $0.5 m$ and mass $0.45\\hat{k} g$ is free to rotate about its axis. Two massless spring toy-guns, each carrying a steel ball of mass $0.05\\hat{k} g$ are attached to the platform at a distance $0.25 m$ from the centre on its either sides along its diameter (see figure). Each gun simultaneously fires the balls horizontally and perpendicular to the diameter in opposite directions. After leaving the platform, the balls have horizontal speed of $9 m s^{-1}$ with respect to the ground. The rotational speed of the platform $\\mathrm{in} rads^{-1}$ after the balls leave the platform is\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-09.jpg?height=331&width=858&top_left_y=1675&top_left_x=610}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-10.jpg?height=232&width=461&top_left_y=702&top_left_x=701}\ntert-butanol and 2-methylpropan-2-ol",
+   "options": [
+    "[ tert-butanol and 1, 1-dimethylethan-1-ol",
+    "[ $n$-butanol and butan-1-ol",
+    "[ isobutyl alcohol and 2-methylpropan-1-ol Answer:"
+   ],
+   "chapter": "A horizontal circular platform of radius",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $4$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 21,
+   "imported": true,
+   "questionNumber": 21,
+   "printedNumber": 19,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "differs",
+    "differences": [
+     {
+      "kind": "wrong_unit",
+      "detail": "The card has '0.45\\hat{k} g' and '0.05\\hat{k} g' instead of '0.45 kg' and '0.05 kg', and 'inrads^{-1}' instead of 'in rad s^{-1}'."
+     },
+     {
+      "kind": "extra_card",
+      "detail": "The card includes spurious extra images and text from question 21 ('tert-butanol and 2-methylpropan-2-ol', options from Q21) mixed into question 19, which is a numerical value question with no options."
+     }
+    ],
+    "suggestedText": "A horizontal circular platform of radius $0.5~\\mathrm{m}$ and mass $0.45~\\mathrm{kg}$ is free to rotate about its axis. Two massless spring toy-guns, each carrying a steel ball of mass $0.05~\\mathrm{kg}$ are attached to the platform at a distance $0.25~\\mathrm{m}$ from the centre on its either sides along its diameter (see figure). Each gun simultaneously fires the balls horizontally and perpendicular to the diameter in opposite directions. After leaving the platform, the balls have horizontal speed of $9~\\mathrm{ms}^{-1}$ with respect to the ground. The rotational speed of the platform in $\\mathrm{rad}~\\mathrm{s}^{-1}$ after the balls leave the platform is\n\n[figure]",
+    "suggestedPassage": "",
+    "suggestedOptions": [],
+    "suggestedFigures": {
+     "text": [
+      "/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p10-a5a49995d661add5.png?page=10&x0=0.3249&y0=0.2502&x1=0.5527&y1=0.3453"
+     ],
+     "passage": [],
+     "options": []
+    },
+    "pages": [
+     10,
+     11
+    ],
+    "checkedAt": 1794152936216,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Correction not used: the correction adds options to a number-answer question",
+    "tried": [
+     "1097:783qwr"
+    ],
+    "at": 1794152937022
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-19",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "The correct combination of names for isomeric alcohols with molecular formula $\\mathrm{C}_{4}\\mathrm{H}_{10}\\mathrm{O}$ is/are",
+   "options": [
+    "\\textit{tert}-butanol and 2-methylpropan-2-ol",
+    "\\textit{tert}-butanol and 1, 1-dimethylethan-1-ol",
+    "\\textit{n}-butanol and butan-1-ol",
+    "isobutyl alcohol and 2-methylpropan-1-ol"
+   ],
+   "chapter": "The correct combination of names for iso",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 22,
+   "imported": true,
+   "questionNumber": 22,
+   "printedNumber": 20,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153120935,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153120935,
+     "card": {
+      "text": "The correct combination of names for isomeric alcohols with molecular formula $C_{4} \\mathrm{H}_{10} \\mathrm{O}$ is/are\ntert-butanol an$d^2-$methylpropan-2-ol",
+      "options": [
+       "[ tert-butanol an$d^1$, 1-dimethylethan-1-ol",
+       "[ $n$-butanol and butan-1-ol",
+       "[ isobutyl alcohol an$d^2-$methylprop"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "320:1qo2cxs",
+     "288:1wfh09b"
+    ],
+    "at": 1794153122522
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-20",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "In the reaction shown below, the major product(s) formed is/are\n\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p12-2fd403588eee904b.png?page=12&x0=0.3073&y0=0.1584&x1=0.6939&y1=0.2653}",
+   "options": [
+    "\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p12-d48a9ff367c7b33a.png?page=12&x0=0.1402&y0=0.2693&x1=0.3809&y1=0.3871}",
+    "\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p12-5672fa30c58abd73.png?page=12&x0=0.1414&y0=0.3938&x1=0.4033&y1=0.5007}",
+    "\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p12-47bdff95f5cc0777.png?page=12&x0=0.1423&y0=0.5075&x1=0.3445&y1=0.6253}",
+    "\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p12-3a43033da79981e1.png?page=12&x0=0.1414&y0=0.6320&x1=0.3033&y1=0.7535}"
+   ],
+   "chapter": "In the reaction shown below, the major p",
+   "solution": "**Answer.** (A) ]       $\\end{itemize}$ Answer :\n\n*(From printed key — replace with full working before publish if needed.)*\n\n**Correct:** (A)",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 23,
+   "imported": true,
+   "questionNumber": 23,
+   "printedNumber": 21,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152945603,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152945603,
+     "card": {
+      "text": "In the reaction shown below, the major product(s) formed is/are\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=274&width=1160&top_left_y=444&top_left_x=306}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=298&width=494&top_left_y=751&top_left_x=306}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=266&width=539&top_left_y=1093&top_left_x=309}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=295&width=422&top_left_y=1407&top_left_x=299}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-12.jpg?height=303&width=327&top_left_y=1752&top_left_x=309}\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-13.jpg?height=754&width=1238&top_left_y=530&top_left_x=445}",
+      "options": [
+       "[",
+       "[",
+       "[ Answer :"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "841:1q6w3y8",
+     "980:b99zqy"
+    ],
+    "at": 1794152947425
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-21",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "In a galvanic cell, the salt bridge",
+   "options": [
+    "does not participate chemically in the cell reaction.",
+    "stops the diffusion of ions from one electrode to another.",
+    "is necessary for the occurrence of the cell reaction.",
+    "ensures mixing of the two electrolytic solutions."
+   ],
+   "chapter": "In a galvanic cell, the salt bridge\ndoes",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 24,
+   "imported": true,
+   "questionNumber": 24,
+   "printedNumber": 22,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152958241,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152958241,
+     "card": {
+      "text": "In a galvanic cell, the salt bridge\ndoes not participate chemically in the cell reaction.",
+      "options": [
+       "[ stops the diffusion of ions from one electrode to another.",
+       "[ is necessary for the occurrence of the cell reaction.",
+       "[ ensures mixing of the"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "269:1hkrrxu",
+     "246:1t2yhe8"
+    ],
+    "at": 1794152959840
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-22",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "The correct statement(s) for orthoboric acid is/are",
+   "options": [
+    "It behaves as a weak acid in water due to self ionization.",
+    "Acidity of its aqueous solution increases upon addition of ethylene glycol.",
+    "It has a three dimensional structure due to hydrogen bonding.",
+    "It is a weak electrolyte in water."
+   ],
+   "chapter": "The correct statement(s) for orthoboric ",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 25,
+   "imported": true,
+   "questionNumber": 25,
+   "printedNumber": 23,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152968650,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152968650,
+     "card": {
+      "text": "The correct statement(s) for orthoboric acid is/are\nIt behaves as a weak acid in water due to self ionization.",
+      "options": [
+       "[ Acidity of its aqueous solution increases upon addition of ethylene glycol.",
+       "[ It has a three dimensional structure due to hydrogen bonding.",
+       "[ It is a weak electrolyte in water. {Answer:"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "300:1xhvvfm",
+     "314:g1ta32"
+    ],
+    "at": 1794152970143
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-23",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "d (C)}\n10. Two ideal batteries of $e m f V_{1}$ and $V_{2}$ and three resistances $R_{1}, R_{2}$ and $R_{3}$ are connected as shown in the figure. The current in resistance $R_{2}$ would be zero if\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-06.jpg?height=454&width=310&top_left_y=360&top_left_x=674}",
+   "options": [
+    "and",
+    "in the Hindi Version, Answer",
+    "*} *- Due to a minor error in option",
+    ""
+   ],
+   "chapter": "For the reaction: $$\\mathrm{I}^{-}+\\math",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 26,
+   "imported": true,
+   "questionNumber": 26,
+   "printedNumber": 24,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "differs",
+    "differences": [
+     {
+      "kind": "wrong_text",
+      "detail": "The card's question text starts with junk text 'd (C)}'."
+     },
+     {
+      "kind": "wrong_option",
+      "detail": "The options are completely corrupted with unrelated text instead of the four equations from the page."
+     }
+    ],
+    "suggestedText": "Two ideal batteries of $\\mathrm{emf} V_{1}$ and $V_{2}$ and three resistances $R_{1}, R_{2}$ and $R_{3}$ are connected as shown in the figure. The current in resistance $R_{2}$ would be zero if\n\\includegraphics{https://cdn.mathpix.com/cropped/9ab2d29f-ee19-436f-a8e7-188a6b4e110f-06.jpg?height=454&width=310&top_left_y=360&top_left_x=674}",
+    "suggestedPassage": "",
+    "suggestedOptions": [
+     "$V_{1}=V_{2}$ and $R_{1}=R_{2}=R_{3}$",
+     "$V_{1}=V_{2}$ and $R_{1}=2 R_{2}=R_{3}$",
+     "$V_{1}=2 V_{2}$ and $2 R_{1}=2 R_{2}=R_{3}$",
+     "$2 V_{1}=V_{2}$ and $2 R_{1}=R_{2}=R_{3}$"
+    ],
+    "pages": [
+     6,
+     7
+    ],
+    "checkedAt": 1794153134113,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Correction not used: the correction adds options to a number-answer question",
+    "tried": [
+     "433:1cre0ma"
+    ],
+    "at": 1794153134822
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-24",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "For the reaction:\n$$\\mathrm{I}^- + \\mathrm{ClO}_3^- + \\mathrm{H}_2\\mathrm{SO}_4 \\rightarrow \\mathrm{Cl}^- + \\mathrm{HSO}_4^- + \\mathrm{I}_2$$\nThe correct statement(s) in the balanced equation is/are:",
+   "options": [
+    "Stoichiometric coefficient of $\\mathrm{HSO}_4^-$ is 6.",
+    "Iodide is oxidized.",
+    "Sulphur is reduced.",
+    "$\\mathrm{H}_2\\mathrm{O}$ is one of the products."
+   ],
+   "correctIndex": 0,
+   "chapter": "Iodide is oxidized. \n(C) Sulphur is redu",
+   "solution": "**Answer.** (A) and\n\n**Quick eliminations:**\n- **(B)** in the Hindi Version, Answer\n- **(D)** *} *- Due to a minor error in option\n\n*(From printed key — replace with full working before publish if needed.)*\n\n**Correct:** (A)",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 27,
+   "imported": true,
+   "questionNumber": 27,
+   "printedNumber": 25,
+   "answerSource": "from_paper",
+   "answerConfidence": 85,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153143564,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153143564,
+     "card": {
+      "text": "Iodide is oxidized. \n(C) Sulphur is reduced. \n(D) $\\mathrm{H}_{2} \\mathrm{O}$ is one of the products. {Answer:",
+      "options": [
+       "and",
+       "in the Hindi Version, Answer",
+       "*} *- Due to a minor error in option"
+      ],
+      "correctIndex": 0,
+      "answerSource": "from_paper"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "373:1sqyzzf",
+     "199:1l900d9"
+    ],
+    "at": 1794153145056
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-25",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "Consider all possible isomeric ketones, including stereoisomers, of $\\mathrm{MW}=100$. All these isomers are independently reacted with $\\mathrm{NaBH}_{4}$ (NOTE: stereoisomers are also reacted separately). The total number of ketones that give a racemic product(s) is/are",
+   "options": [],
+   "chapter": "Consider all possible isomeric ketones, ",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $5$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 28,
+   "imported": true,
+   "questionNumber": 28,
+   "printedNumber": 26,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-26",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "A list of species having the formula $\\mathrm{XZ}_{4}$ is given below. $\\mathrm{XeF}_{4}, \\mathrm{SF}_{4}, \\mathrm{SiF}_{4}, \\mathrm{BF}_{4}{ }^{-}, \\mathrm{BrF}_{4}{ }^{-},\\left[\\mathrm{Cu}\\left(\\mathrm{NH}_{3}\\right)_{4}\\right]^{2+},\\left[\\mathrm{FeCl}_{4}\\right]^{2-},\\left[\\mathrm{CoCl}_{4}\\right]^{2-}$ and $\\left[\\mathrm{PtCl}_{4}\\right]^{2-}$. Defining shape on the basis of the location of X and Z atoms, the total number of species having a square planar shape is",
+   "options": [],
+   "chapter": "A list of species having the formula $\\m",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $4$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 29,
+   "imported": true,
+   "questionNumber": 29,
+   "printedNumber": 27,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-27",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "Among PbS, CuS, HgS, MnS, $$\\mathrm{Ag}_{2} \\mathrm{~S}, \\mathrm{NiS}, \\mathrm{CoS}_{2}, \\mathrm{Bi}_{2} \\mathrm{~S}_{3}$$and$\\mathrm{SnS}_{2}$, the total number of BLACK coloured sulfides is",
+   "options": [],
+   "chapter": "Among PbS, CuS, HgS, MnS, $$\\mathrm{Ag}_",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 30,
+   "imported": true,
+   "questionNumber": 30,
+   "printedNumber": 28,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-28",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "The total number(s) of stable conformers with non-zero dipole moment for the following compound is (are) <smiles>CC(Cl)(Br)C",
+   "options": [],
+   "chapter": "The total number(s) of stable conformers",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $3$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 31,
+   "imported": true,
+   "questionNumber": 31,
+   "printedNumber": 29,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-29",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "Consider the following list of reagents: Acidified $\\mathrm{K}_{2} \\mathrm{Cr}_{2} \\mathrm{O}_{7}$, alkaline $\\mathrm{KMnO}_{4}, \\mathrm{CuSO}_{4}, \\mathrm{H}_{2} \\mathrm{O}_{2}, \\mathrm{Cl}_{2}, \\mathrm{O}_{3}, \\mathrm{FeCl}_{3}, \\mathrm{HNO}_{3}$ and $\\mathrm{Na}_{2} \\mathrm{~S}_{2} \\mathrm{O}_{3}$. The total number of reagents that can oxidise aqueous iodide to iodine is",
+   "options": [],
+   "chapter": "Consider the following list of reagents:",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $7$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 32,
+   "imported": true,
+   "questionNumber": 32,
+   "printedNumber": 30,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "matches",
+    "differences": [],
+    "suggestedText": "",
+    "suggestedPassage": "",
+    "suggestedOptions": [],
+    "pages": [
+     17,
+     18
+    ],
+    "checkedAt": 1794152977024,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Compare found no correction, but the alert is still there",
+    "tried": [
+     "400:tc7h5z"
+    ],
+    "at": 1794152977680
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-30",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "The total number of distinct naturally occurring amino acids obtained by complete acidic hydrolysis of the peptide shown below is <smiles>CC\ndeterminant of $\\left(M^{2}+M N^{2}\\right)$ is 0",
+   "options": [
+    "[ there is a 3 × 3 non-zero matrix $U$ determinant of $\\left(M^{2}+M N^{2}\\right) \\geq 1$",
+    "[ for a 3 × 3 matrix $U$, if $\\left(M^{2}+M N^{2}\\right) U$ equals the zero matrix then $U$ is the zero matrix {Answer:"
+   ],
+   "chapter": "The total number of distinct naturally o",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $1$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 33,
+   "imported": true,
+   "questionNumber": 33,
+   "printedNumber": 31,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-31",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "In an atom, the total number of electrons having quantum numbers $n = 4$, $|m_l| = 1$ and $m_s = -1/2$ is",
+   "options": [],
+   "chapter": "In an atom, the total number of electron",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $6$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 34,
+   "imported": true,
+   "questionNumber": 34,
+   "printedNumber": 32,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794152991085,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794152991085,
+     "card": {
+      "text": "In an atom, the total number of electrons having quantum numbers $n=4,\\left|m_{l}\\right|=$1 and$m_{s}=-\\frac{1}{2}$ is",
+      "options": [],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "115:1pahz7s",
+     "131:jxhv36"
+    ],
+    "at": 1794152992575
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-32",
+   "subject": "physics",
+   "questionType": "numerical",
+   "text": "If the value of Avogadro number is $6.023 \\times 10^{23} \\mathrm{~mol}^{-1}$ and the value of Boltzmann constant is $1.380 \\times 10^{-23} \\mathrm{~J} \\mathrm{~K}^{-1}$, then the number of significant digits in the calculated value of the universal gas constant is",
+   "options": [],
+   "chapter": "If the value of Avogadro number is $6.02",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $4$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 35,
+   "imported": true,
+   "questionNumber": 35,
+   "printedNumber": 33,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-33",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "A compound $\\mathbf{H}_{\\mathbf{2}} \\mathbf{X}$ with molar weight of $80~g$ is dissolved in a solvent having density of $0.4~g~ml^{-1}$. Assuming no change in volume upon dissolution, the molality of a $3.2$ molar solution is",
+   "options": [],
+   "chapter": "A compound $\\mathbf{H}_{\\mathbf{2}} \\mat",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $8$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 36,
+   "imported": true,
+   "questionNumber": 36,
+   "printedNumber": 34,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153003672,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153003672,
+     "card": {
+      "text": "A compound $\\mathbf{H}_{\\mathbf{2}} \\mathbf{X}$ with molar weight of $80 g$ is dissolved in a solvent having density of $0.4 g m l^{-1}$. Assuming no change in volume upon dissolution, the molality of.2 molar solution is",
+      "options": [],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "238:1aztlv7",
+     "233:1u8uqn5"
+    ],
+    "at": 1794153005421
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-34",
+   "subject": "physics",
+   "questionType": "integer",
+   "text": "Consider the following list of reagents:\nAcidified $\\mathrm{K}_{2}\\mathrm{Cr}_{2}\\mathrm{O}_{7}$, alkaline $\\mathrm{KMnO}_{4}$, $\\mathrm{CuSO}_{4}$, $\\mathrm{H}_{2}\\mathrm{O}_{2}$, $\\mathrm{Cl}_{2}$, $\\mathrm{O}_{3}$, $\\mathrm{FeCl}_{3}$, $\\mathrm{HNO}_{3}$ and $\\mathrm{Na}_{2}\\mathrm{S}_{2}\\mathrm{O}_{3}$.\nThe total number of reagents that can oxidise aqueous iodide to iodine is",
+   "options": [],
+   "chapter": "Let M a n d N b",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 37,
+   "imported": true,
+   "questionNumber": 37,
+   "printedNumber": 35,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153016793,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153016796,
+     "card": {
+      "text": "Let M a n d N b",
+      "options": [],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "408:zrbeor",
+     "25:c1bnst"
+    ],
+    "at": 1794153018379
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-35",
+   "subject": "mathematics",
+   "questionType": "single_correct",
+   "text": "The total number of \\textit{\\textbf{distinct}} \\textit{\\textbf{naturally}} \\textit{\\textbf{occurring}} \\textit{\\textbf{amino}} \\textit{\\textbf{acids}} obtained by complete acidic hydrolysis of the peptide shown below is\n\\includegraphics{/api/official-pyq/original/crops/opyq-1794152749476-dfjyua9-p17-fc6c2f2a074e0ef5.png?page=17&x0=0.1155&y0=0.4038&x1=0.8786&y1=0.6189}",
+   "options": [
+    ",",
+    "}",
+    "",
+    ""
+   ],
+   "chapter": "if$$\\left(M^{2}+M N^{2}\\right) U$$equals",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 38,
+   "imported": true,
+   "questionNumber": 38,
+   "printedNumber": 36,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153029206,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153029206,
+     "card": {
+      "text": "if$\\left(M^{2}+M N^{2}\\right) U$equals the zero matrix then$U$ is the zero matrix {Answer:",
+      "options": [
+       ",",
+       "}",
+       "",
+       ""
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "405:1wzswdn",
+     "115:1wa1jso"
+    ],
+    "at": 1794153030741
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-36",
+   "subject": "mathematics",
+   "questionType": "single_correct",
+   "text": "For every pair of continuous functions $f, g:[0,1] \\rightarrow \\mathbb{R}$ such that\n$$\\max \\{f(x): x \\in[0,1]\\}=\\max \\{g(x): x \\in[0,1]\\},$$\nthe correct statement(s) is(are) :",
+   "options": [
+    "$(f(c))^{2}+3 f(c)=(g(c))^{2}+3 g(c)$ for some $c \\in[0,1]$",
+    "$(f(c))^{2}+f(c)=(g(c))^{2}+3 g(c)$ for some $c \\in[0,1]$",
+    "$(f(c))^{2}+3 f(c)=(g(c))^{2}+g(c)$ for some $c \\in[0,1]$",
+    "$(f(c))^{2}=(g(c))^{2}$ for some $c \\in[0,1]$"
+   ],
+   "correctIndex": 0,
+   "chapter": "For every pair of continuous functions $",
+   "solution": "**Answer.** (A) ] $(f\n\n**Quick eliminations:**\n- **(B)** ] $(f\n- **(C)** )^{2}+3 f\n- **(D)** ] (f\n\n*(From printed key — replace with full working before publish if needed.)*\n\n**Correct:** (A)",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 39,
+   "imported": true,
+   "questionNumber": 39,
+   "printedNumber": 37,
+   "answerSource": "from_paper",
+   "answerConfidence": 85,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153040444,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153040444,
+     "card": {
+      "text": "For every pair of continuous functions $f, g:[0,1] \\rightarrow \\mathbb{R}$ such that $\\max \\{f(x): x \\in[0,1]\\}=\\max \\{g(x): x \\in[0,1]\\},$ the correct statement(s) is(are) :",
+      "options": [
+       "(f",
+       "(f",
+       ")^{2}+3 f",
+       "(f"
+      ],
+      "correctIndex": 0,
+      "answerSource": "from_paper"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "431:1lwsen4",
+     "220:1d9ftf6"
+    ],
+    "at": 1794153041880
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-37",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "Let $f:(0, \\infty) \\rightarrow \\mathbb{R}$ be given by$$f(x)=\\int_{\\frac{1}{x}}^{x} e^{-\\left(t+\\frac{1}{t}\\right)} \\frac{d t}{t}$$Then\n$f(x)$ is monotonically increasing on $[1, \\infty)$",
+   "options": [
+    "[ $f(x)$ is monotonically decreasing on $(0,1)$",
+    "[ $$f(x)+f\\left(\\frac{1}{x}\\right)= 0$$, for all $x \\in(0, \\infty)$ [ $$f\\left(2^{x}\\right)$$is"
+   ],
+   "chapter": "Let $f:(0, \\infty) \\rightarrow \\mathbb{R",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 40,
+   "imported": true,
+   "questionNumber": 40,
+   "printedNumber": 38,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "differs",
+    "differences": [
+     {
+      "kind": "wrong_passage",
+      "detail": "The card has text from a completely different mathematics calculus question, whereas question 38 on page 17 is about Avogadro number and Boltzmann constant."
+     }
+    ],
+    "suggestedText": "If the value of Avogadro number is $6.023 \\times 10^{23}~\\mathrm{mol}^{-1}$ and the value of Boltzmann constant is $1.380 \\times 10^{-23}~\\mathrm{J}~\\mathrm{K}^{-1}$, then the number of significant digits in the calculated value of the universal gas constant is",
+    "suggestedPassage": "",
+    "suggestedOptions": [],
+    "pages": [
+     17,
+     18
+    ],
+    "checkedAt": 1794153052617,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Correction not used: a formula does not draw (a $ sign or cut-off math shows on the card)",
+    "tried": [
+     "362:mk0v80"
+    ],
+    "at": 1794153053292
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-38",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "A compound $\\mathbf{H}_2\\mathbf{X}$ with molar weight of $80~g$ is dissolved in a solvent having density of $0.4~g~ml^{-1}$. Assuming no change in volume upon dissolution, the \\textbf{molality} of a $3.2$ molar solution is",
+   "options": [
+    "[ $f(x)$ has only one real root if $a>4$",
+    "[ $f(x)$ has three real roots if $a<-4$",
+    "[ $f(x)$ has three real roots"
+   ],
+   "chapter": "Let $a \\in \\mathbb{R}$ and let $f: \\math",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 41,
+   "imported": true,
+   "questionNumber": 41,
+   "printedNumber": 39,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153153680,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153153680,
+     "card": {
+      "text": "Let $a \\in \\mathbb{R}$ and let $f: \\mathbb{R} \\rightarrow \\mathbb{R}$ be given by $f(x)=x^{5}-5 x+a .$ Then\n$f(x)$ has three real roots if $a>4$",
+      "options": [
+       "[ $f(x)$ has only one real root if $a>4$",
+       "[ $f(x)$ has three real roots if $a<-4$",
+       "[ $f(x)$ has three real roots"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "351:7qhhs3",
+     "276:pbf75y"
+    ],
+    "at": 1794153155459
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-39",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "Let $f:[a, b] \\rightarrow[1, \\infty)$ be a continuous function and let $g: \\mathbb{R} \\rightarrow \\mathbb{R}$ be defined as$g(x)= \\begin{cases}0 & \\text { if } x<a, \\\\ \\int_{a}^{x} f(t) d t & \\text { if } a \\leq x \\leq b, \\\\ \\int_{a}^{b} f(t) d t & \\text { if } x>b .\\end{cases}$ Then\n$g(x)$ is continuous but not differentiable at $a$",
+   "options": [
+    "[ $g(x)$ is differentiable on $\\mathbb{R}$",
+    "[ $g(x)$ is continuous but not differentiable at $b$",
+    "[ $g(x)$ is continuous and differentiable at either $a$ or $b$ but not both {Answer:"
+   ],
+   "chapter": "Let $f:[a, b] \\rightarrow[1, \\infty)$ be",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 42,
+   "imported": true,
+   "questionNumber": 42,
+   "printedNumber": 40,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "differs",
+    "notFound": true,
+    "textMatches": true,
+    "differences": [],
+    "suggestedText": "",
+    "suggestedPassage": "",
+    "suggestedOptions": [],
+    "pages": [
+     18,
+     19
+    ],
+    "checkedAt": 1794153060592,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Compare found no correction, but the alert is still there",
+    "tried": [
+     "551:tpo1ui"
+    ],
+    "at": 1794153061238
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-40",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "Let $$f:\\left(-\\frac{\\pi}{2}, \\frac{\\pi}{2}\\right) \\rightarrow \\mathbb{R}$$be given by$f(x)=(\\log (\\sec x+\\tan x))^{3} .$ Then\n$f(x)$ is an odd function",
+   "options": [
+    "[ $f(x)$ is a one-one function",
+    "[ $f(x)$ is an onto function",
+    "[ $f(x)$ is"
+   ],
+   "chapter": "Let $$f:\\left(-\\frac{\\pi}{2}, \\frac{\\pi}",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 43,
+   "imported": true,
+   "questionNumber": 43,
+   "printedNumber": 41,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "differs",
+    "notFound": true,
+    "differences": [],
+    "suggestedText": "",
+    "suggestedPassage": "",
+    "suggestedOptions": [],
+    "pages": [
+     19,
+     20
+    ],
+    "checkedAt": 1794153069110,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Compare found no correction, but the alert is still there",
+    "tried": [
+     "251:8y3kwz"
+    ],
+    "at": 1794153069811
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-41",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "From a point $P(\\lambda, \\lambda, \\lambda)$, perpendiculars $P Q$ and $P R$ are drawn respectively on the lines $y=x, z=1$ and $y=-x, z=-1$. If $P$ is such that $\\angle Q P R$ is a right angle, then the possible value(s) of $\\lambda$ is(are)",
+   "options": [
+    "$\\sqrt{2}$",
+    "$1$",
+    "$-1$",
+    "$-\\sqrt{2}$"
+   ],
+   "chapter": "From a point $P(\\lambda, \\lambda, \\lambd",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 44,
+   "imported": true,
+   "questionNumber": 44,
+   "printedNumber": 42,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153164176,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153164176,
+     "card": {
+      "text": "From a point $P(\\lambda, \\lambda, \\lambda)$, perpendiculars $P Q$ and $P R$ are drawn respectively on the lines $y=x, z=1$ and $y=-x, z=-1$. If $P$ is such that $\\angle Q P R$ is a right angle, then the possible value(s) of $\\lambda$ is(are)\n$\\sqrt{2}$ [\n1",
+      "options": [
+       "[ -1",
+       "[ $-\\sqrt{2}$ $$ {Answer:"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "297:knwjpp",
+     "309:15apu3t"
+    ],
+    "at": 1794153165893
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-42",
+   "subject": "physics",
+   "questionType": "single_correct",
+   "text": "A circle $S$ passes through the point $(0, 1)$ and is orthogonal to the circles $(x - 1)^2 + y^2 = 16$ and $x^2 + y^2 = 1$. Then",
+   "options": [
+    "radius of $S$ is $8$",
+    "radius of $S$ is $7$",
+    "centre of $S$ is $(-7, 1)$",
+    "centre of $S$ is $(-8, 1)$"
+   ],
+   "chapter": "A circle $S$ passes through the point $(",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 45,
+   "imported": true,
+   "questionNumber": 45,
+   "printedNumber": 43,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "adminEdited": true,
+   "adminEditedAt": 1794153174204,
+   "editSource": "auto_compare",
+   "editHistory": [
+    {
+     "savedAt": 1794153174204,
+     "card": {
+      "text": "A circle $S$ passes through the point $(0,1)$ and is orthogonal to the circles $(x-1)^{2}+y^{2}=16$ and $x^{2}+y^{2}=1$. Then\nradius of $S$ i$s^8$",
+      "options": [
+       "[ radius of $S$ i$s^7$",
+       "[ centre of $S$ is (-7, centre of $S$ is (-8,"
+      ],
+      "answerSource": "unknown"
+     }
+    }
+   ],
+   "autoFix": {
+    "outcome": "fixed",
+    "source": "auto_compare",
+    "tried": [
+     "241:17syij3",
+     "229:dv7yr"
+    ],
+    "at": 1794153176132
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-43",
+   "subject": "mathematics",
+   "questionType": "single_correct",
+   "text": "Let $M$ be $\\times 2$ symmetric matrix with integer entries. Then $M$ is invertible if\nthe first column of $M$ is the transpose of the second row of $M$",
+   "options": [
+    "[ the second row of $M$ is the transpose of the first column of $M$",
+    "[ $M$ is a diagonal matrix with nonzero entries in the main diagonal",
+    "[ the product of entries in the main diagonal of $M$ is not the square of"
+   ],
+   "chapter": "Let $M$ be $\\times 2$ symmetric matrix w",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 46,
+   "imported": true,
+   "questionNumber": 46,
+   "printedNumber": 44,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-44",
+   "subject": "mathematics",
+   "questionType": "numerical",
+   "text": "Let $a, b, c$ be positive integers such that $\\frac{b}{a}$ is an integer. If $a, b, c$ are in geometric progression and the arithmetic mean of $a, b, c$ is $b+2$, then the value of $\\frac{a^{2}+a-14}{a+1}$",
+   "options": [],
+   "chapter": "Let $a, b, c$ be positive integers such ",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $4$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 47,
+   "imported": true,
+   "questionNumber": 47,
+   "printedNumber": 45,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-45",
+   "subject": "mathematics",
+   "questionType": "numerical",
+   "text": "Let $n \\geq 2$ be an integer. Take $n$ distinct points on a circle and join each pair of points by a line segment. Colour the line segment joining every pair of adjacent points by blue and the rest by red. If the number of red and blue line segments are equal, then the value of $n$ is",
+   "options": [],
+   "chapter": "Let $n \\geq 2$ be an integer. Take $n$ d",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $5$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 48,
+   "imported": true,
+   "questionNumber": 48,
+   "printedNumber": 46,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "matches",
+    "differences": [],
+    "suggestedText": "",
+    "suggestedPassage": "",
+    "suggestedOptions": [],
+    "pages": [
+     23,
+     24
+    ],
+    "checkedAt": 1794153086162,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Compare found no correction, but the alert is still there",
+    "tried": [
+     "296:qncyv5"
+    ],
+    "at": 1794153086823
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-46",
+   "subject": "mathematics",
+   "questionType": "integer",
+   "text": "Let $n_{1}<n_{2}<n_{3}<n_{4}<n_{5}$ be positive integers such that $n_{1}+n_{2}+n_{3}+n_{4}+n_{5}=20$. Then the number of such distinct arrangements $\\left(n_{1}, n_{2}, n_{3}, n_{4}, n_{5}\\right)$ is",
+   "options": [],
+   "chapter": "Let $n_{1}<n_{2}<n_{3}<n_{4}<n_{5}$ be p",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $7$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 49,
+   "imported": true,
+   "questionNumber": 49,
+   "printedNumber": 47,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-47",
+   "subject": "mathematics",
+   "questionType": "integer",
+   "text": "Let f m a t h b= |x|+1$and$g(x)=$x^{2}+1$$. Define$h: \\mathbb{R} \\rightarrow \\mathbb{R}$by$$h(x)= $$\\begin{cases}\\max \\{f(x), g(x)\\} & \\text { if } x \\leq 0, \\\\ \\min \\{f(x), g(x)\\} & \\text { if } x>0 .\\end{cases}$$ The number of points at which $h(x) is not differentiable is",
+   "options": [],
+   "chapter": "Let f m a t h b= |x|+1$and$g(x)=$x^{2}+1",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $3$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 50,
+   "imported": true,
+   "questionNumber": 50,
+   "printedNumber": 48,
+   "cleanStatus": "incomplete_math",
+   "cleanNotes": "leftover TeX",
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html",
+   "originalCompare": {
+    "verdict": "differs",
+    "differences": [
+     {
+      "kind": "wrong_symbol",
+      "detail": "The card has completely wrong text from another question (different question text about f(x), g(x), h(x)), while Question 48 on page 22 is a vector question."
+     },
+     {
+      "kind": "wrong_option",
+      "detail": "The card has no options, but Question 48 has options (A), (B), (C), (D)."
+     }
+    ],
+    "suggestedText": "Let $\\vec{x}, \\vec{y}$ and $\\vec{z}$ be three vectors each of magnitude $\\sqrt{2}$ and the angle between each pair of them is $\\frac{\\pi}{3}$. If $\\vec{a}$ is a nonzero vector perpendicular to $\\vec{x}$ and $\\vec{y} \\times \\vec{z}$ and $\\vec{b}$ is a nonzero vector perpendicular to $\\vec{y}$ and $\\vec{z} \\times \\vec{x}$, then",
+    "suggestedPassage": "",
+    "suggestedOptions": [
+     "$\\vec{b}=(\\vec{b} \\cdot \\vec{z})(\\vec{z}-\\vec{x})$",
+     "$\\vec{a}=(\\vec{a} \\cdot \\vec{y})(\\vec{y}-\\vec{z})$",
+     "$\\vec{a} \\cdot \\vec{b}=-(\\vec{a} \\cdot \\vec{y})(\\vec{b} \\cdot \\vec{z})$",
+     "$\\vec{a}=(\\vec{a} \\cdot \\vec{y})(\\vec{z}-\\vec{y})$"
+    ],
+    "pages": [
+     22,
+     23
+    ],
+    "checkedAt": 1794153185631,
+    "model": "gemini-3.7-flash"
+   },
+   "autoFix": {
+    "outcome": "needs_admin",
+    "reason": "Correction not used: the correction adds options to a number-answer question",
+    "tried": [
+     "301:1p41gcj"
+    ],
+    "at": 1794153186392
+   }
+  },
+  {
+   "id": "pyq-imp-1794152748676-48",
+   "subject": "mathematics",
+   "questionType": "integer",
+   "text": "The value of$$\\int_{0}^{1} 4 x^{3}\\left\\{\\frac{d^{2}}{d x^{2}}\\left(1-x^{2}\\right)^{5}\\right\\} d x$$",
+   "options": [],
+   "chapter": "The value of$$\\int_{0}^{1} 4 x^{3}\\left\\",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $2$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 51,
+   "imported": true,
+   "questionNumber": 51,
+   "printedNumber": 49,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-49",
+   "subject": "mathematics",
+   "questionType": "integer",
+   "text": "The slope of the tangent to the curve $\\left(y-x^{5}\\right)^{2}=x\\left(1+x^{2}\\right)^{2}$at the point$(1,3)$ is",
+   "options": [],
+   "chapter": "The slope of the tangent to the curve $$",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $8$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 52,
+   "imported": true,
+   "questionNumber": 52,
+   "printedNumber": 50,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-50",
+   "subject": "mathematics",
+   "questionType": "integer",
+   "text": "The largest value of the nonnegative integer $a$ for which$$\\lim _{x \\rightarrow 1}\\left\\{\\frac{-a x+\\sin (x-1)+a}{x+\\sin (x-1)-1}\\right\\}^{\\frac{1-x}{1-\\sqrt{x}}}=\\frac{1}{4}$$",
+   "options": [],
+   "chapter": "The largest value of the nonnegative int",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 53,
+   "imported": true,
+   "questionNumber": 53,
+   "printedNumber": 51,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-51",
+   "subject": "mathematics",
+   "questionType": "integer",
+   "text": "Let $f:[0,4 \\pi] \\rightarrow[0, \\pi]$ be defined by $f(x)=\\cos ^{-1}(\\cos x)$. The number of points $x \\in[0,4 \\pi]$ satisfying the equation $f(x)=\\frac{10-x}{10}$",
+   "options": [],
+   "chapter": "Let $f:[0,4 \\pi] \\rightarrow[0, \\pi]$ be",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $3$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 54,
+   "imported": true,
+   "questionNumber": 54,
+   "printedNumber": 52,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-52",
+   "subject": "mathematics",
+   "questionType": "integer",
+   "text": "let $d_{1}(P)$ and $d_{2}(P)$ be the distances of the point $P$ from the lines $x-y= 0$ and $x+y= 0$ respectively. The area of the region $R$ consisting of all points $P$ lying in the first quadrant of the plane and satisfying $2 \\leq d_{1}(P)+d_{2}(P) \\leq 4$, is",
+   "options": [],
+   "chapter": "let $d_{1}(P)$ and $d_{2}(P)$ be the dis",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $6$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 55,
+   "imported": true,
+   "questionNumber": 55,
+   "printedNumber": 53,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  },
+  {
+   "id": "pyq-imp-1794152748676-53",
+   "subject": "mathematics",
+   "questionType": "numerical",
+   "text": "Let $\\vec{a}, \\vec{b}$, and $\\vec{c}$ be three non-coplanar unit vectors such that the angle between every pair of them is $\\frac{\\pi}{3}$ . If $\\vec{a} \\times \\vec{b}+\\vec{b} \\times \\vec{c}=p \\vec{a}+q \\vec{b}+r \\vec{c}$, where $p, q$ and $r$ are scalars, then the value of $\\frac{p^{2}+2 q^{2}+r^{2}}{q^{2}}$ is",
+   "options": [],
+   "chapter": "Let $\\vec{a}, \\vec{b}$, and $\\vec{c}$ be",
+   "solution": "**Step 1.** Set up the equation from the stem and solve for the integer.\n\n**Correct:** $4$",
+   "pyqYear": 2014,
+   "examPatternId": "jee-advanced",
+   "paperId": "2014-adv-paper-1",
+   "paperLabel": "2014 JEE Advanced Paper 1",
+   "pyqSession": "Paper 1",
+   "pyqSlot": 56,
+   "imported": true,
+   "questionNumber": 56,
+   "printedNumber": 54,
+   "solutionSource": "from_paper",
+   "solutionConfidence": 80,
+   "answerSource": "unknown",
+   "provenance": "Official JEE Advanced archive · https://jeeadv.ac.in/archive.html"
+  }
+ ]
+}

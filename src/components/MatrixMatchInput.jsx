@@ -93,6 +93,13 @@ export default function MatrixMatchInput({ question, answer, onChange, disabled 
             Mark matching pairs: each row (Column I) may match one or more columns in Column II.
             Grid is {MATRIX_ROW_COUNT}×{gridCols}.
           </p>
+          {question.matrixMarking?.perRow ? (
+            <p className="form-hint">
+              Each row is marked on its own: +{question.matrixMarking.correct} if exactly right
+              {Number(question.matrixMarking.wrong) ? `, ${question.matrixMarking.wrong} for any other ticks` : ''}, 0 if
+              left blank.
+            </p>
+          ) : null}
           <table className="matrix-grid-table" role="grid" aria-label="Matrix match response grid">
             <thead>
               <tr>

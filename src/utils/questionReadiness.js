@@ -11,6 +11,7 @@ import { matchQuestionMissingListI } from './uploadQualityGuards.js'
 import { latexExtractionIncomplete } from './healTruncatedLatex.js'
 import { stemLooksIncompleteOnDisplay } from './sanitizeStemForDisplay.js'
 import { stemIsIncompleteMatrixOnly } from './hybridLatexSanitize.js'
+import { isMatrixGridCard } from './matrixGridPyq.js'
 
 /** @typedef {{ id: string, severity: 'error' | 'warn' | 'info', message: string }} ReadinessIssue */
 
@@ -39,7 +40,7 @@ export function validateQuestionReadiness(q) {
         message: `Stem LaTeX needs fix (${broken.slice(0, 2).join('; ')}).`,
       })
     }
-    if (stemLooksIncompleteOnDisplay(stem) || latexExtractionIncomplete(q.passageText)) {
+    if (stemLooksIncompleteOnDisplay(stem, q.options) || latexExtractionIncomplete(q.passageText)) {
       issues.push({
         id: 'extraction-incomplete',
         severity: 'error',
@@ -93,7 +94,10 @@ export function validateQuestionReadiness(q) {
   }
 
   if (type === 'multiple_correct') {
-    const found = countRealMcqOptions(stem, q.options ?? [])
+    const found = Math.max(
+      countRealMcqOptions(stem, q.options ?? []),
+      countFilledMcqOptionsForPublish(q.options ?? [], q.optionImages),
+    )
     if (found < 2) {
       issues.push({
         id: 'msq-incomplete',
@@ -109,8 +113,25 @@ export function validateQuestionReadiness(q) {
     }
   }
 
-  if (type === 'matrix_match') {
-    const filledRows = (q.matrixRows ?? []).filter((r) => String(r ?? '').replace(/\s/g, '').length > 8).length
+  const hasMatrixRows = (q.matrixRows ?? []).some((r) => String(r ?? '').trim())
+  const optionsMatch =
+    type === 'matrix_match' && !hasMatrixRows && countFilledMcqOptionsForPublish(q.options ?? [], q.optionImages) > 0
+  if (optionsMatch) {
+    // List-I/List-II in the stem, answered by one of four coded options "(III) (ii) (R)".
+    const found = countFilledMcqOptionsForPublish(q.options ?? [], q.optionImages)
+    if (found < 4) {
+      issues.push({
+        id: 'mcq-incomplete',
+        severity: 'error',
+        message: `Options ${found}/4 — all four choices (A–D) are required.`,
+      })
+    }
+  } else if (type === 'matrix_match') {
+    // Official paper grids copy both lists word for word ("Oxide", "Heavy water"): no OCR-heal heuristics.
+    const verbatimGrid = isMatrixGridCard(q) && Array.isArray(q.matrixColLabels) && q.matrixColLabels.length > 0
+    const filledRows = (q.matrixRows ?? []).filter(
+      (r) => String(r ?? '').replace(/\s/g, '').length > (verbatimGrid ? 0 : 8),
+    ).length
     if (filledRows < 2) {
       issues.push({
         id: 'matrix-rows',
@@ -124,7 +145,10 @@ export function validateQuestionReadiness(q) {
         message: `Matrix Column I has ${filledRows}/4 rows.`,
       })
     }
-    if (matrixColsNeedHeal(q.matrixCols)) {
+    const colsIncomplete = verbatimGrid
+      ? q.matrixColLabels.some((_, i) => !String(q.matrixCols?.[i] ?? '').trim())
+      : matrixColsNeedHeal(q.matrixCols)
+    if (colsIncomplete) {
       issues.push({
         id: 'matrix-cols',
         severity: 'error',

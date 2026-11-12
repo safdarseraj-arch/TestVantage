@@ -12,11 +12,14 @@ import { prepareTextForMathTextDisplay } from './prepareMathForRender.js'
 export function mathDrawFailure(text) {
   let raw = String(text ?? '')
   if (!raw.trim()) return ''
-  if (/<(?:div|table|span|br|p|td|tr)\b/i.test(raw)) return 'raw HTML'
+  // MathText draws its own reaction-align blocks; "2<P<8" in math is not a <p> tag.
+  const htmlLeft = raw.replace(/<div class="reaction-align"[\s\S]*?<\/div>/gi, ' ')
+  if (/<(?:div|table|span|br|p|td|tr)(?:\s[^<>]*)?\/?>/i.test(htmlLeft)) return 'raw HTML'
   try {
     raw = prepareTextForMathTextDisplay(raw)
       .replace(/<annotation\b[\s\S]*?<\/annotation>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
+      // Real tags only: "H<0$$ ... $T_2>T_1$" is math, and eating it removed the $ signs.
+      .replace(/<\/?[a-zA-Z][^<>]*>/g, ' ')
   } catch {
     /* judge the stored text */
   }

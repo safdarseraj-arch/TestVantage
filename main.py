@@ -271,7 +271,15 @@ class OfficialPyqFillRequest(BaseModel):
     toughness_level: str | None = None
     source: str | None = None
     answer: str | None = None
+    answer_is_official: bool = Field(
+        default=False,
+        description="The answer is printed on the paper or set by an admin: the solution must reach it.",
+    )
     solution: str | None = None
+    tags_only: bool = Field(
+        default=False,
+        description="Answer and solution are printed on the paper: fill metatags only, no answer or solution.",
+    )
 
 
 class OfficialPyqReplicaQuestionRequest(BaseModel):
@@ -1105,7 +1113,7 @@ async def ingest_pdf(
 
 @app.post("/api/official-pyq/fill-tags", tags=["Official PYQ"])
 async def official_pyq_fill_tags(body: OfficialPyqFillRequest) -> dict[str, Any]:
-    """Return suggested tags, answer, and solution. Does not save or change the stem."""
+    """Return suggested tags, answer, and solution (tags only when tags_only). Does not save or change the stem."""
     options = [str(opt or "") for opt in (body.options or [])]
     options_text = "\n".join(f"{chr(65 + i)}) {opt}" for i, opt in enumerate(options))
     params = {
@@ -1120,8 +1128,10 @@ async def official_pyq_fill_tags(body: OfficialPyqFillRequest) -> dict[str, Any]
         "exam": body.exam,
         "toughness_level": body.toughness_level,
         "source": body.source,
-        "answer": body.answer,
-        "solution": body.solution,
+        "answer": "" if body.tags_only else body.answer,
+        "answer_is_official": bool(body.answer_is_official) and not body.tags_only,
+        "solution": "" if body.tags_only else body.solution,
+        "tags_only": body.tags_only,
     }
     try:
         filled = await ai_generator.fill_published_pyq(params)
@@ -1167,6 +1177,16 @@ async def official_pyq_replica_question(body: OfficialPyqReplicaQuestionRequest)
     }
 
 
+class OfficialPyqCropRequest(BaseModel):
+    """A box on one original page, as fractions of the page width/height (0..1)."""
+
+    page: int = Field(..., ge=1)
+    x0: float = Field(..., ge=0, le=1)
+    y0: float = Field(..., ge=0, le=1)
+    x1: float = Field(..., ge=0, le=1)
+    y1: float = Field(..., ge=0, le=1)
+
+
 class OfficialPyqCompareQuestionRequest(BaseModel):
     """One card vs the original page. Reports differences only; never rewrites the card."""
 
@@ -1176,12 +1196,15 @@ class OfficialPyqCompareQuestionRequest(BaseModel):
     card_text: str = ""
     passage_text: str = ""
     subject: str = ""
+    occurrence: int = Field(0, ge=0)
+    same_number_count: int = Field(1, ge=1)
     options: list[str] = Field(default_factory=list)
     answer_key: str | None = None
     has_figure: bool = False
     drawn_text: str = ""
     drawn_passage: str = ""
     drawn_options: list[str] = Field(default_factory=list)
+    screen_problems: list[str] = Field(default_factory=list)
 
 
 class OfficialPyqCompareCountRequest(BaseModel):
@@ -1202,6 +1225,16 @@ def _compare_http_error(exc: BaseException) -> HTTPException:
             status_code=503,
             detail={"code": "gemini_key_missing", "message": opc.GEMINI_KEY_MISSING_MESSAGE},
         )
+    if isinstance(exc, opc.GeminiTimeoutError):
+        return HTTPException(
+            status_code=504,
+            detail={"code": "gemini_timeout", "message": opc.GEMINI_TIMEOUT_MESSAGE},
+        )
+    if isinstance(exc, opc.GeminiConnectionError):
+        return HTTPException(
+            status_code=503,
+            detail={"code": "gemini_connection", "message": opc.GEMINI_CONNECTION_MESSAGE},
+        )
     low = str(exc).lower()
     if "402" in low or "resource_exhausted" in low or "prepayment credits" in low or "quota" in low:
         return HTTPException(
@@ -1217,6 +1250,77 @@ def _compare_http_error(exc: BaseException) -> HTTPException:
         status_code=502,
         detail={"code": "compare_failed", "message": _public_generation_error(exc)},
     )
+
+
+@app.get("/api/official-pyq/original/crops/{name}", tags=["Official PYQ"])
+async def official_pyq_original_crop_file(name: str) -> Response:
+    """A picture the admin cut out of an original page."""
+    import official_pyq_compare as opc
+
+    try:
+        data = opc.read_crop(name)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _compare_http_error(exc) from exc
+    return Response(content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@app.post("/api/official-pyq/original/{paper_id}/crop", tags=["Official PYQ"])
+async def official_pyq_original_crop(paper_id: str, body: OfficialPyqCropRequest) -> dict[str, Any]:
+    """Cut a box out of one original page (PyMuPDF, local). No Gemini; the pixels are copied, never redrawn."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    try:
+        result = await asyncio.to_thread(opc.crop_original_page, paper_id, body.page, body.model_dump())
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _compare_http_error(exc) from exc
+    return {"ok": True, **result}
+
+
+class OfficialPyqMathpixCropsRequest(BaseModel):
+    urls: list[str] = Field(default_factory=list, max_length=800)
+
+
+@app.post("/api/official-pyq/original/{paper_id}/mathpix-crops", tags=["Official PYQ"])
+async def official_pyq_mathpix_crops(paper_id: str, body: OfficialPyqMathpixCropsRequest) -> dict[str, Any]:
+    """Mathpix picture links cut again from the stored original PDF (PyMuPDF, local). Mathpix deletes its links."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    try:
+        result = await asyncio.to_thread(opc.crops_for_mathpix_links, paper_id, body.urls)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _compare_http_error(exc) from exc
+    return {"ok": True, **result}
+
+
+@app.get("/api/official-pyq/original/mathpix-picture", tags=["Official PYQ"])
+async def official_pyq_mathpix_picture(u: str = Query(..., max_length=600)) -> Response:
+    """The local copy of a Mathpix picture link, once it was cut from the original PDF."""
+    import official_pyq_compare as opc
+
+    local = opc.local_crop_for_mathpix(u)
+    if not local:
+        raise HTTPException(status_code=404, detail={"code": "no_local_picture", "message": "No local copy of this picture."})
+    name = local[len(opc.CROP_URL_PREFIX) :].split("?", 1)[0]
+    try:
+        data = opc.read_crop(name)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _compare_http_error(exc) from exc
+    return Response(content=data, media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+@app.post("/api/official-pyq/original/mathpix-picture/keep", tags=["Official PYQ"])
+async def official_pyq_keep_mathpix_pictures(body: OfficialPyqMathpixCropsRequest) -> dict[str, Any]:
+    """Download Mathpix picture links while they still load and keep local copies (uploads with no original PDF)."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    result = await asyncio.to_thread(opc.keep_mathpix_pictures, body.urls)
+    return {"ok": True, "saved": len(result["saved"]), "kept": len(result["kept"]), "failed": result["failed"]}
 
 
 @app.get("/api/official-pyq/original/{paper_id}", tags=["Official PYQ"])
@@ -1249,6 +1353,8 @@ async def official_pyq_original_locate(
     paper_id: str,
     printed_number: int = Query(0, ge=0),
     card_text: str = Query("", max_length=4000),
+    occurrence: int = Query(0, ge=0),
+    same_number_count: int = Query(1, ge=1),
 ) -> dict[str, Any]:
     """Which original page holds this question. Local only (PDF text layer / saved page map); no Gemini."""
     import asyncio
@@ -1256,7 +1362,23 @@ async def official_pyq_original_locate(
     import official_pyq_compare as opc
 
     try:
-        result = await asyncio.to_thread(opc.locate_question_local, paper_id, printed_number, card_text)
+        result = await asyncio.to_thread(
+            opc.locate_question_local, paper_id, printed_number, card_text, occurrence, same_number_count
+        )
+    except ValueError as exc:
+        raise _compare_http_error(exc) from exc
+    return {"ok": True, **result}
+
+
+@app.get("/api/official-pyq/original/{paper_id}/layout", tags=["Official PYQ"])
+async def official_pyq_original_layout(paper_id: str) -> dict[str, Any]:
+    """Option layout (row / grid / list) of every question on the original PDF. Local text layer; no Gemini."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    try:
+        result = await asyncio.to_thread(opc.option_layouts, paper_id)
     except ValueError as exc:
         raise _compare_http_error(exc) from exc
     return {"ok": True, **result}

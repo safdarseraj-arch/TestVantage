@@ -39,6 +39,9 @@ import { stripLeakedOptionsFromStem } from './stripLeakedOptionsFromStem.js'
 import {
   cleanMathpixCardText,
 } from './mathpixCleanPipeline.js'
+import { LATEX_FENCE, flattenNestedTabulars } from './latexTabularDisplay.js'
+
+const LEFT_FENCE_AT_END = new RegExp(String.raw`\\left\s*${LATEX_FENCE}\s*$`)
 
 /** Drop OCR of a drawing that already has \\includegraphics — never invent reagents. */
 export function stripMatchFigureCaptionLeftovers(text) {
@@ -79,7 +82,7 @@ export function stripMatchFigureCaptionLeftovers(text) {
  */
 export function sanitizeStemForDisplay(text, options = []) {
   const raw = linearizeChemReactionAligned(
-    cleanMathpixCardText(String(text ?? '').replace(/\r\n/g, '\n')),
+    cleanMathpixCardText(flattenNestedTabulars(String(text ?? '').replace(/\r\n/g, '\n'))),
   )
   try {
     let t = stripEmptyImageMarkdown(stripEmptyFigureShells(raw))
@@ -119,7 +122,7 @@ export function sanitizeStemForDisplay(text, options = []) {
     t = t.replace(/(\\begin\{(?:array|cases)\}[\s\S]*?\\end\{(?:array|cases)\})/g, (block, _, offset, str) => {
       const before = String(str).slice(0, offset)
       // Already inside \left\{ / \left[ / \left( … \right. — do not insert $$ between delimiter and begin.
-      if (/\\left(?:\\\{|\[|\()\s*$/.test(before)) return block
+      if (LEFT_FENCE_AT_END.test(before)) return block
       // Open $ or $$ must keep the environment. A $$ that only closed the
       // previous display is not a reason to wrap a cases block that still
       // belongs to that formula (\right comes after the cases).
@@ -153,7 +156,10 @@ export function sanitizeStemForDisplay(text, options = []) {
     t = t.replace(/\$+(?=\$\$\\begin\{array\})/gi, '')
     t = t.replace(/(\$\$\\begin\{array\}[\s\S]*?\\end\{array\})\$+/gi, '$1$$')
     // Ensure every display-opened array has a $$ close.
-    t = t.replace(/\$\$(\\begin\{array\}[\s\S]*?\\end\{array\})(?!\$\$)/gi, '$$$$$1$$$$')
+    t = t.replace(/\$\$(\\begin\{array\}[\s\S]*?\\end\{array\})(?!\s*\$\$)/gi, '$$$$$1$$$$')
+    t = t.replace(/(\$\$\s*)?(\\begin\{tabular\}[\s\S]*?\\end\{tabular\})\s*\$\$/g, (full, open, block) =>
+      open ? full : block,
+    )
     t = stripUnlabeledListTwoDump(t)
     t = t.replace(
       /\\begin\{tabular\}(?:\[[^\]]*\])?(?:\{[^}]*\})?\s*(?:\\hline\s*)*(?:\\end\{tabular\})?\s*$/gi,
@@ -172,7 +178,19 @@ export function sanitizeStemForDisplay(text, options = []) {
   }
 }
 
-/** Incomplete banner / publish block after the same clean-up students see. */
-export function stemLooksIncompleteOnDisplay(text) {
-  return latexExtractionIncomplete(sanitizeStemForDisplay(text))
+/**
+ * Incomplete banner / publish block after the same clean-up students see.
+ * A stem ending in "Then" is torn from its formula only when no options finish the sentence.
+ * @param {unknown} text
+ * @param {unknown[]} [options]
+ */
+export function stemLooksIncompleteOnDisplay(text, options) {
+  return shownStemLooksIncomplete(sanitizeStemForDisplay(text), options)
+}
+
+/** Already-sanitized stem: "…, then" followed by two or more choices is a finished question. */
+export function shownStemLooksIncomplete(shown, options) {
+  const filled = (Array.isArray(options) ? options : []).filter((opt) => String(opt ?? '').trim()).length
+  const checked = filled >= 2 ? String(shown ?? '').replace(/\s*\bThen\s*$/i, '') : String(shown ?? '')
+  return latexExtractionIncomplete(checked)
 }

@@ -1,0 +1,545 @@
+\section*{JEE (ADVANCED) 2015}
+
+Answer Keys for Paper 2
+(After considering feedback from public)
+
+\section*{PART I : PHYSICS}
+
+SECTION 1 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If the bubble corresponding to the answer is darkened
+\item[0] In all other cases
+\end{itemize}
+\item[Q.] 1 A large spherical mass $M$ is fixed at one position and two identical point masses $m$ are kept on a line passing through the centre of $M$ (see figure). The point masses are connected by a rigid massless rod of length $l$ and this assembly is free to move along the line connecting them. All three masses interact only through their mutual gravitational interaction. When the point mass nearer to $M$ is at a distance $r=3 l$ from $M$, the tension in the rod is zero for $m=k\left(\frac{M}{288}\right)$. The value of $k$ is
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-02.jpg?height=165&width=913&top_left_y=1215&top_left_x=684)
+\item[Q.] 2 The energy of a system as a function of time $t$ is given as $E(t)=A^{2} \exp (-\alpha t)$, where $\alpha=0.2 \mathrm{~s}^{-1}$. The measurement of $A$ has an error of 1.25\%. If the error in the measurement of time is 1.50\%, the percentage error in the value of $E(t)$ at $t=5 \mathrm{~s}$ is
+\item[Q.] 3 The densities of two solid spheres $A$ and $B$ of the same radii $R$ vary with radial distance $r$ as $\rho_{A}(r)=k\left(\frac{r}{R}\right)$ and $\rho_{B}(r)=k\left(\frac{r}{R}\right)^{5}$, respectively, where $k$ is a constant. The moments of inertia of the individual spheres about axes passing through their centres are $I_{A}$ and $I_{B}$, respectively. If $\frac{I_{B}}{I_{A}}=\frac{n}{10}$, the value of $n$ is
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 4 Four harmonic waves of equal frequencies and equal intensities $I_{0}$ have phase angles $0, \pi / 3$, $2 \pi / 3$ and $\pi$. When they are superposed, the intensity of the resulting wave is $n I_{0}$. The value of $n$ is
+\item[Q.] 5 For a radioactive material, its activity $A$ and rate of change of its activity $R$ are defined as $A=-\frac{d N}{d t}$ and $R=-\frac{d A}{d t}$, where $N(t)$ is the number of nuclei at time $t$. Two radioactive sources $P$ (mean life $\tau$ ) and $Q$ (mean life $2 \tau$ ) have the same activity at $t=0$. Their rates of change of activities at $t=2 \tau$ are $R_{P}$ and $R_{Q}$, respectively. If $\frac{R_{P}}{R_{Q}}=\frac{n}{e}$, then the value of $n$ is
+\item[Q.] 6 A monochromatic beam of light is incident at 60° on one face of an equilateral prism of refractive index $n$ and emerges from the opposite face making an angle $\theta(n)$ with the normal (see the figure). For $n=\sqrt{3}$ the value of $\theta$ is 60° and $\frac{d \theta}{d n}=m$. The value of $m$ is
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-03.jpg?height=372&width=755&top_left_y=1092&top_left_x=666)
+
+\end{itemize}
+\begin{itemize}
+\item[Q.] 7 In the following circuit, the current through the resistor $R(=2 \Omega)$ is $I$ Amperes. The value of $I$ is
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-04.jpg?height=845&width=1035&top_left_y=458&top_left_x=625)
+\item[Q.] 8 An electron in an excited state of $\mathrm{Li}^{2+}$ ion has angular momentum $3 h / 2 \pi$. The de Broglie wavelength of the electron in this state is $p \pi a_{0}$ (where $a_{0}$ is the Bohr radius). The value of $p$ is
+
+\end{itemize}
+
+SECTION 2 (Maximum Marks : 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme :
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\item[Q.] 9 Two spheres $P$ and $Q$ of equal radii have densities $\rho_{1}$ and $\rho_{2}$, respectively. The spheres are connected by a massless string and placed in liquids $L_{1}$ and $L_{2}$ of densities $\sigma_{1}$ and $\sigma_{2}$ and viscosities $\eta_{1}$ and $\eta_{2}$, respectively. They float in equilibrium with the sphere $P$ in $L_{1}$ and sphere $Q$ in $L_{2}$ and the string being taut (see figure). If sphere $P$ alone in $L_{2}$ has terminal velocity $\vec{V}_{P}$ and $Q$ alone in $L_{1}$ has terminal velocity $\vec{V}_{Q}$, then
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-05.jpg?height=340&width=263&top_left_y=1271&top_left_x=916)
+(A) $\frac{\left|\vec{V}_{P}\right|}{\left|\vec{V}_{Q}\right|}=\frac{\eta_{1}}{\eta_{2}}$
+(B) $\frac{\left|\vec{V}_{P}\right|}{\left|\vec{V}_{Q}\right|}=\frac{\eta_{2}}{\eta_{1}}$
+(C) $\vec{V}_{P} \cdot \vec{V}_{Q}>0$
+(D) $\vec{V}_{P} \cdot \vec{V}_{Q}<0$
+\item[Q.] 10 In terms of potential difference $V$, electric current $I$, permittivity $\varepsilon_{0}$, permeability $\mu_{0}$ and speed of light $c$, the dimensionally correct equation(s) is(are)
+(A) $\mu_{0} I^{2}=\varepsilon_{0} V^{2}$
+(B) $\varepsilon_{0} I=\mu_{0} V$
+(C) $I=\varepsilon_{0} c V$
+(D) $\mu_{0} c I=\varepsilon_{0} V$
+\end{itemize}
+
+PHYSICS
+\begin{itemize}
+\item[Q.] 11 Consider a uniform spherical charge distribution of radius $R_{1}$ centred at the origin O. In this distribution, a spherical cavity of radius $R_{2}$, centred at $P$ with distance $\mathrm{OP}=a=R_{1}-R_{2}$ (see figure) is made. If the electric field inside the cavity at position $\vec{r}$ is $\vec{E}(\vec{r})$, then the correct statement(s) is(are)
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-06.jpg?height=567&width=571&top_left_y=627&top_left_x=789)
+\begin{itemize}
+\item[(A)] $\vec{E}$ is uniform, its magnitude is independent of $R_{2}$ but its direction depends on $\vec{r}$
+\item[(B)] $\vec{E}$ is uniform, its magnitude depends on $R_{2}$ and its direction depends on $\vec{r}$
+\item[(C)] $\vec{E}$ is uniform, its magnitude is independent of $a$ but its direction depends on $\vec{a}$
+\item[(D)] $\vec{E}$ is uniform and both its magnitude and direction depend on $\vec{a}$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 12 In plotting stress versus strain curves for two materials $P$ and $Q$, a student by mistake puts strain on the $y$-axis and stress on the $x$-axis as shown in the figure. Then the correct statement(s) is(are)
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-07.jpg?height=719&width=638&top_left_y=525&top_left_x=833)
+\begin{itemize}
+\item[(A)] $P$ has more tensile strength than $Q$
+\item[(B)] $P$ is more ductile than $Q$
+\item[(C)] $P$ is more brittle than $Q$
+\item[(D)] The Young's modulus of $P$ is more than that of $Q$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 13 A spherical body of radius $R$ consists of a fluid of constant density and is in equilibrium under its own gravity. If $P(r)$ is the pressure at $r(r<R)$, then the correct option(s) is(are)
+(A) $P(r=0)=0$
+(B) $\frac{P(r=3 R / 4)}{P(r=2 R / 3)}=\frac{63}{80}$
+(C) $\frac{P(r=3 R / 5)}{P(r=2 R / 5)}=\frac{16}{21}$
+(D) $\frac{P(r=R / 2)}{P(r=R / 3)}=\frac{20}{27}$
+\item[Q.] 14 A parallel plate capacitor having plates of area $S$ and plate separation $d$, has capacitance $C_{1}$ in air. When two dielectrics of different relative permittivities ( $\varepsilon_{1}=2$ and $\varepsilon_{2}=4$ ) are introduced between the two plates as shown in the figure, the capacitance becomes $C_{2}$. The ratio $\frac{C_{2}}{C_{1}}$ is
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-08.jpg?height=554&width=762&top_left_y=1026&top_left_x=700)
+(A) 6/5
+(B) 5/3
+(C) 7/5
+(D) 7/3
+\end{itemize}
+
+PHYSICS
+\begin{itemize}
+\item[Q.] 15 An ideal monoatomic gas is confined in a horizontal cylinder by a spring loaded piston (as shown in the figure). Initially the gas is at temperature $T_{1}$, pressure $P_{1}$ and volume $V_{1}$ and the spring is in its relaxed state. The gas is then heated very slowly to temperature $T_{2}$, pressure $P_{2}$ and volume $V_{2}$. During this process the piston moves out by a distance $x$. Ignoring the friction between the piston and the cylinder, the correct statement(s) is(are)
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-09.jpg?height=368&width=833&top_left_y=625&top_left_x=692)
+\begin{itemize}
+\item[(A)] If $V_{2}=2 V_{1}$ and $T_{2}=3 T_{1}$, then the energy stored in the spring is $\frac{1}{4} P_{1} V_{1}$
+\item[(B)] If $V_{2}=2 V_{1}$ and $T_{2}=3 T_{1}$, then the change in internal energy is $3 P_{1} V_{1}$
+\item[(C)] If $V_{2}=3 V_{1}$ and $T_{2}=4 T_{1}$, then the work done by the gas is $\frac{7}{3} P_{1} V_{1}$
+\item[(D)] If $V_{2}=3 V_{1}$ and $T_{2}=4 T_{1}$, then the heat supplied to the gas is $\frac{17}{6} P_{1} V_{1}$
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 16 A fission reaction is given by ${ }_{92}^{236} \mathrm{U} \rightarrow{ }_{54}^{140} \mathrm{Xe}+{ }_{38}^{94} \mathrm{Sr}+x+y$, where $x$ and $y$ are two particles. Considering ${ }_{92}^{236} \mathrm{U}$ to be at rest, the kinetic energies of the products are denoted by $K_{\mathrm{Xe}}, K_{\mathrm{Sr}}$, $K_{x}(2 \mathrm{MeV})$ and $K_{y}(2 \mathrm{MeV})$, respectively. Let the binding energies per nucleon of ${ }_{92}^{236} \mathrm{U},{ }_{54}^{140} \mathrm{Xe}$ and ${ }_{38}^{94} \mathrm{Sr}$ be 7.5 MeV, 8.5 MeV and 8.5 MeV, respectively. Considering different conservation laws, the correct option(s) is(are)
+\begin{itemize}
+\item[(A)] $x=n, y=n, K_{\mathrm{Sr}}=129 \mathrm{MeV}, K_{\mathrm{Xe}}=86 \mathrm{MeV}$
+\item[(B)] $x=p, y=e^{-}, K_{\mathrm{Sr}}=129 \mathrm{MeV}, K_{\mathrm{Xe}}=86 \mathrm{MeV}$
+\item[(C)] $x=p, y=n, K_{\mathrm{Sr}}=129 \mathrm{MeV}, K_{\mathrm{Xe}}=86 \mathrm{MeV}$
+\item[(D)] $x=n, y=n, K_{\mathrm{Sr}}=86 \mathrm{MeV}, K_{\mathrm{Xe}}=129 \mathrm{MeV}$
+\end{itemize}
+\end{itemize}
+
+SECTION 3 (Maximum Marks : 16)
+\begin{itemize}
+\item[-] This section contains TWO paragraphs
+\item[-] Based on each paragraph, there will be TWO questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme :
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\end{itemize}
+
+\section*{PARAGRAPH 1}
+
+In a thin rectangular metallic strip a constant current $I$ flows along the positive $x$-direction, as shown in the figure. The length, width and thickness of the strip are $l, w$ and $d$, respectively.
+A uniform magnetic field $\vec{B}$ is applied on the strip along the positive $y$-direction. Due to this, the charge carriers experience a net deflection along the $z$-direction. This results in accumulation of charge carriers on the surface $P Q R S$ and appearance of equal and opposite charges on the face opposite to $P Q R S$. A potential difference along the $z$-direction is thus developed. Charge accumulation continues until the magnetic force is balanced by the electric force. The current is assumed to be uniformly distributed on the cross section of the strip and carried by electrons.
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-12.jpg?height=304&width=1401&top_left_y=883&top_left_x=386)
+\begin{itemize}
+\item[Q.] 17 Consider two different metallic strips (1 and 2) of the same material. Their lengths are the same, widths are $w_{1}$ and $w_{2}$ and thicknesses are $d_{1}$ and $d_{2}$, respectively. Two points $K$ and $M$ are symmetrically located on the opposite faces parallel to the $x-y$ plane (see figure). $V_{1}$ and $V_{2}$ are the potential differences between $K$ and $M$ in strips 1 and 2, respectively. Then, for a given current $I$ flowing through them in a given magnetic field strength $B$, the correct statement(s) is(are)
+\begin{itemize}
+\item[(A)] If $w_{1}=w_{2}$ and $d_{1}=2 d_{2}$, then $V_{2}=2 V_{1}$
+\item[(B)] If $w_{1}=w_{2}$ and $d_{1}=2 d_{2}$, then $V_{2}=V_{1}$
+\item[(C)] If $w_{1}=2 w_{2}$ and $d_{1}=d_{2}$, then $V_{2}=2 V_{1}$
+\item[(D)] If $w_{1}=2 w_{2}$ and $d_{1}=d_{2}$, then $V_{2}=V_{1}$
+\end{itemize}
+\item[Q.] 18 Consider two different metallic strips (1 and 2) of same dimensions (length $l$, width $w$ and thickness $d$ ) with carrier densities $n_{1}$ and $n_{2}$, respectively. Strip 1 is placed in magnetic field $B_{1}$ and strip 2 is placed in magnetic field $B_{2}$, both along positive $y$-directions. Then $V_{1}$ and $V_{2}$ are the potential differences developed between $K$ and $M$ in strips 1 and 2, respectively. Assuming that the current $I$ is the same for both the strips, the correct option(s) is(are)
+\begin{itemize}
+\item[(A)] If $B_{1}=B_{2}$ and $n_{1}=2 n_{2}$, then $V_{2}=2 V_{1}$
+\item[(B)] If $B_{1}=B_{2}$ and $n_{1}=2 n_{2}$, then $V_{2}=V_{1}$
+\item[(C)] If $B_{1}=2 B_{2}$ and $n_{1}=n_{2}$, then $V_{2}=0.5 V_{1}$
+\item[(D)] If $B_{1}=2 B_{2}$ and $n_{1}=n_{2}$, then $V_{2}=V_{1}$
+\end{itemize}
+\end{itemize}
+
+\section*{PARAGRAPH 2}
+
+Light guidance in an optical fiber can be understood by considering a structure comprising of thin solid glass cylinder of refractive index $n_{1}$ surrounded by a medium of lower refractive index $n_{2}$. The light guidance in the structure takes place due to successive total internal reflections at the interface of the media $n_{1}$ and $n_{2}$ as shown in the figure. All rays with the angle of incidence $i$ less than a particular value $i_{m}$ are confined in the medium of refractive index $n_{1}$. The numerical aperture (NA) of the structure is defined as $\sin i_{m}$.
+$$n_{1}>n_{2}$$
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-13.jpg?height=394&width=1155&top_left_y=856&top_left_x=519)
+\begin{itemize}
+\item[Q.] 19 For two structures namely $S_{1}$ with $n_{1}=\sqrt{45} / 4$ and $n_{2}=3 / 2$, and $S_{2}$ with $n_{1}=8 / 5$ and $n_{2}=7 / 5$ and taking the refractive index of water to be 4/3 and that of air to be 1, the correct option(s) is(are)
+\begin{itemize}
+\item[(A)] NA of $S_{1}$ immersed in water is the same as that of $S_{2}$ immersed in a liquid of refractive index $\frac{16}{3 \sqrt{15}}$
+\item[(B)] NA of $S_{1}$ immersed in liquid of refractive index $\frac{6}{\sqrt{15}}$ is the same as that of $S_{2}$ immersed in water
+\item[(C)] NA of $S_{1}$ placed in air is the same as that of $S_{2}$ immersed in liquid of refractive index $\frac{4}{\sqrt{15}}$.
+\item[(D)] NA of $S_{1}$ placed in air is the same as that of $S_{2}$ placed in water
+\end{itemize}
+\item[Q.] 20 If two structures of same cross-sectional area, but different numerical apertures $N A_{1}$ and $N A_{2}\left(N A_{2}<N A_{1}\right)$ are joined longitudinally, the numerical aperture of the combined structure is
+(A) $\frac{N A_{1} N A_{2}}{N A_{1}+N A_{2}}$
+(B) $N A_{1}+N A_{2}$
+(C) $N A_{1}$
+(D) $N A_{2}$
+\end{itemize}
+
+\section*{PART II : CHEMISTRY}
+
+SECTION 1 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If the bubble corresponding to the answer is darkened
+\item[0] In all other cases
+\end{itemize}
+\end{itemize}
+Q. 21 The number of hydroxyl group(s) in Q is
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-14.jpg?height=194&width=1135&top_left_y=931&top_left_x=334)
+Q. 22 Among the following, the number of reaction(s) that produce(s) benzaldehyde is
+\begin{itemize}
+\begin{itemize}
+\item[I.]
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-14.jpg?height=129&width=586&top_left_y=1236&top_left_x=439)
+\item[II.]
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-14.jpg?height=143&width=464&top_left_y=1384&top_left_x=437)
+\item[III.]
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-14.jpg?height=135&width=462&top_left_y=1547&top_left_x=434)
+\item[IV.]
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-14.jpg?height=192&width=577&top_left_y=1705&top_left_x=434)
+\end{itemize}
+\item[Q.] 23 In the complex acetylbromidodicarbonylbis(triethylphosphine)iron(II), the number of Fe-C bond(s) is
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 24 Among the complex ions, $\left[\mathrm{Co}\left(\mathrm{NH}_{2}-\mathrm{CH}_{2}-\mathrm{CH}_{2}-\mathrm{NH}_{2}\right)_{2} \mathrm{Cl}_{2}\right]^{+},\left[\mathrm{CrCl}_{2}\left(\mathrm{C}_{2} \mathrm{O}_{4}\right)_{2}\right]^{3-},\left[\mathrm{Fe}\left(\mathrm{H}_{2} \mathrm{O}\right)_{4}(\mathrm{OH})_{2}\right]^{+}$, $\left[\mathrm{Fe}\left(\mathrm{NH}_{3}\right)_{2}(\mathrm{CN})_{4}\right]^{-},\left[\mathrm{Co}\left(\mathrm{NH}_{2}-\mathrm{CH}_{2}-\mathrm{CH}_{2}-\mathrm{NH}_{2}\right)_{2}\left(\mathrm{NH}_{3}\right) \mathrm{Cl}\right]^{2+}$ and $\left[\mathrm{Co}\left(\mathrm{NH}_{3}\right)_{4}\left(\mathrm{H}_{2} \mathrm{O}\right) \mathrm{Cl}\right]^{2+}$, the number of complex ion(s) that show(s) cis-trans isomerism is
+\item[Q.] 25 Three moles of $\mathrm{B}_{2} \mathrm{H}_{6}$ are completely reacted with methanol. The number of moles of boron containing product formed is
+\item[Q.] 26 The molar conductivity of a solution of a weak acid HX (0.01 M) is 10 times smaller than the molar conductivity of a solution of a weak acid HY (0.10 M). If $\lambda_{\mathrm{X}^{-}}^{0} \approx \lambda_{\mathrm{Y}^{-}}^{0}$, the difference in their $\mathrm{p} K_{\mathrm{a}}$ values, $\mathrm{p} K_{\mathrm{a}}(\mathrm{HX})-\mathrm{p} K_{\mathrm{a}}(\mathrm{HY})$, is (consider degree of ionization of both acids to be << 1)
+\item[Q.] 27 A closed vessel with rigid walls contains 1 mol of ${ }_{92}^{238} \mathrm{U}$ and 1 mol of air at 298 K. Considering complete decay of ${ }_{92}^{238} \mathrm{U}$ to ${ }_{82}^{206} \mathrm{~Pb}$, the ratio of the final pressure to the initial pressure of the system at 298 K is
+\item[Q.] 28 In dilute aqueous $\mathrm{H}_{2} \mathrm{SO}_{4}$, the complex diaquodioxalatoferrate(II) is oxidized by $\mathrm{MnO}_{4}^{-}$. For this reaction, the ratio of the rate of change of $\left[\mathrm{H}^{+}\right]$to the rate of change of $\left[\mathrm{MnO}_{4}^{-}\right]$is
+\end{itemize}
+
+\section*{SECTION 2 (Maximum Marks: 32)}
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are)correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\item[Q.] 29 In the following reactions, the product S is
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-16.jpg?height=150&width=882&top_left_y=999&top_left_x=333)
+<smiles>Cc1ccc2ccncc2c1</smiles>
+<smiles>Cc1ccc2cccnc2c1</smiles>
+<smiles>Cc1ccc2cnccc2c1</smiles>
+<smiles>Cc1ccc2ncccc2c1</smiles>
+\item[Q.] 30 The major product U in the following reactions is
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-16.jpg?height=158&width=1025&top_left_y=1592&top_left_x=326)
+<smiles>CCC(OO)c1ccccc1</smiles>
+<smiles>CC(C)(OO)c1ccccc1</smiles>
+<smiles>C=CC(OO)c1ccccc1</smiles>
+<smiles>C=C(COO)c1ccccc1</smiles>
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 31 In the following reactions, the major product $\mathbf{W}$ is
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-17.jpg?height=225&width=996&top_left_y=406&top_left_x=302)
+<smiles>Oc1ccc2ccccc2c1N=Nc1ccccc1</smiles>
+<smiles>Oc1cc(N=Nc2ccccc2)c2ccccc2c1</smiles>
+<smiles>Oc1ccc2c(N=Nc3ccccc3)cccc2c1</smiles>
+<smiles>Oc1ccc2cccc(N=Nc3ccccc3)c2c1</smiles>
+\item[Q.] 32 The correct statement(s) regarding, (i) HClO, (ii) $\mathrm{HClO}_{2}$, (iii) $\mathrm{HClO}_{3}$ and (iv) $\mathrm{HClO}_{4}$, is(are)
+\begin{itemize}
+\item[(A)] The number of $\mathrm{Cl}=\mathrm{O}$ bonds in (ii) and (iii) together is two
+\item[(B)] The number of lone pairs of electrons on Cl in (ii) and (iii) together is three
+\item[(C)] The hybridization of Cl in (iv) is $s p^{3}$
+\item[(D)] Amongst (i) to (iv), the strongest acid is (i)
+\end{itemize}
+\item[Q.] 33 The pair(s) of ions where BOTH the ions are precipitated upon passing $\mathrm{H}_{2} \mathrm{~S}$ gas in presence of dilute HCl, is(are)
+(A) $\mathrm{Ba}^{2+}, \mathrm{Zn}^{2+}$
+(B) $\mathrm{Bi}^{3+}, \mathrm{Fe}^{3+}$
+(C) $\mathrm{Cu}^{2+}, \mathrm{Pb}^{2+}$
+(D) $\mathrm{Hg}^{2+}, \mathrm{Bi}^{3+}$
+
+\end{itemize}
+\begin{itemize}
+\item[Q.] 34 Under hydrolytic conditions, the compounds used for preparation of linear polymer and for chain termination, respectively, are
+(A) $\mathrm{CH}_{3} \mathrm{SiCl}_{3}$ and $\mathrm{Si}\left(\mathrm{CH}_{3}\right)_{4}$
+(B) $\left(\mathrm{CH}_{3}\right)_{2} \mathrm{SiCl}_{2}$ and $\left(\mathrm{CH}_{3}\right)_{3} \mathrm{SiCl}$
+(C) $\left(\mathrm{CH}_{3}\right)_{2} \mathrm{SiCl}_{2}$ and $\mathrm{CH}_{3} \mathrm{SiCl}_{3}$
+(D) $\mathrm{SiCl}_{4}$ and $\left(\mathrm{CH}_{3}\right)_{3} \mathrm{SiCl}$
+\item[Q.] 35 When $\mathrm{O}_{2}$ is adsorbed on a metallic surface, electron transfer occurs from the metal to $\mathrm{O}_{2}$. The TRUE statement(s) regarding this adsorption is(are)
+(A) $\mathrm{O}_{2}$ is physisorbed
+(B) heat is released
+(C) occupancy of $\pi_{2 p}^{*}$ of $\mathrm{O}_{2}$ is increased
+(D) bond length of $\mathrm{O}_{2}$ is increased
+\item[Q.] 36 One mole of a monoatomic real gas satisfies the equation $p(V-b)=R T$ where $b$ is a constant. The relationship of interatomic potential $V(r)$ and interatomic distance $r$ for the gas is given by
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-18.jpg?height=350&width=359&top_left_y=1094&top_left_x=469)
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-18.jpg?height=352&width=383&top_left_y=1076&top_left_x=1227)
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-18.jpg?height=370&width=404&top_left_y=1475&top_left_x=471)
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-18.jpg?height=374&width=366&top_left_y=1468&top_left_x=1229)
+\end{itemize}
+
+\section*{SECTION 3 (Maximum Marks: 16)}
+\begin{itemize}
+\item[-] This section contains TWO paragraphs
+\item[-] Based on each paragraph, there will be TWO questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\end{itemize}
+
+\section*{PARAGRAPH 1}
+
+In the following reactions
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-19.jpg?height=133&width=897&top_left_y=1109&top_left_x=287)
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-19.jpg?height=135&width=318&top_left_y=1266&top_left_x=285)
+![](https://cdn.mathpix.com/cropped/655415be-2334-41ee-8e91-ef1f76965a8d-19.jpg?height=149&width=459&top_left_y=1409&top_left_x=279)
+Q. 37 Compound $\mathbf{X}$ is
+<smiles>CC(=O)c1ccccc1</smiles>
+<smiles>CC(O)c1ccccc1</smiles>
+<smiles>OCCc1ccccc1</smiles>
+<smiles>O=CCc1ccccc1</smiles>
+Q. 38 The major compound Y is
+<smiles>C/C=C/Cc1ccccc1</smiles>
+<smiles>CC/C=C/c1ccccc1</smiles>
+<smiles>C=C(CC)c1ccccc1</smiles>
+<smiles>CC=C(C)c1ccccc1</smiles>
+
+\section*{PARAGRAPH 2}
+
+When 100 mL of 1.0 M HCl was mixed with 100 mL of 1.0 M NaOH in an insulated beaker at constant pressure, a temperature increase of 5.7 °C was measured for the beaker and its contents (Expt. 1). Because the enthalpy of neutralization of a strong acid with a strong base is a constant $\left(-57.0 \mathrm{~kJ} \mathrm{~mol}^{-1}\right)$, this experiment could be used to measure the calorimeter constant. In a second experiment (Expt. 2), 100 mL of 2.0 M acetic acid $\left(K_{\mathrm{a}}=2.0 \times 10^{-5}\right)$ was mixed with 100 mL of 1.0 M NaOH (under identical conditions to Expt. 1) where a temperature rise of 5.6 °C was measured.
+(Consider heat capacity of all solutions as $4.2 \mathrm{~J} \mathrm{~g}^{-1} \mathrm{~K}^{-1}$ and density of all solutions as $1.0 \mathrm{~g} \mathrm{~mL}^{-1}$ )
+\begin{itemize}
+\item[Q.] 39 Enthalpy of dissociation (in $\mathrm{kJ} \mathrm{mol}^{-1}$ ) of acetic acid obtained from the Expt. 2 is
+(A) 1.0
+(B) 10.0
+(C) 24.5
+(D) 51.4
+\item[Q.] 40 The pH of the solution after Expt. 2 is
+(A) 2.8
+(B) 4.7
+(C) 5.0
+(D) 7.0
+\end{itemize}
+
+\section*{END OF PART II : CHEMISTRY \\ }
+
+\section*{PART III : MATHEMATICS}
+
+SECTION 1 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] The answer to each question is a SINGLE DIGIT INTEGER ranging from 0 to 9, both inclusive
+\item[-] For each question, darken the bubble corresponding to the correct integer in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If the bubble corresponding to the answer is darkened
+\item[0] In all other cases
+\end{itemize}
+\item[Q.] 41 For any integer $k$, let $\alpha_{k}=\cos \left(\frac{k \pi}{7}\right)+i \sin \left(\frac{k \pi}{7}\right)$, where $i=\sqrt{-1}$. The value of the expression $\frac{\sum_{k=1}^{12}\left|\alpha_{k+1}-\alpha_{k}\right|}{\sum_{k=1}^{3}\left|\alpha_{4 k-1}-\alpha_{4 k-2}\right|}$ is
+\item[Q.] 42 Suppose that all the terms of an arithmetic progression (A.P.) are natural numbers. If the ratio of the sum of the first seven terms to the sum of the first eleven terms is 6:11 and the seventh term lies in between 130 and 140, then the common difference of this A.P. is
+\item[Q.] 43 The coefficient of $x^{9}$ in the expansion of $(1+x)\left(1+x^{2}\right)\left(1+x^{3}\right) \ldots\left(1+x^{100}\right)$ is
+\end{itemize}
+
+\begin{itemize}
+\item[Q.] 44 Suppose that the foci of the ellipse $\frac{x^{2}}{9}+\frac{y^{2}}{5}=1$ are $\left(f_{1}, 0\right)$ and $\left(f_{2}, 0\right)$ where $f_{1}>0$ and $f_{2}<0$. Let $P_{1}$ and $P_{2}$ be two parabolas with a common vertex at $(0,0)$ and with foci at $\left(f_{1}, 0\right)$ and $\left(2 f_{2}, 0\right)$, respectively. Let $T_{1}$ be a tangent to $P_{1}$ which passes through $\left(2 f_{2}, 0\right)$ and $T_{2}$ be a tangent to $P_{2}$ which passes through $\left(f_{1}, 0\right)$. If $m_{1}$ is the slope of $T_{1}$ and $m_{2}$ is the slope of $T_{2}$, then the value of $\left(\frac{1}{m_{1}^{2}}+m_{2}^{2}\right)$ is
+\item[Q.] 45 Let $m$ and $n$ be two positive integers greater than 1. If
+$$\lim _{\alpha \rightarrow 0}\left(\frac{e^{\cos \left(\alpha^{n}\right)}-e}{\alpha^{m}}\right)=-\left(\frac{e}{2}\right)$$
+then the value of $\frac{m}{n}$ is
+\item[Q.] 46 If
+$$\alpha=\int_{0}^{1}\left(e^{9 x+3 \tan ^{-1} x}\right)\left(\frac{12+9 x^{2}}{1+x^{2}}\right) d x$$
+where $\tan ^{-1} x$ takes only principal values, then the value of $\left(\log _{e}|1+\alpha|-\frac{3 \pi}{4}\right)$ is
+\end{itemize}
+
+MATHEMATICS
+\begin{itemize}
+\item[Q.] 47 Let $f: \mathbb{R} \rightarrow \mathbb{R}$ be a continuous odd function, which vanishes exactly at one point and $f(1)=\frac{1}{2}$. Suppose that $F(x)=\int_{-1}^{x} f(t) d t$ for all $x \in[-1,2]$ and $G(x)=\int_{-1}^{x} t|f(f(t))| d t$ for all $x \in[-1,2]$. If $\lim _{x \rightarrow 1} \frac{F(x)}{G(x)}=\frac{1}{14}$, then the value of $f\left(\frac{1}{2}\right)$ is
+\item[Q.] 48 Suppose that $\vec{p}, \vec{q}$ and $\vec{r}$ are three non-coplanar vectors in $\mathbb{R}^{3}$. Let the components of a vector $\vec{s}$ along $\vec{p}, \vec{q}$ and $\vec{r}$ be 4, 3 and 5, respectively. If the components of this vector $\vec{s}$ along $(-\vec{p}+\vec{q}+\vec{r}),(\vec{p}-\vec{q}+\vec{r})$ and $(-\vec{p}-\vec{q}+\vec{r})$ are $x, y$ and $z$, respectively, then the value of $2 x+y+z$ is
+\end{itemize}
+
+\begin{tabular}[t]{|l|l|}
+\hline \multirow{2}{*}{} & \\
+\hline & However, considering the level of the question, +4 marks will be awarded to ALL the candidates. \\
+\hline
+\end{tabular}
+
+SECTION 2 (Maximum Marks: 32)
+\begin{itemize}
+\item[-] This section contains EIGHT questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme:
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\item[Q.] 49 Let $S$ be the set of all non-zero real numbers $\alpha$ such that the quadratic equation $\alpha x^{2}-x+\alpha=0$ has two distinct real roots $x_{1}$ and $x_{2}$ satisfying the inequality $\left|x_{1}-x_{2}\right|<1$. Which of the following intervals is(are) a subset(s) of $S$ ?
+(A) $\left(-\frac{1}{2},-\frac{1}{\sqrt{5}}\right)$
+(B) $\left(-\frac{1}{\sqrt{5}}, 0\right)$
+(C) $\left(0, \frac{1}{\sqrt{5}}\right)$
+(D) $\left(\frac{1}{\sqrt{5}}, \frac{1}{2}\right)$
+\item[Q.] 50 If $\alpha=3 \sin ^{-1}\left(\frac{6}{11}\right)$ and $\beta=3 \cos ^{-1}\left(\frac{4}{9}\right)$, where the inverse trigonometric functions take only the principal values, then the correct option(s) is(are)
+(A) $\cos \beta>0$
+(B) $\quad \sin \beta<0$
+(C) $\quad \cos (\alpha+\beta)>0$
+(D) $\quad \cos \alpha<0$
+\end{itemize}
+
+MATHEMATICS
+\begin{itemize}
+\item[Q.] 51 Let $E_{1}$ and $E_{2}$ be two ellipses whose centers are at the origin. The major axes of $E_{1}$ and $E_{2}$ lie along the $x$-axis and the $y$-axis, respectively. Let $S$ be the circle $x^{2}+(y-1)^{2}=2$. The straight line $x+y=3$ touches the curves $S, E_{1}$ and $E_{2}$ at $P, Q$ and $R$, respectively. Suppose that $P Q=P R=\frac{2 \sqrt{2}}{3}$. If $e_{1}$ and $e_{2}$ are the eccentricities of $E_{1}$ and $E_{2}$, respectively, then the correct expression(s) is(are)
+(A) $e_{1}^{2}+e_{2}^{2}=\frac{43}{40}$
+(B) $\quad e_{1} e_{2}=\frac{\sqrt{7}}{2 \sqrt{10}}$
+(C) $\left|e_{1}^{2}-e_{2}^{2}\right|=\frac{5}{8}$
+(D) $e_{1} e_{2}=\frac{\sqrt{3}}{4}$
+\item[Q.] 52 Consider the hyperbola $H: x^{2}-y^{2}=1$ and a circle $S$ with center $N\left(x_{2}, 0\right)$. Suppose that $H$ and $S$ touch each other at a point $P\left(x_{1}, y_{1}\right)$ with $x_{1}>1$ and $y_{1}>0$. The common tangent to $H$ and $S$ at $P$ intersects the $x$-axis at point $M$. If $(l, m)$ is the centroid of the triangle $\triangle P M N$, then the correct expression(s) is(are)
+(A) $\frac{d l}{d x_{1}}=1-\frac{1}{3 x_{1}^{2}}$ for $x_{1}>1$
+(B) $\frac{d m}{d x_{1}}=\frac{x_{1}}{3\left(\sqrt{x_{1}^{2}-1}\right)}$ for $x_{1}>1$
+(C) $\frac{d l}{d x_{1}}=1+\frac{1}{3 x_{1}^{2}}$ for $x_{1}>1$
+(D) $\frac{d m}{d y_{1}}=\frac{1}{3}$ for $y_{1}>0$
+\end{itemize}
+
+MATHEMATICS
+\begin{itemize}
+\item[Q.] 53 The option(s) with the values of $a$ and $L$ that satisfy the following equation is(are)
+$$\frac{\int_{0}^{4 \pi} e^{t}\left(\sin ^{6} a t+\cos ^{4} a t\right) d t}{\int_{0}^{\pi} e^{t}\left(\sin ^{6} a t+\cos ^{4} a t\right) d t}=L ?$$
+(A) $a=2, L=\frac{e^{4 \pi}-1}{e^{\pi}-1}$
+(B) $a=2, L=\frac{e^{4 \pi}+1}{e^{\pi}+1}$
+(C) $a=4, L=\frac{e^{4 \pi}-1}{e^{\pi}-1}$
+(D) $a=4, L=\frac{e^{4 \pi}+1}{e^{\pi}+1}$
+\item[Q.] 54 Let $f, g:[-1,2] \rightarrow \mathbb{R}$ be continuous functions which are twice differentiable on the interval (-1, 2). Let the values of $f$ and $g$ at the points -1, 0 and 2 be as given in the following table:
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline & $x=-1$ & $x=0$ & $x=2$ \\
+\hline $f(x)$ & 3 & 6 & 0 \\
+\hline $g(x)$ & 0 & 1 & -1 \\
+\hline
+\end{tabular}
+In each of the intervals $(-1,0)$ and $(0,2)$ the function $(f-3 g)^{\prime \prime}$ never vanishes. Then the correct statement(s) is(are)
+\begin{itemize}
+\item[(A)] $f^{\prime}(x)-3 g^{\prime}(x)=0$ has exactly three solutions in $(-1,0) \cup(0,2)$
+\item[(B)] $f^{\prime}(x)-3 g^{\prime}(x)=0$ has exactly one solution in $(-1,0)$
+\item[(C)] $f^{\prime}(x)-3 g^{\prime}(x)=0$ has exactly one solution in $(0,2)$
+\item[(D)] $f^{\prime}(x)-3 g^{\prime}(x)=0$ has exactly two solutions in (-1, 0) and exactly two solutions in $(0,2)$
+\end{itemize}
+\end{itemize}
+
+MATHEMATICS
+\begin{itemize}
+\item[Q.] 55 Let $f(x)=7 \tan ^{8} x+7 \tan ^{6} x-3 \tan ^{4} x-3 \tan ^{2} x$ for all $x \in\left(-\frac{\pi}{2}, \frac{\pi}{2}\right)$. Then the correct expression(s) is(are)
+(A) $\int_{0}^{\pi / 4} x f(x) d x=\frac{1}{12}$
+(B) $\quad \int_{0}^{\pi / 4} f(x) d x=0$
+(C) $\quad \int_{0}^{\pi / 4} x f(x) d x=\frac{1}{6}$
+(D) $\quad \int_{0}^{\pi / 4} f(x) d x=1$
+\item[Q.] 56 Let $f^{\prime}(x)=\frac{192 x^{3}}{2+\sin ^{4} \pi x}$ for all $x \in \mathbb{R}$ with $f\left(\frac{1}{2}\right)=0$. If $m \leq \int_{1 / 2}^{1} f(x) d x \leq M$, then the possible values of $m$ and $M$ are
+(A) $m=13, M=24$
+(B) $m=\frac{1}{4}, M=\frac{1}{2}$
+(C) $m=-11, M=0$
+(D) $m=1, M=12$
+\end{itemize}
+
+\section*{SECTION 3 (Maximum Marks : 16)}
+\begin{itemize}
+\item[-] This section contains TWO paragraphs
+\item[-] Based on each paragraph, there will be TWO questions
+\item[-] Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct
+\item[-] For each question, darken the bubble(s) corresponding to all the correct option(s) in the ORS
+\item[-] Marking scheme :
+\begin{itemize}
+\item[] +4 If only the bubble(s) corresponding to all the correct option(s) is(are) darkened
+\item[0] If none of the bubbles is darkened
+\item[] -2 In all other cases
+\end{itemize}
+\end{itemize}
+
+\section*{PARAGRAPH 1}
+
+Let $n_{1}$ and $n_{2}$ be the number of red and black balls, respectively, in box I. Let $n_{3}$ and $n_{4}$ be the number of red and black balls, respectively, in box II.
+\begin{itemize}
+\item[Q.] 57 One of the two boxes, box I and box II, was selected at random and a ball was drawn randomly out of this box. The ball was found to be red. If the probability that this red ball was drawn from box II is $\frac{1}{3}$, then the correct option(s) with the possible values of $n_{1}, n_{2}, n_{3}$ and $n_{4}$ is(are)
+(A) $n_{1}=3, n_{2}=3, n_{3}=5, n_{4}=15$
+(B) $n_{1}=3, n_{2}=6, n_{3}=10, n_{4}=50$
+(C) $n_{1}=8, n_{2}=6, n_{3}=5, n_{4}=20$
+(D) $n_{1}=6, n_{2}=12, n_{3}=5, n_{4}=20$
+\item[Q.] 58 A ball is drawn at random from box I and transferred to box II. If the probability of drawing a red ball from box I, after this transfer, is $\frac{1}{3}$, then the correct option(s) with the possible values of $n_{1}$ and $n_{2}$ is(are)
+(A) $n_{1}=4$ and $n_{2}=6$
+(B) $n_{1}=2$ and $n_{2}=3$
+(C) $n_{1}=10$ and $n_{2}=20$
+(D) $n_{1}=3$ and $n_{2}=6$
+\end{itemize}
+
+PARAGRAPH 2
+Let $F: \mathbb{R} \rightarrow \mathbb{R}$ be a thrice differentiable function. Suppose that $F(1)=0, F(3)=-4$ and $F^{\prime}(x)<0$ for all $x \in(1 / 2,3)$. Let $f(x)=x F(x)$ for all $x \in \mathbb{R}$.
+\begin{itemize}
+\item[Q.] 59 The correct statement(s) is(are)
+(A) $\quad f^{\prime}(1)<0$
+(B) $f(2)<0$
+(C) $f^{\prime}(x) \neq 0$ for any $x \in(1,3)$
+(D) $f^{\prime}(x)=0$ for some $x \in(1,3)$
+\item[Q.] 60 If $\int_{1}^{3} x^{2} F^{\prime \prime}(x) d x=-12$ and $\int_{1}^{3} x^{3} F^{\prime \prime}(x) d x=40$, then the correct expression(s) is(are)
+(A) $9 f^{\prime}(3)+f^{\prime}(1)-32=0$
+(B) $\int_{1}^{3} f(x) d x=12$
+(C) $9 f^{\prime}(3)-f^{\prime}(1)+32=0$
+(D) $\int_{1}^{3} f(x) d x=-12$
+\end{itemize}
+
+END OF THE QUESTION PAPER
+
+\section*{Answers for the above questions}
+Ans for Q.1: 7
+Ans for Q.2: 4
+Ans for Q.3: 6
+Ans for Q.4: 3
+Ans for Q.5: 2
+Ans for Q.6: 2
+Ans for Q.7: 1
+Ans for Q.8: 2
+Ans for Q.9: (A) and (D)
+Ans for Q.10: (A) and (C)
+Ans for Q.11: (D)
+Ans for Q.12: (A) and (B)
+Ans for Q.13: (B) and (C)
+Ans for Q.14: (D)
+Ans for Q.15: (A), (B) and (C)
+Ans for Q.16: (A)
+Ans for Q.17: (A) and (D)
+Ans for Q.18: (A) and (C)
+Ans for Q.19: (A) and (C)
+Ans for Q.20: (D)
+Ans for Q.21: 4
+Ans for Q.22: 4
+Ans for Q.23: 3
+Ans for Q.24: 6
+Ans for Q.25: 6
+Ans for Q.26: 3
+Ans for Q.27: 9
+Ans for Q.28: 8
+Ans for Q.29: (A)
+Ans for Q.30: (B)
+Ans for Q.37: (C)
+Ans for Q.38: (D)
+Ans for Q.39: (A)
+Ans for Q.40: (B)
+Ans for Q.41: 4
+Ans for Q.42: 9
+Ans for Q.43: 8
+Ans for Q.44: 4
+Ans for Q.45: 2
+Ans for Q.46: 9
+Ans for Q.47: 7
+Ans for Q.48: 9
+Ans for Q.49: (A) and (D)
+Ans for Q.50: (B), (C) and (D)
+Ans for Q.51: (A) and (B)
+Ans for Q.52: (A), (B) and (D)
+Ans for Q.53: (A) and (C)
+Ans for Q.54: (B) and (C)
+Ans for Q.55: (A) and (B)
+Ans for Q.56: (D)
+Ans for Q.57: (A) and (B)
+Ans for Q.58: (C) and (D)
+Ans for Q.59: (A), (B) and (C)
+Ans for Q.60: (C) and (D)

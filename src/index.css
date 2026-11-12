@@ -1135,7 +1135,9 @@ h3 {
 }
 
 .match-list-item-body .mathpix-paper-figure,
-.official-pyq-simple-stem .mathpix-paper-figure {
+.official-pyq-simple-stem .mathpix-paper-figure,
+.official-pyq-options .mathpix-paper-figure,
+.option-text .mathpix-paper-figure {
   max-width: 100%;
 }
 
@@ -1213,6 +1215,7 @@ h3 {
 
 .option-text {
   flex: 1;
+  min-width: 0;
   color: var(--text-h);
 }
 
@@ -8804,6 +8807,17 @@ body:has(.official-pyq-page) .official-pyq-page {
   min-height: 5rem;
 }
 
+.official-pyq-solution-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border, #d8dde6);
+  border-radius: 8px;
+  background: var(--surface-muted, #f8fafc);
+  white-space: pre-line;
+}
+
 .official-pyq-preview-list {
   max-height: none;
 }
@@ -8971,4 +8985,26 @@ body:has(.official-pyq-page) .official-pyq-page {
   gap: 0.5rem;
 }
 
+.matrix-grid-view-table {
+  max-width: 28rem;
+}
 
+.matrix-grid-view-table .matrix-grid-cell {
+  min-width: 2.25rem;
+  font-weight: 700;
+}
+
+.matrix-grid-cell--right {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.matrix-grid-cell--wrong {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.matrix-grid-cell--missed {
+  background: #fef9c3;
+  color: #854d0e;
+}

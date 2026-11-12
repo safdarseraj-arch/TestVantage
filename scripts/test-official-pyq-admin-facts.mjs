@@ -14,13 +14,33 @@ import {
 } from '../src/utils/officialPyqAdminFacts.js'
 import { stampSubjectsFromPaper } from '../src/utils/parsePaperSectionMap.js'
 import {
+  cleanOfficialPyqPassageBody,
   fillOfficialPyqPairPassages,
   officialPyqCardHasMistakenPassage,
   peelOfficialPyqCardForDisplay,
 } from '../src/utils/passage.js'
+import { shapeOfficialPyqDrafts } from '../src/utils/officialPyqPaperFacts.js'
+import { applyOfficialPyqQualityGuards, healUploadQuestionCard } from '../src/utils/uploadQualityGuards.js'
+import {
+  findGluedNextQuestionStart,
+  paperItemsFromMathpixOcr,
+  recoverOptionsFromStem,
+} from '../src/utils/mathpixQuestionSplit.js'
+import { mergeAdjacentOptionTails, storedMatchOptionsAreCutOff } from '../src/utils/extendTruncatedStem.js'
+import { parseMatchingListForDisplay } from '../src/utils/parseMatchingListDisplay.js'
+import { looksLikePyqSectionInstructionStem } from '../src/utils/bulkExtractClean.js'
 import { reviewOfficialPyqCards } from '../src/utils/officialPyqUnifiedCheck.js'
 import { officialPyqContentReviewMessages } from '../src/utils/officialPyqReviewFlags.js'
 import { keepAdminEditedOfficialPyqCards } from '../src/utils/officialPyqPendingStore.js'
+import { mathDrawFailure } from '../src/utils/mathDrawCheck.js'
+import { prepareTextForMathTextDisplay } from '../src/utils/prepareMathForRender.js'
+import { restoreLabelledFigureOptions } from '../src/utils/labelledFigureOptions.js'
+import { extractMathpixImageUrls, splitMathpixMediaSegments } from '../src/utils/mathpixMedia.js'
+import { adminFactsMatchingScan, numberingPrintedInOcr } from '../src/utils/officialPyqAdminFacts.js'
+import { convertLatexTabularToArray } from '../src/utils/latexTabularDisplay.js'
+import { latexExtractionIncomplete } from '../src/utils/healTruncatedLatex.js'
+import { reviewMarkSpans } from '../src/utils/officialPyqReviewFlags.js'
+import { officialPyqDrawnText } from '../src/utils/officialPyqOriginalCompare.js'
 
 let passed = 0
 function test(name, fn) {
@@ -168,6 +188,112 @@ test('one-card check never reports the paper count (it blocked every Approve)', 
   assert.deepEqual(cardsOnly.messages, [])
 })
 
+const STEM_OCR = [
+  '\\section*{Question Stem for Question Nos. 5 and 6}',
+  '',
+  'Question Stem',
+  'A projectile is thrown from a point O on the ground at an angle 45° from the vertical. The acceleration due to gravity $g=10 \\mathrm{~m} / \\mathrm{s}^{2}$.',
+  'Q. 5 The value of $t$ is \\_\\_\\_\\_.',
+  'Q. 6 The value of $x$ is \\_\\_\\_\\_.',
+  '',
+  '\\section*{Question Stem for Question Nos. 7 and 8}',
+  '',
+  'Question Stem',
+  'In the circuit shown below, the switch S is connected to position P for a long time so that the charge on the capacitor becomes $q_{1} \\mu \\mathrm{C}$.',
+  '![](https://cdn.mathpix.com/cropped/circuit-03.jpg?height=289&width=844&top_left_y=2286&top_left_x=676)',
+  '\\begin{itemize}',
+  '\\item[Q.] 7 The magnitude of $q_{1}$ is \\_\\_\\_\\_.',
+  '\\item[Q.] 8 The magnitude of $q_{2}$ is \\_\\_\\_\\_.',
+  '\\end{itemize}',
+  '',
+  '\\section*{Question Stem for Question Nos. 9 and 10}',
+  '',
+  'Question Stem',
+  'Two point charges $-Q$ and $+Q / \\sqrt{3}$ are placed in the $x y$-plane as shown in the figure. All lengths are measured in meters.',
+  '![](https://cdn.mathpix.com/cropped/charges-04.jpg?height=327&width=621&top_left_y=1131&top_left_x=749)',
+  '\\begin{itemize}',
+  '\\item[Q.] 9 The value of $R$ is \\_\\_\\_\\_ meter.',
+  '\\item[Q.] 10 The value of $b$ is \\_\\_\\_\\_ meter.',
+  '\\end{itemize}',
+  '',
+  '\\section*{SECTION 3}',
+].join('\n')
+
+test('question-stem passage keeps only its body (2021 P1 Q5-Q10)', () => {
+  const leaked = [
+    '}',
+    '',
+    'Question Stem',
+    'A projectile is thrown from a point O on the ground.',
+    'The value of $t$ is \\_\\_\\_\\_.',
+    'The value of $x$ is \\_\\_\\_\\_.',
+  ].join('\n')
+  assert.equal(cleanOfficialPyqPassageBody(leaked), 'A projectile is thrown from a point O on the ground.')
+  const listOpener = '}\n\nQuestion Stem\nIn the circuit shown below.\n![](https://cdn.mathpix.com/cropped/c.jpg)\n\\begin{itemize}'
+  assert.equal(cleanOfficialPyqPassageBody(listOpener), 'In the circuit shown below.\n![](https://cdn.mathpix.com/cropped/c.jpg)')
+  const plain = 'A passage with no heading.\nSecond line of it.'
+  assert.equal(cleanOfficialPyqPassageBody(plain), plain)
+  const cards = [5, 6, 7, 8, 9, 10].map((n) => ({
+    id: `s${n}`,
+    text: n < 7 ? `The value of ${n === 5 ? '$t$' : '$x$'} is ____.` : `The magnitude of $q_{${n - 6}}$ is ____.`,
+    options: [],
+    printedNumber: n,
+    questionType: 'numerical',
+  }))
+  const { questions } = shapeOfficialPyqDrafts(cards, STEM_OCR)
+  for (const q of questions) {
+    assert.doesNotMatch(q.passageText, /^\s*(?:\}|Question\s+Stem)/, `Q${q.printedNumber} heading`)
+    assert.doesNotMatch(q.passageText, /The value of|The magnitude of|\\begin\{itemize\}\s*$/, `Q${q.printedNumber} tail`)
+  }
+})
+
+test('the second child of a shared stem keeps the stem figure (2021 P1 Q8)', () => {
+  const passage = 'In the circuit shown below, the switch S is connected to position P for a long time so that the charge on the capacitor becomes $q_{1} \\mu \\mathrm{C}$.\n![](https://cdn.mathpix.com/cropped/circuit-03.jpg?height=289&width=844&top_left_y=2286&top_left_x=676)'
+  for (const n of [7, 8]) {
+    const card = {
+      id: `c${n}`,
+      text: `The magnitude of $q_{${n - 6}}$ is ____.`,
+      options: [],
+      printedNumber: n,
+      questionNumber: n,
+      questionType: 'numerical',
+      passageText: passage,
+      passageSource: 'ocr-header',
+      passageId: 'admin-physics-7-8',
+    }
+    const shown = peelOfficialPyqCardForDisplay(healUploadQuestionCard(card, STEM_OCR), STEM_OCR)
+    assert.match(String(shown.passageText ?? ''), /circuit-03\.jpg/, `Q${n} lost the circuit figure`)
+  }
+})
+
+test('missing-OCR check stops at the question end (2021 P2 Q6, Q19, Q47 false alarms)', () => {
+  const q6Stem = 'Two concentric circular loops lie in the $x y$-plane. Which of the following statement(s) is(are) correct?'
+  const q6Opts = ['perpendicular', 'radial only', 'non-zero', 'outward']
+  const q19Stem = 'The work functions for metals $P, Q$ and $R$ are 4.0 eV, 4.5 eV and 5.5 eV. The photon energy, in eV, is ____.'
+  const q47Stem = 'The value of $2 m_{1}+3 n_{1}+m_{1} n_{1}$ is ____.'
+  const ocr = [
+    q6Stem,
+    '\\begin{itemize} \\item[(A)] perpendicular \\item[(B)] radial only \\item[(C)] non-zero \\item[(D)] outward \\end{itemize}',
+    '\\section*{SECTION 2} \\section*{Question Stem} The test-tube glass has density 2.5 gm/cc and the trapped air is 3.3 cc.',
+    'Q. 9',
+    q19Stem.replace('____', '\\_\\_\\_\\_'),
+    '\\end{itemize} \\section*{SECTION 1} Each question has FOUR options (A), (B), (C) and (D).',
+    'Q. 10',
+    q47Stem.replace('____', '\\_\\_\\_\\_'),
+    'Q. 11 The value is 1.25. \\section*{SECTION 3} Each question has FOUR options (A), (B), (C) and (D).',
+  ].join('\n')
+  const blank = ['', '', '', '']
+  const cardsIn = [
+    { text: q6Stem, options: q6Opts, questionType: 'multiple_correct' },
+    { text: q19Stem, options: blank, questionType: 'integer' },
+    { text: q47Stem, options: blank, questionType: 'numerical' },
+  ]
+  const clean = reviewOfficialPyqCards(cardsIn, ocr, null, { cardsOnly: true })
+  assert.deepEqual(clean.messages, [], clean.messages.join(' | '))
+  const lostOption = reviewOfficialPyqCards([{ ...cardsIn[0], options: q6Opts.slice(0, 3) }], ocr, null, { cardsOnly: true })
+  assert.ok(lostOption.messages.some((m) => /4 options in the scan/.test(m)), lostOption.messages.join(' | '))
+})
+
 test('a hand-edited card that moved slot keeps its edit and does not overwrite another card', () => {
   const edited = { id: 'b', text: 'Edited by admin', options: opts, pyqSlot: 3, adminEdited: true, adminEditedAt: 5 }
   const prev = [
@@ -274,6 +400,373 @@ test('subject from facts is not re-guessed', () => {
 test('wrong card count leaves cards alone', () => {
   const out = enforceAdminFactsOnQuestions(twelve.slice(0, 11), twoSubject, twoOcr)
   assert.equal(out[0].subject, 'mathematics')
+})
+
+test('facts set as continuous still find passages the paper numbers per subject (2021 P1 Chemistry Q24)', () => {
+  const continuous = { ...twoSubject, numbering: 'continuous' }
+  const { slots } = validateAdminFacts(continuous)
+  assert.equal(slots[8].printed, 9)
+  const cut = cutAdminPassagesFromOcr(twoOcr, slots)
+  assert.match(cut.get(slots[8].passage), /^Tin is obtained/)
+  assert.match(cut.get(slots[10].passage), /^A solution of a weak acid/)
+  const out = enforceAdminFactsOnQuestions(twelve, continuous, twoOcr)
+  assert.match(out[8].passageText, /^Tin is obtained/)
+  assert.match(out[11].passageText, /^A solution of a weak acid/)
+  const approved = twelve.map((q, i) => (i === 8 ? { ...q, passageText: 'Approved as shown.', adminApproved: true } : q))
+  assert.equal(enforceAdminFactsOnQuestions(approved, continuous, twoOcr)[8].passageText, 'Approved as shown.')
+})
+
+test('an answer blank after \\left|…\\right| display math still draws (2021 P1 Q55)', () => {
+  const text =
+    'For $x \\in \\mathbb{R}$, the number of real roots of the equation\n$$3 x^{2}-4\\left|x^{2}-1\\right|+x-1=0$$\nis $____$.'
+  assert.equal(mathDrawFailure(text), '')
+  assert.doesNotMatch(prepareTextForMathTextDisplay(text), /\$____\$/)
+})
+
+test('option pictures labelled (B) and (D) leave the stem and join the bare A and C options (2021 P1 Q21)', () => {
+  const imgB = 'https://cdn.mathpix.com/cropped/x-12.jpg?height=171&width=186&top_left_y=2164&top_left_x=1210'
+  const imgD = 'https://cdn.mathpix.com/cropped/x-12.jpg?height=177&width=203&top_left_y=2445&top_left_x=1209'
+  const card = {
+    questionType: 'single_correct',
+    text: `Among the following, the conformation that corresponds to the most stable conformation of meso-butane-2,3-diol is\n\n(B)\n\n\\includegraphics{${imgB}}\n\n(D)\n\n\\includegraphics{${imgD}}`,
+    options: ['<smiles>C[C@@H](O)[C@H](C)O</smiles>', '<smiles>C[C@H](O)[C@@H](C)O</smiles>'],
+  }
+  const out = restoreLabelledFigureOptions(card)
+  assert.equal(out.text, 'Among the following, the conformation that corresponds to the most stable conformation of meso-butane-2,3-diol is')
+  assert.deepEqual(out.options, [card.options[0], `\\includegraphics{${imgB}}`, card.options[1], `\\includegraphics{${imgD}}`])
+  const three = { ...card, options: [...card.options, 'third'] }
+  assert.equal(restoreLabelledFigureOptions(three), three)
+  const healed = healUploadQuestionCard(card, '')
+  assert.equal(healed.options.filter((o) => String(o).trim()).length, 4)
+  assert.doesNotMatch(healed.text, /includegraphics/)
+  const batch = applyOfficialPyqQualityGuards([card], '')[0]
+  assert.deepEqual(batch.options, out.options)
+
+  const scan = `\\item[Q.] 2 ${out.text}\n\n${card.options[0]}\n\n\\begin{figure}\n\\captionsetup{labelformat=empty}\n\\caption{(B)}\n\\includegraphics[alt={},max width=\\textwidth]{${imgB}}\n\\end{figure}\n\n${card.options[1]}\n\n\\begin{figure}\n\\captionsetup{labelformat=empty}\n\\caption{(D)}\n\\includegraphics[alt={},max width=\\textwidth]{${imgD}}\n\\end{figure}\n\\end{itemize}\n\\begin{itemize}\n\\item[Q.] 3 Next question here.`
+  const unlabelled = { ...card, text: `${out.text}\n\n\\includegraphics{${imgB}}\n\n\\includegraphics{${imgD}}`, options: [...card.options, '', ''] }
+  assert.equal(restoreLabelledFigureOptions(unlabelled, ''), unlabelled)
+  const fromScan = restoreLabelledFigureOptions(unlabelled, scan)
+  assert.equal(fromScan.text, out.text)
+  assert.deepEqual(fromScan.options, out.options)
+  const split = recoverOptionsFromStem(scan.slice(scan.indexOf('Among'), scan.indexOf('\\item[Q.] 3')), [])
+  assert.deepEqual(split.options, out.options)
+  assert.doesNotMatch(split.stem, /includegraphics|\(B\)|\(D\)/)
+})
+
+test('a picture cropped from the original page draws and survives heal and quality fix (2021 P1 Q21 A, C)', () => {
+  const cropA = '/api/official-pyq/original/crops/opyq-1-p12-0123456789abcdef.png'
+  const cropC = '/api/official-pyq/original/crops/opyq-1-p12-fedcba9876543210.png'
+  const imgB = 'https://cdn.mathpix.com/cropped/x-12.jpg?height=171&width=186&top_left_y=2164&top_left_x=1210'
+  const imgD = 'https://cdn.mathpix.com/cropped/x-12.jpg?height=177&width=203&top_left_y=2445&top_left_x=1209'
+  const options = [`\\includegraphics{${cropA}}`, `\\includegraphics{${imgB}}`, `\\includegraphics{${cropC}}`, `\\includegraphics{${imgD}}`]
+  const card = {
+    questionType: 'single_correct',
+    text: 'Among the following, the conformation that corresponds to the most stable conformation of meso-butane-2,3-diol is',
+    options,
+    adminEdited: true,
+  }
+  assert.deepEqual(splitMathpixMediaSegments(options[0]), [{ kind: 'img', value: cropA }])
+  assert.deepEqual(extractMathpixImageUrls(`${card.text}\n${options.join('\n')}`), [cropA, imgB, cropC, imgD])
+  for (const opt of options) assert.equal(mathDrawFailure(opt), '')
+  assert.deepEqual(healUploadQuestionCard(card, '').options, options)
+  assert.deepEqual(applyOfficialPyqQualityGuards([card], '')[0].options, options)
+  const cropStem = '/api/official-pyq/original/crops/opyq-1-p12-00000000aaaaaaaa.png'
+  const inStem = { ...card, text: `${card.text}\n\\includegraphics{${cropStem}}` }
+  assert.match(healUploadQuestionCard(inStem, '').text, /opyq-1-p12-00000000aaaaaaaa\.png/)
+  assert.match(applyOfficialPyqQualityGuards([inStem], '')[0].text, /opyq-1-p12-00000000aaaaaaaa\.png/)
+})
+
+test('option D that starts with "If" stays on its question, and a cross-section question is not a SECTION header (2022 P2 Q29, Q35)', () => {
+  const bubble =
+    'Q. 11  A bubble has surface tension $S$. The ideal gas inside the bubble has ratio of specific heats $\\gamma=\\frac{5}{3}$. When the atmospheric pressure is $P_{a 2}$, the radius of the bubble and the temperature of the enclosed gas are $r_{2}$ and $T_{2}$, respectively.\nWhich of the following statement(s) is(are) correct?\n(A) If the surface of the bubble is a perfect heat insulator, then $r_{1}=r_{2}$.\n(B) If the surface of the bubble is a perfect heat insulator, then the total internal energy does not change.\n(C) If the surface of the bubble is a perfect heat conductor, then $r_{1}>r_{2}$.\n(D) If the surface of the bubble is a perfect heat insulator, then $T_{2}=T_{1}$.\n\\end{itemize}'
+  assert.equal(findGluedNextQuestionStart(bubble), -1)
+  const items = paperItemsFromMathpixOcr(`${bubble}\n\\begin{itemize}\n\\item[Q.] 12 A disk of radius R with uniform positive charge density $\\sigma$ is placed on the $x y$ plane. Which of the following statement(s) is(are) correct?\n\\begin{itemize}\n\\item[(A)] For $\\beta=1$ the particle reaches the origin.\n\\item[(B)] For $\\beta=2$ the particle reaches the origin.\n\\item[(C)] For $\\beta=3$ the particle returns.\n\\item[(D)] For $\\beta>1$ the particle always reaches the origin.\n\\end{itemize}`)
+  assert.equal(items.length, 2)
+  assert.match(items[0].options[3], /T_\{2\}=T_\{1\}/)
+
+  const screw =
+    'Area of the cross-section of a wire is measured using a screw gauge. The pitch of the main scale is 0.5 mm. The measured readings are listed below.\n\n\\begin{tabular}[t]{|l|l|l|}\n\\hline Measurement condition & Main scale reading & Circular scale reading \\\\\n\\hline Attempt-1: With wire & 4 divisions & 20 divisions \\\\\n\\hline\n\\end{tabular}\nWhat are the diameter and cross-sectional area of the wire measured using the screw gauge?'
+  assert.equal(looksLikePyqSectionInstructionStem(screw), false)
+  assert.equal(looksLikePyqSectionInstructionStem('SECTION 2 (Maximum marks: 24)\nThis section contains SIX (06) questions.'), true)
+  assert.equal(looksLikePyqSectionInstructionStem('Section-A contains FOUR questions. Each question has FOUR options.'), true)
+  const photo = {
+    text: 'When light of a given wavelength is incident on a metallic surface, the minimum potential needed to stop the emitted photoelectrons is $6.0 V$. What are the wavelength of the first source and the work function of the metal, respectively?',
+    options: ['$1.72 \\times 10^{-7} m, 1.20 eV$', '$1.72 \\times 10^{-7} m, 5.60 eV$', '$3.78 \\times 10^{-7} m, 5.60 eV$', '$3.78 \\times 10^{-7} m, 1.20 eV$'],
+    printedNumber: 16,
+  }
+  const gauge = {
+    text: screw,
+    options: ['$2.22 \\pm 0.02 mm$', '$2.22 \\pm 0.01 mm$', '$2.14 \\pm 0.02 mm$', '$2.14 \\pm 0.01 mm$'],
+    printedNumber: 17,
+  }
+  const kept = mergeAdjacentOptionTails([photo, gauge])
+  assert.equal(kept.length, 2)
+  assert.match(kept[1].text, /^Area of the cross-section/)
+})
+
+test('a table followed by a $…$ line keeps that dollar, raises Z^(n+), and the graph is not flagged (2022 P2 Q39)', () => {
+  const q39 =
+    'The value of (m + n + p) is ____.\nGiven:\n\n\\begin{tabular}[t]{|l|l|l|}\n\\hline Ion & \\mathrm{Z}^{\\mathrm{n}+} & \\mathrm{X}^{\\mathrm{m}-} \\\\\n\\hline \\lambda^{0}(\\mathrm{~S} \\mathrm{~cm}^{2} \\mathrm{~mol}^{-1}) & 50.0 & 80.0 \\\\\n\\hline\n\\end{tabular}\n$\\lambda^{0}$ is the limiting molar conductivity of ions\nThe plot of molar conductivity ( $\\Lambda$ ) of $\\mathrm{Z}_{\\mathrm{m}} \\mathrm{X}_{\\mathrm{n}}$ vs $\\mathrm{c}^{1 / 2}$ is given below.\n\\includegraphics{https://cdn.mathpix.com/cropped/45dff9a8-20.jpg?height=554&width=625&top_left_y=845&top_left_x=783}'
+  const drawn = convertLatexTabularToArray(q39)
+  assert.match(drawn, /<\/table>\s*\$\\lambda\^\{0\}\$ is the limiting/)
+  assert.match(drawn, /Z<sup>n\+<\/sup>/)
+  assert.match(drawn, /X<sup>m−<\/sup>/)
+  assert.match(drawn, /cm²/)
+  assert.equal(latexExtractionIncomplete(q39), false)
+  assert.deepEqual(reviewMarkSpans(q39), [])
+  assert.match(convertLatexTabularToArray('$\\begin{tabular}{|l|l|}\\hline A & 1 \\\\ \\hline\\end{tabular}$ next'), /\\end\{array\}\$\$ next/)
+
+  const forCompare = officialPyqDrawnText(q39)
+  assert.match(forCompare, /Ion \| Z\^\(n\+\) \| X\^\(m−\)/)
+  assert.match(forCompare, /\[picture\]$/)
+  assert.doesNotMatch(forCompare, /tabular|includegraphics/)
+})
+
+test('the scan settles restart vs continuous numbering, so Chemistry Q.3 is not stamped Q39', () => {
+  const subject = (name) =>
+    `\\section*{${name}}\n` +
+    Array.from({ length: 18 }, (_, i) => `\\item[Q.] ${i + 1} Question ${i + 1} of ${name} text here.`).join('\n')
+  const restartOcr = ['MATHEMATICS', 'PHYSICS', 'CHEMISTRY'].map(subject).join('\n')
+  const continuousOcr = Array.from({ length: 54 }, (_, i) => `Q. ${i + 1} Question ${i + 1} text here.`).join('\n')
+  assert.equal(numberingPrintedInOcr(restartOcr, 18), 'restart')
+  assert.equal(numberingPrintedInOcr(continuousOcr, 18), 'continuous')
+  assert.equal(numberingPrintedInOcr('Q. 1 only', 18), '')
+
+  const rows = [
+    { from: 1, to: 8, type: 'integer', options: 0, listI: '', listII: '' },
+    { from: 9, to: 14, type: 'multiple_correct', options: 4, listI: '', listII: '' },
+    { from: 15, to: 18, type: 'single_correct', options: 4, listI: '', listII: '' },
+  ]
+  const admin = {
+    totalQuestions: 54,
+    subjectOrder: ['mathematics', 'physics', 'chemistry'],
+    numbering: 'continuous',
+    samePattern: true,
+    pattern: { rows, passages: '' },
+    confirmedAt: 1,
+  }
+  assert.equal(adminFactsMatchingScan(admin, restartOcr).numbering, 'restart')
+  assert.equal(adminFactsMatchingScan(admin, continuousOcr), admin)
+  const cards = Array.from({ length: 54 }, (_, i) => ({ text: `Question ${i + 1}`, options: [], printedNumber: i + 1 }))
+  const stamped = enforceAdminFactsOnQuestions(cards, admin, restartOcr)
+  assert.equal(stamped[38].printedNumber, 3)
+  assert.equal(stamped[38].subject, 'chemistry')
+  assert.equal(enforceAdminFactsOnQuestions(cards, admin, continuousOcr)[38].printedNumber, 39)
+  assert.equal(draftAdminFacts(restartOcr, cards).numbering, 'restart')
+})
+
+test('determinants inside one $$ formula keep \\left| … \\right| and draw (2022 P1 Q14)', () => {
+  const plainQ = (n) =>
+    `\\item[Q.] ${n} Find the value of $x^{${n}}$ when the matrix is singular and real.\n\\begin{itemize}\n\\item[(A)] $1$\n\\item[(B)] $2$\n\\item[(C)] $3$\n\\item[(D)] $4$\n\\end{itemize}`
+  const ocr = [
+    '\\begin{itemize}',
+    plainQ(13),
+    '\\item[Q.] 14 Let $|M|$ denote the determinant of a square matrix $M$. Let',
+    '$$f(\\theta)=\\frac{1}{2}\\left|\\begin{array}{ccc}',
+    '1 & \\sin \\theta & 1 \\\\',
+    '-1 & -\\sin \\theta & 1',
+    '\\end{array}\\right|+\\left|\\begin{array}{cc}',
+    '\\sin \\pi & \\cos \\left(\\theta+\\frac{\\pi}{4}\\right) \\\\',
+    '\\cot \\left(\\theta+\\frac{\\pi}{4}\\right) & \\tan \\pi',
+    '\\end{array}\\right| .$$',
+    'Then, which of the following is/are TRUE ?',
+    '\\begin{itemize}',
+    '\\item[(A)] $p(1)<0$',
+    '\\item[(B)] $p(2)>0$',
+    '\\item[(C)] $p(3)>0$',
+    '\\item[(D)] $p(4)<0$',
+    '\\end{itemize}',
+    plainQ(15),
+    '\\end{itemize}',
+  ].join('\n')
+  const card = paperItemsFromMathpixOcr(ocr).find((q) => /denote the determinant/.test(q.text))
+  assert.ok(card)
+  assert.equal(/\\left\|\$\$|\$\$\\right\|/.test(card.text), false, card.text)
+  assert.ok(card.text.includes('\\cos \\left(\\theta+\\frac{\\pi}{4}\\right)'))
+  assert.equal(mathDrawFailure(card.text), '')
+  const shown = prepareTextForMathTextDisplay('$$x=\\frac{1}{2}\\left|\\begin{array}{cc}1&2\\\\3&4\\end{array}\\right| .$$')
+  assert.equal(/\\left\|\$\$|\$\$\\right\|/.test(shown), false, shown)
+  const stored = '$$f=\\left|$$\\begin{array}{cc}\n1 & 2 \\\\\n3 & 4\n\\end{array}$$\\right| .$$'
+  assert.equal(mathDrawFailure(stored) === '' && !/\\left\|\$\$/.test(prepareTextForMathTextDisplay(stored)), true)
+})
+
+const romanPlainQ = (n) =>
+  `\\item[Q.] ${n} Find the value of $x^{${n}}$ when the matrix is singular and real.\n\\begin{itemize}\n\\item[(A)] $1$\n\\item[(B)] $2$\n\\item[(C)] $3$\n\\item[(D)] $4$\n\\end{itemize}`
+const romanOpts = [
+  '\\item[(A)] (I) → (P); (II) → (S); (III) → (P); (IV) → (S)',
+  '\\item[(B)] (I) → (P); (II) → (P); (III) → (T); (IV) → (R)',
+  '\\item[(C)] (I) → (Q); (II) → (P); (III) → (T); (IV) → (S)',
+  '\\item[(D)] (I) → (Q); (II) → (S); (III) → (P); (IV) → (R)',
+]
+const romanLabels = (card) => {
+  const parsed = parseMatchingListForDisplay(card.text, card.options)
+  return `${(parsed?.listI || []).map((r) => r.label).join('')}|${(parsed?.listII || []).map((r) => r.label).join('')}`
+}
+
+test('List-I (I)–(IV) × List-II (P)–(T) table keeps its labels, (T) row and set math', () => {
+  const ocr = [
+    '\\begin{itemize}',
+    romanPlainQ(14),
+    '\\end{itemize}',
+    'Q. 15 Consider the following lists:',
+    '',
+    '\\begin{tabular}[t]{|l|l|}',
+    '\\hline List-I & List-II \\\\',
+    '\\hline (I) $\\left\\{x \\in\\left[-\\frac{2 \\pi}{3}, \\frac{2 \\pi}{3}\\right]: \\cos x+\\sin x=1\\right\\}$ & (P) has two elements \\\\',
+    '\\hline (II) $\\left\\{x \\in\\left[-\\frac{5 \\pi}{18}, \\frac{5 \\pi}{18}\\right]: \\sqrt{3} \\tan 3 x=1\\right\\}$ & (Q) has three elements \\\\',
+    '\\hline (III) $\\left\\{x \\in\\left[-\\frac{6 \\pi}{5}, \\frac{6 \\pi}{5}\\right]: 2 \\cos (2 x)=\\sqrt{3}\\right\\}$ & (R) has four elements \\\\',
+    '\\hline (IV) $\\left\\{x \\in\\left[-\\frac{7 \\pi}{4}, \\frac{7 \\pi}{4}\\right]: \\sin x-\\cos x=1\\right\\}$ & (S) has five elements \\\\',
+    '\\hline & (T) has six elements \\\\',
+    '\\hline',
+    '\\end{tabular}',
+    '',
+    'The correct option is:',
+    '\\begin{itemize}',
+    ...romanOpts,
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    romanPlainQ(16),
+    '\\end{itemize}',
+  ].join('\n')
+  const card = paperItemsFromMathpixOcr(ocr).find((q) => /Consider the following lists/.test(q.text))
+  assert.ok(card)
+  assert.ok(card.text.includes('(I) $\\left\\{x \\in\\left[-\\frac{2 \\pi}{3}, \\frac{2 \\pi}{3}\\right]'), card.text)
+  assert.ok(/\(T\) has six elements/.test(card.text), card.text)
+  assert.equal(/\\begin\{tabular\}|\[t\]\{/.test(card.text), false, card.text)
+  assert.equal(mathDrawFailure(card.text), '')
+  assert.equal(romanLabels(card), '(I)(II)(III)(IV)|(P)(Q)(R)(S)(T)')
+  assert.equal(card.options.filter(Boolean).length, 4)
+  assert.equal(storedMatchOptionsAreCutOff(card.options), false)
+  const review = reviewOfficialPyqCards([card], ocr, null, { cardsOnly: true })
+  assert.equal(review.messages.some((m) => /not in the lists/.test(m)), false, review.messages.join(' | '))
+})
+
+test('roman List-I with A–D printed before List-II keeps one List-II and clean mapping options', () => {
+  const ocr = [
+    '\\begin{itemize}',
+    romanPlainQ(15),
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    '\\item[Q.] 16 List I describes four systems, each with two particles $A$ and $B$ in relative motion. List II gives possible magnitudes of their relative velocities.',
+    '',
+    '\\section*{List-I}',
+    '(I) $A$ and $B$ are moving on a horizontal circle of radius $1 m$.',
+    '(II) Projectiles $A$ and $B$ are fired at $t=0$ and $t=0.1 s$ respectively.',
+    '(III) Two harmonic oscillators $A$ and $B$ moving in the $x$ direction.',
+    '(IV) Particle $A$ is rotating in a horizontal circular path of radius $1 m$.',
+    'Which one of the following options is correct?',
+    '\\begin{itemize}',
+    '\\item[(A)] I → R, II → T, III → P, IV → S',
+    '\\item[(B)] I → S, II → P, III → Q, IV → R',
+    '\\item[(C)] I → S, II → T, III → P, IV → R',
+    '\\item[(D)] I → T, II → P, III → R, IV → S',
+    '\\end{itemize}',
+    '',
+    'List-II',
+    '\\begin{itemize}',
+    '\\item[(P)] $\\frac{\\sqrt{3}+1}{2}$',
+    '\\item[(Q)] $\\frac{(\\sqrt{3}-1)}{\\sqrt{2}}$',
+    '\\item[(R)] $\\sqrt{10}$',
+    '\\item[(R)] $\\sqrt{10}$',
+    '\\item[(S)] $\\sqrt{2}$',
+    '\\item[(T)] $\\sqrt{25 \\pi^{2}+1}$',
+    '\\end{itemize}',
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    romanPlainQ(17),
+    '\\end{itemize}',
+  ].join('\n')
+  const card = paperItemsFromMathpixOcr(ocr).find((q) => /relative velocities/.test(q.text))
+  assert.ok(card)
+  assert.equal((card.text.match(/List-II\s*\n/g) || []).length, 1, card.text)
+  assert.equal((card.text.match(/\(R\)/g) || []).length, 1, card.text)
+  assert.deepEqual(card.options, [
+    'I → R, II → T, III → P, IV → S',
+    'I → S, II → P, III → Q, IV → R',
+    'I → S, II → T, III → P, IV → R',
+    'I → T, II → P, III → R, IV → S',
+  ])
+  assert.equal(romanLabels(card), '(I)(II)(III)(IV)|(P)(Q)(R)(S)(T)')
+})
+
+test('roman List-I \\item rows and a figure List-II keep (I)–(IV) and (T)', () => {
+  const fig = (y) => `\\begin{figure}\n\\captionsetup{labelformat=empty}\n\\caption{(${y})}\n\\includegraphics[alt={},max width=\\textwidth]{https://cdn.mathpix.com/cropped/demo-29.jpg?height=296&width=366&top_left_y=${100 + 'PQRST'.indexOf(y) * 300}&top_left_x=1371}\n\\end{figure}`
+  const ocr = [
+    '\\begin{itemize}',
+    romanPlainQ(14),
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    '\\item[Q.] 15 Match the rate expressions in LIST-I for the decomposition of X with the corresponding profiles provided in LIST-II.',
+    '',
+    'LIST-I',
+    '\\begin{itemize}',
+    '\\item[(I)] rate $=k[X]$ under all possible initial concentrations of X',
+    '\\item[(II)] rate $=k[X]$ where initial concentrations of X are much less',
+    '\\item[(III)] rate $=k$ where initial concentrations of X are much higher',
+    '\\item[(IV)] rate $=k[X]^{2}$ where initial concentration of X is much higher',
+    '\\end{itemize}',
+    '',
+    'LIST-II',
+    ...'PQRST'.split('').map(fig),
+    '\\item[(A)] I→ P; II→ Q; III → S; IV → T',
+    '\\item[(B)] I→ R; II→ S; III → S; IV → T',
+    '\\item[(C)] I→ P; II→ Q; III → Q; IV → R',
+    '\\item[(D)] I→ R; II→ S; III → Q; IV → R',
+    '\\end{itemize}',
+    '\\begin{itemize}',
+    romanPlainQ(16),
+    '\\end{itemize}',
+  ].join('\n')
+  const card = paperItemsFromMathpixOcr(ocr).find((q) => /rate expressions/.test(q.text))
+  assert.ok(card)
+  assert.equal(card.options[3], 'I→ R; II→ S; III → Q; IV → R')
+  assert.equal(romanLabels(card), '(I)(II)(III)(IV)|(P)(Q)(R)(S)(T)')
+})
+
+test('a stem that opens with "List I describes…" keeps its words, its figure, and the question line under the lists (2022 P1 Q33, Q35, Q53)', () => {
+  const rows = (labels, body) => labels.map((L) => `(${L})\n${body(L)}`).join('\n\n')
+  const fig = '\\includegraphics{https://cdn.mathpix.com/cropped/demo-17.jpg?height=443&width=376&top_left_y=1117&top_left_x=932}'
+  const q33 = [
+    'A small loop carries current $I$ as shown in the figure. List-I gives time dependences of $\\hat{n}$. List-II gives the torques. Let $\\alpha=\\frac{A}{2 R}$.',
+    fig,
+    '',
+    'List-I',
+    '',
+    rows(['I', 'II', 'III', 'IV'], (L) => `$\\frac{1}{\\sqrt{2}}(\\sin \\omega t \\hat{\\jmath}) ${L}$`),
+    '',
+    'List-II',
+    '',
+    rows(['P', 'Q', 'R', 'S', 'T'], (L) => `$-\\frac{\\alpha}{4} ${L}$`),
+    '',
+    'Which one of the following options is correct?',
+  ].join('\n')
+  const a = parseMatchingListForDisplay(q33, ['I→ Q, II→P, III→S, IV→T', 'I→ S, II→ T, III→Q, IV→P', 'I→ Q, II→P, III→S, IV→R', 'I→ T, II→Q, III→P,IV→R'])
+  assert.match(a.intro, /List-I gives time dependences/)
+  assert.match(a.intro, /Let \$\\alpha/)
+  assert.ok(a.intro.includes(fig))
+  assert.equal(a.outro, 'Which one of the following options is correct?')
+  assert.equal(a.listII[4].text, '$-\\frac{\\alpha}{4} T$')
+
+  const q35 = [
+    'List I describes thermodynamic processes in four different systems. List II gives the magnitudes of possible changes in the internal energy.',
+    '',
+    'List-I',
+    '',
+    rows(['I', 'II', 'III', 'IV'], (L) => `Process ${L} of an ideal gas at $500 K$.`),
+    '',
+    'List-II',
+    '',
+    rows(['P', 'Q', 'R', 'S', 'T'], (L) => `$${'PQRST'.indexOf(L) + 2} k J$`),
+    '',
+    '[Given: Atomic number of $\\mathrm{Cr}=24$ ]',
+    '',
+    'Match each process in LIST-I with LIST-II, and choose the correct option',
+  ].join('\n')
+  const b = parseMatchingListForDisplay(q35)
+  assert.match(b.intro, /^List I describes thermodynamic processes/)
+  assert.equal(b.listI.length, 4)
+  assert.equal(b.listII[4].text, '$6 k J$')
+  assert.match(b.outro, /^\[Given: Atomic number[\s\S]*\n\nMatch each process/)
 })
 
 console.log(`official-pyq admin facts: ${passed} tests passed`)

@@ -14,8 +14,12 @@
  */
 
 import { findFirstOptionsBlockStart } from './mcqOptionMarkers.js'
+import { isMatrixGridCard, keepMatrixGridCards } from './matrixGridPyq.js'
+import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
 import { extractLatexItemizeMcq, extractLatexTabularMcq } from './mathpixQuestionSplit.js'
-import { restoreMissingOptionGridGraphs } from './mathpixMedia.js'
+import { stripHindiOcr } from './stripHindiOcr.js'
+import { hasOriginalPageCrop, isOriginalCropUrl, restoreMissingOptionGridGraphs } from './mathpixMedia.js'
+import { repairScanStructureCodes } from './smilesDisplay.js'
 import {
   parsePaperSectionMap,
   printedQuestionNumber,
@@ -89,6 +93,8 @@ import { annotateMathpixCleanStatus } from './mathpixCleanPipeline.js'
 import { sanitizeStemForDisplay } from './sanitizeStemForDisplay.js'
 import {
   fillOfficialPyqPairPassages,
+  officialPyqCardAllowsPassage,
+  officialPyqPassageNeedsOcrRefresh,
   officialPyqPassageRanges,
   officialPyqQuestionsHaveMistakenPassages,
   stripMistakenOfficialPyqPassages,
@@ -123,9 +129,12 @@ function stripIncompleteFracTail(s) {
     .trim()
 }
 
+/** "(P)" or a row that starts its line with "P." / "P)" (older papers). */
 function countListMarkers(text, letters) {
   const t = String(text ?? '')
-  return letters.filter((L) => new RegExp(`\\(\\s*${L}\\s*\\)`).test(t)).length
+  return letters.filter((L) =>
+    new RegExp(`\\(\\s*${L}\\s*\\)|(?:^|\\n)[ \\t]*${L}\\s*[.)][ \\t]+[A-Za-z$\\\\]`).test(t),
+  ).length
 }
 
 function filledMatchRows(text, letters) {
@@ -418,7 +427,7 @@ function sliceUntilStemEnd(taken) {
   if (midSec > 40) end = Math.min(end, midSec)
   const nextNum = t.slice(24).search(/\n(?:Q(?:uestion)?\s*\.?\s*)?\d{1,2}[\.\)]\s/)
   if (nextNum >= 0) end = Math.min(end, 24 + nextNum)
-  const nextItemQ = t.slice(20).search(/\\item\s*\[\s*Q/i)
+  const nextItemQ = t.slice(20).search(/\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)/i)
   if (nextItemQ >= 0) end = Math.min(end, 20 + nextItemQ)
   const nextQDot = t.slice(20).search(/\nQ\s*\.\s*\d{1,3}\b/)
   if (nextQDot >= 0) end = Math.min(end, 20 + nextQDot)
@@ -540,7 +549,10 @@ function hasListTwoEntries(text) {
   if (last >= 0) {
     const after = t.slice(last)
     const listIAt = after.search(/(?:List|Column)\s*[-–]?\s*I(?!I)\b/i)
-    const numAt = after.search(/\(\s*[1-5]\s*\)/)
+    const romanI = countListMarkers(t, ['I', 'II', 'III', 'IV']) >= 2
+    const numAt = after.search(
+      romanI ? /\(\s*(?:[1-5]|[PQRST])\s*\)/ : /\(\s*[1-5]\s*\)|(?:^|\n|&)[ \t]*[1-5]\.[ \t]+\S/,
+    )
     if (numAt >= 0 && (listIAt < 0 || numAt < listIAt)) return true
   }
   if (
@@ -548,6 +560,11 @@ function hasListTwoEntries(text) {
     countListMarkers(t, ['P', 'Q', 'R', 'S']) < 2 &&
     /(?:^List-II\b|\(1\)\s*\$?\s*\d|\binfinite\b)/i.test(t)
   ) {
+    return true
+  }
+  // Rows "(1)" … after the (P) … rows are List-II even when the scan dropped its heading (2013 P2 Q19, Q39, Q59).
+  const firstRow = t.search(/(?:^|\n)[ \t]*\(\s*P\s*\)/)
+  if (firstRow >= 0 && new Set([...t.slice(firstRow).matchAll(/\n[ \t]*\(\s*([1-5])\s*\)/g)].map((m) => m[1])).size >= 2) {
     return true
   }
   return false
@@ -604,17 +621,23 @@ function stemWantsChemistryProducts(text) {
 }
 
 /** Physics match lists must not keep Q50-style SMILES leftovers. */
-function stripChemistryLeakFromPhysicsStem(text) {
+function stripChemistryLeakFromPhysicsStem(text, subject = '') {
   const t = String(text ?? '')
   if (!/<smiles>/i.test(t)) return t
+  // Not a match list (2014 P2 Q22 hexane classes): its structures are the question.
+  if (!/(?:List|Column)\s*[-–]?\s*I/i.test(t)) return t
   if (stemWantsChemistryProducts(t)) return t
+  // A chemistry stem's own structure ("the peptide shown below", 2014 P1 Q36) is the question.
+  if (subject === 'chemistry') return t
+  if (/(?:shown|given|drawn)\s+below|following\s+(?:compound|structure|molecule|peptide)/i.test(t.split(/<smiles>/i)[0])) return t
+  if (/\(\s*[PQRS]\s*\)\s*<smiles>/i.test(t)) return t
   return t
     .replace(/\n?\(\s*[1-5]\s*\)\s*\n\s*<smiles>[\s\S]*?<\/smiles>/gi, '')
     .replace(/<smiles>[\s\S]*?<\/smiles>/gi, '')
 }
 
-function stripForeignListTwo(text) {
-  const t = stripChemistryLeakFromPhysicsStem(text)
+function stripForeignListTwo(text, subject = '') {
+  const t = stripChemistryLeakFromPhysicsStem(text, subject)
   if (!listTwoLooksForeign(t)) return t
   const ii = standaloneListTwoIndex(t)
   if (ii < 12) return t
@@ -624,11 +647,15 @@ function stripForeignListTwo(text) {
 /** True leftover List-II dump vs a real match card that still needs List-I. */
 function listTwoHasOwnStem(q) {
   const t = String(q?.text ?? '').trim()
+  // "Q. 17 LIST-I contains reactions and LIST-II contains major products." opens a new item
+  // even when OCR lost every (P)/(1) label of its lists.
+  if (/^(?:(?:Q\.?\s*)?\d{1,3}[.)]?\s+)?(?:List|Column)\s*[-–]?\s*I\s+(?:contains|gives|lists|shows)\b/i.test(t)) return true
   const ii = t.search(/(?:List|Column)\s*[-–]?\s*II\b/i)
   const before = (ii >= 0 ? t.slice(0, ii) : t).trim()
   if (before.length < 40) return false
   if (looksLikeMatchInstructionOnly(before)) return false
   return (
+    /\b(?:in|from)\s+(?:the\s+)?(?:List|Column)\s*[-–]?\s*I\b(?!\s*I)/i.test(before) ||
     looksLikeMatchingListStem(before) ||
     looksLikeFullPaperItem(before) ||
     /Match each|Match the|A thin uniform|A light ray|One mole|The circuit shown|Four identical/i.test(
@@ -657,15 +684,19 @@ function looksLikeOrphanListTwo(q) {
 
 /** Match-the-column card that still has no List-I (P)–(S) / Titrate / figure rows — do not approve. */
 export function matchQuestionMissingListI(q) {
+  if (isMatrixGridCard(q)) {
+    return (Array.isArray(q.matrixRows) ? q.matrixRows : []).filter((row) => String(row ?? '').trim()).length < 2
+  }
   const t = String(q?.text ?? '').trim()
   if (!t) return false
   if (hasListIEntries(t, q?.options)) return false
+  if (hasOriginalPageCrop(t)) return false
   if (looksLikeOrphanListTwo(q)) return true
   if (looksLikeMatchInstructionOnly(t) && !hasListIEntries(t, q?.options)) return true
   if (looksLikeMatchingListStem(t) && !hasListIEntries(t, q?.options)) return true
   if (
     /match\s+(?:the|each)\b/i.test(t) &&
-    /(?:List|Column)\s*[-–]?\s*I(?!I)/i.test(t) &&
+    /(?:List|Column)\s*[-–]?\s*I(?!I)\b/i.test(t) &&
     countListMarkers(t, ['P', 'Q', 'R', 'S']) < 2 &&
     countListMarkers(t, ['A', 'B', 'C', 'D']) < 3
   ) {
@@ -704,7 +735,14 @@ function extractListIBlockFromWindow(window) {
 }
 
 function extractListIIBlockFromWindow(window) {
-  const raw = rewriteLatexItemLabels(flattenTabularMatchLists(window))
+  let w = String(window ?? '')
+  const listTwoAt = w.search(/(?:List|Column)\s*[-–]?\s*II\b/i)
+  if (listTwoAt >= 0) {
+    // "PART-2 CHEMISTRY / SECTION -1 (...)" after the last row is the next part, never a List-II row.
+    const heading = w.slice(listTwoAt).search(/\n\s*(?:\\section\*?\{\s*)?(?:PART|SECTION)\s*[-–]?\s*(?:\d|[IVX]+)\b/)
+    if (heading > 0) w = w.slice(0, listTwoAt + heading)
+  }
+  const raw = rewriteLatexItemLabels(flattenTabularMatchLists(w))
   const parsed = parseMatchingListForDisplay(raw)
   if (parsed?.listII?.length >= 2) {
     const rows = parsed.listII
@@ -721,7 +759,7 @@ function extractListIIBlockFromWindow(window) {
  * Also cut at a new full paper stem glued without a Q. N marker.
  */
 const OCR_STEM_BOUNDARY_RE =
-  /(?:\\item\s*\[\s*Q[^\]]*\]|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?|(?:^|\n)Q\s*\.?\s*\d{1,2}\b|\b(?:Four identical|A light ray is incident|A thin uniform rod|A source\s*\(\s*S\s*\)|One mole of a|The circuit shown in the figure|A parallel plate|Two identical thin|Based on VSEPR|List-I contains various|Among the following phenolic|In a conductometric|The option\(s\) with correct sequence|A particle of charge|PARAGRAPH|Question\s+Stem\s+for\s+Question\s+Nos?)\b)/gi
+  /(?:\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|(?:\\section\*?\{\s*)?Question\s+Stem\s+for\s+Question\s+Nos?\.?|(?:^|\n)Q\s*\.?\s*\d{1,2}\b|\b(?:Four identical|A light ray is incident|A thin uniform rod|A source\s*\(\s*S\s*\)|One mole of a|The circuit shown in the figure|A parallel plate|Two identical thin|Based on VSEPR|List-I contains various|Among the following phenolic|In a conductometric|The option\(s\) with correct sequence|A particle of charge|PARAGRAPH|Question\s+Stem\s+for\s+Question\s+Nos?)\b)/gi
 
 function clipOcrWindowToQuestion(window, probeAt) {
   const t = String(window ?? '')
@@ -912,7 +950,8 @@ function dropForeignOptionFigures(options, stem, source) {
       .replace(/\$+/g, '')
       .trim()
     if (prose.length > 12) return o
-    if (urls.every((u) => winUrls.has(u))) return o
+    // A crop cut from the original page is never in the scan text.
+    if (urls.every((u) => winUrls.has(u) || isOriginalCropUrl(u))) return o
     return ''
   })
 }
@@ -998,17 +1037,45 @@ function matchWindowOwnsStem(window, stem) {
   return windowBelongsToStem(w, stem)
 }
 
+/**
+ * Printed numbers repeat per subject, so a paragraph's pictures are checked against the
+ * scan right after its own wording, not the first "Q. 17" span.
+ */
+function passageWordingOwnsUrls(passage, source, urls) {
+  const src = String(source ?? '')
+  const lines = stripMathpixImageMarkup(String(passage ?? ''))
+    .replace(/<smiles>[\s\S]*?<\/smiles>/gi, ' ')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 30)
+    .sort((a, b) => b.length - a.length)
+  for (const line of lines.slice(0, 3)) {
+    for (let at = src.indexOf(line); at >= 0; at = src.indexOf(line, at + 1)) {
+      const region = src.slice(at, at + String(passage).length + 2000)
+      if (urls.every((url) => region.includes(url))) return true
+    }
+  }
+  return false
+}
+
 /** Wrong-question drawings: drop URLs that are not in this card's OCR span. */
-function dropStolenFigures(stem, source, printedNumber, map) {
+function dropStolenFigures(stem, source, printedNumber, map, { passage = false } = {}) {
   const t = String(stem ?? '').trim()
   if (!t) return t
   const urls = extractMathpixImageUrls(t)
   if (!urls.length) return t
   const src = String(source ?? '')
-  const span = ocrSpanForCard(src, printedNumber, map, t)
+  if (passage && passageWordingOwnsUrls(t, src, urls.filter((url) => !isOriginalCropUrl(url)))) return t
+  // A shared passage owns the figures of its whole range (heading to last child), not one
+  // child's span, which can run into the next stem's heading and figure.
+  const n = Number(printedNumber)
+  const inRange = passage && officialPyqPassageRanges(src, map).some((r) => n >= r.from && n <= r.to)
+  const span = passage ? (inRange ? ocrSpanForCard(src, printedNumber, map) : '') : ocrSpanForCard(src, printedNumber, map, t)
   const spanUrls = span ? new Set(extractMathpixImageUrls(span)) : null
   let next = t
   for (const url of urls) {
+    // A picture cropped from this card's original page is never in the OCR and never stolen.
+    if (isOriginalCropUrl(url)) continue
     // Only drop when this card's OCR span clearly owns other figures and not this URL.
     if (span && span.length >= 80 && spanUrls && spanUrls.size > 0 && !spanUrls.has(url)) {
       next = stripUrlFromStem(next, url)
@@ -1018,7 +1085,9 @@ function dropStolenFigures(stem, source, printedNumber, map) {
     if (figureSubjectConflictsStem(t, ctx)) next = stripUrlFromStem(next, url)
   }
   next = next.replace(/\n{3,}/g, '\n\n').trim()
-  const kept = extractMathpixImageUrls(next)
+  // Without a scan nothing shows a picture belongs to another question (a hand-edited card is checked this way).
+  if (!src.trim()) return next
+  const kept = extractMathpixImageUrls(next).filter((url) => !isOriginalCropUrl(url))
   if (!kept.length) return next
   if (stemMentionsFigure(next)) return next
   if (kept.length >= 2 && mathpixFiguresSupplyListI(next)) return next
@@ -1040,7 +1109,8 @@ function dropStolenFigures(stem, source, printedNumber, map) {
       return owned.replace(/\n{3,}/g, '\n\n').trim()
     }
   }
-  return stripMathpixImageMarkup(next)
+  if (kept.length === extractMathpixImageUrls(next).length) return stripMathpixImageMarkup(next)
+  return kept.reduce((s, url) => stripUrlFromStem(s, url), next).replace(/\n{3,}/g, '\n\n').trim()
 }
 
 function spliceListIIntoStem(stem, listIBlock) {
@@ -1074,8 +1144,10 @@ function uniqueStemProbes(text) {
       .trim()
     if (s.length >= 12 && !probes.includes(s)) probes.push(s)
   }
-  const rowP = t.match(/\(\s*P\s*\)\s+[^\n]{8,70}/)
+  const rowP = t.match(/\(\s*P\s*\)\s+([^\n]{8,70})/)
   if (rowP) push(rowP[0])
+  // OCR writes the label as \item[P.], so also look for the row wording alone.
+  if (rowP && rowP[1].replace(/\$+/g, '').trim().length >= 24) push(rowP[1])
   const distinctive = t.match(
     /(?:Let\s+\$\\alpha|Let\s+\$f\s*:\s*\\mathbb\{R\}|One mole of a|Four identical thin|A light ray is incident|The circuit shown in the figure|Based on VSEPR|List-I contains various|Among the following phenolic|In a conductometric|A particle of charge|The option\(s\) with correct sequence|conversion of P to Q|Work done in the complete)[^\n]{0,48}/i,
   )
@@ -1206,7 +1278,8 @@ export function restoreMissingListIIFromSource(stem, options, source) {
       const idx = findProbeInSource(src.slice(from), short)
       if (idx < 0) break
       const abs = from + idx
-      const winStart = Math.max(0, abs - 200)
+      // A List-I row probe sits after the whole stem; look back far enough to keep the stem.
+      const winStart = Math.max(0, abs - Math.max(200, Math.min(text.length + 200, 2400)))
       const window = clipOcrWindowToQuestion(src.slice(winStart, abs + 2800), abs - winStart)
       // A later question can have a longer List-II. Keep only the window that
       // still contains this card. Do not delete rows that window already has,
@@ -1230,11 +1303,24 @@ export function restoreMissingListIIFromSource(stem, options, source) {
   return spliceListIIIntoStem(text, bestBlock)
 }
 
+/** Whitespace-free body of every labelled row in a "List-II\n(1) …" block. */
+function listBlockRowBodies(block) {
+  return String(block ?? '')
+    .split('\n')
+    .map((line) => line.match(/^\s*\(\s*(?:[1-6]|[A-Za-z])\s*\)\s*(.*)$/)?.[1] ?? '')
+    .map((body) => body.replace(/\s+/g, ''))
+    .filter(Boolean)
+}
+
 function spliceListIIIntoStem(stem, listIIBlock) {
   const t = String(stem ?? '').trim()
   const block = String(listIIBlock ?? '').trim()
   if (!t || !block) return t
   if (hasListTwoEntries(t)) return t
+  /** The scan's List-II is the card's own, row for row: copying it again only shows it twice (2018 P2 Q16 lost row 4 in both). */
+  const bodies = listBlockRowBodies(block)
+  const flat = t.replace(/\s+/g, '')
+  if (bodies.length && bodies.every((body) => flat.includes(body))) return t
   const emptyII = t.search(
     /(?:List|Column)\s*[-–]?\s*II\b\s*(?=\s*$)/i,
   )
@@ -1738,6 +1824,20 @@ export function matchMappingOptionIsCutOff(opt) {
   ) {
     return false
   }
+  if (
+    ['I', 'II', 'III', 'IV'].every((roman) =>
+      new RegExp(`(?:^|[^A-Za-z])${roman}\\s*\\)?\\s*(?:\\\\rightarrow|→|->)`).test(t),
+    )
+  ) {
+    return false
+  }
+  if (
+    ['I', 'II', 'III', 'IV'].every((roman) =>
+      new RegExp(`(?:^|[^A-Za-z])${roman}\\s*\\)?\\s*(?:\\\\rightarrow|→|->)`).test(t),
+    )
+  ) {
+    return false
+  }
   return /\(\s*P\s*\)/.test(t) && /(?:\\rightarrow|→|->)/.test(t)
 }
 
@@ -1949,7 +2049,8 @@ function ensureStemMathDelimiters(text) {
   s = normalizeSmashedChemDollars(s)
   s = stripBareNumericListTwoDump(s)
   s = stripTrailingPyqSectionHeader(s)
-  return stripAnswerDotTail(s.replace(/\$\s+\$/g, ' '))
+  // Empty "$ $" only; a display closer "$$" then "\n$x$" on the next line is not empty math.
+  return stripAnswerDotTail(s.replace(/(?<!\$)\$\s+\$(?!\$)/g, ' '))
 }
 
 /** Duplicate unlabeled 0 / 2 / 4 dump before a real labeled List-II. */
@@ -1988,7 +2089,7 @@ function freshReactionSequenceStem(stem, source) {
   const sentence = src.lastIndexOf('In the following', idx)
   const from = sentence >= 0 && idx - sentence < 80 ? sentence : idx
   const window = src.slice(from, from + 2200)
-  const cut = window.search(/\n\\item\s*\[\s*Q|\n\\section\*?\s*\{[^}]*SECTION|\nQ\s*\.\s*\d{1,3}\b/i)
+  const cut = window.search(/\n\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|\n\\section\*?\s*\{[^}]*SECTION|\nQ\s*\.\s*\d{1,3}\b/i)
   const slice = cut > 80 ? window.slice(0, cut) : window
   const peeled = extractLatexItemizeMcq(slice)
   if (!peeled?.reactionStepsInStem || String(peeled.stem ?? '').length < 40) return ''
@@ -2025,8 +2126,48 @@ function restoreTabularOptionsFromOcr(stem, options, source) {
   const tab = extractLatexTabularMcq(window)
   if (!tab || tab.options.length < 2) return opts
   const next = tab.options.slice(0, 4).map((o) => String(o ?? ''))
+  // "options (A), (B), (C) and (D)" in a section instruction leaves only commas and "and".
+  if (next.filter((o) => /[\p{L}\d\\<]/u.test(o.replace(/^\s*(?:and|or)\s*$/i, ''))).length < 2) return opts
   while (next.length < 4) next.push('')
   return next
+}
+
+function mathHasUnpairedLeftRight(text) {
+  const segments = String(text ?? '').match(/\$\$[\s\S]*?\$\$|\$[^$]*\$/g) || []
+  return segments.some((seg) => {
+    const lefts = (seg.match(/\\left(?![a-zA-Z])/g) || []).length
+    const rights = (seg.match(/\\right(?![a-zA-Z])/g) || []).length
+    return lefts !== rights
+  })
+}
+
+/**
+ * A card that draws cleanly can still need the full heal: match questions carry list,
+ * key and option fixes; other cards may be missing a figure or paragraph the scan has.
+ */
+function cardNeedsFullHeal(q, text, passage, options, source, map) {
+  if (/(?:List|Column)\s*[-–]?\s*I{1,2}\b|match\s+(?:the|each)\b/i.test(text)) return true
+  if (options.some((opt) => /^\s*[\]\)}]/.test(opt))) return true
+  if (/\\begin\{/.test(text) || mathHasUnpairedLeftRight(text)) return true
+  if (/PARAGRAPH|\\section\*?\{|\\item\[/i.test(text)) return true
+  if (options.some((opt) => opt.trim().length >= 8 && text.includes(opt.trim()))) return true
+  if (
+    options.filter((opt) => opt.trim()).length < 4 &&
+    peelGluedMcqOptions(text, options, source).text.trim() !== text.trim()
+  ) {
+    return true
+  }
+  const figures = extractMathpixImageUrls(text)
+  if ((text.match(/\\includegraphics|!\[[^\]]*\]\(/g) || []).length > figures.length) return true
+  const src = String(source ?? '')
+  if (src.length < 40) return false
+  const hasFigure = figures.length > 0
+  if (!hasFigure && stemMentionsFigure(text) && /\\includegraphics|cdn\.mathpix/i.test(src)) return true
+  if (hasFigure && dropStolenFigures(text, src, printedQuestionNumber(q), map) !== text) return true
+  if (!/PARAGRAPH/i.test(src)) return false
+  return passage.trim()
+    ? officialPyqPassageNeedsOcrRefresh(passage, q, src)
+    : officialPyqCardAllowsPassage(q, src, map)
 }
 
 /**
@@ -2036,8 +2177,9 @@ function restoreTabularOptionsFromOcr(stem, options, source) {
  * @param {unknown} source
  */
 export function healUploadQuestionCard(q, source, map) {
-  if (!q || typeof q !== 'object' || q.placeholder === true) return q
-  const textFixed = restoreDroppedMsOnGivenLine(String(q.text ?? ''))
+  if (!q || typeof q !== 'object' || q.placeholder === true || isMatrixGridCard(q)) return q
+  q = restoreLabelledFigureOptions(q, source)
+  const textFixed = repairScanStructureCodes(restoreDroppedMsOnGivenLine(String(q.text ?? '')))
   const passageFixed = restoreDroppedMsOnGivenLine(String(q.passageText ?? ''))
   if (textFixed !== String(q.text ?? '') || (q.passageText != null && passageFixed !== String(q.passageText))) {
     q = {
@@ -2052,11 +2194,15 @@ export function healUploadQuestionCard(q, source, map) {
   const alreadyClean =
     !storedMatchOptionsAreCutOff(storedOpts) &&
     !storedOpts.some((opt) => visibleLatexSourceHits(opt).length > 0) &&
-    !stemLooksIncompleteOnDisplay(storedText) &&
+    !stemLooksIncompleteOnDisplay(storedText, storedOpts) &&
     !stemLooksIncompleteOnDisplay(storedPassage) &&
-    ![storedText, storedPassage, ...storedOpts].some((part) => visibleLatexSourceHits(part).length > 0)
+    ![storedText, storedPassage, ...storedOpts].some((part) => visibleLatexSourceHits(part).length > 0) &&
+    peelForeignComprehensionFromStem(storedText, q) === storedText &&
+    repairSmashedWeightSubscripts(storedText, source) === storedText &&
+    !cardNeedsFullHeal(q, storedText, storedPassage, storedOpts, source, map)
   if (alreadyClean) {
-    const peeled = peelPrintedAnswerFromStem(storedText)
+    const unnumbered = stripRepeatedQuestionNumberPrefix(storedText)
+    const peeled = peelPrintedAnswerFromStem(unnumbered === storedText.trim() ? storedText : unnumbered)
     return peeled === storedText ? q : { ...q, text: peeled }
   }
   const src = String(source ?? '')
@@ -2068,9 +2214,9 @@ export function healUploadQuestionCard(q, source, map) {
   text = repairSmashedWeightSubscripts(text, src)
   const printedN = printedQuestionNumber(q)
   text = dropStolenFigures(text, src, printedN, map)
-  text = stripChemistryLeakFromPhysicsStem(text)
+  text = stripChemistryLeakFromPhysicsStem(text, String(q.subject || ''))
   text = restoreMissingListIFromSource(text, q.options, src)
-  text = stripForeignListTwo(text)
+  text = stripForeignListTwo(text, String(q.subject || ''))
   {
     const folded = foldListIIFromOptionsIntoStem(text, q.options)
     text = folded.text
@@ -2102,7 +2248,7 @@ export function healUploadQuestionCard(q, source, map) {
   options = (Array.isArray(glued.options) ? glued.options : []).map((o) =>
     stripTrailingPyqSectionHeader(ensureOptionMathDelimiters(o)),
   )
-  options = restoreTabularOptionsFromOcr(text, options, src)
+  if (!/^(?:integer|numerical)$/.test(String(q.questionType ?? ''))) options = restoreTabularOptionsFromOcr(text, options, src)
   options = dropForeignOptionFigures(options, text, src)
   options = dropLoneMatchArrowDebris(options, text, src)
   options = dropSmilesFragmentsFromMatchOptions(options, text)
@@ -2133,7 +2279,7 @@ export function healUploadQuestionCard(q, source, map) {
   let passageText = peeledCard.passageText
   if (passageText) {
     passageText = restoreMissingFiguresFromSource(passageText, src, printedN, map)
-    passageText = dropStolenFigures(passageText, src, printedN, map)
+    passageText = dropStolenFigures(passageText, src, printedN, map, { passage: true })
     passageText = sanitizeStemForDisplay(passageText)
   }
   const samePass = String(passageText ?? '') === String(q.passageText ?? '')
@@ -2242,8 +2388,14 @@ export function applyUploadQualityGuards(questions, source, map) {
     const prevFp = cardOpenDedupeKey(prev?.text)
     // Identical stems drop. A shared "Match each entry…" opener is not identity —
     // cardOpenDedupeKey ignores that sentence, so different List-I sets both stay.
+    // Paired match questions share one stem ("…considering List-I and List-II?")
+    // and differ only in A–D, so different filled options keep both.
     if (prev && prevFp && prevFp === fp && prevFp.length >= 80) {
-      continue
+      const filled = (c) => (Array.isArray(c?.options) ? c.options : []).map((o) => String(o ?? '').trim())
+      const a = filled(prev)
+      const b = filled(healed)
+      const thin = a.filter(Boolean).length < 2 || b.filter(Boolean).length < 2
+      if (thin || a.join('\n') === b.join('\n')) continue
     }
     out.push(healed)
   }
@@ -2311,7 +2463,8 @@ function isDisplayLeftoverCard(q) {
   if (isLeftoverMatchFragment(q)) return true
   if (isJunkOfficialPyqRow(q)) return true
   const tornTable = /\\end\{tabular\}/i.test(t) && !/\\begin\{tabular\}/i.test(t)
-  const midSentence = /^[a-z]/.test(t) && !/^(?:sin|cos|tan|log|lim)\b/.test(t)
+  // A full A–D set of its own means a real question whose first letter OCR lost ("he reactivity").
+  const midSentence = /^[a-z]/.test(t) && !/^(?:sin|cos|tan|log|lim)\b/.test(t) && optionCount(q) < 4
   if (looksLikeOrphanFragment(t) && (optionCount(q) < 2 || tornTable || midSentence)) return true
   return false
 }
@@ -2418,6 +2571,7 @@ function mergeTwoQuestionCards(prev, next) {
 
 function matchingListQuestionType(prev, next, joinedStem, options) {
   const n = (Array.isArray(options) ? options : []).filter((o) => String(o ?? '').trim()).length
+  if (prev?.typeSource === 'admin_facts') return prev.questionType
   if (n >= 2 && hasListIEntries(joinedStem)) {
     const prevType = String(prev?.questionType || next?.questionType || 'single_correct')
     return prevType === 'matrix_match' ? 'single_correct' : prevType
@@ -2593,7 +2747,12 @@ function mergeOrphanStemContinuationsOnce(list) {
 }
 
 function matchTwinKey(q) {
-  const t = foldStem(q?.text)
+  // Figure URLs share one long CDN prefix per paper, so they cannot tell two questions apart.
+  const t = foldStem(
+    String(q?.text ?? '')
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g, ' '),
+  )
   const p = t.match(/\(p\)\s*(.{16,80})/)
   if (p) return `p:${p[1].slice(0, 64)}`
   return ''
@@ -2671,6 +2830,7 @@ function attachStrayListTwoToPrevious(list) {
     const prev = out[out.length - 1]
     const prevNeedsTail =
       prev &&
+      !listTwoHasOwnStem(q) &&
       prevAcceptsMatchContinuation(prev) &&
       (matchingListMissingListTwo(prev) || optionCount(prev) < 2)
     if (prevNeedsTail) {
@@ -2719,7 +2879,7 @@ export function officialPyqPaperSourceText(paper) {
   if (!paper || typeof paper !== 'object') return ''
   const notes = String(paper.notes ?? '')
   const prepared = String(paper.preparedText ?? '')
-  const stored = `${notes}\n\n${prepared}`.trim()
+  const stored = stripHindiOcr(`${notes}\n\n${prepared}`.trim())
   // Stored OCR / notes are the paper. Do not concatenate every other card —
   // that steals chemistry figures into a physics List-II and can freeze Q17
   // while scanning 51 figure-heavy stems (Approve shows 0 stored OCR chars).
@@ -2816,11 +2976,15 @@ export function prepareOfficialPyqHealContext(paper, opts = {}) {
     rebuilt,
     qs,
     workingQs,
+    gridCards: (rebuilt || workingQs).filter(isMatrixGridCard),
   }
 }
 
 /** One card: restore List-I, wrap math, recover options. Never invents rows. */
 export function extendOfficialPyqHealCard(q, source) {
+  if (isMatrixGridCard(q)) return q
+  // Pictures cut from the original page stay. The scan's cut-up copy is not pasted back (2014 P2 Q37).
+  if (hasOriginalPageCrop(q?.text) || hasOriginalPageCrop(q?.passageText)) return q
   let text = restoreMissingListIFromSource(
     stripPageBreakAndSectionGlue(extendStemFromSource(q.text, source)),
     q.options,
@@ -2861,7 +3025,10 @@ export function extendOfficialPyqHealCard(q, source) {
     text,
     options,
     questionType:
-      nOpts >= 2 && hasListIEntries(text) && q.questionType === 'matrix_match'
+      nOpts >= 2 &&
+      q.typeSource !== 'admin_facts' &&
+      hasListIEntries(text) &&
+      q.questionType === 'matrix_match'
         ? 'single_correct'
         : q.questionType,
   }
@@ -2881,9 +3048,10 @@ export function finalizeOfficialPyqHealCards(extended, ctx, opts = {}) {
     ctx.pickTarget,
     ctx.minKeep,
   )
-  const healed = opts.skipGuards
+  const guarded = opts.skipGuards
     ? assignUniqueOfficialPyqNumbers(picked || final)
     : applyUploadQualityGuards(picked || final, ctx.source)
+  const healed = keepMatrixGridCards(ctx.gridCards, guarded)
   if (!ctx.reserved.length) return healed
   return mergeReservedOfficialPyqSlots(ctx.reserved, healed)
 }

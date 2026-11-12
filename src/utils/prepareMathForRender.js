@@ -26,6 +26,7 @@ import {
   repairOrphanPiecewiseArray,
 } from './wrapBareLatexRuns.js'
 import {
+  LATEX_FENCE,
   convertLatexTabularToArray,
   restoreSheetConfigHtml,
   stashSheetConfigHtml,
@@ -125,6 +126,28 @@ function convertMathpixDelimiters(text) {
  * Multi-row \begin{array} must sit in balanced $$…$$ for MathText / KaTeX.
  * @param {string} text
  */
+/** Inside $…$ or $$…$$ at `offset`; $$ toggles display math as one delimiter. */
+function insideMathBefore(before) {
+  let inline = false
+  let display = false
+  for (let i = 0; i < before.length; i += 1) {
+    if (before[i] === '\\') {
+      i += 1
+      continue
+    }
+    if (before[i] !== '$') continue
+    if (before[i + 1] === '$') {
+      display = !display
+      i += 1
+    } else {
+      inline = !inline
+    }
+  }
+  return inline || display
+}
+
+const LEFT_FENCE_TAIL = new RegExp(String.raw`\\left\s*${LATEX_FENCE}?\s*$`)
+
 export function wrapDisplayArrayBlocks(text) {
   if (!text?.includes('\\begin{array}')) return text
 
@@ -160,7 +183,7 @@ export function wrapDisplayArrayBlocks(text) {
     (full, block, offset, str) => {
       const before = String(str ?? '').slice(0, offset)
       if (((before.match(/(?<!\\)\$/g) || []).length % 2) === 1) return full
-      if (/\\left\s*[(\[{.]?\s*$/.test(before.slice(-16))) return full
+      if (LEFT_FENCE_TAIL.test(before.slice(-24))) return full
       return /\\\\/.test(block) ? `$$${block}$$` : `$${block}$`
     },
   )
@@ -168,8 +191,8 @@ export function wrapDisplayArrayBlocks(text) {
     /(?<!\$)\s*(\\begin\{array\}\{[^}]*\}[\s\S]*?\\end\{array\})\s*(?!\$)/g,
     (full, block, offset, str) => {
       const before = String(str ?? '').slice(0, offset)
-      if (((before.match(/(?<!\\)\$/g) || []).length % 2) === 1) return full
-      if (/\\left\s*[(\[{.]?\s*$/.test(before.slice(-16))) return full
+      if (insideMathBefore(before)) return full
+      if (LEFT_FENCE_TAIL.test(before.slice(-24))) return full
       if (/\$\$/.test(full)) return full
       return /\\\\/.test(block) ? `$$${String(block).trim()}$$` : full
     },
@@ -202,8 +225,9 @@ export function repairPiecewiseBraceArray(text) {
     (_, a, gAssign, b) =>
       `\\begin{cases}${a}\\end{cases}$ and $$${gAssign}\\begin{cases}${b}\\end{cases}$$`,
   )
+  // cases brings its own brace, so the "\right." that closed \left\{ goes too.
   s = s.replace(
-    /\\left\s*\\\{\s*\\begin\{array\}\{l+\}([\s\S]*?)\\end\{array\}/gi,
+    /\\left\s*\\\{\s*\\begin\{array\}\{l+\}([\s\S]*?)\\end\{array\}(?:\s*\\right\s*\.)?/gi,
     (_, body) => `\\begin{cases}${body}\\end{cases}`,
   )
   // After sanitize: f(x)=$\{$ $$\begin{array}…\end{array}$$
@@ -754,6 +778,37 @@ function wrapBareFractionsAndRoots(text) {
   return out
 }
 
+const MATH_UNIT = String.raw`(?:kcal|cal|kJ|J|mol|K|atm|bar|M|mL|L|dm|cm|mm|nm|pm|km|kg|mg|g|s|min|h|Pa|kPa|V|mV|Hz|eV|W)`
+const NUMBER_UNIT_RE = new RegExp(String.raw`(\d|\^\{[^{}]*\})\s+\\mathrm\s*\{\s*(${MATH_UNIT})\s*\}`, 'g')
+const UNIT_UNIT_RE = new RegExp(
+  String.raw`(\\mathrm\s*\{\s*${MATH_UNIT}\s*\}(?:\^\{[^{}]*\})?)\s+\\mathrm\s*\{\s*(${MATH_UNIT})\b`,
+  'g',
+)
+
+/** KaTeX drops source spaces, so `105 \mathrm{kcal} \mathrm{mol}` would draw as "105kcalmol". */
+export function spaceMathUnits(text) {
+  let s = String(text ?? '')
+  s = s.replace(/\(\s*\\mathrm\s*\{\s*~\s*(g|l|s|aq)\s*\}\s*\)/g, '(\\mathrm{$1})')
+  s = s.replace(NUMBER_UNIT_RE, (_, lead, unit) => `${lead}~\\mathrm{${unit}}`)
+  s = s.replace(/(\d~\\mathrm\{M\})\s+\\mathrm\s*\{(?!\s*~)/g, '$1~\\mathrm{')
+  for (let i = 0; i < 3; i += 1) {
+    const next = s.replace(UNIT_UNIT_RE, (_, first, unit) => `${first}~\\mathrm{${unit}`)
+    if (next === s) break
+    s = next
+  }
+  return s
+}
+
+/**
+ * The paper's answer blank "____" inside math is not TeX. A blank that is the whole
+ * formula is plain text; one inside a formula becomes a drawn blank line.
+ */
+export function answerBlanksInMath(text) {
+  return String(text ?? '')
+    .replace(/(?<!\$)\$\s*(_{2,})\s*\$(?!\$)/g, (_, blank) => blank)
+    .replace(/\$[^$\n]*\$/g, (seg) => seg.replace(/(?<![\\_])_{2,}(?![_{])/g, '\\underline{\\hspace{2em}}'))
+}
+
 /**
  * Full display pipeline for MathText — sanitize OCR glitches, then KaTeX prep.
  * @param {string} text
@@ -809,6 +864,7 @@ export function prepareTextForMathTextDisplay(text, opts = {}) {
   out = sanitizeStemForDisplay(out)
   out = cleanupBrokenStemDelimiters(normalizeSmashedChemDollars(out))
   out = stripLatexDisplayChrome(out)
+  out = answerBlanksInMath(spaceMathUnits(out))
   out = stripMarkdownBoldOutsideMath(out)
   out = healTruncatedLatexForDisplay(out)
   if (/\\text\s*\{\s*frac\s*\}/i.test(out) || /\\frac\s*\\\{/.test(out)) {
@@ -917,9 +973,11 @@ function keepClosedMath(raw, finished) {
   const opened = !hasUnclosedDisplayMath(raw) && hasUnclosedDisplayMath(finished)
   const leaked = !commandLeftOutsideMath(raw) && commandLeftOutsideMath(finished)
   if (!opened && !leaked) return finished
-  const safe = convertLatexTabularToArray(sanitizeStemForDisplay(raw))
+  const safe = answerBlanksInMath(convertLatexTabularToArray(sanitizeStemForDisplay(raw)))
   if (!hasUnclosedDisplayMath(safe) && !commandLeftOutsideMath(safe)) return safe
-  if (!hasUnclosedDisplayMath(raw) && !commandLeftOutsideMath(raw)) return convertLatexTabularToArray(raw)
+  if (!hasUnclosedDisplayMath(raw) && !commandLeftOutsideMath(raw)) {
+    return answerBlanksInMath(convertLatexTabularToArray(raw))
+  }
   return finished
 }
 

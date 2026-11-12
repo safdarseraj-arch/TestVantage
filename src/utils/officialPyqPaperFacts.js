@@ -3,6 +3,11 @@
  * junk, subjects, and types. No network and no invented questions.
  */
 
+import { cleanOfficialPyqPassageBody } from './passage.js'
+import { MATRIX_GRID_FACT_TYPE, isMatrixGridCard, matrixGridSectionFacts, withFactType } from './matrixGridPyq.js'
+import { stripHindiOcr } from './stripHindiOcr.js'
+import { stripEndAnswerSection } from './printedEndSolutions.js'
+
 const WORD = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
 }
@@ -25,15 +30,28 @@ function normalizeSubject(name) {
   return ''
 }
 
+/** OCR prints the letter O as a zero in count words ("TW0 (02)"). */
+function fixZeroInCountWords(text) {
+  return String(text ?? '').replace(/\b[A-Za-z]*0[A-Za-z0]*\b/g, (w) => {
+    if (!/[A-Za-z]/.test(w)) return w
+    const fixed = w.replace(/0/g, 'O')
+    return WORD[fixed.toLowerCase()] ? fixed : w
+  })
+}
+
 function sectionType(window) {
   const t = String(window || '')
-  if (/matching\s+list|match\s+list|match\s+the\s+following/i.test(t)) return 'matrix_match'
+  if (matrixGridSectionFacts(t)) return MATRIX_GRID_FACT_TYPE
+  if (/matching\s+list|match\s+list|list[-\s]match|match\s+the\s+following/i.test(t)) return 'matrix_match'
   if (/one\s+or\s+more/i.test(t)) return 'multiple_correct'
   if (/only\s+one/i.test(t)) return 'single_correct'
   if (/numerical/i.test(t)) return 'numerical'
   if (/non[-\s]?negative\s+integer|\binteger\b/i.test(t)) return 'integer'
   return ''
 }
+
+const PRINTED_Q_LABEL_RE =
+  /\\item\s*\[\s*Q\.?\s*\]\s*(\d{1,3})(?!\d)|\\item\s*\[\s*Q\.?\s*(\d{1,3})\s*\]|(?<![A-Za-z\\])Q\s*\.\s*(\d{1,3})(?!\d)/g
 
 /**
  * Read part headings and "This section contains …" lines.
@@ -42,11 +60,14 @@ function sectionType(window) {
  * @param {unknown} raw
  */
 export function buildPaperFacts(raw) {
-  const text = String(raw ?? '').replace(/\r\n/g, '\n')
+  const text = fixZeroInCountWords(stripEndAnswerSection(stripHindiOcr(raw)).replace(/\r\n/g, '\n'))
   const sections = []
   const notes = []
+  // 2026: "This section contains TWO (02) questions corresponding to each question stem" is the
+  // per-stem count of the section above, not a new section.
+  // 2014: "This section contains 10 multiple choice type questions".
   const re =
-    /This section contains\s+([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*(question stems?|paragraphs?|matching list(?:\s+sets)?|questions?)/gi
+    /This section contains\s+([A-Za-z]+|\d+)\s*(?:\(\s*0*(\d+)\s*\)\s*)?(?:(?:multiple\s+choice|integer(?:\s+answer)?|numerical(?:\s+value)?|single\s+correct)\s+(?:type\s+)?)?(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)\b(?!\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)/gi
   let m
   let subject = ''
   let sawHeading = false
@@ -73,7 +94,12 @@ export function buildPaperFacts(raw) {
     const kind = String(m[3] || '').toLowerCase()
     const n = wordNumber(m[1], m[2])
     const ahead = text.slice(at, at + 500)
-    const stop = ahead.slice(20).search(/This section contains|\bSECTION\s*[-–]?\s*\d/i)
+    // "This section contains TWO tables" (2017) describes the same section, so it does not end the window.
+    const stop = ahead
+      .slice(20)
+      .search(
+        /This section contains\s+(?:[A-Za-z]+|\d+)\s*(?:\(\s*0*\d+\s*\)\s*)?(?:(?:multiple\s+choice|integer(?:\s+answer)?|numerical(?:\s+value)?|single\s+correct)\s+(?:type\s+)?)?(?:question(?!s?\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)|paragraph|matching list|list[-\s]match)|\bSECTION\s*[-–]?\s*\d/i,
+      )
     const window = stop >= 0 ? ahead.slice(0, stop + 20) : ahead
     let count = 0
     let stems = 0
@@ -83,13 +109,23 @@ export function buildPaperFacts(raw) {
       const each =
         window.match(
           /([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*questions?\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b/i,
-        ) || window.match(/\beach\b[^.\n]{0,120}?([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*questions?/i)
+        ) ||
+        window.match(
+          /\beach\b[^.\n]{0,120}?([A-Za-z]+|\d+)\s*\(\s*0*(\d+)\s*\)\s*(?:multiple\s+choice\s+)?questions?/i,
+        ) ||
+        // 2017: "Based on each paragraph, there are TWO questions" (no "(02)"); 2015: "there will be TWO questions".
+        window.match(
+          /\beach\s+(?:paragraph|passage|question\s+stem|stem)\b[^.\n]{0,40}?\bthere\s+(?:are|is|will\s+be)\s+([A-Za-z]+|\d+)()\s+(?:multiple\s+choice\s+)?questions?/i,
+        ) ||
+        // 2014: "Six questions relate to the three paragraphs with two questions on each paragraph".
+        window.match(/\b([A-Za-z]+|\d+)()\s+questions?\s+on\s+each\s+(?:paragraph|passage|question\s+stem|stem)\b/i)
       const k = each ? wordNumber(each[1], each[2]) : 0
       count = k ? n * k : 0
       if (!k) notes.push(`OCR does not say how many questions sit under “${m[0].replace(/\s+/g, ' ')}”.`)
     }
     const type = sectionType(window)
     if (!type) notes.push(`OCR does not name the question type for “${m[0].replace(/\s+/g, ' ')}”.`)
+    const grid = type === MATRIX_GRID_FACT_TYPE ? matrixGridSectionFacts(window) : null
     sections.push({
       subject,
       part,
@@ -99,6 +135,7 @@ export function buildPaperFacts(raw) {
       type,
       kind,
       source,
+      ...(grid ? { listI: grid.rows, listII: grid.cols } : {}),
     })
   }
   if (!sections.length) {
@@ -110,8 +147,30 @@ export function buildPaperFacts(raw) {
   if (sawHeading && headings.size < 3 && sections.length >= 6) {
     notes.push('OCR is missing a PHYSICS, CHEMISTRY, or MATHEMATICS part heading. Those questions are not tagged.')
   }
-  const known = sections.length > 0 && sections.every((s) => s.count > 0 && s.type)
-  const expectedQuestionCount = known ? sections.reduce((n, s) => n + s.count, 0) : null
+  // Every subject of a sitting prints the same sections; a subject with fewer means the scan
+  // dropped a "This section contains …" line (2014 P1 lost Chemistry and Maths Section 2).
+  const perSubject = new Map()
+  for (const s of sections) if (s.subject) perSubject.set(s.subject, (perSubject.get(s.subject) || 0) + 1)
+  const uneven = perSubject.size >= 2 && sections.every((s) => s.subject) && new Set(perSubject.values()).size > 1
+  if (uneven) {
+    notes.push(
+      `OCR shows ${[...perSubject].map(([sub, n]) => `${n} section(s) for ${sub}`).join(', ')}. A section instruction is missing, so the facts card is unknown.`,
+    )
+  }
+  let known = !uneven && sections.length > 0 && sections.every((s) => s.count > 0 && s.type)
+  let expectedQuestionCount = known ? sections.reduce((n, s) => n + s.count, 0) : null
+  // Restart numbering never prints a label above the total, so a higher label means a lost instruction.
+  const highestLabel = Math.max(
+    0,
+    ...[...text.matchAll(PRINTED_Q_LABEL_RE)].map((l) => Number(l[1] || l[2] || l[3]) || 0),
+  )
+  if (known && highestLabel > expectedQuestionCount) {
+    notes.push(
+      `OCR prints Q. ${highestLabel}, and its section instructions add up to only ${expectedQuestionCount} questions. A section instruction is missing, so the facts card is unknown.`,
+    )
+    known = false
+    expectedQuestionCount = null
+  }
   return {
     known,
     expectedQuestionCount,
@@ -132,9 +191,14 @@ function filledOptions(options) {
   return (Array.isArray(options) ? options : []).map((o) => String(o ?? '').trim()).filter(Boolean)
 }
 
+/** "Answer Q.13, Q. 14 and Q. 15 by appropriately matching …" (2017 tables, 2019 paragraphs). */
+const MATCH_GROUP_HEAD_RE =
+  /^(?:\\(?:section\*?|caption)\{)?\s*Answer\s+Q\.?\s*\d{1,3}(?:\s*,\s*Q\.?\s*\d{1,3})*\s+and\s+Q\.?\s*\d{1,3}\s+by\s+appropriately\s+matching/i
+
 export function isPassageOnlyCard(q) {
   const t = String(q?.text ?? '').trim()
   if (!t) return false
+  if (MATCH_GROUP_HEAD_RE.test(t) && !/\\item\s*\[\s*Q|(?:^|\n)\s*\[\s*A\s*\]/.test(t)) return true
   const opts = filledOptions(q?.options)
   if (opts.length >= 2) return false
   return /^(?:\\section\*?\{[^}]*\})?\s*(?:Paragraph|PARAGRAPH|Passage|Question\s+Stem)\b/i.test(t)
@@ -150,15 +214,21 @@ function isJunkOnlyCard(q) {
 }
 
 function passageBodyFromCard(text) {
-  return stripPyqJunkText(
-    String(text ?? '')
-      .replace(/\\section\*?\{([^}]*)\}/gi, '$1')
-      .replace(/^(?:Paragraph|PARAGRAPH|Passage|Question\s+Stem(?:\s+for\s+Question\s+Nos?\.?\s*\d{1,2}\s+and\s+\d{1,2})?)\b[:.\s-]*/i, ''),
+  return cleanOfficialPyqPassageBody(
+    stripPyqJunkText(
+      String(text ?? '')
+        .replace(/\\section\*?\{([^}]*)\}/gi, '$1')
+        .replace(/^(?:Paragraph|PARAGRAPH|Passage|Question\s+Stem(?:\s+for\s+Question\s+Nos?\.?\s*\d{1,2}\s+and\s+\d{1,2})?)\b[:.\s-]*/i, '')
+        .replace(/^["“”']\s*[A-Z0-9]{1,4}\s*["“”']\s*/, ''),
+    ),
   )
 }
 
 function namedStemNums(text) {
-  const m = String(text ?? '').match(/Question\s+Nos?\.?\s*(\d{1,2})\s+and\s+(\d{1,2})/i)
+  const t = String(text ?? '')
+  const head = t.match(MATCH_GROUP_HEAD_RE)
+  if (head) return [...head[0].matchAll(/Q\.?\s*(\d{1,3})/gi)].map((m) => Number(m[1])).filter((n) => n > 0)
+  const m = t.match(/Question\s+Nos?\.?\s*(\d{1,2})\s+and\s+(\d{1,2})/i)
   if (!m) return []
   return [Number(m[1]), Number(m[2])].filter((n) => n > 0)
 }
@@ -214,9 +284,9 @@ function attachNamedStems(questions, ocr) {
   while ((m = re.exec(src))) {
     const start = m.index + m[0].length
     const rest = src.slice(start)
-    const cut = rest.search(/\\item\s*\[\s*Q[^\]]*\]\s*\d|\\section\*?\{|Question\s+Stem\s+for\s+Question/i)
+    const cut = rest.search(/\\item\s*\[\s*Q[^\]]*\]\s*\d|(?:^|\n)\s*Q\s*\.\s*\d{1,2}\b|\\section\*?\{|Question\s+Stem\s+for\s+Question/i)
     let body = (cut > 40 ? rest.slice(0, cut) : rest.slice(0, 1800)).trim()
-    body = stripPyqJunkText(body.replace(/^[\s:.-]+/, ''))
+    body = cleanOfficialPyqPassageBody(stripPyqJunkText(body.replace(/^[\s:.-]+/, '')))
     if (body.length < 20) continue
     jobs.push({ nums: [Number(m[1]), Number(m[2])], body, at: m.index })
   }
@@ -229,20 +299,35 @@ function attachNamedStems(questions, ocr) {
     }
     return name
   }
-  return questions.map((q) => {
+  /** Continuous numbering on the cards (Chemistry Q24) while the paper prints "Nos. 5 and 6" per subject. */
+  const seenInSubject = new Map()
+  const localNumber = questions.map((q) => {
+    const sub = String(q?.subject || '')
+    const n = (seenInSubject.get(sub) || 0) + 1
+    seenInSubject.set(sub, n)
+    return n
+  })
+  return questions.map((q, i) => {
     const n = Number(q?.printedNumber || q?.questionNumber)
     const sub = String(q?.subject || '')
-    const job = jobs.find((row) => {
-      if (!row.nums.includes(n)) return false
-      const jobSub = subjectAt(row.at)
-      if (sub && jobSub && jobSub !== sub) return false
-      if (!sub && jobSub && questions.some((other) => String(other?.subject || '') === jobSub && Number(other?.printedNumber) === n)) {
-        return false
-      }
-      return true
-    })
+    const job =
+      jobs.find((row) => {
+        if (!row.nums.includes(n)) return false
+        const jobSub = subjectAt(row.at)
+        if (sub && jobSub && jobSub !== sub) return false
+        if (!sub && jobSub && questions.some((other) => String(other?.subject || '') === jobSub && Number(other?.printedNumber) === n)) {
+          return false
+        }
+        return true
+      }) ||
+      (sub && localNumber[i] !== n
+        ? jobs.find((row) => row.nums.includes(localNumber[i]) && subjectAt(row.at) === sub)
+        : undefined)
     if (!job) return q
-    if (String(q.passageText || '').trim().length >= job.body.length) return q
+    const stored = cleanOfficialPyqPassageBody(q.passageText)
+    if (stored.length >= job.body.length) {
+      return stored === String(q.passageText ?? '') ? q : { ...q, passageText: stored }
+    }
     return {
       ...q,
       passageText: job.body,
@@ -263,9 +348,8 @@ function stampFromAdminFacts(questions, facts) {
   return questions.map((q, i) => {
     const slot = slots[i]
     return {
-      ...q,
+      ...withFactType(q, slot.type),
       subject: slot.subject,
-      questionType: slot.type,
       paperPart: slot.part,
       printedNumber: slot.printed,
       questionNumber: i + 1,
@@ -291,7 +375,10 @@ function stampFromFacts(questions, facts) {
         q.paperPart = section.part
         if (section.subject) q.subject = section.subject
         else if (section.headingMissing) q.subject = ''
-        if (section.type) q.questionType = section.type
+        // A grid card is read from the same instructions, so the OCR facts leave it alone.
+        if (section.type && section.type !== MATRIX_GRID_FACT_TYPE && !isMatrixGridCard(q)) {
+          q.questionType = section.type
+        }
         if (section.type === 'numerical' || section.type === 'integer') q.options = []
       }
       cursor += 1

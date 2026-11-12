@@ -6,6 +6,14 @@
  */
 
 import { buildPaperFacts, shapeOfficialPyqDrafts } from './officialPyqPaperFacts.js'
+import {
+  MATRIX_GRID_DEFAULT_COLS,
+  MATRIX_GRID_DEFAULT_ROWS,
+  MATRIX_GRID_FACT_TYPE,
+  withFactType,
+} from './matrixGridPyq.js'
+import { stripHindiOcr } from './stripHindiOcr.js'
+import { labelNumberedQuestions } from './numberedQuestionMarkers.js'
 
 export const ADMIN_FACTS_VERSION = 1
 
@@ -21,7 +29,13 @@ export const FACT_TYPES = [
   { id: 'integer', label: 'Integer', options: 0 },
   { id: 'numerical', label: 'Numerical (decimal)', options: 0 },
   { id: 'matrix_match', label: 'Match the lists', options: 4 },
+  { id: MATRIX_GRID_FACT_TYPE, label: 'Matrix match (grid)', options: 0, listI: MATRIX_GRID_DEFAULT_ROWS, listII: MATRIX_GRID_DEFAULT_COLS },
 ]
+
+/** A type whose answer is ticked on the paper, not picked from options. */
+export function typeHasNoOptions(type) {
+  return type === 'integer' || type === 'numerical' || type === MATRIX_GRID_FACT_TYPE
+}
 
 const TYPE_IDS = new Set(FACT_TYPES.map((t) => t.id))
 const SUBJECT_IDS = FACT_SUBJECTS.map((s) => s.id)
@@ -32,6 +46,12 @@ export function subjectLabel(id) {
 
 export function defaultOptionsFor(type) {
   return FACT_TYPES.find((t) => t.id === type)?.options ?? 4
+}
+
+/** Default Column I / Column II sizes for a type ('' when the type has none). */
+export function defaultListSizesFor(type) {
+  const t = FACT_TYPES.find((row) => row.id === type)
+  return { listI: t?.listI ?? '', listII: t?.listII ?? '' }
 }
 
 /** @returns {{ from: number|'', to: number|'', type: string, options: number|'', listI: number|'', listII: number|'' }} */
@@ -109,8 +129,8 @@ export function draftAdminFacts(ocr, questions = []) {
         to: next + count - 1,
         type,
         options: defaultOptionsFor(type),
-        listI: '',
-        listII: '',
+        listI: Number(s.listI) > 0 ? Number(s.listI) : '',
+        listII: Number(s.listII) > 0 ? Number(s.listII) : '',
       })
       const stems = Number(s.stems) || 0
       const each = stems > 0 ? count / stems : 0
@@ -133,7 +153,9 @@ export function draftAdminFacts(ocr, questions = []) {
     0,
     ...(Array.isArray(questions) ? questions : []).map((q) => Number(q?.printedNumber) || 0),
   )
-  const numbering = perSubject && maxPrinted > perSubject + 2 ? 'continuous' : 'restart'
+  const numbering =
+    numberingPrintedInOcr(ocr, perSubject) ||
+    (perSubject && maxPrinted > perSubject + 2 ? 'continuous' : 'restart')
 
   /** @type {Record<string, { rows: any[], passages: string }>} */
   const bySubject = {}
@@ -211,6 +233,9 @@ export function validateAdminFacts(admin) {
       if (!TYPE_IDS.has(r.type)) errors.push(`${label}: pick the question type.`)
       const isMcq = r.type === 'single_correct' || r.type === 'multiple_correct' || r.type === 'matrix_match'
       if (isMcq && !(r.options >= 2)) errors.push(`${label}: enter how many options (usually 4).`)
+      if (r.type === MATRIX_GRID_FACT_TYPE && (!(r.listI >= 1) || !(r.listII >= 1))) {
+        errors.push(`${label}: enter how many Column I rows and Column II rows (usually 4 and 5).`)
+      }
     })
     const { groups, bad } = parsePassageGroups(block?.passages)
     for (const piece of bad) errors.push(`${where}: passage "${piece}" — write it like 13-14.`)
@@ -236,7 +261,7 @@ export function validateAdminFacts(admin) {
           part,
           printed: n + shift,
           type: r.type,
-          options: r.type === 'integer' || r.type === 'numerical' ? 0 : r.options || 0,
+          options: typeHasNoOptions(r.type) ? 0 : r.options || 0,
           listI: r.listI || 0,
           listII: r.listII || 0,
           passage: passageOf.get(n) || '',
@@ -250,6 +275,44 @@ export function validateAdminFacts(admin) {
     errors.push(`The sections add up to ${slots.length} questions, and the total says ${total}.`)
   }
   return { errors: [...new Set(errors)], slots }
+}
+
+/** Questions in one subject, from the admin's section rows. */
+function questionsPerSubject(admin) {
+  const blocks = admin?.samePattern !== false ? [admin?.pattern] : Object.values(admin?.bySubject || {})
+  const ends = blocks.flatMap((b) => (Array.isArray(b?.rows) ? b.rows : []).map((r) => int(r?.to)))
+  return Math.max(0, ...ends.filter((n) => n > 0))
+}
+
+/**
+ * How the scan numbers its questions: 'restart' when Q.1 is printed again in each
+ * subject and no number goes past one subject, 'continuous' when the numbers run
+ * past one subject. '' when the scan has too few numbers to tell.
+ * @param {unknown} ocr
+ * @param {number} perSubject
+ */
+export function numberingPrintedInOcr(ocr, perSubject) {
+  const src = labelNumberedQuestions(stripHindiOcr(ocr))
+  if (!(perSubject > 0) || !src) return ''
+  const nums = allMatches(ANY_Q_MARKER_RE, src).map(({ index, end }) => Number(src.slice(index, end).match(/(\d{1,3})\s*\]?$/)?.[1]))
+  const seen = nums.filter((n) => n > 0)
+  if (seen.length < perSubject) return ''
+  if (Math.max(...seen) > perSubject + 2) return 'continuous'
+  return seen.filter((n) => n === 1).length >= 2 ? 'restart' : ''
+}
+
+/**
+ * The printed numbers are on the page, so the scan settles "restart" vs "continuous".
+ * A confirmed choice the scan contradicts would put Chemistry Q.3 on the card as Q39.
+ * @param {any} admin
+ * @param {unknown} ocr
+ */
+export function adminFactsMatchingScan(admin, ocr) {
+  if (!admin || typeof admin !== 'object') return admin
+  const printed = numberingPrintedInOcr(ocr, questionsPerSubject(admin))
+  const chosen = admin.numbering === 'continuous' ? 'continuous' : 'restart'
+  if (!printed || printed === chosen) return admin
+  return { ...admin, numbering: printed, numberingFromScan: true }
 }
 
 /**
@@ -271,10 +334,53 @@ export function adminFactsToPaperFacts(admin) {
   }
 }
 
+/**
+ * Confirmed sections whose question type differs from the type the scan prints
+ * in its "This section contains …" lines (Q1–10 confirmed "One or more correct"
+ * on a paper that prints "Only One Option Correct Type"). Confirmed facts are
+ * not changed; the admin is told. Empty when the scan does not settle it.
+ * @param {any} admin
+ * @param {unknown} ocr
+ * @returns {string[]}
+ */
+export function adminFactsDisagreeWithScan(admin, ocr) {
+  if (!admin?.confirmedAt) return []
+  const read = buildPaperFacts(ocr)
+  if (!read.known || !Array.isArray(read.sections)) return []
+  const { errors, slots } = validateAdminFacts(adminFactsMatchingScan(admin, ocr))
+  if (errors.length || slots.length !== read.expectedQuestionCount) return []
+  const scanOrder = [...new Set(read.sections.map((s) => s.subject).filter(Boolean))]
+  const slotOrder = [...new Set(slots.map((s) => s.subject))]
+  if (scanOrder.join('|') !== slotOrder.join('|')) return []
+  /** @type {string[]} */
+  const scanTypes = []
+  for (const s of read.sections) for (let k = 0; k < s.count; k += 1) scanTypes.push(s.type)
+  if (scanTypes.length !== slots.length) return []
+  const label = (id) => FACT_TYPES.find((t) => t.id === id)?.label || id
+  /** @type {Array<{ subject: string, from: number, to: number, mine: string, scan: string }>} */
+  const runs = []
+  slots.forEach((slot, i) => {
+    const scan = scanTypes[i]
+    if (!scan || scan === slot.type) return
+    // Match-the-lists questions with four choices are printed under "Only one option correct".
+    if (slot.type === 'matrix_match' && scan === 'single_correct') return
+    const last = runs[runs.length - 1]
+    if (last && last.subject === slot.subject && last.mine === slot.type && last.scan === scan && last.to === slot.printed - 1) {
+      last.to = slot.printed
+    } else {
+      runs.push({ subject: slot.subject, from: slot.printed, to: slot.printed, mine: slot.type, scan })
+    }
+  })
+  return runs.map(
+    (r) =>
+      `Paper facts: ${subjectLabel(r.subject)} Q${r.from}–Q${r.to} are confirmed as “${label(r.mine)}”, and the scan prints “${label(r.scan)}” for that section. Please check the facts card.`,
+  )
+}
+
 /** Confirmed admin facts win; otherwise the facts read from the OCR. */
 export function factsForPaper(paper) {
   if (paper?.adminFacts?.confirmedAt) {
-    const facts = adminFactsToPaperFacts(paper.adminFacts)
+    const facts = adminFactsToPaperFacts(adminFactsMatchingScan(paper.adminFacts, paper.preparedText))
     if (facts) return facts
   }
   return paper?.paperFacts || null
@@ -302,9 +408,28 @@ function allMatches(re, src) {
 function cleanPassageBody(body) {
   return String(body ?? '')
     .replace(PASSAGE_HEADER_RE, '\n')
+    // "\section*{1. $\mathrm{NaNH}_{2}$ (excess)}" is a heading inside the paragraph; keep its words.
+    .replace(/\\section\*?\{([^{}]*(?:\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}[^{}]*)*)\}/g, '$1')
     .replace(/\\(?:begin|end)\{itemize\}/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+/**
+ * 1-based place of each card inside its subject. Papers set as continuous
+ * (Chemistry Q24) often print per-subject numbers ("Q. 5") on the page.
+ * @param {Array<{ subject?: string }>} list
+ * @returns {number[]}
+ */
+export function subjectLocalNumbers(list) {
+  /** @type {Map<string, number>} */
+  const seen = new Map()
+  return (Array.isArray(list) ? list : []).map((row) => {
+    const sub = String(row?.subject ?? '')
+    const n = (seen.get(sub) || 0) + 1
+    seen.set(sub, n)
+    return n
+  })
 }
 
 /**
@@ -328,15 +453,23 @@ export function cutAdminPassagesFromOcr(ocr, slots) {
     if (!markerCache.has(n)) markerCache.set(n, allMatches(questionMarkerRe(n), src))
     return markerCache.get(n) || []
   }
+  const local = subjectLocalNumbers(slots)
+  /** Paper slot -> its marker: the confirmed number first, else the number inside its subject. */
+  const markerAt = (i) => {
+    for (const nums of [slots.map((s) => s.printed), local]) {
+      const n = nums[i]
+      const sameNumber = nums.filter((x) => x === n).length
+      const occurrence = nums.slice(0, i).filter((x) => x === n).length
+      const markers = markersFor(n)
+      if (markers.length === sameNumber) return markers[occurrence].index
+    }
+    return -1
+  }
   slots.forEach((slot, i) => {
     const key = slot?.passage
     if (!key || out.has(key)) return
-    const n = slot.printed
-    const sameNumber = slots.filter((s) => s.printed === n).length
-    const occurrence = slots.slice(0, i).filter((s) => s.printed === n).length
-    const markers = markersFor(n)
-    if (markers.length !== sameNumber) return
-    const at = markers[occurrence].index
+    const at = markerAt(i)
+    if (at < 0) return
     const prevQuestion = anyMarkers.filter((m) => m.index < at).pop()
     const floor = prevQuestion ? prevQuestion.end : 0
     const header = headers.filter((h) => h.index >= floor && h.index < at).shift()
@@ -359,22 +492,21 @@ export function cutAdminPassagesFromOcr(ocr, slots) {
 export function enforceAdminFactsOnQuestions(questions, admin, ocr) {
   const list = Array.isArray(questions) ? questions : []
   if (!admin?.confirmedAt) return list
-  const { errors, slots } = validateAdminFacts(admin)
+  const { errors, slots } = validateAdminFacts(adminFactsMatchingScan(admin, ocr))
   if (errors.length || !slots.length || slots.length !== list.length) return list
   const passages = cutAdminPassagesFromOcr(ocr, slots)
   return list.map((q, i) => {
     if (!q || typeof q !== 'object' || q.placeholder === true) return q
     const slot = slots[i]
     const next = {
-      ...q,
+      ...withFactType(q, slot.type),
       subject: slot.subject,
       subjectSource: 'admin_facts',
-      questionType: slot.type,
       typeSource: 'admin_facts',
       paperPart: slot.part,
       printedNumber: slot.printed,
     }
-    if (q.passageSource === 'admin_edit') return next
+    if (q.passageSource === 'admin_edit' || q.adminApproved === true) return next
     if (!slot.passage) {
       if (!q.passageText && !q.passageId && !q.passageGroup) return next
       const { passageText: _t, passageId: _i, passageGroup: _g, passageRole: _r, passageSource: _s, ...rest } = next
@@ -401,7 +533,7 @@ export function enforceAdminFactsOnQuestions(questions, admin, ocr) {
  * @param {unknown} ocr
  */
 export function applyAdminFactsToQuestions(questions, admin, ocr) {
-  const facts = adminFactsToPaperFacts(admin)
+  const facts = adminFactsToPaperFacts(adminFactsMatchingScan(admin, ocr))
   const list = Array.isArray(questions) ? questions : []
   if (!facts) return { questions: list, facts: null }
   const shaped = shapeOfficialPyqDrafts(list, ocr, { facts })

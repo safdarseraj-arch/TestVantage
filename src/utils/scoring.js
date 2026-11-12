@@ -6,8 +6,10 @@ import { isAnswerAttempted } from './answers.js'
 import { formatCorrectAnswer, formatUserAnswer } from './formatAnswer.js'
 import { getAnswerableQuestions } from './passage.js'
 import { matrixAnswersEqual } from './matrixMatch.js'
+import { gridFieldsOf, isMatrixGridCard, scoreMatrixGridRows } from './matrixGridPyq.js'
 import { DEFAULT_MSQ_MARKING, scoreMsqAnswer } from './msqMarking.js'
 import { passageQuestionUsesNumerical } from './passageSubAnswer.js'
+import { letterAlternativesOf, numericAnswerMatches } from './answerAlternatives.js'
 
 /**
  * @param {import('../data/tests').Question} q
@@ -28,6 +30,8 @@ function getMarking(q, pattern) {
  * @returns {{ grade: 'correct' | 'partial' | 'wrong' | 'unattempted', marks: number }}
  */
 function gradeQuestion(q, answer, pattern) {
+  /** The paper printed "MARKS TO ALL": every candidate gets full marks, answered or not. */
+  if (q.bonusMarksToAll === true) return { grade: 'correct', marks: getMaxMarks(q, pattern) }
   if (!isAnswerAttempted(answer, q)) {
     const m = getMarking(q, pattern)
     return { grade: 'unattempted', marks: m.unattempted ?? 0 }
@@ -41,14 +45,13 @@ function gradeQuestion(q, answer, pattern) {
       if (passageQuestionUsesNumerical(q)) {
         const n = parseFloat(String(answer))
         if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
-        const tol = q.numericalTolerance ?? 0.01
-        return Math.abs(n - (q.correctNumerical ?? 0)) <= tol
+        return numericAnswerMatches({ ...q, correctNumerical: q.correctNumerical ?? 0, numericalTolerance: q.numericalTolerance ?? 0.01 }, n)
           ? { grade: 'correct', marks: m.correct }
           : { grade: 'wrong', marks: m.wrong }
       }
       const n = parseFloat(String(answer))
       if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
-      return n === q.correctInteger
+      return n === q.correctInteger || numericAnswerMatches({ numericalAlternatives: q.numericalAlternatives }, n, 0)
         ? { grade: 'correct', marks: m.correct }
         : { grade: 'wrong', marks: m.wrong }
     }
@@ -64,7 +67,10 @@ function gradeQuestion(q, answer, pattern) {
     case 'multiple_correct': {
       const scheme = q.msqMarking ?? DEFAULT_MSQ_MARKING
       const selected = Array.isArray(answer) ? answer : []
-      const result = scoreMsqAnswer(selected, q.correctIndices ?? [], scheme)
+      const sets = [q.correctIndices ?? [], ...letterAlternativesOf(q)]
+      const result = sets
+        .map((set) => scoreMsqAnswer(selected, set, scheme))
+        .reduce((best, r) => (r.marks > best.marks ? r : best))
       return { grade: result.grade, marks: result.marks }
     }
 
@@ -72,7 +78,7 @@ function gradeQuestion(q, answer, pattern) {
       const n = parseInt(String(answer), 10)
       const m = getMarking(q, pattern)
       if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
-      return n === q.correctInteger
+      return n === q.correctInteger || numericAnswerMatches({ numericalAlternatives: q.numericalAlternatives }, n, 0)
         ? { grade: 'correct', marks: m.correct }
         : { grade: 'wrong', marks: m.wrong }
     }
@@ -81,13 +87,17 @@ function gradeQuestion(q, answer, pattern) {
       const n = parseFloat(String(answer))
       const m = getMarking(q, pattern)
       if (Number.isNaN(n)) return { grade: 'wrong', marks: m.wrong }
-      const tol = q.numericalTolerance ?? 0.01
-      return Math.abs(n - (q.correctNumerical ?? 0)) <= tol
+      return numericAnswerMatches({ ...q, correctNumerical: q.correctNumerical ?? 0, numericalTolerance: q.numericalTolerance ?? 0.01 }, n)
         ? { grade: 'correct', marks: m.correct }
         : { grade: 'wrong', marks: m.wrong }
     }
 
     case 'matrix_match': {
+      if (gridMarkedPerRow(q)) {
+        const r = scoreMatrixGridRows(answer, q, q.matrixMarking)
+        if (r.rowsRight === r.rows) return { grade: 'correct', marks: r.marks }
+        return { grade: r.rowsRight > 0 ? 'partial' : 'wrong', marks: r.marks }
+      }
       const m = getMarking(q, pattern)
       return matrixAnswersEqual(answer, q)
         ? { grade: 'correct', marks: m.correct }
@@ -99,9 +109,17 @@ function gradeQuestion(q, answer, pattern) {
   }
 }
 
+/** A grid card whose paper marks each Column I row on its own. */
+function gridMarkedPerRow(q) {
+  return isMatrixGridCard(q) && q.matrixMarking?.perRow === true && Number.isFinite(q.matrixMarking.correct)
+}
+
 function getMaxMarks(q, pattern) {
   if (q.questionType === 'multiple_correct' && q.msqMarking) {
     return q.msqMarking.full
+  }
+  if (gridMarkedPerRow(q)) {
+    return (Array.isArray(q.matrixRows) ? q.matrixRows.length : 0) * q.matrixMarking.correct
   }
   return getMarking(q, pattern).correct
 }
@@ -199,6 +217,7 @@ export function evaluateTest(test, answers, options = {}) {
       userAnswerLabel: formatUserAnswer(q, answers[q.id]),
       correctAnswerLabel: formatCorrectAnswer(q),
       marked: markedSet.has(q.id),
+      ...(isMatrixGridCard(q) ? gridFieldsOf(q) : {}),
     })
 
     score += marks

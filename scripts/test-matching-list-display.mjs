@@ -147,9 +147,34 @@ assert.equal(
 const ions = convertLatexTabularToArray(
   '\\begin{tabular}[t]{|l|l|} \\hline Ions & Ag^+ \\\\ \\hline $\\Lambda_0$ & 6.2 \\\\ \\hline \\end{tabular}',
 )
-assert.match(ions, /\\begin\{array\}/)
+assert.match(ions, /<table class="paper-data-table"/)
 assert.doesNotMatch(ions, /\\begin\{tabular\}/)
-assert.match(prepareTextForMathTextDisplay(ions), /\\begin\{array\}/)
+assert.match(ions, />Λ₀</, 'Greek capital in a cell is kept')
+assert.match(ions, />Ag⁺</, 'ion charge draws as a superscript')
+assert.match(prepareTextForMathTextDisplay(ions), /<table class="paper-data-table"/)
+
+const bdeTable = prepareTextForMathTextDisplay(String.raw`Correct match of the C-H bonds (shown in bold) in Column J with their BDE in Column K is
+
+\begin{tabular}[t]{|l|l|}
+\hline Column J Molecule & Column K BDE ( $\mathrm{kcal} \mathrm{mol}^{-1}$ ) \\
+\hline (P) $\mathbf{H}-\mathrm{CH}\left(\mathrm{CH}_{3}\right)_{2}$ & (i) 132 \\
+\hline (Q) $\mathbf{H}-\mathrm{CH}_{2} \mathrm{Ph}$ & (ii) 110 \\
+\hline (S) $\mathbf{H}-\mathbf{C} \equiv \mathrm{CH}$ & (iv) 88 \\
+\hline
+\end{tabular}`)
+assert.match(bdeTable, /text-align:center[^"]*">Column J<br>Molecule</, 'header prints on two centred lines')
+assert.match(bdeTable, />Column K<br>BDE \(kcal mol⁻¹\)</)
+assert.match(bdeTable, /text-align:left[^"]*">\(P\) <b>H<\/b>&ndash;CH\(CH₃\)₂</, '{l} column is left aligned, bold H kept')
+assert.match(bdeTable, />\(Q\) <b>H<\/b>&ndash;CH₂Ph</, 'formula is not split by a space')
+assert.match(bdeTable, />\(S\) <b>H&ndash;C<\/b>≡CH</, 'bold H–C bond stays one bold run')
+assert.match(bdeTable, /text-align:left[^"]*">\(i\) 132</)
+assert.match(
+  convertLatexTabularToArray(
+    '\\begin{tabular}{|l|l|} \\hline Column $\\mathbf{J}$ Molecule & Column $\\mathbf{K}$ BDE \\\\ \\hline (P) a & (i) 1 \\\\ \\hline \\end{tabular}',
+  ),
+  />Column <b>J<\/b><br>Molecule</,
+  'bold column letter still splits the header',
+)
 
 const gluedStem =
   'Let $L_1$ and $L_2$ be two lines. Match each entry in List-I to the correct entry in List-II. List-I'
@@ -296,7 +321,7 @@ assert.doesNotMatch(displayPrepared, /\\begin\{tabular\}/, 'display path has no 
 assert.doesNotMatch(displayPrepared, /\\item\s*\[/, 'display path has no \\item[]')
 assert.doesNotMatch(displayPrepared, /\\caption/, 'display path has no \\caption')
 assert.match(displayPrepared, /\\mathrm\{mol\}/, 'mol is kept for KaTeX')
-assert.match(displayPrepared, /\\begin\{array\}/, 'tabular becomes array')
+assert.match(displayPrepared, /<table class="paper-data-table"/, 'tabular becomes a drawn table')
 const displayProse = displayPrepared.replace(/\$\$[\s\S]+?\$\$/g, ' ').replace(/\$[^$]+\$/g, ' ')
 assert.doesNotMatch(displayProse, /\\mathrm\{mol\}/, 'mol is inside math delimiters')
 
@@ -787,5 +812,44 @@ assert.doesNotMatch(String(rRows?.intro || ''), /cos \^\{2\}/)
 for (const label of ['(P)', '(Q)', '(R)', '(S)']) {
   assert.ok(rRows?.listI?.some((r) => r.label === label), label)
 }
+
+const nuclear = [
+  'Match List I of the nuclear processes with List II containing parent nucleus and one of the end products of each process and then select the correct answer using the codes given below the lists :',
+  '',
+  '(P)',
+  'Alpha decay',
+  '',
+  '(Q)',
+  '$\\beta^{+}$decay',
+  '',
+  '(R)',
+  'Fission',
+  '',
+  '(S)',
+  'Proton emission',
+  '',
+  '(1)',
+  '${ }_{8}^{15} \\mathrm{O} \\rightarrow{ }_{7}^{15} \\mathrm{~N}+\\ldots$..',
+  '',
+  '(2)',
+  '${ }_{92}^{238} U \\rightarrow{ }_{90}^{234} T h+\\ldots$..',
+  '',
+  '(3)',
+  '${ }_{83}^{185} \\mathrm{Bi} \\rightarrow{ }_{82}^{184} \\mathrm{~Pb}+\\ldots$..',
+  '',
+  '(4)',
+  '${ }_{94}^{239} \\mathrm{Pu} \\rightarrow{ }_{57}^{140} \\mathrm{La}+\\ldots$..',
+].join('\n')
+const nuclearRows = parseMatchingListForDisplay(nuclear, ['4 2 1 3', '1 3 2 4', '2 1 4 3', '4 3 2 1'])
+assert.equal(
+  nuclearRows?.intro,
+  'Match List I of the nuclear processes with List II containing parent nucleus and one of the end products of each process and then select the correct answer using the codes given below the lists :',
+  '2013 P2 Q19: "List I" inside the sentence is not the List-I heading',
+)
+assert.deepEqual(
+  nuclearRows?.listI?.map((r) => r.text),
+  ['Alpha decay', '$\\beta^{+}$decay', 'Fission', 'Proton emission'],
+)
+assert.equal(nuclearRows?.listII?.length, 4)
 
 console.log('ok matching-list display + arrow repair')

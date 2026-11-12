@@ -589,6 +589,18 @@ function printedNumberInPassageRange(n, source, map) {
   return officialPyqPassageRanges(source, map).some((r) => n >= r.from && n <= r.to)
 }
 
+/** True when the paper itself prints "Paragraph for Questions X and Y" covering n. */
+function passageHeadingNamesNumber(n, source) {
+  if (!n) return false
+  const re = /Paragraph\s+for\s+Q(?:uestions?|\.)?\s*(?:Nos?\.?\s*)?(\d{1,3})\s*(?:and|&|\\&|,|to|-|–)\s*(?:Q\.?\s*)?(\d{1,3})/gi
+  for (const m of String(source ?? '').matchAll(re)) {
+    const from = Number(m[1])
+    const to = Number(m[2])
+    if (to >= from && to - from <= 3 && n >= from && n <= to) return true
+  }
+  return false
+}
+
 /**
  * True when a long MCQ reused a comprehension slot number (must not keep a paragraph).
  * Short child stems ("Value of…", "If n(X)…", fill-blanks) stay eligible.
@@ -624,6 +636,7 @@ export function officialPyqCardAllowsPassage(q, source = '', map) {
   const n = officialPyqPrintedNumber(q)
   if (!n) return false
   if (!printedNumberInPassageRange(n, source, map)) return false
+  if (passageHeadingNamesNumber(n, source)) return true
   if (looksLikeStandaloneMcqOnChildSlot(q.text ?? q.stem, q.options)) return false
   return true
 }
@@ -650,6 +663,7 @@ export function officialPyqCardHasMistakenPassage(q, source = '') {
     return false
   }
   if (String(source ?? '').length < 40) return false
+  if (q.passageSource === 'ocr-header' && String(q.passageText ?? '').trim()) return false
   return !officialPyqCardAllowsPassage(
     {
       ...q,
@@ -758,6 +772,9 @@ export function recoverOfficialPyqPassageFromSource(q, source) {
   if (!q || typeof q !== 'object') return q
   if (passageSetByAdmin(q)) return q
   const stored = stripOfficialPyqPaperChrome(q.passageText)
+  if (q.passageSource === 'ocr-header' && stored) {
+    return stored === String(q.passageText ?? '').trim() ? q : { ...q, passageText: stored }
+  }
   const blob = `${q.text || ''} ${q.subject || ''} ${stored}`
   const src = String(source ?? '')
   const allowsBySlot = officialPyqCardAllowsPassage(
@@ -913,10 +930,42 @@ export function stripOfficialPyqPaperChrome(text) {
     .replace(/\\section\*?/gi, '')
     .replace(/\bJEE\s*\(?\s*Advanced\s*\)?\s*\d{4}\s*Paper\s*[12]\b/gi, '')
     .replace(/\bEND\s+OF\s+THE\s+QUESTION\s+PAPER\b\.?/gi, '')
-    .replace(/(?:^|\n)\s*\d{1,2}\s*\/\s*\d{1,2}\s*(?=\n|$)/g, '\n')
+    // Page footers read "8/32" (page of total). A whole option "7/3" is an answer, not a footer.
+    .replace(/(?:^|\n)\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*(?=\n|$)/g, (line, page, total, at, all) => {
+      const onlyLine = !(all.slice(0, at) + all.slice(at + line.length)).trim()
+      return onlyLine || Number(total) < 10 || Number(page) > Number(total) ? line : '\n'
+    })
     .replace(/\n*---\s*page\s*---\n*/gi, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+const PASSAGE_HEADING_LINE =
+  /^\s*(?:\}\s*)?(?:Question\s+Stem(?:\s+for\s+Question\s+Nos?\.?\s*\d{1,2}\s+and\s+\d{1,2})?|Paragraph(?:\s+[IVX\d]+)?|PARAGRAPH(?:\s+[IVX\d]+)?|Passage|Comprehension)?\s*\}?\s*$/
+const PASSAGE_QUESTION_START = /(?:^|\n)[ \t]*(?:\\item\s*\[\s*Q\.?\s*\]|Q\s*\.)\s*\d{1,2}\b/
+const PASSAGE_TAIL_LINE = /^\s*(?:\\begin\{(?:itemize|enumerate)\}|\\end\{(?:itemize|enumerate)\})\s*$/
+const PASSAGE_ANSWER_LINE = /\\_\s*\\_\s*\\_|_{4,}/
+
+/**
+ * Shared passage / question stem body only: no "Question Stem for Question Nos. 5 and 6"
+ * heading (or a stray `}` left from it), no question lines after it, no dangling list opener.
+ * @param {unknown} text
+ */
+export function cleanOfficialPyqPassageBody(text) {
+  let body = String(text ?? '').replace(/\r\n/g, '\n')
+  const cut = body.search(PASSAGE_QUESTION_START)
+  if (cut >= 0) body = body.slice(0, cut)
+  const lines = body.split('\n')
+  while (lines.length && PASSAGE_HEADING_LINE.test(lines[0])) lines.shift()
+  while (
+    lines.length &&
+    (PASSAGE_TAIL_LINE.test(lines[lines.length - 1]) ||
+      !lines[lines.length - 1].trim() ||
+      (PASSAGE_ANSWER_LINE.test(lines[lines.length - 1]) && lines[lines.length - 1].length < 200))
+  ) {
+    lines.pop()
+  }
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 const PHYS_COMPREHENSION_RE =
@@ -1111,7 +1160,7 @@ function childStemFromOcrNearParagraph(source, n, passageText) {
   if (at < 0) return ''
   const tail = src.slice(at)
   const cut = tail.slice(8).search(
-    /(?:\\item\s*\[\s*Q[^\]]*\]|(?:^|\n)Q\s*\.?\s*\d{1,3}\b|(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?(?:XII|XI|VIII|VII|VI|IV|IX|III|II|I|V|X|\d+)))/i,
+    /(?:\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|(?:^|\n)Q\s*\.?\s*\d{1,3}\b|(?:^|\n)\s*(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?(?:XII|XI|VIII|VII|VI|IV|IX|III|II|I|V|X|\d+)))/i,
   )
   const window = (cut >= 0 ? tail.slice(0, cut + 8) : tail.slice(0, 900)).trim()
   const stem = stripOfficialPyqPaperChrome(
@@ -1352,7 +1401,7 @@ export function looksLikeOfficialPyqPassageOnly(text) {
   const t = String(text ?? '').trim()
   if (!looksLikePyqParagraphHeader(t)) return false
   if (/\(\s*A\s*\)[\s\S]{4,}\(\s*B\s*\)/.test(t)) return false
-  if (/(?:^|\n)\s*(?:\\item\s*\[\s*Q|Q\s*\.?\s*\d{1,3}\b)/i.test(t.slice(20))) return false
+  if (/(?:^|\n)\s*(?:\\item\s*\[\s*Q\s*\.?\s*(?:\d{1,3}\s*\]|\]\s*\$?\s*\d)|Q\s*\.?\s*\d{1,3}\b)/i.test(t.slice(20))) return false
   return (
     /^Paragraph\s+for\b/i.test(t) ||
     /^(?:\\section\*?\{[^}]*PARAGRAPH|PARAGRAPH\s*[“"'"]?(?:XII|XI|VIII|VII|VI|IV|IX|III|II|I|V|X|\d+))/i.test(t) ||
@@ -1439,6 +1488,10 @@ export function peelOfficialPyqCardForDisplay(q, source = '') {
   }
   if (next.passageText && passageConflictsCard(next.text, next.passageText)) {
     next = clearMistakenPassage(next)
+  }
+  if (next.passageText) {
+    const body = cleanOfficialPyqPassageBody(next.passageText)
+    if (body !== next.passageText) next = body ? { ...next, passageText: body } : clearMistakenPassage(next)
   }
   const sameText = next.text === raw
   const samePass = String(next.passageText ?? '') === stripOfficialPyqPaperChrome(q.passageText)

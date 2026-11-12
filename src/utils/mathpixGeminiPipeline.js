@@ -1,5 +1,7 @@
 /**
- * Mathpix OCR, then local split, then Gemini light tags/answers/solutions.
+ * Mathpix OCR, then split only (local first, Gemini split as backup).
+ * Upload never fills tags, answers, or solutions with AI — the
+ * "Fill with Hybrid AI" button on Draft questions does that later.
  * Mathpix never fills bank fields. Gemini never reads the page.
  */
 import { API_BASE } from '../config/platform.js'
@@ -20,15 +22,18 @@ import {
 import { healOfficialPyqPaperQuestions } from './extendTruncatedStem.js'
 import { applyUploadQualityGuards } from './uploadQualityGuards.js'
 import { localMathpixSplitGoodEnough } from './pyqGeminiExtract.js'
+import { readPrintedAnswerKey } from './printedAnswerKey.js'
 import {
   localBankSplitGoodEnough,
-  mergeLightEnrichOntoDrafts,
   GEMINI_LIGHT_MODEL,
 } from './uploadLocalFirstPipeline.js'
 import { raceStepTimeout } from './ocrTimeout.js'
 
 const GEMINI_STRUCTURE_MISSING =
-  'OCR text is ready. Add GEMINI_API_KEY to onlinetest/.env, keep the bottom panel open, then press F5 so Gemini (flash-lite) can fill answers and tags if local split failed.'
+  'OCR text is ready. Add GEMINI_API_KEY to onlinetest/.env, keep the bottom panel open, then press F5 so Gemini (flash-lite) can split questions if local split failed.'
+
+export const BANK_FILL_LATER_NOTE =
+  'Tags, answers, and solutions are not filled yet — open Draft questions and press Fill with Hybrid AI.'
 
 export { GEMINI_LIGHT_MODEL }
 
@@ -130,68 +135,10 @@ export async function structureOcrWithGeminiClient(opts) {
   }
 }
 
-const LIGHT_ENRICH_TIMEOUT_MS = 20_000
-const LIGHT_ENRICH_BATCH = 10
-
-/**
- * Cheap flash-lite pass: metatags, answers, brief solutions. Never rewrites stems.
- * Fail-open — local cards stay if Gemini is down.
- * @param {object[]} questions
- * @param {{ paperMeta?: object, deferSolutions?: boolean, signal?: AbortSignal }} [opts]
- */
-export async function enrichQuestionsLightClient(questions, opts = {}) {
-  const list = Array.isArray(questions) ? questions : []
-  if (!list.length) return list
-  if (typeof window === 'undefined') return list
-  const deferSolutions = opts.deferSolutions === true
-  const budget = Math.max(4000, Number(opts.timeoutMs) || LIGHT_ENRICH_TIMEOUT_MS)
-  try {
-    const status = await raceStepTimeout(
-      fetchCloudVisionStatus(),
-      2500,
-      'Gemini status timeout',
-      'VISION_STATUS_TIMEOUT',
-    )
-    if (!status.configured) return list
-    const started = Date.now()
-    let merged = list
-    for (let start = 0; start < list.length; start += LIGHT_ENRICH_BATCH) {
-      const remaining = budget - (Date.now() - started)
-      if (remaining < 1500) break
-      const slice = list.slice(start, start + LIGHT_ENRICH_BATCH)
-      const slim = slice.map((q, j) => ({
-        i: start + j,
-        stem: String(q.text ?? q.stem ?? '').slice(0, 360),
-        options: Array.isArray(q.options) ? q.options.map((o) => String(o ?? '').slice(0, 100)) : [],
-        questionType: q.questionType || '',
-      }))
-      const gate = mergeAbort(opts.signal, Math.min(8000, remaining))
-      try {
-        const res = await fetch(`${API_BASE}/vision/enrich-ocr-light`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json; charset=utf-8' },
-          body: JSON.stringify({
-            questions: slim,
-            paperMeta: opts.paperMeta && typeof opts.paperMeta === 'object' ? opts.paperMeta : {},
-            deferSolutions,
-            model: GEMINI_LIGHT_MODEL,
-          }),
-          signal: gate.signal,
-        })
-        const data = await res.json().catch(() => ({}))
-        if (res.ok && Array.isArray(data.questions) && data.questions.length) {
-          merged = mergeLightEnrichOntoDrafts(merged, data.questions, { deferSolutions })
-        }
-      } catch {
-        /* keep local cards */
-      } finally {
-        gate.clear()
-      }
-    }
-    return merged
-  } catch {
-    return list
-  }
+/** Solutions wait for Fill with Hybrid AI, except one printed on the paper. @param {any} d */
+export function deferUnprintedSolution(d) {
+  if (d?.solutionSource === 'from_paper' && String(d.solution ?? '').trim()) return d
+  return { ...d, solution: '', solutionSource: undefined, solutionPending: true }
 }
 
 function loadExistingBankSafe() {
@@ -273,21 +220,8 @@ export async function structureTextThenMaybeSave(rawText, opts = {}) {
   if (localOk) {
     progress(86)
     let questions = applyUploadQualityGuards(healedLocal, text)
-    questions = await enrichQuestionsLightClient(questions, {
-      paperMeta,
-      deferSolutions: opts.deferSolutions === true,
-      signal: opts.signal,
-      timeoutMs: opts.officialPyq ? 20_000 : 12_000,
-    })
     questions = stampBankUploadIds(
-      opts.deferSolutions === true
-        ? questions.map((d) => ({
-            ...d,
-            solution: '',
-            solutionSource: undefined,
-            solutionPending: true,
-          }))
-        : questions,
+      opts.deferSolutions === true ? questions.map(deferUnprintedSolution) : questions,
       loadExistingBankSafe(),
       opts.paperMeta,
     )
@@ -303,15 +237,15 @@ export async function structureTextThenMaybeSave(rawText, opts = {}) {
       format,
       docxBase64: opts.docxBase64,
       cloudNote: savedDrafts.length
-        ? `Local split + Gemini ${GEMINI_LIGHT_MODEL} saved ${savedDrafts.length} draft(s) (tags/answers${opts.deferSolutions === true ? '' : '/solutions'}).`
-        : `Split ${questions.length} question(s) locally from Mathpix. Gemini ${GEMINI_LIGHT_MODEL} filled tags, answers${opts.deferSolutions === true ? '' : ', and brief solutions'}.`,
+        ? `Local split saved ${savedDrafts.length} draft(s). ${BANK_FILL_LATER_NOTE}`
+        : `Split ${questions.length} question(s) locally from Mathpix. ${BANK_FILL_LATER_NOTE}`,
       lowConfidence: false,
       ocrWeakness: 12,
       mathpixMissing: false,
       geminiMissing: false,
       savedDrafts,
       instructionText: backup.instructionText,
-      structuredBy: 'local+gemini-light',
+      structuredBy: 'local',
     }
   }
 
@@ -340,7 +274,7 @@ export async function structureTextThenMaybeSave(rawText, opts = {}) {
     })
     const fromGemini = geminiStructureToBankDrafts(
       { questions: structured.questions, instructions: structured.instructions },
-      { paperMeta: opts.paperMeta, deferSolutions: opts.deferSolutions === true },
+      { paperMeta: opts.paperMeta, deferSolutions: opts.deferSolutions === true, splitOnly: true },
     )
     if (
       fromGemini.drafts.length >= 2 &&
@@ -348,11 +282,11 @@ export async function structureTextThenMaybeSave(rawText, opts = {}) {
       fromGemini.drafts.length >= mapped.drafts.length
     ) {
       mapped = fromGemini
-      cloudNote = `Local split was incomplete — Gemini ${GEMINI_LIGHT_MODEL} filled ${fromGemini.drafts.length} question(s).`
+      cloudNote = `Local split was incomplete — Gemini ${GEMINI_LIGHT_MODEL} split ${fromGemini.drafts.length} question(s). ${BANK_FILL_LATER_NOTE}`
     } else if (mapped.drafts.length < 2 && fromGemini.drafts.length >= 1) {
       mapped = fromGemini
       if (fromGemini.drafts.length === 1) {
-        cloudNote = 'Gemini filled 1 question from Mathpix text.'
+        cloudNote = `Gemini split 1 question from Mathpix text. ${BANK_FILL_LATER_NOTE}`
       }
     }
     progress(90)
@@ -399,14 +333,7 @@ export async function structureTextThenMaybeSave(rawText, opts = {}) {
     ...mapped,
     drafts: applyUploadQualityGuards(
       stampBankUploadIds(
-        (opts.deferSolutions || !opts.saveToBank
-          ? mapped.drafts.map((d) => ({
-              ...d,
-              solution: '',
-              solutionSource: undefined,
-              solutionPending: true,
-            }))
-          : mapped.drafts),
+        (opts.deferSolutions || !opts.saveToBank ? mapped.drafts.map(deferUnprintedSolution) : mapped.drafts),
         loadExistingBankSafe(),
         opts.paperMeta,
       ),
@@ -419,9 +346,9 @@ export async function structureTextThenMaybeSave(rawText, opts = {}) {
     savedDrafts = addUploadedQuestionsBulk(mapped.drafts)
     cloudNote =
       cloudNote ||
-      `Mathpix OCR + Gemini saved ${savedDrafts.length} draft(s) to the question bank (not published).`
+      `Mathpix OCR saved ${savedDrafts.length} draft(s) to the question bank (not published). ${BANK_FILL_LATER_NOTE}`
   } else if (mapped.drafts.length) {
-    cloudNote = cloudNote || `Gemini filled ${mapped.drafts.length} question(s) from Mathpix text.`
+    cloudNote = cloudNote || `Split ${mapped.drafts.length} question(s) from Mathpix text. ${BANK_FILL_LATER_NOTE}`
   } else if (!cloudNote) {
     cloudNote = geminiMissing
       ? GEMINI_STRUCTURE_MISSING
@@ -481,6 +408,8 @@ export async function runMathpixThenGemini(file, opts = {}) {
       signal: opts.signal,
       onProgress: (p) => progress(Math.max(6, Math.round(6 + Number(p) * 0.56))),
     })
+    // Cleaning cuts the printed "Ans for Q.N" boxes out, so read the key from the raw text first.
+    const printedAnswerKey = readPrintedAnswerKey(ocr.text)
     const text = sanitizeMathpixOcrText(ocr.text)
     if (!text) {
       progress(100)
@@ -492,7 +421,7 @@ export async function runMathpixThenGemini(file, opts = {}) {
       })
     }
 
-    return await structureTextThenMaybeSave(text, {
+    const structured = await structureTextThenMaybeSave(text, {
       signal: opts.signal,
       progress,
       format,
@@ -503,6 +432,7 @@ export async function runMathpixThenGemini(file, opts = {}) {
       engine: 'mathpix',
       docxBase64: ocr.docxBase64,
     })
+    return printedAnswerKey.size ? { ...structured, printedAnswerKey } : structured
   } catch (err) {
     progress(100)
     throw err

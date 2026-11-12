@@ -4,17 +4,14 @@
 import { useState } from 'react'
 import { isAdminLoggedIn } from '../utils/auth.js'
 import {
-  fillOfficialPyqTags,
   formatQuestionSourceText,
   requestOfficialPyqReplicaQuestion,
   requestOfficialPyqReplicaSet,
 } from '../utils/hybridAiClient.js'
 import { mapExamSlugToHybridLabel, mapSubjectSlugToHybridLabel } from '../utils/hybridMetadata.js'
-import { applyOfficialPyqPublishedMeta } from '../utils/officialPyqPublishedMeta.js'
 import { loadQuestionBank } from '../utils/questionBank.js'
 import {
   answerFieldsFromHybrid,
-  fillPaperQuestionByQuestion,
   REPLICA_DIFFICULTY_ORDER,
   replicaAlreadyStored,
   replicaPaperName,
@@ -56,119 +53,14 @@ function keyIsMissing(err) {
   return /GEMINI_API_KEY|API key|api key is missing/i.test(msg)
 }
 
-function currentAnswerText(question) {
-  if (Array.isArray(question?.correctIndices) && question.correctIndices.length) {
-    return question.correctIndices.map((n) => String.fromCharCode(65 + Number(n))).join(',')
-  }
-  if (question?.correctNumerical != null && question.correctNumerical !== '') return String(question.correctNumerical)
-  if (question?.correctInteger != null && question.correctInteger !== '') return String(question.correctInteger)
-  if (question?.correctIndex != null && question.correctIndex !== '') {
-    return String.fromCharCode(65 + Number(question.correctIndex))
-  }
-  return ''
-}
-
-export default function OfficialPyqReplicaControls({ paper, onCreated, onFilled }) {
+export default function OfficialPyqReplicaControls({ paper, onCreated }) {
   const [offset, setOffset] = useState('0')
   const [busy, setBusy] = useState(false)
-  const [filling, setFilling] = useState(false)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
-  const [review, setReview] = useState(/** @type {Array<object> | null} */ (null))
   if (!isAdminLoggedIn()) return null
 
-  const locked = busy || filling
-
-  async function onFillPaper() {
-    if (locked) return
-    const full = getOfficialPyqPendingPaper(paper?.id) || paper
-    const questions = Array.isArray(full?.questions) ? full.questions : []
-    if (!questions.some((q) => String(q?.text || q?.stem || '').trim())) {
-      setError('This paper has no questions to fill.')
-      return
-    }
-    setFilling(true)
-    setError('')
-    setNote('')
-    setReview(null)
-    try {
-      const total = questions.length
-      const rows = await fillPaperQuestionByQuestion(
-        questions,
-        async (question) => {
-          const examId = Array.isArray(question.examIds) && question.examIds.length ? question.examIds[0] : full.exam
-          return fillOfficialPyqTags({
-            question_text: String(question.text ?? question.stem ?? ''),
-            options: (Array.isArray(question.options) ? question.options : []).map((opt) => String(opt ?? '')),
-            subject: question.subject
-              ? mapSubjectSlugToHybridLabel(question.subject, question.chapter || question.section)
-              : '',
-            unit: String(question.section || question.unit || ''),
-            section: String(question.section || question.unit || ''),
-            chapter: String(question.chapter || ''),
-            topic: question.topic ? String(question.topic) : '',
-            question_type: question.questionType ? String(question.questionType) : '',
-            exam: examId ? mapExamSlugToHybridLabel(examId) : '',
-            toughness_level: question.toughnessLevel != null ? String(question.toughnessLevel) : '',
-            source: question.source ? String(question.source) : '',
-            answer: currentAnswerText(question),
-            solution: String(question.solution || ''),
-          })
-        },
-        {
-          onProgress: (index) => {
-            setNote('Question ' + (index + 1) + ' of ' + total)
-          },
-          onApplied: (_row, soFar) => {
-            setReview(soFar)
-          },
-          isFatal: (err) => keyIsMissing(err),
-        },
-      )
-      setReview(rows)
-      const filledCount = rows.filter((row) => row.patch).length
-      const look = rows.filter((row) => row.needsLook).length
-      setNote(
-        'Hybrid AI filled ' +
-          filledCount +
-          ' question(s), one at a time. ' +
-          (look ? look + ' need a look. ' : '') +
-          'Review them, then use them if they look right. Nothing is saved yet.',
-      )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Hybrid AI could not fill this paper.')
-    } finally {
-      setFilling(false)
-    }
-  }
-
-  function onUsePaperFill() {
-    if (locked || !review) return
-    const full = getOfficialPyqPendingPaper(paper?.id) || paper
-    setFilling(true)
-    setError('')
-    try {
-      let saved = 0
-      for (const row of review) {
-        if (row.skipped || !row.patch) continue
-        const result = applyOfficialPyqPublishedMeta(full.id, row.index, row.patch)
-        if (!result.ok) throw new Error(result.error || 'Could not save question ' + (row.index + 1) + '.')
-        if (result.status !== 'approved') throw new Error('Save refused because the paper would leave Published.')
-        saved += 1
-      }
-      setReview(null)
-      setNote(
-        'Saved tags, answers, and solutions for ' +
-          saved +
-          ' question(s). This paper is still published. Question wording was not changed.',
-      )
-      if (typeof onFilled === 'function') onFilled(full)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the filled paper.')
-    } finally {
-      setFilling(false)
-    }
-  }
+  const locked = busy
 
   async function writeReplicaQuestion(full, question, index, difficultyOffset, avoidTexts, compareWith) {
     const parentId = replicaParentQuestionId(full, question, index)
@@ -548,20 +440,10 @@ export default function OfficialPyqReplicaControls({ paper, onCreated, onFilled 
   return (
     <div data-testid="official-pyq-replica-controls">
       <p className="form-hint">
-        Ask Hybrid AI to fill walks this paper one question at a time. Question 1 gets metatags, the
-        answer, and a short solution, then the next question starts on its own. Create a similar paper
-        makes four pending papers, one original question at a time. Nothing is published until you approve it.
+        Create a similar paper makes four pending papers, one original question at a time. Nothing is
+        published until you approve it and press Publish.
       </p>
       <div className="official-pyq-actions official-pyq-paper-actions" data-testid="official-pyq-paper-actions">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          data-testid="official-pyq-ask-hybrid-paper"
-          onClick={() => void onFillPaper()}
-          disabled={locked}
-        >
-          {filling && !review ? 'Asking Hybrid AI...' : 'Ask Hybrid AI to fill'}
-        </button>
         <button
           type="button"
           className="btn btn-primary btn-sm"
@@ -580,7 +462,7 @@ export default function OfficialPyqReplicaControls({ paper, onCreated, onFilled 
         versions, and the question bank.
       </p>
       <p className="form-hint" data-testid="official-pyq-replica-names">
-        Names: {plannedLabel}. They stay in Pending approval until you Approve &amp; publish, then they
+        Names: {plannedLabel}. They stay in Pending approval until you Approve and then Publish them, then they
         show on the Similar PYQ tab. The original paper stays on the PYQ tab.
       </p>
       <details>
@@ -613,36 +495,6 @@ export default function OfficialPyqReplicaControls({ paper, onCreated, onFilled 
         </div>
         <p className="form-hint">Model for this one paper: {modelForOffset(offset)}</p>
       </details>
-      {review ? (
-        <div className="form-hint" data-testid="official-pyq-paper-hybrid-review">
-          <ul>
-            {review.map((row) => {
-              const slot = row.question?.pyqSlot != null ? row.question.pyqSlot : row.index + 1
-              if (row.skipped) return <li key={row.index}>Question {slot}: no wording, left as it is.</li>
-              if (row.needsLook) {
-                return <li key={row.index}>Question {slot}: needs a look. Nothing was invented.</li>
-              }
-              const filled = row.filled || {}
-              return (
-                <li key={row.index}>
-                  Question {slot}: Subject {filled.subject || '(keeps current)'}, Unit {filled.unit || '(keeps current)'},
-                  Chapter {filled.chapter || '(keeps current)'}, Answer {filled.correct_answer || '(keeps current)'}.
-                  Solution: {String(filled.step_by_step_solution || '').trim() || '(keeps current)'}
-                </li>
-              )
-            })}
-          </ul>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            data-testid="official-pyq-use-hybrid-paper"
-            onClick={onUsePaperFill}
-            disabled={locked}
-          >
-            Use these tags, answer, and solution
-          </button>
-        </div>
-      ) : null}
       {error ? (
         <p className="upload-error" role="alert">
           {error}

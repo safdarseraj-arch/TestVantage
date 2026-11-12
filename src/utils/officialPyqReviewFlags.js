@@ -241,18 +241,21 @@ export function findReviewFlagSpans(text) {
  * Spans to mark, only when this text is one of the reasons the red banner blocks Approve.
  * @param {unknown} text
  */
-export function reviewMarkSpans(text) {
+export function reviewMarkSpans(text, options) {
   const raw = String(text ?? '')
   if (!raw.trim()) return []
   if (closedChemReactionDisplays(raw)) return []
-  const spans = findReviewFlagSpans(raw)
+  const finishedByChoices =
+    (Array.isArray(options) ? options : []).filter((opt) => String(opt ?? '').trim()).length >= 2
+  const thenAt = finishedByChoices ? raw.search(/\bThen\s*$/i) : -1
+  const spans = findReviewFlagSpans(raw).filter((span) => !(thenAt >= 0 && span.start === thenAt))
   if (!spans.length) return []
   const tables = drawableTableRanges(raw)
   const kept = spans.filter(
     (span) => !tables.some((table) => span.start < table.end && span.end > table.start),
   )
   if (!kept.length) return []
-  if (partNeedsReviewFlag(raw) || stemLooksIncompleteOnDisplay(raw)) return kept
+  if (partNeedsReviewFlag(raw) || stemLooksIncompleteOnDisplay(raw, options)) return kept
   return kept.filter((span) => span.kind === 'table-command')
 }
 
@@ -381,7 +384,7 @@ export function officialPyqContentReviewMessages(questions, indexOf, ocr = '') {
   /** @type {string[]} */
   const structureTags = []
   list.forEach((q, i) => {
-    if (!q || isOfficialPyqPlaceholder(q)) return
+    if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
     const index = typeof indexOf === 'function' ? indexOf(q, i) : i
     const tag = reviewQuestionTag(q, index)
     // A drawn reaction (balanced $$ and \xrightarrow) is not a cut-off fraction
@@ -390,7 +393,7 @@ export function officialPyqContentReviewMessages(questions, indexOf, ocr = '') {
       closedChemReactionDisplays(q?.text) || closedChemReactionDisplays(q?.passageText)
     const incomplete =
       !drawnReaction &&
-      (stemLooksIncompleteOnDisplay(q?.text) || stemLooksIncompleteOnDisplay(q?.passageText))
+      (stemLooksIncompleteOnDisplay(q?.text, q?.options) || stemLooksIncompleteOnDisplay(q?.passageText))
     if (incomplete) cutTags.push(tag)
     if (!drawnReaction && questionNeedsRawReview(q)) {
       rawTags.push(tag)
@@ -428,7 +431,7 @@ export function officialPyqMissingListMessage(questions, indexOf) {
   /** @type {string[]} */
   const tags = []
   list.forEach((q, i) => {
-    if (!q || isOfficialPyqPlaceholder(q)) return
+    if (!q || isOfficialPyqPlaceholder(q) || q.adminApproved === true) return
     const missing = validateMathpixQuestion(q).issues.some((issue) => issue.code === 'missing_column')
     if (!missing) return
     const index = typeof indexOf === 'function' ? indexOf(q, i) : i

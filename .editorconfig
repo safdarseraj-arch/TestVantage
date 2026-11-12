@@ -1,0 +1,8 @@
+# All text files are UTF-8 without BOM. Line endings are left to git (core.autocrlf).
+root = true
+
+[*]
+charset = utf-8
+
+[*.{bat,cmd}]
+end_of_line = crlf

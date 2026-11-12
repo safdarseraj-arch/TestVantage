@@ -31,6 +31,7 @@ import {
 import { repairWordSymbolFontText } from './wordSymbolFont.js'
 import { ocrEngineBadgeLabel } from './cloudVisionClient.js'
 import { extractTextFromPptx, isPptxFile } from './pptExtract.js'
+import { readPrintedAnswerKey } from './printedAnswerKey.js'
 
 export { wordExtractLooksBroken } from './wordOmmlExtract.js'
 export { repairWordSymbolFontText } from './wordSymbolFont.js'
@@ -381,9 +382,11 @@ export async function extractMcqFromImage(file, onProgress, opts = {}) {
         paperMeta,
         engine: 'word',
       })
+      const printedAnswerKey = readPrintedAnswerKey(text)
       return {
         text: structured.text || text,
         questions: structured.questions,
+        ...(printedAnswerKey.size ? { printedAnswerKey } : {}),
         engine: /** @type {McqExtractEngine} */ ('word'),
         cloudNote: structured.cloudNote,
         ocrWeakness: structured.ocrWeakness,
@@ -416,6 +419,7 @@ export async function extractMcqFromImage(file, onProgress, opts = {}) {
     return {
       text: result.text,
       questions: result.questions,
+      ...(result.printedAnswerKey ? { printedAnswerKey: result.printedAnswerKey } : {}),
       engine: /** @type {McqExtractEngine} */ ('mathpix'),
       cloudNote: result.cloudNote,
       ocrWeakness: result.ocrWeakness,
@@ -462,10 +466,10 @@ export function describeMcqExtractResult({ engine, cloudNote, lowConfidence } = 
     const warn = lowConfidence ? ' Review stem, options, answers, and tags before publish.' : ''
     return cloudNote
       ? `${cloudNote}${warn}`
-      : `Mathpix read the page. Local AI split questions. Gemini filled tags, answers, and solutions.${warn}`
+      : `Mathpix read the page. Local AI split questions. Press Fill with Hybrid AI on Draft questions to add tags, answers, and solutions.${warn}`
   }
   if (engine === 'cloud-vision') {
-    return 'Gemini is not used for OCR. Re-upload so Mathpix can read the PDF or image, then Gemini can fill tags and answers.'
+    return 'Gemini is not used for OCR. Re-upload so Mathpix can read the PDF or image, then press Fill with Hybrid AI on Draft questions.'
   }
   if (engine === 'pix2text') {
     const warn = lowConfidence

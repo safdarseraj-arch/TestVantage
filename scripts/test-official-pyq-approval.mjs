@@ -73,7 +73,9 @@ const {
 
 const {
   approveOfficialPyqPaper,
+  publishOfficialPyqPaper,
   unpublishOfficialPyqPaper,
+  unapproveOfficialPyqPaper,
   rejectOfficialPyqPaper,
   dismissOfficialPyqPaper,
   dismissOfficialPyqSitting,
@@ -107,7 +109,8 @@ assert.ok(OFFICIAL_PYQ_SOURCE_SLOTS.length >= 6)
 assert.ok(listOfficialPyqSourceSlots('jee-advanced').every((s) => s.exam === 'jee-advanced'))
 assert.ok(getOfficialPyqSourceSlot('jee-adv-2024-p1')?.sourceUrl.includes('jeeadv.ac.in'))
 assert.equal(officialPyqStatusLabel('pending_review'), 'Pending approval')
-assert.equal(officialPyqStatusLabel('approved'), 'Published PYQ')
+assert.equal(officialPyqStatusLabel('approved'), 'Approved')
+assert.equal(officialPyqStatusLabel('published'), 'Published')
 assert.equal(
   assignOfficialPyqSaveId(
     {
@@ -238,12 +241,22 @@ const lockedNoFacts = validateOfficialPyqForApprove(getOfficialPyqPendingPaper(p
 assert.equal(lockedNoFacts.ok, false)
 assert.match(lockedNoFacts.errors.join(' '), /Paper facts are not confirmed/)
 
-// --- Approve → PYQ + published Question Bank ---
+// --- Reviewed — Approve: Approved, nothing for students yet ---
 const beforePyq = loadImportedPyqs().length
-const result = approveOfficialPyqPaper(withFacts(pending.id))
+const beforeBank = (loadQuestionBank().questions ?? []).length
+const approvedOnly = approveOfficialPyqPaper(withFacts(pending.id))
+assert.equal(approvedOnly.ok, true, approvedOnly.errors?.join(' '))
+assert.equal(approvedOnly.questionCount, 2)
+assert.equal(getOfficialPyqPendingPaper(pending.id).status, 'approved')
+assert.equal(loadImportedPyqs().length, beforePyq, 'approve alone must not reach student PYQ')
+assert.equal((loadQuestionBank().questions ?? []).length, beforeBank, 'approve alone must not reach the bank')
+
+// --- Publish → PYQ + published Question Bank ---
+const result = publishOfficialPyqPaper(pending.id)
 assert.equal(result.ok, true, result.errors?.join(' '))
 assert.equal(result.pyqCount, 2)
 assert.equal(result.bankCount, 2)
+assert.equal(getOfficialPyqPendingPaper(pending.id).status, 'published')
 
 const pyqs = loadImportedPyqs()
 assert.equal(pyqs.length, beforePyq + 2)
@@ -283,41 +296,51 @@ assert.equal(pyqAfterTag.subject, 'chemistry')
 assert.equal(pyqAfterTag.chapter, 'Thermodynamics')
 assert.equal(pyqAfterTag.topic, 'Enthalpy')
 
-const approvedRow = listOfficialPyqPendingPapers('approved').find((p) => p.id === pending.id)
-assert.equal(approvedRow?.status, 'approved')
+const publishedRow = listOfficialPyqPendingPapers('published').find((p) => p.id === pending.id)
+assert.equal(publishedRow?.status, 'published')
 
 const double = approveOfficialPyqPaper(withFacts(pending.id))
 assert.equal(double.ok, false)
+assert.match((double.errors || []).join(' '), /already published/i)
+assert.match((double.errors || []).join(' '), /unpublish/i)
+const doublePublish = publishOfficialPyqPaper(pending.id)
+assert.equal(doublePublish.ok, false)
+assert.match((doublePublish.errors || []).join(' '), /already published/i)
 
 const publishedCount = loadImportedPyqs().filter((q) => q.paperId === pending.paperId).length
-updateOfficialPyqPendingPaper(pending.id, { status: 'pending_review' })
-const againWhileLive = approveOfficialPyqPaper(withFacts(pending.id))
-assert.equal(againWhileLive.ok, false)
-assert.match((againWhileLive.errors || []).join(' '), /already published/i)
-assert.match((againWhileLive.errors || []).join(' '), /unapprove/i)
-assert.equal(
-  loadImportedPyqs().filter((q) => q.paperId === pending.paperId).length,
-  publishedCount,
-  'a second publish must not add another copy',
-)
-updateOfficialPyqPendingPaper(pending.id, { status: 'approved' })
+const publishedIds = getOfficialPyqPendingPaper(pending.id).questions.map((q) => q.id)
 
 sessionStorage.setItem(
   'testvantage-session',
   JSON.stringify({ role: 'admin', email: 'admin@test', name: 'Admin', loggedInAt: 1 }),
 )
+// Unpublish: Published → Approved, gone from students, ids stay on the cards
 const unpub = unpublishOfficialPyqPaper(pending.id)
 assert.equal(unpub.ok, true, unpub.error)
-assert.equal(unpub.paper?.status, 'pending_review')
+assert.equal(unpub.paper?.status, 'approved')
 assert.ok(unpub.pyqRemoved >= 2)
-assert.equal(listOfficialPyqPendingPapers('approved').find((p) => p.id === pending.id), undefined)
-assert.equal(listOfficialPyqPendingPapers('pending_review').find((p) => p.id === pending.id)?.status, 'pending_review')
+assert.equal(listOfficialPyqPendingPapers('published').find((p) => p.id === pending.id), undefined)
+assert.equal(listOfficialPyqPendingPapers('approved').find((p) => p.id === pending.id)?.status, 'approved')
 assert.equal(loadImportedPyqs().filter((q) => q.paperId === pending.paperId).length, 0)
+assert.deepEqual(getOfficialPyqPendingPaper(pending.id).questions.map((q) => q.id), publishedIds)
 
-// Re-approve after unpublish must work again
+// Send back for review: Approved → Pending
+const back = unapproveOfficialPyqPaper(pending.id)
+assert.equal(back.ok, true, back.error)
+assert.equal(getOfficialPyqPendingPaper(pending.id).status, 'pending_review')
+
+// Re-approve and publish again: same final ids, one copy only
 const reap = approveOfficialPyqPaper(withFacts(pending.id))
 assert.equal(reap.ok, true, reap.errors?.join(' '))
 assert.equal(listOfficialPyqPendingPapers('approved').find((p) => p.id === pending.id)?.status, 'approved')
+const repub = publishOfficialPyqPaper(pending.id)
+assert.equal(repub.ok, true, repub.errors?.join(' '))
+assert.deepEqual(repub.questionIds, publishedIds, 'publishing again keeps the final ids')
+assert.equal(
+  loadImportedPyqs().filter((q) => q.paperId === pending.paperId).length,
+  publishedCount,
+  'a second publish must not add another copy',
+)
 
 // --- Direct add path ---
 const direct = addOfficialPyqPendingPaper({
@@ -709,16 +732,15 @@ assert.match(
   'approve failures must scroll their error into view',
 )
 
-// The sticky action row must clear the sticky app chrome (brand bar + tricolor +
-// nav, z-index 82-84 above .official-pyq-page). At top: 0 the Approve button
-// parks under the chrome and every click lands on the chrome instead.
+// The approve row stays in normal flow above the question: a sticky row covered
+// half of a tall graph. It still sits above neighbours so clicks land on it.
 const cssSrc = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
-const stickyAt = cssSrc.indexOf('.official-pyq-preview .official-pyq-actions.bank-review-status-actions')
-assert.ok(stickyAt >= 0, 'sticky approve action row rule must exist')
-const stickyRule = cssSrc.slice(stickyAt, cssSrc.indexOf('}', stickyAt) + 1)
-assert.match(stickyRule, /position:\s*sticky/)
-assert.doesNotMatch(stickyRule, /top:\s*0\s*;/, 'sticky approve row must not hide under the app chrome')
-assert.match(stickyRule, /top:\s*var\(--official-pyq-chrome-h/)
+const actionsAt = cssSrc.indexOf('.official-pyq-preview .official-pyq-actions.bank-review-status-actions')
+assert.ok(actionsAt >= 0, 'approve action row rule must exist')
+const actionsRule = cssSrc.slice(actionsAt, cssSrc.indexOf('}', actionsAt) + 1)
+assert.doesNotMatch(actionsRule, /position:\s*sticky/, 'approve row must not cover the figure below it')
+assert.match(actionsRule, /position:\s*relative/)
+assert.match(actionsRule, /z-index:\s*\d+/)
 assert.match(cssSrc, /--official-pyq-chrome-h:\s*calc\(/, 'chrome height offset must be defined')
 
 const fragPaper = importQuestionsToOfficialPyqPending({
@@ -785,7 +807,10 @@ const short50 = importQuestionsToOfficialPyqPending({
   paperLabel: 'Short 50 vs 51 reserve later',
   questions: fiftyQs,
 })
-updateOfficialPyqPendingPaper(short50.id, { expectedQuestionCount: 51 })
+updateOfficialPyqPendingPaper(short50.id, {
+  expectedQuestionCount: 51,
+  paperFacts: { known: true, expectedQuestionCount: 51 },
+})
 const short50Check = validateOfficialPyqForApprove(getOfficialPyqPendingPaper(short50.id))
 assert.equal(short50Check.ok, false, '50 filled vs 51 expected must not approve')
 assert.match(short50Check.errors.join(' '), /50|51|missing|do not approve/i)
@@ -826,7 +851,10 @@ const extra53 = importQuestionsToOfficialPyqPending({
   questions: fiftyThreeQs,
 })
 assert.equal(extra53.expectedQuestionCount, 51)
-const extra53Check = validateOfficialPyqForApprove(extra53)
+const extra53Check = validateOfficialPyqForApprove({
+  ...extra53,
+  paperFacts: { known: true, expectedQuestionCount: 51 },
+})
 assert.equal(extra53Check.ok, false, '53 cards vs 51 expected must not approve')
 assert.match(extra53Check.errors.join(' '), /53|expected|fragment|51/i)
 const incoming51 = fiftyThreeQs.slice(0, 51)
@@ -1115,17 +1143,14 @@ const reviewMsgs = officialPyqContentReviewMessages([
   },
 ])
 const reviewText = reviewMsgs.join(' ')
-assert.match(reviewText, /Question 2 \(printed 14\)/)
-assert.match(reviewText, /incomplete math/)
-assert.match(reviewText, /still shows raw code/)
-assert.match(reviewText, /The marked part is the problem/)
-assert.match(reviewText, /Do not approve/)
-assert.doesNotMatch(reviewText, /1 question\(s\)/)
+assert.match(reviewText, /Go to Q 2\b/)
+assert.match(reviewText, /TeX is still showing/)
+assert.doesNotMatch(reviewText, /Go to Q 1\b/, 'the clean card is not flagged')
 const cutOnly = officialPyqContentReviewMessages([
   { text: 'The ratio is \\frac{1}{', options: ['$1$', '$2$'], subject: 'physics', chapter: 'General' },
 ])
-assert.match(cutOnly.join(' '), /Question 1/)
-assert.match(cutOnly.join(' '), /cut-off fraction/)
+assert.match(cutOnly.join(' '), /Go to Q 1\b/)
+assert.match(cutOnly.join(' '), /did not draw/)
 const cutSpan = findReviewFlagSpans('The ratio is \\frac{1}{')
 assert.ok(cutSpan.some((span) => span.kind === 'cut-off-fraction'))
 const tableStem =

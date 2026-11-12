@@ -2,12 +2,16 @@ import { useState } from 'react'
 import {
   FACT_SUBJECTS,
   FACT_TYPES,
+  adminFactsMatchingScan,
+  defaultListSizesFor,
   defaultOptionsFor,
   draftAdminFacts,
   emptyFactRow,
   subjectLabel,
+  typeHasNoOptions,
   validateAdminFacts,
 } from '../utils/officialPyqAdminFacts.js'
+import { MATRIX_GRID_FACT_TYPE } from '../utils/matrixGridPyq.js'
 import {
   getOfficialPyqPendingOcrText,
   getOfficialPyqPendingPaper,
@@ -21,8 +25,8 @@ function clone(value) {
 function loadDraft(paperId, fresh = false) {
   const paper = getOfficialPyqPendingPaper(paperId)
   if (!paper) return null
-  if (!fresh && paper.adminFacts) return clone(paper.adminFacts)
   const ocr = getOfficialPyqPendingOcrText(paperId) || String(paper.preparedText ?? '')
+  if (!fresh && paper.adminFacts) return clone(adminFactsMatchingScan(paper.adminFacts, ocr))
   return draftAdminFacts(ocr, paper.questions)
 }
 
@@ -65,15 +69,15 @@ function SectionRows({ block, title, onChange, disabled }) {
             <th>To Q</th>
             <th>Type</th>
             <th>Options</th>
-            <th>List-I items</th>
-            <th>List-II items</th>
+            <th>List-I / Column I items</th>
+            <th>List-II / Column II items</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {rows.map((r, i) => {
-            const noOptions = r.type === 'integer' || r.type === 'numerical'
-            const isMatch = r.type === 'matrix_match'
+            const noOptions = typeHasNoOptions(r.type)
+            const isMatch = r.type === 'matrix_match' || r.type === MATRIX_GRID_FACT_TYPE
             return (
               <tr key={i}>
                 <td>{i + 1}</td>
@@ -98,9 +102,16 @@ function SectionRows({ block, title, onChange, disabled }) {
                 <td>
                   <select
                     value={r.type}
-                    onChange={(e) =>
-                      setRow(i, { type: e.target.value, options: defaultOptionsFor(e.target.value) })
-                    }
+                    onChange={(e) => {
+                      const type = e.target.value
+                      const sizes = defaultListSizesFor(type)
+                      setRow(i, {
+                        type,
+                        options: defaultOptionsFor(type),
+                        listI: sizes.listI || r.listI,
+                        listII: sizes.listII || r.listII,
+                      })
+                    }}
                     aria-label={`Section ${i + 1} type`}
                   >
                     {FACT_TYPES.map((t) => (
@@ -193,7 +204,7 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
     light = null
   }
   const confirmedAt = Number(light?.adminFacts?.confirmedAt) || 0
-  const published = String(light?.status ?? '') === 'approved'
+  const published = String(light?.status ?? '') === 'approved' || String(light?.status ?? '') === 'published'
   if (published && !confirmedAt) return null
 
   function onToggle(e) {
@@ -235,7 +246,8 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
     setErrors([])
     setNote('Saving the paper facts and checking every question…')
     try {
-      const { confirmOfficialPyqPaperFacts } = await import('../utils/officialPyqAdminFactsApply.js')
+      const [{ confirmOfficialPyqPaperFacts }, { OFFICIAL_PYQ_FACTS_CONFIRMED_EVENT, autoFixAfterOfficialPyqFactsConfirmed }] =
+        await Promise.all([import('../utils/officialPyqAdminFactsApply.js'), import('../utils/officialPyqFactsAutoFix.js')])
       const out = confirmOfficialPyqPaperFacts(paperId, draft)
       if (!out.ok) {
         setErrors(out.errors)
@@ -245,14 +257,26 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
       const q = out.quality
       const goTo = Array.isArray(q?.failedGoTo) ? q.failedGoTo : []
       const lines = Array.isArray(q?.lines) ? q.lines : []
-      setNote(
-        `Saved. Questions: ${out.before} → ${out.after} (paper facts say ${out.expected}). ` +
-          (q?.passed
-            ? 'Quality check passed.'
-            : `Quality check not passed.${goTo.length ? ` Go to Q ${goTo.slice(0, 24).join(', ')}.` : ''} ${lines[0] || ''}`),
-      )
+      const after = getOfficialPyqPendingPaper(paperId)?.questions?.length ?? out.after
+      const saved =
+        `Saved. Questions: ${out.before} → ${after} (paper facts say ${out.expected}). ` +
+        (q?.passed
+          ? 'Quality check passed.'
+          : `Quality check not passed.${goTo.length ? ` Go to Q ${goTo.slice(0, 24).join(', ')}.` : ''} ${lines[0] || ''}`)
+      setNote(saved)
       setDraft(loadDraft(paperId))
       onChanged?.()
+      const detail = { paperId, before: out.before, handled: false }
+      window.dispatchEvent(new CustomEvent(OFFICIAL_PYQ_FACTS_CONFIRMED_EVENT, { detail }))
+      if (detail.handled) {
+        setNote(`${saved} Facts confirmed — auto-fix started (see Compare with original paper below).`)
+      } else {
+        const fix = await autoFixAfterOfficialPyqFactsConfirmed(paperId, { before: out.before })
+        const left = fix.todo?.length ? ` Still flagged: Q ${fix.todo.join(', ')} — use Auto-fix flagged questions.` : ''
+        setNote(`${saved} Facts confirmed — free auto-fix ran, nothing was sent to Gemini.${left}`)
+        setDraft(loadDraft(paperId))
+        onChanged?.()
+      }
     } catch (err) {
       setErrors([err instanceof Error ? err.message : 'Could not save the paper facts.'])
       setNote('')
@@ -279,7 +303,7 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
             Confirmed {new Date(confirmedAt).toLocaleString()}
           </span>
         ) : (
-          <span className="upload-error">Not confirmed — needed before Approve &amp; publish</span>
+          <span className="upload-error">Not confirmed — needed before Approve</span>
         )}
       </summary>
 
@@ -332,7 +356,7 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
                   type="radio"
                   name={`facts-numbering-${paperId}`}
                   checked={draft.numbering !== 'continuous'}
-                  onChange={() => patch({ numbering: 'restart' })}
+                  onChange={() => patch({ numbering: 'restart', numberingFromScan: false })}
                 />{' '}
                 restart at Q1 in each subject
               </label>{' '}
@@ -341,10 +365,18 @@ export default function OfficialPyqPaperFactsForm({ paperId, onChanged }) {
                   type="radio"
                   name={`facts-numbering-${paperId}`}
                   checked={draft.numbering === 'continuous'}
-                  onChange={() => patch({ numbering: 'continuous' })}
+                  onChange={() => patch({ numbering: 'continuous', numberingFromScan: false })}
                 />{' '}
                 run straight through all subjects
               </label>
+              {draft.numberingFromScan ? (
+                <p className="form-hint" data-testid="official-pyq-facts-numbering-from-scan">
+                  Set from the scan: the paper prints{' '}
+                  {draft.numbering === 'continuous'
+                    ? 'numbers that run on past one subject.'
+                    : 'Q.1 again at the start of each subject.'}
+                </p>
+              ) : null}
             </div>
 
             <label>

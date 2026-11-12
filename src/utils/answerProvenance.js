@@ -16,10 +16,13 @@ import {
   trySolveIncreasingConcaveDownGraphMcq,
 } from './repairDerivativePrimeStemOcr.js'
 
+import { BONUS_MARKS_TO_ALL_RE, numericChoiceFields, parseNumericAnswerChoices } from './answerAlternatives.js'
+
 /** @typedef {'from_paper' | 'ai_generated' | 'manual' | 'draft' | 'unknown'} AnswerSource */
 
+/** "ANSWER : AD" prints the letters of a multiple-correct key side by side (2013 P2). */
 const ANSWER_LINE =
-  /^(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?|Ans\.?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?([A-D1-4](?:\s*[,;&\/]\s*[A-D1-4])*)\b/i
+  /^(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?|Ans\.?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?([A-D1-4](?:\s*[,;&\/]\s*[A-D1-4])*|[A-D]{2,4})\b(?!\s*or\s+(?:\d|[A-D]{1,4}\b))/i
 
 const ANSWER_INLINE =
   /(?:^|[\n\s])(?:Ans(?:wer)?s?|Key|Correct(?:\s+option)?)\s*[\:\-\=]?\s*(?:is\s+)?(?:option\s+)?\(?([A-D])\)?(?:\s|$|[.,;])/i
@@ -32,7 +35,10 @@ const ANSWER_THEREFORE = /(?:∴|therefore|hence)\s*(?:the\s+)?(?:answer|option)
 const SOLUTION_LINE = /^(?:Solution|Explanation|Sol\.?|Hint)\s*[\:\-]?\s*(.*)$/i
 
 const INTEGER_ANS =
-  /^(?:Ans(?:wer)?s?|Key)\s*[\:\-\=]?\s*(-?\d{1,4}(?:\.\d+)?)\s*$/i
+  /^(?:Ans(?:wer)?s?|Key)\s*[\:\-\=]?\s*(-?\d{1,4}(?:\.\d+)?)(?:\s*\(\s*[a-z]+\s*\))?\s*$/i
+
+/** "Answer: (A), (C) and (D)" / "Answer (C) and (D)" (2014) → "Answer: A, C, D". */
+const BRACKETED_LETTER_KEY = /((?:Ans(?:wer)?s?|Key)\s*[:\-=]?\s*)((?:\(\s*[A-D]\s*\)\s*(?:,|\band\b|&)?\s*)+)/gi
 
 /** A printed key at the end of a stem: "Answer: A", "Answer: 6", "Answer: [0.7 to 0.8]". */
 const PRINTED_ANSWER_TAIL =
@@ -70,9 +76,17 @@ function lettersToAnswer(key) {
  * }}
  */
 export function detectAnswerFromPaper(block) {
-  const text = String(block ?? '').replace(/\r\n/g, '\n')
+  /** Mathpix prints some keys as headings: "\section*{Answer: [2.2 to 2.3]}" (2025 P1 Q9/Q41/Q42). */
+  const text = String(block ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\\section\*?\{\s*((?:(?:Official\s+)?Ans(?:wer)?s?\.?|Key)\s*(?:[:.\-=]|(?=\(\s*[A-D]\s*\)))[^{}\n]*)\}/gi, '$1')
+    .replace(BRACKETED_LETTER_KEY, (_, head, list) => `${head.replace(/[\s:\-=]*$/, '')}: ${[...list.matchAll(/\(\s*([A-D])\s*\)/gi)].map((m) => m[1]).join(', ')} `)
   if (!text.trim()) {
     return { answerSource: 'unknown', answerConfidence: 0 }
+  }
+  const bonus = text.match(BONUS_MARKS_TO_ALL_RE)
+  if (bonus) {
+    return { bonusMarksToAll: true, answerSource: 'from_paper', answerConfidence: 90, matchedLine: bonus[0].trim() }
   }
 
   const lines = text.split('\n')
@@ -100,7 +114,7 @@ export function detectAnswerFromPaper(block) {
       }
     }
     const m = t.match(ANSWER_LINE)
-    if (m) {
+    if (m && !(/^[A-D]{2,4}$/i.test(m[1]) && m[1] !== m[1].toUpperCase())) {
       return {
         ...lettersToAnswer(m[1]),
         answerSource: 'from_paper',
@@ -148,13 +162,15 @@ export function detectAnswerFromPaper(block) {
 
 /**
  * Read a printed key that sits at the end of the question, including a range.
- * Does not invent a number when the key is a band such as [0.7 to 0.8].
+ * A band such as [0.7 to 0.8] becomes 0.75 ± 0.05, so exactly the printed band is marked correct.
  * @param {string} text
  */
 function printedAnswerTail(text) {
   const m = String(text ?? '').match(PRINTED_ANSWER_TAIL)
   if (!m) return null
-  const value = String(m[2] ?? '').trim().replace(/\.$/, '')
+  let value = String(m[2] ?? '').trim()
+  if (!value.includes('{')) value = value.replace(/\}+$/, '').trim()
+  value = value.replace(/\.$/, '')
   if (!value || /^(?:a|an|the)\b/i.test(value)) return null
   const letter = value.match(/^\(?([A-D])\)?$/i)
   if (letter) {
@@ -162,6 +178,15 @@ function printedAnswerTail(text) {
       ...lettersToAnswer(letter[1]),
       answerSource: 'from_paper',
       answerConfidence: 94,
+      matchedLine: m[1].trim(),
+    }
+  }
+  const choices = parseNumericAnswerChoices(value)
+  if (choices) {
+    return {
+      ...numericChoiceFields(choices),
+      answerSource: 'from_paper',
+      answerConfidence: 90,
       matchedLine: m[1].trim(),
     }
   }
@@ -185,13 +210,92 @@ function printedAnswerTail(text) {
     }
   }
   if (!/^(?:-?\d|\[[\d.+\-])/.test(value)) return null
+  const band = value.match(/^\[?\s*(-?\d+(?:\.\d+)?)\s*(?:to|–|—)\s*(-?\d+(?:\.\d+)?)\s*\]?$/i)
+  const low = band ? Number(band[1]) : NaN
+  const high = band ? Number(band[2]) : NaN
+  /** "[0.27 to 0.33]" is the band itself: its middle with half its width accepts exactly that band. */
+  const bandAnswer =
+    Number.isFinite(low) && Number.isFinite(high) && high > low
+      ? {
+          correctNumerical: Number(((low + high) / 2).toFixed(6)),
+          numericalTolerance: Number(((high - low) / 2).toFixed(6)),
+        }
+      : {}
   return {
+    ...bandAnswer,
     answerSource: 'from_paper',
     answerConfidence: 90,
-    solution: m[1].trim(),
-    solutionSource: 'from_paper',
     matchedLine: m[1].trim(),
   }
+}
+
+const ANS_MARK_SRC = String.raw`(?:Ans(?:wer)?s?|ANS(?:WER)?S?)\s*(?:[.:\-=]|\(\s*[A-D]\s*\))`
+const SOL_MARK_SRC = String.raw`(?:Sol(?:ution)?|SOL(?:UTION)?|Explanation|EXPLANATION|Hints?|HINTS?)\s*[.:\-\u2013]`
+/** "Solution" / "\section*{Explanation}" alone on its line also opens a printed solution. */
+const SOL_LINE_ALONE_SRC = String.raw`(?:\\section\*?\{\s*)?(?:Sol(?:ution)?|SOL(?:UTION)?|Explanation|EXPLANATION|Hints?|HINTS?)\s*\}?[ \t]*(?=\n|$)`
+const TAIL_START_RE = new RegExp(String.raw`(^|[ \t]+|\n[ \t]*)(?=${ANS_MARK_SRC}|${SOL_MARK_SRC}|${SOL_LINE_ALONE_SRC})`, 'g')
+const SOL_START_RE = new RegExp(String.raw`(?:^|[ \t]|\n[ \t]*)(?:${SOL_MARK_SRC}|${SOL_LINE_ALONE_SRC})`)
+const ANS_START_LINE_RE = new RegExp(String.raw`^(?:\\section\*?\{\s*)?${ANS_MARK_SRC}`)
+const SOL_START_LINE_RE = new RegExp(String.raw`^(?:${SOL_MARK_SRC}|${SOL_LINE_ALONE_SRC})`)
+
+/**
+ * A printed answer + solution under the question ("Ans. (B)" then "Sol. …"): the part before it is
+ * the question, the part from it on is the paper's own answer and solution. Only when a solution
+ * marker is printed; a lone "Answer: C" key is left to the key readers.
+ * @param {unknown} block
+ * @returns {{ head: string, tail: string } | null}
+ */
+export function cutPrintedSolutionTail(block) {
+  const text = String(block ?? '').replace(/\r\n/g, '\n')
+  for (const m of text.matchAll(TAIL_START_RE)) {
+    const at = m.index + m[1].length
+    if (!SOL_START_RE.test(text.slice(at - (at > 0 ? 1 : 0)))) return null
+    if (at === 0) continue
+    return { head: text.slice(0, at).trimEnd(), tail: text.slice(at).trim() }
+  }
+  return null
+}
+
+/**
+ * Answer and solution from the printed tail of one question.
+ * @param {unknown} tail
+ * @returns {{ answer: ReturnType<typeof detectAnswerFromPaper>, solution: string }}
+ */
+export function readPrintedAnswerAndSolution(tail) {
+  const lines = String(tail ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(new RegExp(String.raw`[ \t]+(?=${SOL_MARK_SRC}|${ANS_MARK_SRC})`, 'g'), '\n')
+    .split('\n')
+  const answerLines = []
+  const solutionLines = []
+  let inSolution = false
+  for (const line of lines) {
+    const t = line.trim()
+    if (ANS_START_LINE_RE.test(t)) {
+      answerLines.push(
+        t
+          .replace(/^(?:\\section\*?\{\s*)?(?:Ans(?:wer)?s?|ANS(?:WER)?S?)\s*[.:\-=]?\s*/, 'Answer: ')
+          .replace(/\}\s*$/, ''),
+      )
+      continue
+    }
+    if (SOL_START_LINE_RE.test(t)) {
+      inSolution = true
+      const rest = t.replace(
+        /^(?:\\section\*?\{\s*)?(?:Sol(?:ution)?|SOL(?:UTION)?|Explanation|EXPLANATION|Hints?|HINTS?)\s*[.:\-\u2013]?\s*\}?\s*/,
+        '',
+      )
+      if (rest) solutionLines.push(rest)
+      continue
+    }
+    if (inSolution) solutionLines.push(line.trimEnd())
+  }
+  const solution = solutionLines
+    .join('\n')
+    .replace(/\\(?:begin|end)\{(?:itemize|enumerate)\}/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return { answer: detectAnswerFromPaper(answerLines.join('\n')), solution }
 }
 
 /**
@@ -242,13 +346,19 @@ const PRINTED_ANSWER_LINE =
 export function stripAnswerMetaLines(block) {
   return String(block ?? '')
     .split('\n')
-    .filter((line) => {
+    .flatMap((line) => {
       const t = line.trim()
-      if (!t) return true
-      if (ANSWER_LINE.test(t) || INTEGER_ANS.test(t) || SOLUTION_LINE.test(t)) return false
-      if (PRINTED_ANSWER_LINE.test(t) || PRINTED_ANSWER_TAIL.test(t)) return false
-      if (ANSWER_PAREN.test(t) && t.length < 40) return false
-      return true
+      if (!t) return [line]
+      if (ANSWER_LINE.test(t) || INTEGER_ANS.test(t) || SOLUTION_LINE.test(t)) return []
+      if (PRINTED_ANSWER_LINE.test(t)) return []
+      if (BONUS_MARKS_TO_ALL_RE.test(t)) return []
+      if (PRINTED_ANSWER_TAIL.test(t)) {
+        // 2025 P2: "Then the value of $r$ is \_\_\_\_. Answer: 6" — the question sentence stays.
+        const kept = line.replace(PRINTED_ANSWER_TAIL, '').trimEnd()
+        return kept.trim() ? [kept] : []
+      }
+      if (ANSWER_PAREN.test(t) && t.length < 40) return []
+      return [line]
     })
     .join('\n')
     .trim()
@@ -623,10 +733,12 @@ export function enrichPassageSubQuestion(sq, chunk = '') {
  * Enrich a parsed question (single or bulk item) with answer/solution provenance.
  * Paper answers win over AI; never overwrite an existing explicit correctIndex from caller
  * unless it came from the same enrich pass.
+ * `paperOnly` keeps what the paper prints and stops there: no solving, no drafted solution.
  * @param {Record<string, unknown>} parsed
  * @param {string} [rawBlock]
+ * @param {{ paperOnly?: boolean }} [opts]
  */
-export function enrichParsedWithAnswerProvenance(parsed, rawBlock = '') {
+export function enrichParsedWithAnswerProvenance(parsed, rawBlock = '', opts = {}) {
   const block = String(rawBlock || parsed?.text || '')
   const paperAns = detectAnswerFromPaper(block)
   const paperSol = detectSolutionFromPaper(block)
@@ -683,6 +795,11 @@ export function enrichParsedWithAnswerProvenance(parsed, rawBlock = '') {
   } else if (out.solution && !out.solutionSource) {
     out.solutionSource = paperSol.solutionSource === 'from_paper' ? 'from_paper' : 'from_paper'
     out.solutionConfidence = paperSol.solutionConfidence || 80
+  }
+
+  if (opts.paperOnly === true) {
+    if (!out.answerSource) out.answerSource = 'unknown'
+    return out
   }
 
   const stillNoAnswer =

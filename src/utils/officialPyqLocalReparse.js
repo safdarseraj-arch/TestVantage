@@ -34,7 +34,7 @@ function shapeWithPaperFacts(paper, questions, preparedText) {
     paperFacts: facts,
   }
 }
-import { officialPyqContentReviewMessages } from './officialPyqReviewFlags.js'
+import { officialPyqContentReviewMessages, officialPyqMissingListMessage } from './officialPyqReviewFlags.js'
 import { healUploadQuestionCard as healPreviewCard, applyStoredOcrCardFixes } from './uploadQualityGuards.js'
 import { enrichMatchListsFromOcr } from './restoreMatchListsOcr.js'
 import {
@@ -44,6 +44,7 @@ import {
   shouldRebuildFromMathpixOcr,
   officialPyqCardsNeedMathpixRebuild,
 } from './mathpixQuestionSplit.js'
+import { storedEndAnswerSectionText } from './printedEndSolutions.js'
 import {
   expectedPyqTargetFromOcrLite,
   quickOcrQuestionCount,
@@ -52,6 +53,7 @@ import {
   getOfficialPyqPendingPaper,
   updateOfficialPyqPendingPaper,
   officialPyqQuestionsArePublishedLocked,
+  officialPyqWordingLockedMessage,
 } from './officialPyqPendingStore.js'
 import { splitOcrInWorker, rememberOfficialPyqSplitKeep } from './officialPyqSplitWorker.js'
 import {
@@ -65,6 +67,7 @@ import {
   dedupeUploadQuestionSlots,
 } from './officialPyqMissingSlots.js'
 import { stripAnswersFromQuestionCards } from './stripAnswerFromQuestionStem.js'
+import { gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.js'
 
 const PYQ_PREPARED_OCR_MARKER = '--- prepared-ocr ---'
 const PYQ_VISION_TEXT_MARKER = '--- vision-ocr ---'
@@ -110,13 +113,15 @@ export function officialPyqStoredOcrTextLocal(paper) {
   const rawNotes = extractPreparedTextFromPaperNotes(paper?.notes)
   const dedicated = sanitizeMathpixOcrText(rawDedicated)
   const fromNotes = sanitizeMathpixOcrText(rawNotes)
+  // The clean cuts the answers / solutions printed after the paper; the split reads them again.
+  const endSection = storedEndAnswerSectionText(rawDedicated) || storedEndAnswerSectionText(rawNotes)
   // preparedText is a cleaned copy. If that clean ate figure URLs, the notes
   // copy still has them. Prefer the copy that still has the drawings.
   if (fromNotes.length >= 80 && mathpixFigureHits(rawNotes) > mathpixFigureHits(rawDedicated)) {
-    return fromNotes
+    return fromNotes + endSection
   }
-  if (dedicated.length >= 80) return dedicated
-  return fromNotes
+  if (dedicated.length >= 80) return dedicated + endSection
+  return fromNotes + endSection
 }
 
 /** @param {'jee-main' | 'jee-advanced' | 'neet'} exam */
@@ -159,9 +164,6 @@ function healOfficialPyqPaperQuestionsEnriched(paper, opts) {
   )
 }
 
-const PUBLISHED_LOCK_ERROR =
-  'This paper is published. Unpublish it before re-parse or heal can change its questions.'
-
 /**
  * Heal fragment cards (53 → ~51) and persist when safe.
  * @param {import('./officialPyqPendingStore.js').OfficialPyqPendingPaper | null | undefined} paper
@@ -176,7 +178,7 @@ export function healAndPersistOfficialPyqPaper(paper, opts = {}) {
       count: n,
       previousCount: n,
       questions: paper?.questions ?? [],
-      error: officialPyqQuestionsArePublishedLocked(paper) ? PUBLISHED_LOCK_ERROR : '',
+      error: officialPyqQuestionsArePublishedLocked(paper) ? officialPyqWordingLockedMessage(paper) : '',
     }
   }
   if (!paper?.id || !['pending_review', 'rejected'].includes(status)) {
@@ -309,21 +311,210 @@ export function healAndPersistOfficialPyqPaper(paper, opts = {}) {
   return { ok: true, changed: true, count: healed.length, previousCount, questions: healed }
 }
 
-function keepAdminEditedCards(next, prev) {
+/**
+ * Places where printed numbers do not run 1, 2, 3… (restarting at 1 per subject).
+ * A question with no "Q." marker in the scan makes the marker count one short, so the
+ * count alone would keep an old list that skips a number.
+ */
+function printedNumberBreaks(questions) {
+  const pn = (Array.isArray(questions) ? questions : []).map((q) => Number(q?.printedNumber) || 0)
+  return pn.filter((n, i) => i > 0 && n !== pn[i - 1] + 1 && n !== 1).length
+}
+
+/** Ordered word pairs of text + options, so matrix-match cards sharing one stem still differ. */
+function cardWordPairs(card) {
+  const options = Array.isArray(card?.options) ? card.options : []
+  const words = String([card?.text ?? '', ...options].join(' ')).toLowerCase().match(/[a-z0-9]+/g) || []
+  const pairs = new Set()
+  for (let i = 1; i < words.length; i += 1) pairs.add(`${words[i - 1]} ${words[i]}`)
+  if (words.length === 1) pairs.add(words[0])
+  return pairs
+}
+
+function pairOverlap(a, b) {
+  if (!a.size || !b.size) return 0
+  let shared = 0
+  for (const p of a) if (b.has(p)) shared += 1
+  return (2 * shared) / (a.size + b.size)
+}
+
+const SAME_CARD_MIN_OVERLAP = 0.6
+
+/**
+ * Card numbers shift when the splitter improves, so an edited card goes to the
+ * new card holding the same question (edited or scanned wording), not the same number.
+ */
+function placeAdminEditedCards(cards, prior, admins) {
+  const nextPairs = cards.map(cardWordPairs)
+  const printedOf = (q) => Number(q?.printedNumber) || 0
+  // A stored card can carry the wrong subject (an old split put Chemistry Q21–39 under Physics),
+  // so when every printed number is used once the number alone finds the card.
+  const printedUnique = new Set(cards.map(printedOf).filter((n) => n > 0)).size === cards.length
+  const scored = []
+  admins.forEach((a, ai) => {
+    // A machine fix can rewrite a slot into another question; its old wording names the slot it
+    // was wrongly made in, so its current wording places it whenever that wording finds a card.
+    const current = cardWordPairs(a)
+    const currentFinds = isMachineFix(a) && nextPairs.some((pairs) => pairOverlap(current, pairs) >= SAME_CARD_MIN_OVERLAP)
+    const history = Array.isArray(a.editHistory) && !currentFinds ? a.editHistory : []
+    const versions = [a, ...history.map((h) => h?.card).filter(Boolean)].map(cardWordPairs)
+    nextPairs.forEach((pairs, qi) => {
+      const subject = String(cards[qi]?.subject || '')
+      const score = Math.max(...versions.map((v) => pairOverlap(v, pairs)))
+      if (a.subject && subject && String(a.subject) !== subject && !(printedUnique && score >= 0.85)) return
+      if (score >= SAME_CARD_MIN_OVERLAP) scored.push({ ai, qi, score })
+    })
+  })
+  scored.sort((x, y) => y.score - x.score)
+  /** @type {Map<number, any>} */
+  const byNext = new Map()
+  const placed = new Set()
+  for (const { ai, qi } of scored) {
+    if (placed.has(ai) || byNext.has(qi)) continue
+    byNext.set(qi, admins[ai])
+    placed.add(ai)
+  }
+  admins.forEach((a, ai) => {
+    // A machine fix that matches no question by wording is a duplicate or a mis-split; a number
+    // or position fallback would paste it over a different question.
+    if (placed.has(ai) || isMachineFix(a)) return
+    let at = cards.findIndex(
+      (q, i) =>
+        !byNext.has(i) &&
+        Number(a.printedNumber) > 0 &&
+        Number(a.printedNumber) === Number(q?.printedNumber) &&
+        (printedUnique || String(a.subject || '') === String(q?.subject || '')),
+    )
+    if (at < 0) at = prior.indexOf(a)
+    if (at >= 0 && at < cards.length && !byNext.has(at)) byNext.set(at, a)
+  })
+  return byNext
+}
+
+/** Two edited cards with the same text and options are one question kept twice; keep the labelled one. */
+function uniqueAdminCards(admins) {
+  const best = new Map()
+  for (const a of admins) {
+    const key = JSON.stringify([a.text ?? '', a.options ?? []])
+    const have = best.get(key)
+    if (!have || (!have.editSource && a.editSource)) best.set(key, a)
+  }
+  return [...best.values()]
+}
+
+/**
+ * An unapproved auto-compare card (a machine fix, not the admin's) that still misses a
+ * match list gives way when the fresh parse of the same slot has both lists.
+ */
+function isMachineFix(q) {
+  return q?.editSource === 'auto_compare' && q?.adminApproved !== true
+}
+
+const filledOptionCount = (q) => (Array.isArray(q?.options) ? q.options : []).filter((o) => String(o ?? '').trim()).length
+
+/** Options on a number-answer question, or fewer A–D choices than the scan prints. */
+function optionShapeDisagrees(old, fresh) {
+  const had = filledOptionCount(old)
+  const scan = filledOptionCount(fresh)
+  if (!scan && had && /^(?:integer|numerical)$/.test(String(fresh?.questionType || ''))) return true
+  return scan >= 4 && had < scan
+}
+
+/** The scan's card shows a structure or picture in its stem and the machine fix shows none. */
+function lostScanDrawing(old, fresh) {
+  const drawing = /<smiles>|\\includegraphics|!\[[^\]]*\]\(/i
+  return drawing.test(String(fresh?.text ?? '')) && !drawing.test(String(old?.text ?? ''))
+}
+
+function autoFixLostToFreshParse(old, fresh, paper) {
+  if (!isMachineFix(old) || !fresh) return false
+  if (isMatrixGridCard(fresh) && !isMatrixGridCard(old)) return true
+  /** "58." above the lists or "31. The product X is": the fix kept the printed question number. */
+  const ownNumber = (q) => {
+    const m = String(q?.text ?? '').match(/^\s*(\d{1,3})\s*[.)](?:[ \t]*(?:\n|$)|[ \t]+(?=[A-Za-z$\\]))/)
+    return Boolean(m) && (/\n|^\s*\d{1,3}\s*[.)]\s*$/.test(m[0]) || Number(m[1]) === Number(fresh?.printedNumber ?? q?.printedNumber))
+  }
+  if (ownNumber(old) && !ownNumber(fresh)) return true
+  /** List-I pictures the scan prints in the stem sit on the fix's A–D. */
+  const stemPics = scanPicturesOf({ text: fresh?.text, passageText: fresh?.passageText })
+  const freshOptPics = scanPicturesOf({ options: fresh?.options })
+  if (
+    (Array.isArray(old?.options) ? old.options : []).some((o) =>
+      (String(o ?? '').match(SCAN_PICTURE_RE) || []).some((u) => stemPics.has(u) && !freshOptPics.has(u)),
+    )
+  ) {
+    return true
+  }
+  /** The fix kept the section instructions as its paragraph. */
+  if (/This section contains/i.test(String(old?.passageText ?? '')) && !/This section contains/i.test(String(fresh?.passageText ?? ''))) return true
+  if (optionShapeDisagrees(old, fresh)) return true
+  if (lostScanDrawing(old, fresh)) return true
+  if (carriesOtherQuestionsScanPicture(old, fresh, paper)) return true
+  return Boolean(officialPyqMissingListMessage([old])) && !officialPyqMissingListMessage([fresh])
+}
+
+const SCAN_PICTURE_RE = /https?:\/\/cdn\.mathpix\.com\/[^\s)}"'\]]+/gi
+
+function scanPicturesOf(q) {
+  const parts = [q?.text, q?.passageText, ...(Array.isArray(q?.options) ? q.options : [])]
+  return new Set(parts.flatMap((p) => String(p ?? '').match(SCAN_PICTURE_RE) || []))
+}
+
+/** The old card shows a scan picture that the fresh parse places under a different question. */
+function carriesOtherQuestionsScanPicture(old, fresh, paper) {
+  const mine = scanPicturesOf(fresh)
+  const extra = [...scanPicturesOf(old)].filter((u) => !mine.has(u))
+  if (!extra.length || !Array.isArray(paper)) return false
+  const elsewhere = new Set(paper.filter((q) => q && q !== fresh).flatMap((q) => [...scanPicturesOf(q)]))
+  return extra.some((u) => elsewhere.has(u))
+}
+
+/** Old card indexes the store may replace because the fresh parse fixed the same slot. */
+function releasedAutoFixIndexes(prev, next) {
+  const fresh = Array.isArray(next) ? next : []
+  const out = []
+  ;(Array.isArray(prev) ? prev : []).forEach((old, i) => {
+    if (old?.editSource !== 'auto_compare') return
+    // Placement left this machine fix out (it matched no question by wording, or a duplicate
+    // card with the same id won), so the store must not paste it back onto its old slot.
+    if (isMachineFix(old) && !fresh.some((q) => old.id && q?.id === old.id && String(q?.text ?? '') === String(old.text ?? ''))) {
+      out.push(i)
+      return
+    }
+    const slot = Number(old?.pyqSlot ?? old?.questionNumber)
+    const now =
+      fresh.find((q) => old?.id && q?.id === old.id) ||
+      fresh.find((q) => Number(q?.pyqSlot ?? q?.questionNumber) === slot)
+    if (!now) return
+    if (now.adminEdited !== true && autoFixLostToFreshParse(old, now, fresh)) out.push(i)
+    else if (old.adminApproved !== true && carriesOtherQuestionsScanPicture(old, now, fresh)) out.push(i)
+    // A machine fix saved without any answer must not wipe the printed key now on the card.
+    else if (isMachineFix(old) && now.answerSource === 'from_paper' && !hasAnyAnswer(old) && hasAnyAnswer(now)) out.push(i)
+  })
+  return out
+}
+
+function hasAnyAnswer(q) {
+  return (
+    [q?.correctIndex, q?.correctInteger, q?.correctNumerical].some((v) => v != null && v !== '') ||
+    (Array.isArray(q?.correctIndices) && q.correctIndices.length > 0)
+  )
+}
+
+export function keepAdminEditedCards(next, prev) {
   const prior = Array.isArray(prev) ? prev : []
-  const admins = prior.filter((q) => q?.adminEdited === true)
+  const cards = Array.isArray(next) ? next : []
+  const admins = uniqueAdminCards(prior.filter((q) => q?.adminEdited === true))
   if (!admins.length) return next
-  return (Array.isArray(next) ? next : []).map((q, i) => {
-    const old =
-      admins.find(
-        (a) =>
-          Number(a.printedNumber) > 0 &&
-          Number(a.printedNumber) === Number(q?.printedNumber) &&
-          String(a.subject || '') === String(q?.subject || ''),
-      ) || (prior[i]?.adminEdited === true ? prior[i] : null)
-    if (!old?.adminEdited) return q
+  const byNext = placeAdminEditedCards(cards, prior, admins)
+  return cards.map((q, i) => {
+    const old = byNext.get(i)
+    if (!old?.adminEdited || autoFixLostToFreshParse(old, q, cards)) return q
     return {
       ...q,
+      id: old.id || q.id,
+      ...(old.editSource ? { editSource: old.editSource } : {}),
+      ...(old.autoFix ? { autoFix: old.autoFix } : {}),
       text: old.text,
       options: old.options,
       passageText: old.passageText,
@@ -331,40 +522,91 @@ function keepAdminEditedCards(next, prev) {
       correctIndices: old.correctIndices,
       correctInteger: old.correctInteger,
       correctNumerical: old.correctNumerical,
+      numericalTolerance: old.numericalTolerance,
+      numericalAlternatives: old.numericalAlternatives,
+      correctIndicesAlternatives: old.correctIndicesAlternatives,
+      bonusMarksToAll: old.bonusMarksToAll,
+      ...gridFieldsOf(old),
       solution: old.solution,
       adminEdited: true,
       adminEditedAt: old.adminEditedAt,
+      ...(old.adminApproved === true ? { adminApproved: true, adminApprovedAt: old.adminApprovedAt } : {}),
+      ...(Array.isArray(old.editHistory) ? { editHistory: old.editHistory } : {}),
     }
   })
 }
 
 /** @param {unknown[]} canonical @param {unknown[]} prev */
-function copyAnswersOntoCanonical(canonical, prev) {
+export function copyAnswersOntoCanonical(canonical, prev) {
   const byNum = new Map()
   for (const q of prev) {
     const n = Number(q?.questionNumber)
     if (Number.isFinite(n) && n > 0) byNum.set(n, q)
   }
+  const admins = uniqueAdminCards(prev.filter((q) => q?.adminEdited === true))
+  const adminAt = admins.length ? placeAdminEditedCards(canonical, prev, admins) : new Map()
   return canonical.map((q, i) => {
-    const old = byNum.get(Number(q.questionNumber)) || prev[i]
+    const placed = adminAt.get(i)
+    let old = placed || byNum.get(Number(q.questionNumber)) || prev[i]
+    if (!placed && old?.adminEdited === true) old = null
     if (!old) return q
-    if (old.adminEdited === true) {
+    if (old.adminEdited === true && !autoFixLostToFreshParse(old, q, canonical)) {
+      const printedKey =
+        isMachineFix(old) && q.answerSource === 'from_paper'
+          ? {
+              correctIndex: q.correctIndex,
+              correctIndices: q.correctIndices,
+              correctInteger: q.correctInteger,
+              correctNumerical: q.correctNumerical,
+              answerSource: 'from_paper',
+            }
+          : {}
       return {
         ...old,
+        ...printedKey,
         questionNumber: q.questionNumber,
         pyqSlot: q.pyqSlot ?? q.questionNumber,
         printedNumber: q.printedNumber ?? old.printedNumber,
         subject: q.subject || old.subject,
-        questionType: old.questionType || q.questionType,
+        questionType: isMachineFix(old) ? q.questionType || old.questionType : old.questionType || q.questionType,
       }
     }
+    if (isMatrixGridCard(q)) {
+      const keepOldKey = !q.matrixAnswerKey && isMatrixGridCard(old) && old.matrixAnswerKey
+      return {
+        ...q,
+        id: q.id || old.id,
+        ...(keepOldKey
+          ? {
+              matrixAnswerKey: old.matrixAnswerKey,
+              ...(old.matrixAnswerAlternates ? { matrixAnswerAlternates: old.matrixAnswerAlternates } : {}),
+              answerSource: old.answerSource,
+            }
+          : {}),
+        solution: stripEmptyFigureShells(
+          stripEmptyImageMarkdown(String(old.solution ?? '').trim() ? old.solution : q.solution || ''),
+        ),
+        solutionSource: old.solutionSource || q.solutionSource,
+      }
+    }
+    /** A key printed in the scan replaces the old answer whole; mixing kept a stale "A" beside "A, C" (2025 P2). */
+    const printed =
+      q.answerSource === 'from_paper' &&
+      old.answerSource !== 'admin_edit' &&
+      (q.bonusMarksToAll === true ||
+        [q.correctIndex, q.correctInteger, q.correctNumerical].some((v) => v != null) ||
+        (Array.isArray(q.correctIndices) && q.correctIndices.length > 0))
     return {
       ...q,
       id: q.id || old.id,
-      correctIndex: q.correctIndex ?? old.correctIndex,
-      correctIndices: q.correctIndices || old.correctIndices,
-      correctInteger: q.correctInteger ?? old.correctInteger,
-      correctNumerical: q.correctNumerical ?? old.correctNumerical,
+      correctIndex: printed ? q.correctIndex : q.correctIndex ?? old.correctIndex,
+      correctIndices: printed ? q.correctIndices : q.correctIndices || old.correctIndices,
+      correctInteger: printed ? q.correctInteger : q.correctInteger ?? old.correctInteger,
+      correctNumerical: printed ? q.correctNumerical : q.correctNumerical ?? old.correctNumerical,
+      numericalTolerance: printed || q.correctNumerical != null ? q.numericalTolerance : old.numericalTolerance,
+      numericalAlternatives: printed || q.correctNumerical != null ? q.numericalAlternatives : old.numericalAlternatives,
+      correctIndicesAlternatives: printed || q.correctIndices?.length ? q.correctIndicesAlternatives : old.correctIndicesAlternatives,
+      bonusMarksToAll: printed ? q.bonusMarksToAll : q.bonusMarksToAll ?? old.bonusMarksToAll,
       solution: stripEmptyFigureShells(
         stripEmptyImageMarkdown(
           String(old.solution ?? '').trim() ? old.solution : q.solution || '',
@@ -381,9 +623,13 @@ function copyAnswersOntoCanonical(canonical, prev) {
 
 /**
  * Mathpix-only re-parse from stored OCR — no Gemini import.
+ * `requireCount`: save only when the rebuilt paper has exactly this many questions and keeps
+ * every admin-edited card; otherwise the stored cards stay untouched.
  * @param {import('./officialPyqPendingStore.js').OfficialPyqPendingPaper | null | undefined} paper
+ * @param {{ requireCount?: number }} [opts]
  */
-export function reExtractOfficialPyqPendingPaperLocal(paper) {
+export function reExtractOfficialPyqPendingPaperLocal(paper, opts = {}) {
+  const required = Number(opts?.requireCount) || 0
   if (!paper) {
     return { ok: false, error: 'Paper not found.', questions: [], count: 0, previousCount: 0 }
   }
@@ -391,7 +637,7 @@ export function reExtractOfficialPyqPendingPaperLocal(paper) {
     const n = paper.questions?.length ?? 0
     return {
       ok: false,
-      error: PUBLISHED_LOCK_ERROR,
+      error: officialPyqWordingLockedMessage(paper),
       questions: paper.questions ?? [],
       count: n,
       previousCount: n,
@@ -445,10 +691,10 @@ export function reExtractOfficialPyqPendingPaperLocal(paper) {
       }
     }
     const healedCanonical = healOfficialPyqPaperQuestionsEnriched({ ...paper, preparedText, questions })
-    const targetCount = markerCount >= minKeep ? markerCount : expected
+    const targetCount = required || (markerCount >= minKeep ? markerCount : expected)
     questions =
       pickQuestionListCloserToExpected(
-        [questions, healedCanonical, canonical],
+        [questions, healedCanonical, canonical, ...(required ? [healOfficialPyqPaperQuestionsEnriched(paper)] : [])],
         targetCount,
         minKeep,
       ) || questions
@@ -460,7 +706,7 @@ export function reExtractOfficialPyqPendingPaperLocal(paper) {
     .map((q, i) => ({
       ...q,
       answerSource: q.answerSource || (q.correctIndex != null ? 'from_paper' : 'unknown'),
-      solutionSource: q.solutionSource || (q.solution ? 'from_paper' : undefined),
+      solutionSource: q.solutionSource || (q.solution ? 'unknown' : undefined),
       provenance:
         q.provenance ||
         `${paper.sourceLabel}${paper.sourceUrl ? ` · ${paper.sourceUrl}` : ''}`,
@@ -511,9 +757,30 @@ export function reExtractOfficialPyqPendingPaperLocal(paper) {
 
   const shaped = shapeWithPaperFacts(paper, questions, preparedText)
   questions = shaped.questions
+  if (required) {
+    const filled = questions.filter((q) => !isOfficialPyqPlaceholder(q)).length
+    const ids = new Set(questions.map((q) => q?.id).filter(Boolean))
+    const sameCard = (q) => JSON.stringify([q?.text ?? '', q?.options ?? []])
+    const kept = new Set(questions.map(sameCard))
+    const adminLost = (paper.questions ?? []).some(
+      (q) => q?.adminEdited === true && !isMachineFix(q) && !(q.id && ids.has(q.id)) && !kept.has(sameCard(q)),
+    )
+    if (filled !== required || adminLost) {
+      return {
+        ok: false,
+        error: adminLost
+          ? 'Re-parse would drop a card you edited; keeping the stored cards.'
+          : `Re-parse found ${filled} question(s), not ${required}; keeping the stored cards.`,
+        questions: paper.questions ?? [],
+        count: existingQuestionCount,
+        previousCount: existingQuestionCount,
+      }
+    }
+  }
   const updated = updateOfficialPyqPendingPaper(paper.id, {
     ...shaped,
     preparedText,
+    releaseAdminEditIndexes: releasedAutoFixIndexes(paper.questions, questions),
   })
   if (!updated) {
     return {
@@ -583,7 +850,7 @@ export async function reExtractOfficialPyqPendingPaperLocalAsync(paper, { yieldF
     const n = paper.questions?.length ?? 0
     return {
       ok: false,
-      error: PUBLISHED_LOCK_ERROR,
+      error: officialPyqWordingLockedMessage(paper),
       questions: paper.questions ?? [],
       count: n,
       previousCount: n,
@@ -668,7 +935,7 @@ export async function reExtractOfficialPyqPendingPaperLocalAsync(paper, { yieldF
     .map((q, i) => ({
       ...q,
       answerSource: q.answerSource || (q.correctIndex != null ? 'from_paper' : 'unknown'),
-      solutionSource: q.solutionSource || (q.solution ? 'from_paper' : undefined),
+      solutionSource: q.solutionSource || (q.solution ? 'unknown' : undefined),
       provenance:
         q.provenance ||
         `${paper.sourceLabel}${paper.sourceUrl ? ` · ${paper.sourceUrl}` : ''}`,
@@ -680,12 +947,15 @@ export async function reExtractOfficialPyqPendingPaperLocalAsync(paper, { yieldF
   if (mustRebuild) {
     const rebuiltQs = questions
     const leakedStored = officialPyqQuestionsHaveMistakenPassages(paper.questions, preparedText)
-    questions =
-      pickQuestionListCloserToExpected(
-        leakedStored ? [rebuiltQs] : [rebuiltQs, paper.questions ?? []],
-        targetCount,
-        minKeep,
-      ) || rebuiltQs
+    const cleanerRun =
+      rebuiltQs.length >= minKeep && printedNumberBreaks(rebuiltQs) < printedNumberBreaks(paper.questions)
+    questions = cleanerRun
+      ? rebuiltQs
+      : pickQuestionListCloserToExpected(
+          leakedStored ? [rebuiltQs] : [rebuiltQs, paper.questions ?? []],
+          targetCount,
+          minKeep,
+        ) || rebuiltQs
   } else {
     questions = restoreMatchListIFromOcrLight(questions, preparedText)
   }
@@ -725,6 +995,7 @@ export async function reExtractOfficialPyqPendingPaperLocalAsync(paper, { yieldF
     ...shaped,
     preparedText,
     localQuality: undefined,
+    releaseAdminEditIndexes: releasedAutoFixIndexes(paper.questions, questions),
   })
   if (!updated) {
     return {

@@ -5,10 +5,19 @@
  */
 
 import { parseMatchColumnUpload, looksLikeMatchColumnUpload } from './parseMatchColumnUpload.js'
+import { hasOriginalPageCrop } from './mathpixMedia.js'
+import { isMatrixGridCard } from './matrixGridPyq.js'
+
+/** Whole words only: "blister copper" is not a List question. */
+const MATCH_WORD_RE = /\b(?:match|list|column)/i
+
+/** A table row "P. Lift is accelerating" / "& 1. $d=1.2 m$" (2014 P2 Q20 keeps its lists in a tabular). */
+const TABLE_ROW_RE = (labels) => new RegExp(`(?:^|[&\\n]|\\\\\\\\)\\s*[${labels}]\\s*\\.\\s+\\S`, 'm')
 
 function matchQuestionMissingListI(q) {
   const t = String(q?.text ?? '')
-  if (!/Match|List|Column/i.test(t)) return false
+  if (!MATCH_WORD_RE.test(t)) return false
+  if (/\\begin\{tabular\}/.test(t) && TABLE_ROW_RE('PQRS').test(t)) return false
   return !/\(\s*[PQRSABCD]\s*\)\s+(?!\(\s*[PQRSABCD1-5]\s*\))\S/.test(t)
 }
 
@@ -41,11 +50,18 @@ function formatListIIFromMatchParse(parsed) {
 
 function hasListTwo(text) {
   const t = String(text ?? '')
+  const firstRow = t.search(/(?:^|\n)[ \t]*\(\s*P\s*\)/)
+  if (firstRow >= 0 && new Set([...t.slice(firstRow).matchAll(/\n[ \t]*\(\s*([1-5])\s*\)/g)].map((m) => m[1])).size >= 2) {
+    return true
+  }
   return (
     /(?:List|Column)\s*[-–]?\s*II\b/i.test(t) &&
-    (/\(\s*[1-5]\s*\)/.test(t) || /\(\s*[PQRS]\s*\)/.test(t))
+    (/\(\s*[1-5]\s*\)/.test(t) || /\(\s*[PQRS]\s*\)/.test(t) || (/\\begin\{tabular\}/.test(t) && TABLE_ROW_RE('1-5').test(t)))
   )
 }
+
+/** The next part / section heading ends the window: its words are never list rows. */
+const PAPER_HEADING_RE = /\n\s*(?:\\section\*?\{\s*)?(?:PART|SECTION)\s*[-–]?\s*(?:\d|[IVX]+)\b/i
 
 /**
  * If heal still left a match card without List-I or List-II, parse the OCR
@@ -54,12 +70,13 @@ function hasListTwo(text) {
  * @param {unknown} source
  */
 export function enrichMatchListsFromOcr(q, source) {
-  if (!q || typeof q !== 'object' || q.placeholder === true) return q
+  if (!q || typeof q !== 'object' || q.placeholder === true || isMatrixGridCard(q)) return q
   const src = String(source ?? '')
   let text = String(q.text ?? '').trim()
   if (!text || src.length < 40) return q
+  if (hasOriginalPageCrop(text) || hasOriginalPageCrop(q.passageText)) return q
   const needI = matchQuestionMissingListI({ text, options: q.options })
-  const needII = /Match|List|Column/i.test(text) && !hasListTwo(text)
+  const needII = MATCH_WORD_RE.test(text) && !hasListTwo(text)
   if (!needI && !needII) return q
   const rowP = text.match(/\(\s*P\s*\)\s+[^\n]{8,70}/)
   const distinctive = text.match(
@@ -74,8 +91,10 @@ export function enrichMatchListsFromOcr(q, source) {
   const nextStem = rawWindow.slice(needII && !needI ? 24 : 0).search(
     /\b(?:Four identical|A light ray is incident|A thin uniform rod|One mole of a|The circuit shown in the figure|Based on VSEPR|List-I contains various reaction sequences and List-II contains the possible|List-I contains various reaction sequences and List-II contains different phenolic|Among the following phenolic|In a conductometric)\b/i,
   )
-  const window =
+  let window =
     nextStem > 40 ? rawWindow.slice(0, (needII && !needI ? 24 : 0) + nextStem) : rawWindow
+  const heading = idx >= 0 ? window.slice(idx - from).search(PAPER_HEADING_RE) : -1
+  if (heading > 0) window = window.slice(0, idx - from + heading)
   if (!looksLikeMatchColumnUpload(window) && !looksLikeMatchColumnUpload(text)) return q
   const parsed = parseMatchColumnUpload(window.length > 80 ? window : text)
   if (!parsed) return q

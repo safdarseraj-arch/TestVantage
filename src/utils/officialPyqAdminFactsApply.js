@@ -18,8 +18,11 @@ import {
 export function confirmOfficialPyqPaperFacts(paperId, draft) {
   const paper = getOfficialPyqPendingPaper(paperId)
   if (!paper) return { ok: false, errors: ['Paper not found.'] }
-  if (String(paper.status) === 'approved') {
+  if (String(paper.status) === 'published') {
     return { ok: false, errors: ['This paper is published. Its facts and questions are locked.'] }
+  }
+  if (String(paper.status) === 'approved') {
+    return { ok: false, errors: ['This paper is approved. Send it back for review to change its facts.'] }
   }
   const { errors } = validateAdminFacts(draft)
   if (errors.length) return { ok: false, errors }

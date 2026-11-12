@@ -20,6 +20,8 @@ const ANSWER_FIELDS = [
   'numericalAlternatives',
   'correctIndicesAlternatives',
   'matrixAnswerKey',
+  'bonusMarksToAll',
+  'zeroMarksToAll',
 ]
 
 /** @param {Record<string, any>} q */
@@ -97,7 +99,7 @@ export function applyAnswerFileToOfficialPyqPaper(paperId, text, opts = {}) {
       answers += 1
     }
     if (String(q.solution ?? '') !== String(before.solution ?? '')) solutions += 1
-    if (String(q.text ?? '').trim() && !hasAnswer(q) && q.bonusMarksToAll !== true) noAnswer.push(i + 1)
+    if (String(q.text ?? '').trim() && !hasAnswer(q) && q.bonusMarksToAll !== true && q.zeroMarksToAll !== true) noAnswer.push(i + 1)
   })
   if (!answers && !solutions) {
     const blank = numbered.map((q) => {

@@ -40,6 +40,8 @@ export const OFFICIAL_PYQ_AUTO_FIX_SOURCE = 'auto_compare'
 export const OFFICIAL_PYQ_AUTO_FIX_ERROR_RETRIES = 2
 /** Gemini calls one run may spend on a paper. */
 export const OFFICIAL_PYQ_AUTO_FIX_MAX = 30
+/** Tries at the answer printed on the page for a card still missing it; the scan often drops an "ANSWER : C" line (2012 P2 Q9). */
+export const OFFICIAL_PYQ_AUTO_FIX_KEY_TRIES = 2
 
 const MCQ_TYPES = /single_correct|multiple_correct|matrix_match/
 
@@ -147,15 +149,16 @@ function answerOnlyGoTo(paper) {
 }
 
 /**
- * A try that did not read the page's answer key (made before Compare reported it) does not
- * count for a card flagged for its missing key; it gets one more try.
+ * A card still flagged for its missing key is tried again until Compare has looked for the printed
+ * key {@link OFFICIAL_PYQ_AUTO_FIX_KEY_TRIES} times: a try that fixed only the wording or pictures,
+ * or saw no key on the page, leaves the key unread.
  * @param {any} card @param {boolean} [keyMissing]
  */
 function alreadyTried(card, keyMissing = false) {
   const tried = Array.isArray(card?.autoFix?.tried) ? card.autoFix.tried : []
   if (!tried.includes(officialPyqAutoFixSignature(card))) return false
   if (!keyMissing) return true
-  return card.autoFix.keyRead === true || (Number(card.autoFix.keyTries) || 0) >= 1
+  return (Number(card.autoFix.keyTries) || 0) >= OFFICIAL_PYQ_AUTO_FIX_KEY_TRIES
 }
 
 /**
@@ -251,7 +254,10 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
     }
     const verdict = String(result?.verdict ?? 'error')
     const keyInfo = keyOnly.has(goTo)
-      ? { keyRead: typeof compared?.printedAnswer === 'string', keyTries: (Number(card.autoFix?.keyTries) || 0) + 1 }
+      ? {
+          keyRead: String(compared?.printedAnswer ?? '').trim() !== '',
+          keyTries: (Number(card.autoFix?.keyTries) || 0) + 1,
+        }
       : {}
     const note = (reason) => {
       out.needsAdmin.push({ goTo, reason })

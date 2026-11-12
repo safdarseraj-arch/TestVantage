@@ -37,7 +37,7 @@ import {
 import { stripTrailingPyqSectionHeader } from './bulkExtractClean.js'
 import { shapeOfficialPyqDrafts } from './officialPyqPaperFacts.js'
 import { stripAwardedToAllNotes, stripPrintedAnswerBoxes } from './printedAnswerKey.js'
-import { BONUS_MARKS_TO_ALL_RE } from './answerAlternatives.js'
+import { BONUS_MARKS_TO_ALL_RE, ZERO_MARKS_TO_ALL_RE } from './answerAlternatives.js'
 import { applyMatrixGridQuestions } from './matrixGridPyq.js'
 import { ocrIsHindiOnly, stripHindiOcr } from './stripHindiOcr.js'
 import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
@@ -1580,7 +1580,7 @@ function blockToMathpixDraft(block, i, attached, paper) {
     /** "Answer: A" printed under the option table left the stem with the table (2025 P2 Q23). */
     const keyLines = body
       .split('\n')
-      .filter((line) => PRINTED_KEY_LINE_RE.test(line) || BONUS_MARKS_TO_ALL_RE.test(line))
+      .filter((line) => PRINTED_KEY_LINE_RE.test(line) || BONUS_MARKS_TO_ALL_RE.test(line) || ZERO_MARKS_TO_ALL_RE.test(line))
       .join('\n')
     if (keyLines) printed = detectAnswerFromPaper(keyLines)
   }
@@ -1612,6 +1612,7 @@ function blockToMathpixDraft(block, i, attached, paper) {
           ...(printed.numericalTolerance != null ? { numericalTolerance: printed.numericalTolerance } : {}),
           ...(printed.numericalAlternatives?.length ? { numericalAlternatives: printed.numericalAlternatives } : {}),
           ...(printed.bonusMarksToAll ? { bonusMarksToAll: true } : {}),
+          ...(printed.zeroMarksToAll ? { zeroMarksToAll: true } : {}),
           answerSource: 'from_paper',
         }
       : { answerSource: 'unknown' }),

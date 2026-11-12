@@ -220,7 +220,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 38
+export const LOCAL_QUALITY_REVISION = 39
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -553,7 +553,7 @@ const ANSWER_CLAIMS = { from_paper: 'answer from the paper', manual: 'answer typ
 /** The card is labelled with an answer source and has no answer, so the fill step skips it and students see none. */
 function answerLabelWithoutAnswer(q) {
   if (!Object.prototype.hasOwnProperty.call(ANSWER_CLAIMS, String(q?.answerSource ?? ''))) return false
-  if (answerKeyOf(q).has || q?.bonusMarksToAll === true || numericalAlternativesOf(q).length) return false
+  if (answerKeyOf(q).has || numericalAlternativesOf(q).length) return false
   const grid = q?.matrixAnswerKey
   if (grid && typeof grid === 'object' && Object.values(grid).some((row) => (Array.isArray(row) ? row.length : row != null && row !== ''))) {
     return false
@@ -567,7 +567,7 @@ function answerLabelWithoutAnswer(q) {
  */
 function answerClaimsUnprintedKey(q, fresh, items = []) {
   if (!fresh || q?.answerSource !== 'from_paper' || q?.answerFromOriginalPage === true || isMatrixGridCard(q)) return false
-  if (fresh.answerSource === 'from_paper' || answerKeyOf(fresh).has || fresh.bonusMarksToAll === true) return false
+  if (fresh.answerSource === 'from_paper' || answerKeyOf(fresh).has) return false
   if (!items.some((item) => item?.answerSource === 'from_paper' && answerKeyOf(item).has)) return false
   const saved = answerKeyOf(q)
   const pageKey = String(q?.originalCompare?.printedAnswer ?? '').trim() || q?.pageAnswerKey
@@ -1079,10 +1079,12 @@ const ANSWER_FIELDS = [
   'numericalAlternatives',
   'correctIndicesAlternatives',
   'bonusMarksToAll',
+  'zeroMarksToAll',
 ]
 
 function answerKeyOf(q) {
   if (q?.bonusMarksToAll === true) return { letters: null, number: null, tol: null, alternatives: [], bonus: true, has: true }
+  if (q?.zeroMarksToAll === true) return { letters: null, number: null, tol: null, alternatives: [], dropped: true, has: true }
   const letters = Array.isArray(q?.correctIndices) && q.correctIndices.length
     ? [...q.correctIndices].map(Number).sort((a, b) => a - b)
     : q?.correctIndex != null && q.correctIndex !== ''
@@ -1105,7 +1107,7 @@ function answerDiffersFromPrintedKey(q, fresh) {
   const printed = answerKeyOf(fresh)
   if (!printed.has) return false
   const saved = answerKeyOf(q)
-  const sig = (k) => JSON.stringify([k.letters, k.number, k.tol, k.alternatives, k.bonus])
+  const sig = (k) => JSON.stringify([k.letters, k.number, k.tol, k.alternatives, k.bonus, k.dropped])
   return sig(saved) !== sig(printed)
 }
 

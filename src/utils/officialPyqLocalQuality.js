@@ -71,6 +71,7 @@ import { officialPyqDrawnCutOff, officialPyqDrawnProblems } from './officialPyqD
 import { officialPyqMatchListLayoutProblems, withoutHeadingOnRowLabel } from './matchListLayoutCheck.js'
 import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
 import { officialPyqScanStructureReason } from './officialPyqScanStructures.js'
+import { instituteQualityLines } from './instituteSolutionsParse.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
@@ -592,7 +593,13 @@ function passagesMissingSiblingFigure(questions) {
   return out
 }
 
-const ANSWER_CLAIMS = { from_paper: 'answer from the paper', manual: 'answer typed by hand', ai_generated: 'AI answer', hybrid_ai: 'AI answer' }
+const ANSWER_CLAIMS = {
+  from_paper: 'answer from the paper',
+  manual: 'answer typed by hand',
+  ai_generated: 'AI answer',
+  hybrid_ai: 'AI answer',
+  institute: 'answer from the institute solutions',
+}
 
 /** The card is labelled with an answer source and has no answer, so the fill step skips it and students see none. */
 function answerLabelWithoutAnswer(q) {
@@ -752,6 +759,12 @@ function withAnswerDisagreementNote(result, questions) {
   if (!nums.length) return result
   const line = `Go to Q ${nums.join(', ')}. Hybrid AI got a different answer from the printed key; the printed answer is kept. Please check.`
   return { ...result, lines: [...result.lines, line] }
+}
+
+/** Institute solutions that differ from the official key, and stems that differ from the institute's copy. */
+function withInstituteNotes(result, questions) {
+  const lines = instituteQualityLines(questions, isOfficialPyqPlaceholder)
+  return lines.length ? { ...result, lines: [...result.lines, ...lines] } : result
 }
 
 function stemLeakReason(q, fresh, items) {
@@ -1324,7 +1337,10 @@ export function localOfficialPyqQualityCheck(paper) {
   )
   return {
     ...withAdminFactsScanNote(
-      withAnswerDisagreementNote(withHindiOnlyFlag(mergeQualityResults(failedGoTo, review, damage), ocr), questions),
+      withInstituteNotes(
+        withAnswerDisagreementNote(withHindiOnlyFlag(mergeQualityResults(failedGoTo, review, damage), ocr), questions),
+        questions,
+      ),
       paper,
       ocr,
     ),
@@ -1643,8 +1659,11 @@ export function repairOfficialPyqUntilQuality(paper) {
     paper: { ...paper, questions },
     quality: {
       ...withAdminFactsScanNote(
-        withAnswerDisagreementNote(
-          withHindiOnlyFlag(mergeQualityResults(failedGoTo, review, cardDamageReasons(questions, ocr, true, structureCodeRules(paper))), ocr),
+        withInstituteNotes(
+          withAnswerDisagreementNote(
+            withHindiOnlyFlag(mergeQualityResults(failedGoTo, review, cardDamageReasons(questions, ocr, true, structureCodeRules(paper))), ocr),
+            questions,
+          ),
           questions,
         ),
         paper,

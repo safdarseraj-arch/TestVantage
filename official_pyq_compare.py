@@ -266,6 +266,72 @@ def original_status(paper_id: str) -> dict[str, Any]:
     }
 
 
+INSTITUTE_MISSING_MESSAGE = "Institute solutions PDF not available for this paper"
+
+
+def _institute_dir() -> Path:
+    return ORIGINALS_DIR / "institute"
+
+
+def _institute_file(paper_id: str) -> Path | None:
+    path = _institute_dir() / f"{_safe_id(paper_id)}.pdf"
+    return path if path.exists() else None
+
+
+def _institute_meta_path(paper_id: str) -> Path:
+    return _institute_dir() / f"{_safe_id(paper_id)}.meta.json"
+
+
+def _read_institute_meta(paper_id: str) -> dict[str, Any]:
+    try:
+        data = json.loads(_institute_meta_path(paper_id).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _write_institute_meta(paper_id: str, meta: dict[str, Any]) -> None:
+    _institute_dir().mkdir(parents=True, exist_ok=True)
+    _institute_meta_path(paper_id).write_text(json.dumps(meta), encoding="utf-8")
+
+
+def save_institute(paper_id: str, filename: str, institute: str, data: bytes) -> dict[str, Any]:
+    """A coaching institute's solutions PDF, kept beside the original as a second reference."""
+    name = re.sub(r"\s+", " ", str(institute or "")).strip()[:80]
+    if not name:
+        raise ValueError("Type the institute name (for example Allen or Resonance).")
+    if not data:
+        raise ValueError("The file is empty.")
+    if Path(filename or "").suffix.lower() != ".pdf" and data[:5] != b"%PDF-":
+        raise ValueError("Use the institute's solutions PDF.")
+    try:
+        with fitz.open(stream=data, filetype="pdf") as doc:
+            pages = doc.page_count
+    except Exception as exc:  # noqa: BLE001 - surface a plain message
+        raise ValueError("That PDF could not be opened.") from exc
+    _institute_dir().mkdir(parents=True, exist_ok=True)
+    (_institute_dir() / f"{_safe_id(paper_id)}.pdf").write_bytes(data)
+    _write_institute_meta(paper_id, {"file_name": filename, "institute": name, "pages": pages})
+    return institute_status(paper_id)
+
+
+def institute_status(paper_id: str) -> dict[str, Any]:
+    if _institute_file(paper_id) is None:
+        return {"available": False, "message": INSTITUTE_MISSING_MESSAGE}
+    meta = _read_institute_meta(paper_id)
+    return {
+        "available": True,
+        "institute": meta.get("institute") or "",
+        "file_name": meta.get("file_name") or "",
+        "pages": int(meta.get("pages") or 1),
+    }
+
+
+def _institute_picture_ids(paper_id: str) -> set[str]:
+    ids = _read_institute_meta(paper_id).get("picture_ids")
+    return {str(i) for i in ids} if isinstance(ids, list) else set()
+
+
 def _prose_words(text: str) -> list[str]:
     plain = re.sub(r"\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}|!\[[^\]]*\]\([^)]*\)|<smiles>.*?</smiles>|https?://\S+", " ", str(text or ""), flags=re.S)
     plain = re.sub(r"\$[^$]*\$", " ", plain)
@@ -616,20 +682,27 @@ def _mathpix_key(url: str) -> str | None:
     return "{}-{}:{}:{}:{}:{}".format(*box) if box else None
 
 
-def crops_for_mathpix_links(paper_id: str, urls: list[str]) -> dict[str, Any]:
-    """The same boxes cut from the stored original PDF, so pictures survive the Mathpix links. Pixels only."""
-    path = _original_file(paper_id)
+def crops_for_mathpix_links(paper_id: str, urls: list[str], institute: bool = False) -> dict[str, Any]:
+    """The same boxes cut from the stored original PDF, so pictures survive the Mathpix links. Pixels only.
+
+    `institute` cuts from the stored institute solutions PDF instead. Links read from that file are
+    remembered, so a later cut from the original never puts its page under an institute link.
+    """
+    path = _institute_file(paper_id) if institute else _original_file(paper_id)
     if path is None or path.suffix != ".pdf":
-        raise OriginalMissingError(ORIGINAL_MISSING_MESSAGE)
+        raise OriginalMissingError(INSTITUTE_MISSING_MESSAGE if institute else ORIGINAL_MISSING_MESSAGE)
+    foreign = set() if institute else _institute_picture_ids(paper_id)
     out: dict[str, str] = {}
     keyed: dict[str, str] = {}
     skipped: list[str] = []
+    seen_ids: set[str] = set()
     with fitz.open(str(path)) as doc:
         for url in list(dict.fromkeys(str(u or "") for u in urls))[:_MAX_MATHPIX_URLS]:
             box = _mathpix_box(url)
-            if not box:
+            if not box or box[0] in foreign:
                 skipped.append(url)
                 continue
+            seen_ids.add(box[0])
             _, page, x, y, w, h = box
             if not 1 <= page <= doc.page_count or w <= 0 or h <= 0:
                 skipped.append(url)
@@ -647,8 +720,13 @@ def crops_for_mathpix_links(paper_id: str, urls: list[str]) -> dict[str, Any]:
                 (clip.x1 - rect.x0) / rect.width,
                 (clip.y1 - rect.y0) / rect.height,
             )
-            out[url] = _save_crop(paper_id, page, pdf_page, clip, _CROP_DPI / 72.0, box)["url"]
+            crop_id = f"{paper_id}-institute" if institute else paper_id
+            out[url] = _save_crop(crop_id, page, pdf_page, clip, _CROP_DPI / 72.0, box)["url"]
             keyed[str(_mathpix_key(url))] = out[url]
+    if institute and seen_ids - _institute_picture_ids(paper_id):
+        meta = _read_institute_meta(paper_id)
+        meta["picture_ids"] = sorted(_institute_picture_ids(paper_id) | seen_ids)
+        _write_institute_meta(paper_id, meta)
     _remember_mathpix_links(keyed)
     return {"crops": out, "skipped": skipped}
 

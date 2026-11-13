@@ -256,6 +256,9 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
   const [reParseBusy, setReParseBusy] = useState(false)
   const [answerFileBusy, setAnswerFileBusy] = useState(false)
   const [answerFilePct, setAnswerFilePct] = useState(0)
+  const [instituteName, setInstituteName] = useState('')
+  const [instituteBusy, setInstituteBusy] = useState(false)
+  const [institutePct, setInstitutePct] = useState(0)
   const [qualityBusyId, setQualityBusyId] = useState('')
   const [progressPct, setProgressPct] = useState(0)
   const [progressLabel, setProgressLabel] = useState('')
@@ -1278,6 +1281,47 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
     }
   }
 
+  /** A coaching institute's solutions PDF: fills answers and solutions, the official key wins. */
+  async function onInstituteFile(ev) {
+    const file = ev.target.files?.[0]
+    ev.target.value = ''
+    if (!file || !selected || instituteBusy) return
+    const institute = (instituteName || selected.instituteSolutions?.institute || '').trim()
+    if (!institute) {
+      setError('Type the institute name first (for example Allen or Resonance), then choose the PDF.')
+      return
+    }
+    const paperId = selected.id
+    setInstituteBusy(true)
+    setError('')
+    setMessage('')
+    setInstitutePct(2)
+    try {
+      const { addInstituteSolutionsToOfficialPyqPaper } = await import('../utils/officialPyqInstituteSolutions.js')
+      const result = await addInstituteSolutionsToOfficialPyqPaper(paperId, file, institute, (p) =>
+        setInstitutePct(Math.max(2, Math.min(95, Number(p) || 0))),
+      )
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      if (result.paper?.status === 'pending_review') {
+        const { persistOfficialPyqQualityRun } = await import('../utils/officialPyqLocalQuality.js')
+        const fresh = getOfficialPyqPendingPaper(paperId)
+        if (fresh) persistOfficialPyqQualityRun(fresh)
+      }
+      setMessage(result.note)
+      setOpenedPaper((prev) => (prev?.id === paperId ? lookupSavedPaperSummary(paperId) || prev : prev))
+      setPreviewReload((n) => n + 1)
+      bump()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not read the institute solutions.')
+    } finally {
+      setInstituteBusy(false)
+      setInstitutePct(0)
+    }
+  }
+
   /** @param {'other_institute' | 'own'} [audience] who an uploaded other paper is for */
   async function onPublish(audience) {
     if (!selected || selected.status !== 'approved' || approveBusy) return
@@ -1799,6 +1843,56 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
                             disabled={answerFileBusy || busy || approveBusy}
                             data-testid="official-pyq-answer-file-input"
                             onChange={onAnswerFile}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                    {!isOtherPaper(selected) &&
+                    (selected.status === 'pending_review' || (selected.status === 'approved' && isAdminLoggedIn())) ? (
+                      <div className="official-pyq-actions" data-testid="official-pyq-institute-solutions">
+                        <p className="form-hint">
+                          Have a <strong>solutions PDF from a coaching institute</strong> (Allen, Resonance, FIITJEE…)?
+                          Its answers fill questions that have none, and its solutions fill questions with no solution
+                          (or only an AI one). The official answer key always wins: a different institute answer is
+                          listed in the Quality check. Each question&apos;s text is also checked against the
+                          institute&apos;s copy.
+                          {selected.instituteSolutions?.institute
+                            ? ` Last added: ${selected.instituteSolutions.institute}${
+                                selected.instituteSolutions.fileName ? ` (“${selected.instituteSolutions.fileName}”)` : ''
+                              }.`
+                            : ''}
+                        </p>
+                        <label className="official-pyq-edit-field">
+                          Institute name{' '}
+                          <input
+                            type="text"
+                            value={instituteName}
+                            placeholder={selected.instituteSolutions?.institute || 'e.g. Allen'}
+                            maxLength={80}
+                            disabled={instituteBusy}
+                            data-testid="official-pyq-institute-name"
+                            onChange={(e) => setInstituteName(e.target.value)}
+                          />
+                        </label>
+                        <label
+                          className="btn btn-ghost btn-sm"
+                          aria-disabled={!(instituteName || selected.instituteSolutions?.institute || '').trim()}
+                        >
+                          {instituteBusy
+                            ? `Reading institute solutions… ${Math.round(institutePct)}%`
+                            : 'Add institute solutions (PDF)'}
+                          <input
+                            type="file"
+                            accept=".pdf,application/pdf"
+                            hidden
+                            disabled={
+                              instituteBusy ||
+                              busy ||
+                              approveBusy ||
+                              !(instituteName || selected.instituteSolutions?.institute || '').trim()
+                            }
+                            data-testid="official-pyq-institute-file-input"
+                            onChange={onInstituteFile}
                           />
                         </label>
                       </div>

@@ -57,9 +57,18 @@ export function mathpixPictureLinksIn(...values) {
   return [...found]
 }
 
-/** Every Mathpix picture link in the cards (any text field) and the stored OCR. @param {any} paper @param {string} [ocrText] */
+/**
+ * Every Mathpix picture link in the cards (any text field) and the stored OCR. Institute solutions
+ * were read from another PDF, so their links are not cut from this paper's original.
+ * @param {any} paper @param {string} [ocrText]
+ */
 export function mathpixPictureLinksOfPaper(paper, ocrText = '') {
-  return mathpixPictureLinksIn(paper?.questions, String(ocrText ?? ''))
+  const cards = (Array.isArray(paper?.questions) ? paper.questions : []).map((q) => {
+    if (!q || typeof q !== 'object') return q
+    const { instituteQuestionText: _copy, ...rest } = q
+    return q.solutionSource === 'institute' ? { ...rest, solution: '' } : rest
+  })
+  return mathpixPictureLinksIn(cards, String(ocrText ?? ''))
 }
 
 /**

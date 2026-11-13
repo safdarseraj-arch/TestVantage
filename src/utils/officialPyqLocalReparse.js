@@ -14,6 +14,7 @@ import { stripEmptyFigureShells, stripEmptyImageMarkdown } from './mathpixMedia.
 import { LOCAL_QUALITY_REVISION } from './officialPyqLocalQuality.js'
 import { buildPaperFacts } from './officialPyqPaperFacts.js'
 import { adminFactsToPaperFacts, applyAdminFactsToQuestions } from './officialPyqAdminFacts.js'
+import { instituteFieldsOf } from './instituteSolutionsParse.js'
 
 /** Confirmed admin facts re-shape the re-parsed cards; otherwise read facts from the OCR. */
 function shapeWithPaperFacts(paper, questions, preparedText) {
@@ -588,6 +589,7 @@ export function copyAnswersOntoCanonical(canonical, prev) {
           stripEmptyImageMarkdown(String(old.solution ?? '').trim() ? old.solution : q.solution || ''),
         ),
         solutionSource: old.solutionSource || q.solutionSource,
+        ...instituteFieldsOf(old),
       }
     }
     /** A key printed in the scan replaces the old answer whole; mixing kept a stale "A" beside "A, C" (2025 P2). */
@@ -620,6 +622,7 @@ export function copyAnswersOntoCanonical(canonical, prev) {
           ? 'from_paper'
           : old.answerSource || q.answerSource,
       solutionSource: old.solutionSource || q.solutionSource,
+      ...instituteFieldsOf(old),
     }
   })
 }

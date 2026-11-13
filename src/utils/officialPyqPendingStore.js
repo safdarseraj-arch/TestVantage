@@ -585,6 +585,9 @@ function paperToSummary(paper) {
       ? { factsConfirmedAt: paper.adminFacts?.confirmedAt || paper.factsConfirmedAt }
       : {}),
     ...(paper.aiReplicaPaper === true || paper.replicaParentPaperId ? { aiReplicaPaper: true } : {}),
+    ...(paper.instituteSolutions?.institute
+      ? { instituteSolutions: { institute: paper.instituteSolutions.institute, fileName: paper.instituteSolutions.fileName } }
+      : {}),
     ...otherPaperFields(paper),
   }
 }

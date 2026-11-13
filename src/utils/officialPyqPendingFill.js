@@ -29,8 +29,8 @@ import { officialPyqPaperSourceName } from '../data/officialPyqSources.js'
 export const HYBRID_FILL_NEEDS_APPROVAL =
   'Hybrid AI fills tags, answers, and solutions only on an Approved paper. Approve it first; if it is published, Unpublish it first.'
 
-/** Answers and solutions Hybrid AI must leave alone: printed on the paper or typed by an admin. */
-const KEPT_SOURCES = new Set(['from_paper', 'manual'])
+/** Answers and solutions Hybrid AI must leave alone: printed on the paper, typed by an admin, or from an institute's solutions. */
+const KEPT_SOURCES = new Set(['from_paper', 'manual', 'institute'])
 
 /** "A-R; B-P,S" for a grid card's key ('' when a row is blank). @param {any} question @param {unknown} [key] */
 export function gridAnswerText(question, key = question?.matrixAnswerKey) {

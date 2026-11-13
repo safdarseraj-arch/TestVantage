@@ -36,6 +36,7 @@ import {
 
 import MatrixGridView from './MatrixGridView.jsx'
 import { gridColLabels } from '../utils/matrixGridPyq.js'
+import { instituteCardNotes, instituteStemOnly } from '../utils/instituteSolutionsParse.js'
 
 const OfficialPyqPreviewMath = lazy(() => import('../pages/OfficialPyqPreviewMath.jsx'))
 
@@ -544,6 +545,8 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     String(card?.passageText ?? '').trim() || card?.passageId || card?.passageGroup || draft.passageText,
   )
   const passageMates = hasPassage ? passageGroupGoTo(paperId, index) : []
+  const institute = card.adminApproved ? { answer: null, text: null } : instituteCardNotes(card)
+  const instituteStem = institute.text ? instituteStemOnly(card.instituteQuestionText) : ''
   function openEditor(nextDraft, suggested = false) {
     setDraft(nextDraft)
     setFromSuggestion(suggested)
@@ -636,6 +639,13 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
       `Saved Q${goTo}.${shared} Quality check re-run: ${passed ? 'this card passed' : 'this card still needs a look'}. Not published.`,
     )
     onSaved?.(result.card)
+  }
+
+  function onUseInstituteWording() {
+    openEditor({ ...draftFromCard(officialPyqCardForAdmin(paperId, card)), text: instituteStem })
+    setNote(
+      `The institute's wording of Q${goTo} is filled in as the question text. Check it against the original page (Show original page), then Save — or Cancel to keep the card as it is.`,
+    )
   }
 
   function onUseCorrection() {
@@ -812,8 +822,37 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
         </div>
       ) : null}
 
+      {institute.answer || institute.text ? (
+        <div className="form-hint" data-testid="official-pyq-institute-note" role="status">
+          {institute.answer ? (
+            <p style={{ margin: '0.2rem 0' }}>
+              {card.answerInstitute || card.solutionInstitute || 'Institute'} says {institute.answer.said}, official key
+              says {institute.answer.official} — check. The official answer is kept.
+            </p>
+          ) : null}
+          {institute.text ? (
+            <p style={{ margin: '0.2rem 0' }}>
+              Question text differs from the institute copy — check against the original.
+              {institute.text.missingNumbers.length ? ` Numbers only in the institute copy: ${institute.text.missingNumbers.join(', ')}.` : ''}
+              {institute.text.missingWords.length ? ` Words only in the institute copy: ${institute.text.missingWords.join(', ')}.` : ''}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {!editing ? (
         <div className="official-pyq-actions">
+          {instituteStem && !card.adminApproved ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              data-testid="official-pyq-use-institute-wording"
+              title="Fill the edit box with the institute's wording of this question. Nothing is saved until you click Save."
+              onClick={onUseInstituteWording}
+            >
+              Use institute wording
+            </button>
+          ) : null}
           {card.adminApproved ? (
             <button
               type="button"

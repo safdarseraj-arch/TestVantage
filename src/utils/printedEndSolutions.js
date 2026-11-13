@@ -271,13 +271,42 @@ function entryFor(end, n, subject, seg, numberRun) {
   if (!subject && named.length === 1) keys.push(`${named[0]}:${n}`)
   let answer = ''
   let solution = ''
+  let question = ''
   for (const key of keys) {
     const e = key ? end.entries.get(key) : null
     if (!e) continue
     answer ||= e.answer || ''
     solution ||= e.solution || ''
+    question ||= e.question || ''
   }
-  return answer || solution ? { answer, solution } : null
+  return answer || solution ? { answer, solution, question } : null
+}
+
+/**
+ * The entry for every card (null where the file names none): by printed number, per subject when
+ * the numbering restarts.
+ * @param {Array<Record<string, any>>} questions
+ * @param {{ entries: Map<string, { answer?: string, solution?: string, question?: string }>, subjects: string[] } | null} end
+ * @returns {Array<{ answer: string, solution: string, question: string } | null>}
+ */
+export function endSectionEntriesForCards(questions, end) {
+  if (!end?.entries?.size || !Array.isArray(questions)) return Array.isArray(questions) ? questions.map(() => null) : []
+  let seg = 0
+  let numberRun = 0
+  let prev = 0
+  let prevSubject = ''
+  return questions.map((q, i) => {
+    if (!q || typeof q !== 'object') return null
+    const n = Number(q.printedNumber ?? q.questionNumber) || 0
+    const subject = subjectName(q.subject)
+    const restart = i > 0 && n > 0 && prev > 0 && n <= prev
+    if (restart) numberRun += 1
+    if (restart || (i > 0 && subject && prevSubject && subject !== prevSubject)) seg += 1
+    if (n) prev = n
+    if (subject) prevSubject = subject
+    if (!n || q.placeholder === true) return null
+    return entryFor(end, n, subject, seg, numberRun)
+  })
 }
 
 /**
@@ -290,21 +319,9 @@ function entryFor(end, n, subject, seg, numberRun) {
  */
 export function applyEndAnswerSection(questions, end, opts = {}) {
   if (!end?.entries?.size || !Array.isArray(questions)) return questions
-  let seg = 0
-  let numberRun = 0
-  let prev = 0
-  let prevSubject = ''
+  const found = endSectionEntriesForCards(questions, end)
   return questions.map((q, i) => {
-    if (!q || typeof q !== 'object') return q
-    const n = Number(q.printedNumber ?? q.questionNumber) || 0
-    const subject = subjectName(q.subject)
-    const restart = i > 0 && n > 0 && prev > 0 && n <= prev
-    if (restart) numberRun += 1
-    if (restart || (i > 0 && subject && prevSubject && subject !== prevSubject)) seg += 1
-    if (n) prev = n
-    if (subject) prevSubject = subject
-    if (!n || q.placeholder === true) return q
-    const entry = entryFor(end, n, subject, seg, numberRun)
+    const entry = found[i]
     if (!entry) return q
     const next = { ...q }
     const fields = entry.answer ? endKeyAnswerFields(entry.answer, q) : null

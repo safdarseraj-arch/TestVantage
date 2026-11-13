@@ -23,7 +23,7 @@ import {
   parseNumericAnswerChoices,
 } from './answerAlternatives.js'
 
-/** @typedef {'from_paper' | 'ai_generated' | 'manual' | 'draft' | 'unknown'} AnswerSource */
+/** @typedef {'from_paper' | 'ai_generated' | 'manual' | 'draft' | 'institute' | 'unknown'} AnswerSource */
 
 /** "ANSWER : AD" prints the letters of a multiple-correct key side by side (2013 P2). */
 const ANSWER_LINE =
@@ -898,6 +898,8 @@ export function answerSourceBadgeLabel(source) {
       return 'Draft'
     case 'manual':
       return 'Manual'
+    case 'institute':
+      return 'Institute'
     default:
       return 'Needs check'
   }
@@ -913,5 +915,6 @@ export function solutionBadgeLabel(source, meta = {}) {
   if (source === 'draft' || meta.quality === 'draft') return 'Draft'
   if (source === 'ai_generated') return 'AI solution'
   if (source === 'manual') return 'Manual'
+  if (source === 'institute') return 'Institute solution'
   return 'Needs check'
 }

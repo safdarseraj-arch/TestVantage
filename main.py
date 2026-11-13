@@ -1416,6 +1416,60 @@ async def official_pyq_keep_mathpix_pictures(body: OfficialPyqMathpixCropsReques
     return {"ok": True, "saved": len(result["saved"]), "kept": len(result["kept"]), "failed": result["failed"]}
 
 
+def _institute_http_error(exc: BaseException) -> HTTPException:
+    import official_pyq_compare as opc
+
+    if isinstance(exc, opc.OriginalMissingError):
+        return HTTPException(
+            status_code=404,
+            detail={"code": "institute_missing", "message": opc.INSTITUTE_MISSING_MESSAGE},
+        )
+    return _compare_http_error(exc)
+
+
+@app.get("/api/official-pyq/original/{paper_id}/institute", tags=["Official PYQ"])
+async def official_pyq_institute_status(paper_id: str) -> dict[str, Any]:
+    """Is an institute solutions PDF stored for this paper? (Second slot beside the original.)"""
+    import official_pyq_compare as opc
+
+    try:
+        return {"ok": True, **opc.institute_status(paper_id)}
+    except ValueError as exc:
+        raise _institute_http_error(exc) from exc
+
+
+@app.post("/api/official-pyq/original/{paper_id}/institute", tags=["Official PYQ"])
+async def official_pyq_institute_upload(
+    paper_id: str,
+    file: UploadFile = File(...),
+    institute: str = Form(...),
+) -> dict[str, Any]:
+    """Store a coaching institute's solutions PDF for this paper. Does not parse or change questions."""
+    import official_pyq_compare as opc
+
+    data = await file.read()
+    if len(data) > 60 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail={"code": "too_large", "message": "File is over 60 MB."})
+    try:
+        return {"ok": True, **opc.save_institute(paper_id, file.filename or "institute.pdf", institute, data)}
+    except ValueError as exc:
+        raise _institute_http_error(exc) from exc
+
+
+@app.post("/api/official-pyq/original/{paper_id}/institute/mathpix-crops", tags=["Official PYQ"])
+async def official_pyq_institute_mathpix_crops(paper_id: str, body: OfficialPyqMathpixCropsRequest) -> dict[str, Any]:
+    """Mathpix picture links of the institute solutions, cut again from the stored institute PDF (PyMuPDF, local)."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    try:
+        result = await asyncio.to_thread(opc.crops_for_mathpix_links, paper_id, body.urls, True)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _institute_http_error(exc) from exc
+    return {"ok": True, **result}
+
+
 @app.get("/api/official-pyq/original/{paper_id}", tags=["Official PYQ"])
 async def official_pyq_original_status(paper_id: str) -> dict[str, Any]:
     """Is the original PDF / page image stored for this pending paper?"""

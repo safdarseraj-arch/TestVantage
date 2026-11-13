@@ -1,0 +1,124 @@
+\title{
+JEE (Advanced) 2024 | Paper-1 | ALLEN
+}
+\author{
+ALLEN CAREER INSTITUTE
+}
+\maketitle
+
+\section*{PART-1 : PHYSICS}
+
+\section*{SECTION-1 : (Maximum Marks : 12)}
+
+This section contains FOUR (04) questions.
+Each question has FOUR options (A), (B), (C) and (D). ONLY ONE of these four options is the correct answer.
+For each question, choose the option corresponding to the correct answer.
+Answer to each question will be evaluated according to the following marking scheme:
+Full Marks : +3 If ONLY the correct option is chosen;
+Zero Marks : 0 If none of the options is chosen (i.e. the question is unanswered);
+Negative Marks : -1 In all other cases.
+
+1. A block of mass $2 \mathrm{~kg}$ is placed on a rough horizontal surface with coefficient of friction 0.4. A horizontal force of $10 \mathrm{~N}$ acts on it. The acceleration of the block is
+(A) $1 \mathrm{~m} / \mathrm{s}^{2}$
+(B) $3 \mathrm{~m} / \mathrm{s}^{2}$
+(C) $5 \mathrm{~m} / \mathrm{s}^{2}$
+(D) $0$
+
+Ans. (A)
+Sol. Friction $f=\mu m g=0.4 \times 2 \times 10=8 \mathrm{~N}$
+1. Find the friction first.
+2. Then $a=\frac{10-8}{2}=1 \mathrm{~m} / \mathrm{s}^{2}$
+
+JEE (Advanced) 2024 | Paper-1 | ALLEN
+www.allen.ac.in
+2. A ball is thrown vertically upward with speed $20 \mathrm{~m} / \mathrm{s}$. The maximum height reached by the ball is (take $g=10 \mathrm{~m} / \mathrm{s}^{2}$ )
+(A) $10 \mathrm{~m}$
+(B) $20 \mathrm{~m}$
+(C) $30 \mathrm{~m}$
+(D) $40 \mathrm{~m}$
+Ans. (B)
+Sol. $H=\frac{u^{2}}{2 g}=\frac{400}{20}=20 \mathrm{~m}$
+![](https://cdn.mathpix.com/cropped/1111aaaa-2222-3333-4444-555566667777-02.jpg?height=200&width=300&top_left_y=400&top_left_x=500)
+
+3. Two identical charges of $5 \mu \mathrm{C}$ are kept $30 \mathrm{~cm}$ apart in air. The force between them is
+(A) $1.5 \mathrm{~N}$
+(B) $2.5 \mathrm{~N}$
+(C) $3.5 \mathrm{~N}$
+(D) $4.5 \mathrm{~N}$
+Ans. (C)
+Sol. $F=\frac{9 \times 10^{9} \times 25 \times 10^{-12}}{0.09}=2.5 \mathrm{~N}$
+
+4. A wire of resistance $4 \Omega$ is stretched uniformly to twice its original length. Its new resistance is
+(A) $2 \Omega$
+(B) $4 \Omega$
+(C) $8 \Omega$
+(D) $16 \Omega$
+Ans. (D)
+Sol. Volume is constant, so $R \propto l^{2}$ and $R^{\prime}=4 \times 4=16 \Omega$
+
+\section*{SECTION-2 : (Maximum Marks : 12)}
+
+This section contains TWO (02) questions.
+Each question has FOUR options (A), (B), (C) and (D). ONE OR MORE THAN ONE of these four option(s) is(are) correct answer(s).
+Full Marks : +4 ONLY if (all) the correct option(s) is(are) chosen;
+
+5. Which of the following physical quantities are vector quantities?
+(A) Velocity
+(B) Speed
+(C) Force
+(D) Work
+Ans. (A,C)
+Sol. Velocity and force have both magnitude and direction; speed and work have magnitude only.
+
+6. The value of $x$ satisfying the equation $2 x=4.5$ is
+Ans. 2.25
+Sol.
+$x=\frac{4.5}{2}=2.25$
+
+Corporate Office : ALLEN CAREER INSTITUTE, "SANKALP", CP-6, Indra Vihar, Kota (Rajasthan) INDIA-324005
+Page 3
+
+\section*{PART-2 : CHEMISTRY}
+
+1. The number of moles present in $22 \mathrm{~g}$ of carbon dioxide gas is
+(A) 0.25
+(B) 0.5
+(C) 1
+(D) 2
+Answer: (B)
+Solution: Molar mass of $\mathrm{CO}_{2}$ is 44 , so $n=\frac{22}{44}=0.5$
+
+\section*{PARAGRAPH I}
+One mole of an ideal monatomic gas expands isothermally at $300 \mathrm{~K}$ against a constant external pressure.
+
+2. The work done by the gas in kilojoule is closest to
+Ans. [0.50 - 0.60]
+Sol \(^{n}\). $W=P_{\text {ext }} \Delta V$ which gives $0.55 \mathrm{~kJ}$
+
+3. The pH of a $10^{-3} \mathrm{M}$ aqueous hydrochloric acid solution at $25^{\circ} \mathrm{C}$ is
+Ans. 3
+Sol. HCl is a strong acid, so $\left[\mathrm{H}^{+}\right]=10^{-3}$ and $\mathrm{pH}=3$
+
+4. Which of the following is an example of an amphoteric oxide?
+(A) $\mathrm{Al}_{2} \mathrm{O}_{3}$
+(B) $\mathrm{Na}_{2} \mathrm{O}$
+(C) $\mathrm{SO}_{3}$
+(D) $\mathrm{CaO}$
+Ans. (A)
+Sol. Aluminium oxide reacts with both acids and bases.
+
+JEE (Advanced) 2024 | Paper-1 | ALLEN
+\section*{PART-3 : MATHEMATICS}
+
+Q.1 If $f(x)=x^{2}+1$, then the value of $f^{\prime}(3)$ is
+(A) 3
+(B) 6
+(C) 9
+(D) 12
+\section*{Ans. (B)}
+Sol. $f^{\prime}(x)=2 x$, so $f^{\prime}(3)=6$.
+
+Q.2 The number of solutions of $\sin x=0$ in the closed interval $[0,2 \pi]$ is
+Ans. 3
+Sol. $x=0, \pi, 2 \pi$
+Toll Free : 1800 212 1799

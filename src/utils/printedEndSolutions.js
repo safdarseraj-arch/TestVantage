@@ -272,14 +272,17 @@ function entryFor(end, n, subject, seg, numberRun) {
   let answer = ''
   let solution = ''
   let question = ''
+  /** @type {string[]} */
+  const used = []
   for (const key of keys) {
     const e = key ? end.entries.get(key) : null
-    if (!e) continue
+    if (!e || used.includes(key)) continue
+    used.push(key)
     answer ||= e.answer || ''
     solution ||= e.solution || ''
     question ||= e.question || ''
   }
-  return answer || solution ? { answer, solution, question } : null
+  return answer || solution ? { answer, solution, question, keys: used } : null
 }
 
 /**
@@ -287,7 +290,7 @@ function entryFor(end, n, subject, seg, numberRun) {
  * the numbering restarts.
  * @param {Array<Record<string, any>>} questions
  * @param {{ entries: Map<string, { answer?: string, solution?: string, question?: string }>, subjects: string[] } | null} end
- * @returns {Array<{ answer: string, solution: string, question: string } | null>}
+ * @returns {Array<{ answer: string, solution: string, question: string, keys: string[] } | null>}
  */
 export function endSectionEntriesForCards(questions, end) {
   if (!end?.entries?.size || !Array.isArray(questions)) return Array.isArray(questions) ? questions.map(() => null) : []

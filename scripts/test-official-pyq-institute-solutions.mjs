@@ -340,6 +340,10 @@ await test('official key wins; empty or AI answers and solutions are filled; tex
   assert.deepEqual(result.notFound, [11])
   assert.deepEqual(result.textDiffers, [4])
   assert.deepEqual(result.noAnswer, [])
+  assert.equal(result.byContent, 12)
+  assert.equal(result.byNumber, 0)
+  assert.deepEqual(result.unmatched, [])
+  assert.deepEqual(result.unsure, [])
   const saved = getOfficialPyqPendingPaper(paperId).instituteSolutions
   assert.equal(saved.institute, 'Allen')
   assert.equal(saved.fileName, 'allen-2024-p1.pdf')
@@ -347,6 +351,7 @@ await test('official key wins; empty or AI answers and solutions are filled; tex
 
   const note = instituteResultNote(result, { institute: 'Allen', fileName: 'allen-2024-p1.pdf', pictures: { kept: 1, failed: 0 }, pdfStored: true })
   assert.match(note, /7 answer\(s\) filled, 9 solution\(s\) filled/)
+  assert.match(note, /Matched 12 question\(s\) by wording and 0 by number; 0 institute question\(s\) not matched; 0 not sure\./)
   assert.match(note, /1 answer\(s\) differ from the official key — the official answer is kept/)
   assert.match(note, /Q3: institute C, official B/)
   assert.match(note, /Not found in the file: Q 11\./)
@@ -429,7 +434,7 @@ await test('works on an Approved paper; refused for other papers and without a n
     institute: 'Allen',
   })
   assert.equal(noMatch.ok, false)
-  assert.match(noMatch.error, /none of its question numbers matched/)
+  assert.match(noMatch.error, /none of its questions matched a question on this paper \(by wording or by number\)/)
   const other = addOfficialPyqPendingPaper({ paperKind: 'other', paperName: 'Allen Major Test', exam: 'jee-main', year: 2026, questions: paperCards() })
   assert.match(applyInstituteSolutionsToOfficialPyqPaper(other.id, ALLEN, { institute: 'Allen' }).error, /Official PYQ papers/)
 })
@@ -476,6 +481,218 @@ await test('a re-parse of the paper keeps the institute notes on the card', () =
   assert.equal(next.instituteAnswerDisagrees, 'C')
   assert.equal(next.solutionInstitute, 'Allen')
   assert.equal(next.solutionSource, 'institute')
+})
+
+/** The institute's answer for each card as printed (null: not in the file). */
+const PRINTED_ANSWERS = ['(A)', '(B)', '(C)', '(D)', '(A,C)', '2.25', '(B)', '[0.50 - 0.60]', '3', '(A)', null, '(B)', '3']
+
+/**
+ * An institute file built from the paper's own cards, in the institute's order and numbering.
+ * @param {{ order?: number[], straight?: boolean, subjectLines?: boolean, options?: Record<number, string[]>, answers?: Record<number, string>, solutions?: Record<number, string> }} how
+ */
+function instituteFile(how = {}) {
+  const cards = paperCards()
+  const order = how.order ?? cards.map((_, i) => i)
+  const out = []
+  let subject = ''
+  let n = 0
+  for (const i of order) {
+    const q = cards[i]
+    const answer = how.answers?.[i] ?? PRINTED_ANSWERS[i]
+    if (answer == null) continue
+    if (q.subject !== subject) {
+      subject = q.subject
+      if (how.subjectLines !== false) out.push(`\\section*{${subject.toUpperCase()}}`)
+      if (!how.straight) n = 0
+    }
+    n += 1
+    const options = how.options?.[i] ?? q.options
+    out.push(`${n}. ${q.text}`)
+    options.forEach((o, k) => out.push(`(${'ABCD'[k]}) ${o}`))
+    out.push(`Ans. ${answer}`)
+    out.push(`Sol. ${how.solutions?.[i] ?? `Working for ${q.id}.`}`)
+    out.push('')
+  }
+  return out.join('\n')
+}
+
+/** The cards come out as the per-subject Allen file gives them. */
+function assertSameAsAllen(q, result) {
+  assert.equal(q[0].correctIndex, 0)
+  assert.equal(q[0].answerSource, 'institute')
+  assert.equal(q[0].solution, 'Working for inst-q1.')
+  assert.equal(q[2].correctIndex, 1, 'official B kept')
+  assert.equal(q[2].instituteAnswerDisagrees, 'C')
+  assert.deepEqual(q[4].correctIndices, [0, 2])
+  assert.equal(q[5].correctNumerical, 2.25)
+  assert.equal(q[6].solution, 'Printed on the paper: $n=22 / 44=0.5$')
+  assert.equal(q[7].correctNumerical, 0.55)
+  assert.equal(q[8].correctNumerical, 3)
+  assert.equal(q[8].solution, 'Working for inst-q9.')
+  assert.equal(q[9].answerSource, 'admin_edit')
+  assert.equal(q[10].answerSource, undefined)
+  assert.equal(q[11].correctIndex, 1)
+  assert.equal(q[11].solution, 'Working for inst-q12.')
+  assert.equal(q[12].correctNumerical, 3)
+  assert.equal(q[12].solution, 'Working for inst-q13.')
+  assert.deepEqual(result.disagreements.map((d) => d.n), [3])
+  assert.deepEqual(result.notFound, [11])
+  assert.equal(result.byContent, 12)
+  assert.deepEqual(result.unsure, [])
+  assert.deepEqual(result.unmatched, [])
+}
+
+await test('numbering 1–12 straight through (no subject lines) on a paper that restarts per subject', () => {
+  resetAll()
+  const id = newPaper().id
+  const text = instituteFile({ straight: true, subjectLines: false })
+  assert.match(text, /^7\. The number of moles/m, 'chemistry goes on from 7')
+  const result = applyInstituteSolutionsToOfficialPyqPaper(id, text, { institute: 'Allen' })
+  assert.equal(result.ok, true, result.error)
+  assertSameAsAllen(getOfficialPyqPendingPaper(id).questions, result)
+  assert.equal(result.byNumber, 0)
+})
+
+await test('Chemistry printed first, numbered straight on: matched by wording, not by number', () => {
+  resetAll()
+  const id = newPaper().id
+  const text = instituteFile({ order: [6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 11, 12], straight: true })
+  assert.match(text, /^\\section\*\{CHEMISTRY\}\n1\. The number of moles/)
+  assert.match(text, /^5\. A block of mass/m)
+  const result = applyInstituteSolutionsToOfficialPyqPaper(id, text, { institute: 'Allen' })
+  assert.equal(result.ok, true, result.error)
+  assertSameAsAllen(getOfficialPyqPendingPaper(id).questions, result)
+  const note = instituteResultNote(result, { institute: 'Allen' })
+  assert.match(note, /Matched 12 question\(s\) by wording and 0 by number; 0 institute question\(s\) not matched; 0 not sure\./)
+})
+
+await test('options in another order: the answer follows the option text; options that do not line up are flagged', () => {
+  resetAll()
+  const id = newPaper().id
+  const cards = paperCards()
+  const text = instituteFile({
+    options: {
+      0: [cards[0].options[1], cards[0].options[3], cards[0].options[0], cards[0].options[2]],
+      6: ['0.5', '2', '0.25', '1'],
+      11: ['12', '3', '8', '10'],
+    },
+    answers: { 0: '(C)', 6: '(A)', 11: '(A)' },
+    solutions: { 0: 'Friction is 8 N, so $a=1 \\mathrm{~m} / \\mathrm{s}^{2}$, option (C).', 6: 'Moles are 0.5.' },
+  })
+  const result = applyInstituteSolutionsToOfficialPyqPaper(id, text, { institute: 'Resonance' })
+  assert.equal(result.ok, true, result.error)
+  const q = getOfficialPyqPendingPaper(id).questions
+  assert.equal(q[0].correctIndex, 0, 'institute (C) is the official (A) option')
+  assert.equal(q[0].answerSource, 'institute')
+  assert.equal(q[0].solution, undefined, 'a solution naming the institute letter is not used')
+  assert.equal(q[6].correctIndex, 1)
+  assert.equal(q[6].instituteAnswerDisagrees, undefined, 'institute (A) = 0.5 = official (B)')
+  assert.deepEqual(result.reordered, [1, 7])
+  assert.equal(q[11].correctIndex, undefined, 'options do not line up: no answer')
+  assert.equal(q[11].instituteOptionsUnmatched, 'A')
+  assert.equal(q[11].solution, undefined)
+  assert.deepEqual(result.optionsUnmatched, [12])
+  assert.deepEqual(result.disagreements, [{ n: 3, institute: 'C', official: 'B' }])
+  const lines = localOfficialPyqQualityCheck(getOfficialPyqPendingPaper(id)).lines
+  assert.ok(
+    lines.includes("Go to Q 12. The institute's options could not be matched to this question's options — its answer (A) was not used; check."),
+    lines.join(' | '),
+  )
+  assert.deepEqual(instituteCardNotes(q[11]).options, { said: 'A' })
+  const note = instituteResultNote(result, { institute: 'Resonance' })
+  assert.match(note, /options in another order on Q 1, 7; its answers were moved/)
+  assert.match(note, /options could not be matched on Q 12 — those answers were not used/)
+})
+
+await test('an answer-key-only file is matched by number, per subject segment', () => {
+  resetAll()
+  const id = newPaper().id
+  const result = applyInstituteSolutionsToOfficialPyqPaper(id, 'ANSWER KEY\n1. (A) 2. (B) 3. (B) 4. (D)', { institute: 'FIITJEE' })
+  assert.equal(result.ok, true, result.error)
+  assert.equal(result.layout, 'answers_only')
+  assert.equal(result.byContent, 0)
+  assert.equal(result.byNumber, 4)
+  const q = getOfficialPyqPendingPaper(id).questions
+  assert.equal(q[0].correctIndex, 0)
+  assert.equal(q[0].answerSource, 'institute')
+  assert.equal(q[2].instituteAnswerDisagrees, undefined)
+  assert.equal(q[3].correctIndex, 3)
+  assert.equal(q[6].answerSource, 'from_paper', 'chemistry Q1 is not the file\'s Q1')
+  assert.match(instituteResultNote(result, { institute: 'FIITJEE' }), /Matched 0 question\(s\) by wording and 4 by number/)
+})
+
+await test('a question that fits two cards equally is listed as not sure, never applied', () => {
+  resetAll()
+  const lines = (eq) =>
+    `The value of the constant $k$ for which the two given straight lines ${eq} are parallel to each other is`
+  const paper = addOfficialPyqPendingPaper({
+    exam: 'jee-main',
+    year: 2024,
+    session: 'Shift 1',
+    paperLabel: 'JEE Main 2024 (ambiguous fixture)',
+    paperId: `jee-main-2024-ambiguous-${Math.random().toString(36).slice(2, 8)}`,
+    questions: [
+      {
+        text: 'A particle moves in a circle of radius $5 \\mathrm{~m}$ with constant speed $10 \\mathrm{~m} / \\mathrm{s}$. Its centripetal acceleration in $\\mathrm{m} / \\mathrm{s}^{2}$ is',
+        options: ['10', '20', '30', '40'],
+      },
+      { text: lines('$2 x+k y=3$ and $4 x+6 y=5$'), options: [], questionType: 'numerical' },
+      { text: lines('$k x+2 y=1$ and $3 x+6 y=7$'), options: [], questionType: 'numerical' },
+    ].map((q, i) => ({ ...q, id: `amb-${i + 1}`, subject: MATH, printedNumber: i + 1, pyqSlot: i + 1, questionType: q.questionType || 'single' })),
+  })
+  const text = [
+    '1. A particle moves in a circle of radius 5 m with constant speed 10 m/s. Its centripetal acceleration in m/s^2 is',
+    '(A) 10 (B) 20 (C) 30 (D) 40',
+    'Ans. (B)',
+    'Sol. $a=v^{2} / r=100 / 5=20$',
+    '2. The value of the constant k for which the two given straight lines are parallel to each other is',
+    'Ans. 3',
+    'Sol. Equal slopes give $k=3$.',
+  ].join('\n')
+  const result = applyInstituteSolutionsToOfficialPyqPaper(paper.id, text, { institute: 'Allen' })
+  assert.equal(result.ok, true, result.error)
+  const q = getOfficialPyqPendingPaper(paper.id).questions
+  assert.equal(q[0].correctIndex, 1)
+  assert.equal(q[0].solutionSource, 'institute')
+  for (const card of [q[1], q[2]]) {
+    assert.equal(card.correctNumerical, undefined, 'not applied to either look-alike')
+    assert.equal(card.correctInteger, undefined)
+    assert.equal(card.solution, undefined)
+  }
+  assert.deepEqual(result.unsure, [{ n: 2, label: 'Q.2', answer: '3' }])
+  assert.deepEqual(q[1].instituteUnsureMatch, { label: 'Q.2', answer: '3' })
+  assert.equal(result.byContent, 1)
+  const quality = localOfficialPyqQualityCheck(getOfficialPyqPendingPaper(paper.id)).lines
+  assert.ok(
+    quality.includes('Go to Q 2. Institute Q.2 looks like official Q 2 but not sure — its answer and solution were not used; check.'),
+    quality.join(' | '),
+  )
+  const note = instituteResultNote(result, { institute: 'Allen' })
+  assert.match(note, /Matched 1 question\(s\) by wording and 0 by number; 0 institute question\(s\) not matched; 1 not sure\./)
+  assert.match(note, /Not sure, so not used — check: institute Q\.2 looks like official Q 2\./)
+  const edited = { ...q[1], adminEdited: true, correctNumerical: 3 }
+  assert.equal(instituteCardNotes(edited).unsure, null, 'gone once the admin has set the card')
+})
+
+await test('the matcher on its own: entries without text follow the numbers only while the numbers agree', async () => {
+  const { matchInstituteEntries, instituteOptionsOf, instituteOptionOrder, mapInstituteAnswerLetters } = await import(
+    '../src/utils/instituteSolutionsMatch.js'
+  )
+  assert.deepEqual(instituteOptionsOf('Which one?\n(A) sp (B) $\\mathrm{sp}^{2}$\n(C) $\\mathrm{sp}^{3}$\n(D) dsp'), ['sp', '$\\mathrm{sp}^{2}$', '$\\mathrm{sp}^{3}$', 'dsp'])
+  assert.deepEqual(instituteOptionsOf('Pick\n\\begin{enumerate}\n\\item 1\n\\item 2\n\\end{enumerate}'), ['1', '2'])
+  assert.equal(instituteOptionsOf('No options here'), null)
+  assert.deepEqual(instituteOptionOrder('Q\n(A) $\\mathrm{sp}^{3}$ (B) sp (C) dsp (D) $\\mathrm{sp}^{2}$', ['sp', '$sp^{2}$', '$sp^{3}$', 'dsp']), { order: [2, 0, 3, 1] })
+  assert.deepEqual(instituteOptionOrder('Q with pictures only\n(A) ![](https://cdn.mathpix.com/a) (B) ![](https://cdn.mathpix.com/b)', ['x', 'y']), { same: true })
+  assert.equal(mapInstituteAnswerLetters('A, D', [2, 0, 3, 1]), 'B, C')
+  assert.equal(mapInstituteAnswerLetters('3', [2, 0, 3, 1]), 'D')
+
+  const cards = paperCards()
+  const straight = readInstituteSolutions(`${instituteFile({ straight: true, subjectLines: false, order: [6, 7, 8, 9, 0, 1, 2, 3, 4, 5] })}\n11. Ans. (B)\n12. Ans. 3`)
+  const plan = matchInstituteEntries(cards, straight)
+  assert.equal(plan.byContent, 10)
+  assert.equal(plan.numbersAgree, false)
+  assert.equal(plan.byNumber, 0, 'the numbers are the institute\'s own: answer-only entries are not guessed')
+  assert.deepEqual(plan.unmatched, ['Q.11', 'Q.12'])
 })
 
 await test('page and helper wiring', () => {

@@ -28,8 +28,11 @@ const LATEX_SHELL_RE =
 const SOLUTION_WORDS_RE = /\b(?:correct|option|answer|hence|therefore|thus)\b/i
 const GENERIC_NAME_WORDS = new Set(['institute', 'career', 'classes', 'academy', 'limited', 'private', 'coaching', 'centre', 'center'])
 
+/** What the last institute file noted on a card; each new file writes them afresh. */
+export const INSTITUTE_NOTE_FIELDS = ['instituteAnswerDisagrees', 'instituteQuestionText', 'instituteUnsureMatch', 'instituteOptionsUnmatched']
+
 /** Card fields an institute file writes; a re-parse of the paper carries them over. */
-export const INSTITUTE_CARD_FIELDS = ['answerInstitute', 'solutionInstitute', 'instituteAnswerDisagrees', 'instituteQuestionText']
+export const INSTITUTE_CARD_FIELDS = ['answerInstitute', 'solutionInstitute', ...INSTITUTE_NOTE_FIELDS]
 
 /** @param {any} card */
 export function instituteFieldsOf(card) {
@@ -427,24 +430,37 @@ const MAX_ANSWER_LINES = 6
 
 /**
  * What the institute file still flags on this card, worked out from the card as it is now (a fixed
- * card has nothing): its answer against the official key, and its text against the institute copy.
+ * card has nothing): its answer against the official key, its text against the institute copy,
+ * an institute question that may be this one, and options that could not be lined up. The last
+ * two go once an admin edits the card.
  * @param {any} q
- * @returns {{ answer: { said: string, official: string } | null, text: ReturnType<typeof instituteTextDifference> }}
+ * @returns {{
+ *   answer: { said: string, official: string } | null,
+ *   text: ReturnType<typeof instituteTextDifference>,
+ *   unsure: { label: string, answer: string } | null,
+ *   options: { said: string } | null,
+ * }}
  */
 export function instituteCardNotes(q) {
   const said = String(q?.instituteAnswerDisagrees ?? '').trim()
   const fields = said ? endKeyAnswerFields(said, q) : null
   const copy = String(q?.instituteQuestionText ?? '').trim()
   const text = copy ? instituteTextDifference(q, copy) : null
+  const edited = q?.adminEdited === true
+  const guess = q?.instituteUnsureMatch
+  const optionsSaid = String(q?.instituteOptionsUnmatched ?? '').trim()
   return {
     answer: fields && !instituteAnswerAgrees(q, fields) ? { said, official: instituteAnswerText(q) || 'nothing' } : null,
     text: text?.differs ? text : null,
+    unsure: !edited && guess?.label ? { label: String(guess.label), answer: String(guess.answer ?? '') } : null,
+    options: !edited && optionsSaid ? { said: optionsSaid } : null,
   }
 }
 
 /**
- * Quality check lines for an institute file: answers that differ from the official key, and
- * stems that differ from the institute's copy. Cards an admin approved get no alarms.
+ * Quality check lines for an institute file: answers that differ from the official key, stems
+ * that differ from the institute's copy, institute questions matched with doubt (not used), and
+ * options that could not be lined up (answer not used). Cards an admin approved get no alarms.
  * @param {any[]} questions @param {(q: any) => boolean} [isPlaceholder]
  * @returns {string[]}
  */
@@ -453,12 +469,24 @@ export function instituteQualityLines(questions, isPlaceholder = () => false) {
   const disagree = []
   /** @type {number[]} */
   const textDiffers = []
+  /** @type {string[]} */
+  const doubts = []
   ;(Array.isArray(questions) ? questions : []).forEach((q, i) => {
     if (!q || isPlaceholder(q) || q.adminApproved === true) return
-    if (!q.instituteAnswerDisagrees && !q.instituteQuestionText) return
+    if (!INSTITUTE_NOTE_FIELDS.some((key) => q[key])) return
     const notes = instituteCardNotes(q)
     if (notes.answer) disagree.push({ n: i + 1, ...notes.answer })
     if (notes.text) textDiffers.push(i + 1)
+    if (notes.unsure) {
+      doubts.push(
+        `Go to Q ${i + 1}. Institute ${notes.unsure.label} looks like official Q ${i + 1} but not sure — its answer and solution were not used; check.`,
+      )
+    }
+    if (notes.options) {
+      doubts.push(
+        `Go to Q ${i + 1}. The institute's options could not be matched to this question's options — its answer (${notes.options.said}) was not used; check.`,
+      )
+    }
   })
   /** @type {string[]} */
   const lines =
@@ -468,5 +496,5 @@ export function instituteQualityLines(questions, isPlaceholder = () => false) {
   if (textDiffers.length) {
     lines.push(`Go to Q ${textDiffers.join(', ')}. Question text differs from the institute copy — check against the original.`)
   }
-  return lines
+  return lines.concat(doubts)
 }

@@ -545,7 +545,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     String(card?.passageText ?? '').trim() || card?.passageId || card?.passageGroup || draft.passageText,
   )
   const passageMates = hasPassage ? passageGroupGoTo(paperId, index) : []
-  const institute = card.adminApproved ? { answer: null, text: null } : instituteCardNotes(card)
+  const institute = card.adminApproved ? { answer: null, text: null, unsure: null, options: null } : instituteCardNotes(card)
   const instituteStem = institute.text ? instituteStemOnly(card.instituteQuestionText) : ''
   function openEditor(nextDraft, suggested = false) {
     setDraft(nextDraft)
@@ -822,7 +822,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
         </div>
       ) : null}
 
-      {institute.answer || institute.text ? (
+      {institute.answer || institute.text || institute.unsure || institute.options ? (
         <div className="form-hint" data-testid="official-pyq-institute-note" role="status">
           {institute.answer ? (
             <p style={{ margin: '0.2rem 0' }}>
@@ -835,6 +835,19 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
               Question text differs from the institute copy — check against the original.
               {institute.text.missingNumbers.length ? ` Numbers only in the institute copy: ${institute.text.missingNumbers.join(', ')}.` : ''}
               {institute.text.missingWords.length ? ` Words only in the institute copy: ${institute.text.missingWords.join(', ')}.` : ''}
+            </p>
+          ) : null}
+          {institute.unsure ? (
+            <p style={{ margin: '0.2rem 0' }} data-testid="official-pyq-institute-unsure">
+              {card.answerInstitute || card.solutionInstitute || 'Institute'} {institute.unsure.label} looks like this question
+              {institute.unsure.answer ? ` (its answer: ${institute.unsure.answer})` : ''}, but not sure — nothing was taken from it.
+              Check the institute PDF and type the answer yourself if it is the same question.
+            </p>
+          ) : null}
+          {institute.options ? (
+            <p style={{ margin: '0.2rem 0' }} data-testid="official-pyq-institute-options">
+              The institute&apos;s options could not be matched to these options, so its answer ({institute.options.said}) was not
+              used — check which option it means.
             </p>
           ) : null}
         </div>

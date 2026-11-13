@@ -8,13 +8,15 @@
  * - Each stem is checked against the institute's copy of the question (no Gemini).
  * Students see these answers and solutions like any other.
  */
-import { endKeyAnswerFields, endSectionEntriesForCards } from './printedEndSolutions.js'
+import { endKeyAnswerFields } from './printedEndSolutions.js'
 import {
+  INSTITUTE_NOTE_FIELDS,
   instituteAnswerAgrees,
   instituteAnswerText,
   instituteTextDifference,
   readInstituteSolutions,
 } from './instituteSolutionsParse.js'
+import { instituteOptionOrder, mapInstituteAnswerLetters, matchInstituteEntries } from './instituteSolutionsMatch.js'
 import { getOfficialPyqPendingPaper, isOtherPaper, updateOfficialPyqPendingPaper } from './officialPyqPendingStore.js'
 import { officialPyqCardAnswerIsKept } from './officialPyqPendingFill.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
@@ -46,6 +48,19 @@ export function cleanInstituteName(name) {
 function hasOfficialAnswer(q) {
   if (q?.bonusMarksToAll === true || q?.zeroMarksToAll === true) return true
   return officialPyqCardAnswerIsKept(q) && q?.answerSource !== 'institute'
+}
+
+/** A worked solution that names options by letter reads wrong once the options are in another order. */
+const NAMES_OPTION_RE = /\(\s*[A-D]\s*\)|\b(?:option|choice)s?\s*\(?\s*[A-D]\b/i
+
+/** @param {any} q */
+function takesNothing(q) {
+  return !q || typeof q !== 'object' || isOfficialPyqPlaceholder(q) || !String(q.text ?? q.stem ?? '').trim()
+}
+
+/** @param {any} q */
+function hasOptions(q) {
+  return (Array.isArray(q?.options) ? q.options : []).filter((o) => String(o ?? '').trim()).length >= 2
 }
 
 /** @param {any} q */
@@ -85,10 +100,9 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
   const numbered = cards.map((q, i) =>
     Number(q?.printedNumber ?? q?.questionNumber) > 0 ? q : { ...q, printedNumber: Number(q?.pyqSlot) || i + 1 },
   )
-  const found = endSectionEntriesForCards(numbered, read)
+  const plan = matchInstituteEntries(numbered, read, { skip: takesNothing })
   let answers = 0
   let solutions = 0
-  let matched = 0
   /** @type {Array<{ n: number, institute: string, official: string }>} */
   const disagreements = []
   /** @type {number[]} */
@@ -97,20 +111,47 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
   const textDiffers = []
   /** @type {number[]} */
   const noAnswer = []
+  /** @type {number[]} */
+  const reordered = []
+  /** @type {number[]} */
+  const optionsUnmatched = []
+  /** @type {Array<{ n: number, label: string, answer: string }>} */
+  const unsure = []
+  const unsureOf = new Map(plan.unsure.map((u) => [u.card, u]))
 
   const questions = cards.map((q, i) => {
-    if (!q || typeof q !== 'object' || isOfficialPyqPlaceholder(q) || !String(q.text ?? q.stem ?? '').trim()) return q
-    const entry = found[i]
-    if (!entry) {
-      notFound.push(i + 1)
-      return q
-    }
-    matched += 1
+    if (takesNothing(q)) return q
     const next = { ...q }
-    delete next.instituteAnswerDisagrees
-    delete next.instituteQuestionText
-    const fields = entry.answer && !isMatrixGridCard(q) ? endKeyAnswerFields(entry.answer, q) : null
-    let disagrees = false
+    for (const key of INSTITUTE_NOTE_FIELDS) delete next[key]
+    const guess = unsureOf.get(i)
+    if (guess) {
+      next.instituteUnsureMatch = { label: guess.label, answer: guess.entry.answer || '' }
+      unsure.push({ n: i + 1, label: guess.label, answer: guess.entry.answer || '' })
+      return next
+    }
+    const match = plan.matches[i]
+    if (!match) {
+      notFound.push(i + 1)
+      return next
+    }
+    const entry = match.entry
+    let answer = entry.answer
+    let shuffled = false
+    if (answer && entry.question && hasOptions(q) && !isMatrixGridCard(q) && /^(?:[A-H](?:, [A-H])*|[1-4])$/.test(answer)) {
+      const order = instituteOptionOrder(entry.question, q.options)
+      const mapped = order && 'order' in order ? mapInstituteAnswerLetters(answer, order.order) : answer
+      if (!order || !mapped) {
+        next.instituteOptionsUnmatched = answer
+        optionsUnmatched.push(i + 1)
+        answer = ''
+      } else if ('order' in order) {
+        shuffled = true
+        reordered.push(i + 1)
+        answer = mapped
+      }
+    }
+    const fields = answer && !isMatrixGridCard(q) ? endKeyAnswerFields(answer, q) : null
+    let disagrees = Boolean(next.instituteOptionsUnmatched)
     if (fields && hasOfficialAnswer(q)) {
       if (!instituteAnswerAgrees(q, fields)) {
         disagrees = true
@@ -125,7 +166,7 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
       delete next.hybridAnswerDisagrees
       if (q.answerSource !== 'institute' || before !== instituteAnswerText(next)) answers += 1
     }
-    if (entry.solution && !disagrees && solutionIsReplaceable(q)) {
+    if (entry.solution && !disagrees && !(shuffled && NAMES_OPTION_RE.test(entry.solution)) && solutionIsReplaceable(q)) {
       if (String(q.solution ?? '').trim() !== entry.solution.trim() || q.solutionSource !== 'institute') solutions += 1
       next.solution = entry.solution
       next.solutionSource = 'institute'
@@ -139,11 +180,20 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
     return next
   })
 
-  if (!matched) {
+  if (!plan.byContent && !plan.byNumber && !unsure.length) {
     return {
       ok: false,
-      error: 'The file was read, but none of its question numbers matched a question on this paper. Nothing was changed.',
+      error:
+        'The file was read, but none of its questions matched a question on this paper (by wording or by number). Nothing was changed.',
     }
+  }
+  const counts = {
+    byContent: plan.byContent,
+    byNumber: plan.byNumber,
+    unmatched: plan.unmatched,
+    unsure,
+    reordered,
+    optionsUnmatched,
   }
   const summary = {
     institute,
@@ -156,6 +206,11 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
     disagreements: disagreements.map((d) => d.n),
     notFound,
     textDiffers,
+    byContent: plan.byContent,
+    byNumber: plan.byNumber,
+    unmatched: plan.unmatched.length,
+    unsure: unsure.map((u) => u.n),
+    optionsUnmatched,
   }
   const saved = updateOfficialPyqPendingPaper(paper.id, {
     questions,
@@ -163,19 +218,41 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
     instituteSolutions: summary,
   })
   if (!saved) return { ok: false, error: 'Could not save the institute answers. Nothing was changed.' }
-  return { ok: true, paper: saved, answers, solutions, disagreements, notFound, textDiffers, noAnswer, layout: read.layout }
+  return { ok: true, paper: saved, answers, solutions, disagreements, notFound, textDiffers, noAnswer, layout: read.layout, ...counts }
 }
 
 /**
  * Plain result note for the admin.
- * @param {{ answers: number, solutions: number, disagreements: Array<{ n: number, institute: string, official: string }>, notFound: number[], textDiffers: number[], noAnswer?: number[] }} result
+ * @param {{
+ *   answers: number, solutions: number, disagreements: Array<{ n: number, institute: string, official: string }>,
+ *   notFound: number[], textDiffers: number[], noAnswer?: number[], byContent?: number, byNumber?: number,
+ *   unmatched?: string[], unsure?: Array<{ n: number, label: string }>, reordered?: number[], optionsUnmatched?: number[],
+ * }} result
  * @param {{ institute: string, fileName?: string, pictures?: { kept: number, failed: number }, pdfStored?: boolean }} info
  */
 export function instituteResultNote(result, info) {
   const list = (nums) => `Q ${nums.slice(0, 15).join(', ')}${nums.length > 15 ? ' …' : ''}`
+  const labels = (names) => `${names.slice(0, 15).join(', ')}${names.length > 15 ? ' …' : ''}`
+  const unmatched = result.unmatched ?? []
+  const unsure = result.unsure ?? []
   const parts = [
     `Read ${info.institute} solutions${info.fileName ? ` (“${info.fileName}”)` : ''}: ${result.answers} answer(s) filled, ${result.solutions} solution(s) filled.`,
+    `Matched ${result.byContent ?? 0} question(s) by wording and ${result.byNumber ?? 0} by number; ${unmatched.length} institute question(s) not matched; ${unsure.length} not sure.`,
   ]
+  if (unsure.length) {
+    const shown = unsure
+      .slice(0, 6)
+      .map((u) => `institute ${u.label} looks like official Q ${u.n}`)
+      .join('; ')
+    parts.push(`Not sure, so not used — check: ${shown}${unsure.length > 6 ? '; …' : ''}.`)
+  }
+  if (unmatched.length) parts.push(`Not matched to any question here: institute ${labels(unmatched)}.`)
+  if (result.reordered?.length) {
+    parts.push(`The institute prints the options in another order on ${list(result.reordered)}; its answers were moved to the matching options.`)
+  }
+  if (result.optionsUnmatched?.length) {
+    parts.push(`The institute's options could not be matched on ${list(result.optionsUnmatched)} — those answers were not used; the Quality check lists them.`)
+  }
   if (result.disagreements.length) {
     const shown = result.disagreements
       .slice(0, 6)

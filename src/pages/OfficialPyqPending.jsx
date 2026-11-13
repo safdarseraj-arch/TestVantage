@@ -1854,8 +1854,9 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
                           Have a <strong>solutions PDF from a coaching institute</strong> (Allen, Resonance, FIITJEE…)?
                           Its answers fill questions that have none, and its solutions fill questions with no solution
                           (or only an AI one). The official answer key always wins: a different institute answer is
-                          listed in the Quality check. Each question&apos;s text is also checked against the
-                          institute&apos;s copy.
+                          listed in the Quality check. Questions are matched by their wording, so the institute may
+                          number them its own way; a match it is not sure of is listed, not used. Each question&apos;s
+                          text is also checked against the institute&apos;s copy.
                           {selected.instituteSolutions?.institute
                             ? ` Last added: ${selected.instituteSolutions.institute}${
                                 selected.instituteSolutions.fileName ? ` (“${selected.instituteSolutions.fileName}”)` : ''

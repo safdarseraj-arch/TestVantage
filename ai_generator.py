@@ -221,6 +221,7 @@ class PublishedPyqFillOutput(BaseModel):
     source: str = ""
     correct_answer: str = ""
     step_by_step_solution: str = ""
+    missing_info: str = ""
 
 
 class PublishedPyqTagsOutput(BaseModel):
@@ -357,21 +358,43 @@ def _generation_config(
     return types.GenerateContentConfig(**config_kwargs)
 
 
+def _finish_reason(response: Any) -> str:
+    """'MAX_TOKENS', 'SAFETY', 'STOP', … of the first candidate ('' when there is none)."""
+    candidates = getattr(response, "candidates", None) or []
+    raw = getattr(candidates[0], "finish_reason", None) if candidates else None
+    return str(getattr(raw, "name", None) or raw or "").rsplit(".", 1)[-1].upper()
+
+
+def _no_text_message(response: Any) -> str:
+    """Plain words for a reply with no answer text, by why Gemini stopped."""
+    reason = _finish_reason(response)
+    if reason == "MAX_TOKENS":
+        return (
+            "Gemini ran out of room while calculating (the 1500-token reply limit), so no answer came back. "
+            "Press the button again, or type the answer and solution by hand."
+        )
+    blocked = getattr(getattr(response, "prompt_feedback", None), "block_reason", None)
+    if reason in {"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"} or blocked:
+        return f"Gemini declined to answer this question ({reason or blocked}). Type the answer and solution by hand."
+    return f"Gemini sent no answer text (it stopped with {reason or 'no reason given'}). Press the button again."
+
+
 def _response_text(response: Any) -> str:
     text = getattr(response, "text", None)
     if text:
         return str(text).strip()
     candidates = getattr(response, "candidates", None) or []
     if not candidates:
-        raise ValueError("Gemini returned no candidates.")
-    parts = getattr(candidates[0].content, "parts", None) or []
+        raise ValueError(_no_text_message(response))
+    content = getattr(candidates[0], "content", None)
+    parts = getattr(content, "parts", None) or []
     chunks: list[str] = []
     for part in parts:
         if getattr(part, "text", None):
             chunks.append(str(part.text))
     joined = "\n".join(chunks).strip()
     if not joined:
-        raise ValueError("Gemini returned empty text.")
+        raise ValueError(_no_text_message(response))
     return joined
 
 
@@ -1001,6 +1024,12 @@ def _published_answer_rule(params: dict[str, Any]) -> str:
     )
 
 
+def _published_retry_line(params: dict[str, Any]) -> str:
+    """Second ask: one line on what was wrong with the first reply."""
+    reason = " ".join(str(params.get("retry_reason") or "").split())[:300]
+    return f"This is a second try. {reason}\n" if reason else ""
+
+
 def _published_tags_prompt(params: dict[str, Any]) -> str:
     """Metatags only: the paper prints the answer and solution, so neither is asked for."""
     return (
@@ -1030,6 +1059,10 @@ def _published_fill_prompt(params: dict[str, Any]) -> str:
         "If the stored solution is a hint, a story, or longer than this, replace it with this concise complete solution. "
         "Use the exact values in the stem, options, and attached pictures; never assume a value that is not given. "
         "If you cannot solve it, return an empty step_by_step_solution.\n"
+        "missing_info: empty when the question can be solved. If it cannot because its text, a value, the paragraph, "
+        "or a figure it names is missing or unreadable, say what is missing in under 12 words, "
+        "and leave correct_answer and step_by_step_solution empty.\n"
+        f"{_published_retry_line(params)}"
         "If the stored question type is matrix_match_grid (Column I rows A-D, Column II entries P-T, "
         "each row matches one or more entries), correct_answer lists every row like "
         "\"A-P,R; B-Q; C-Q,S,T; D-R\" and question_type stays matrix_match_grid.\n"
@@ -1131,6 +1164,14 @@ def published_fill_model(params: dict[str, Any] | None) -> str:
     return _MODEL_FLASH
 
 
+def _published_fill_cut_off(response: Any, parsed: Any) -> bool:
+    """No usable reply: no JSON came back, or the output cap cut it before the solution."""
+    if parsed is None:
+        return True
+    solution = str(getattr(parsed, "step_by_step_solution", "") or "").strip()
+    return _finish_reason(response) == "MAX_TOKENS" and not solution
+
+
 def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
     """One published question. Code execution only for maths, physics, physical chemistry."""
     from hybrid_metadata import hybrid_code_execution_subject
@@ -1147,12 +1188,38 @@ def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
         max_output_tokens=_MAX_OUTPUT_TOKENS,
     )
     config.http_options = types.HttpOptions(timeout=_PUBLISHED_FILL_TIMEOUT_MS)
-    response = client.models.generate_content(
-        model=model,
-        contents=[_published_fill_prompt(params), *([] if tags_only else _published_fill_pictures(params))],
-        config=config,
-    )
-    parsed = _structured_output_from_response(response, schema)
+    contents = [_published_fill_prompt(params), *([] if tags_only else _published_fill_pictures(params))]
+    response = client.models.generate_content(model=model, contents=contents, config=config)
+    usage = _token_usage(response, model)
+    try:
+        parsed = _structured_output_from_response(response, schema)
+    except ValueError:
+        parsed = None
+    if code_subject is not None and _published_fill_cut_off(response, parsed):
+        # Code execution can spend the whole output cap before the JSON; the short solution fits without it.
+        candidates = getattr(response, "candidates", None) or []
+        parts = getattr(getattr(candidates[0], "content", None), "parts", None) or [] if candidates else []
+        kinds = [k for p in parts for k in ("text", "executable_code", "code_execution_result") if getattr(p, k, None)]
+        logger.warning(
+            "Published fill gave no usable reply with code execution (finish=%s, parts=%s, output tokens=%s); "
+            "asking once more without it",
+            _finish_reason(response) or "none",
+            kinds or "none",
+            usage.get("output"),
+        )
+        config = _generation_config(
+            response_schema=schema,
+            subject=code_subject,
+            use_code_tools=False,
+            max_output_tokens=_MAX_OUTPUT_TOKENS,
+        )
+        config.http_options = types.HttpOptions(timeout=_PUBLISHED_FILL_TIMEOUT_MS)
+        response = client.models.generate_content(model=model, contents=contents, config=config)
+        retry_usage = _token_usage(response, model)
+        usage = {**usage, "input": usage["input"] + retry_usage["input"], "output": usage["output"] + retry_usage["output"]}
+        parsed = None
+    if parsed is None:
+        parsed = _structured_output_from_response(response, schema)
     if not isinstance(parsed, schema):
         parsed = schema.model_validate(parsed)
     tags = _snapped_published_tags(params, parsed)
@@ -1167,6 +1234,7 @@ def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
             "source": source,
             "tags_only": True,
             "model": model,
+            "usage": usage,
         }
     return {
         "subject": parsed.subject,
@@ -1177,8 +1245,20 @@ def fill_published_pyq_sync(params: dict[str, Any]) -> dict[str, str]:
         "source": source,
         "correct_answer": parsed.correct_answer,
         "step_by_step_solution": solution_as_lines(parsed.step_by_step_solution),
+        "missing_info": parsed.missing_info.strip(),
         "model": model,
+        "usage": usage,
     }
+
+
+def _token_usage(response: Any, model: str) -> dict[str, Any]:
+    """Billed tokens of one reply: input (prompt, pictures, code results read back) and output (text, code, thinking)."""
+    meta = getattr(response, "usage_metadata", None)
+    count = lambda name: int(getattr(meta, name, 0) or 0)  # noqa: E731
+    sent = count("prompt_token_count") + count("tool_use_prompt_token_count")
+    total = count("total_token_count")
+    out = max(0, total - sent) if total else count("candidates_token_count") + count("thoughts_token_count")
+    return {"input": sent, "output": out, "model": model}
 
 
 async def fill_published_pyq(params: dict[str, Any]) -> dict[str, str]:

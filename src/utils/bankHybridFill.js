@@ -5,12 +5,14 @@
  * and figures never change. Answers and solutions printed on the paper or typed by hand stay.
  */
 import { fillOfficialPyqTags } from './hybridAiClient.js'
-import { HYBRID_FILL_PART_SIZE, fillPaperQuestionByQuestion } from './officialPyqReplica.js'
+import { HYBRID_FILL_PART_SIZE, fillPaperQuestionByQuestion, hybridFillUsage } from './officialPyqReplica.js'
 import {
   applyHybridPatchToCard,
   currentAnswerText,
   hybridFillRequestForQuestion,
   officialPyqCardTagsOnly,
+  officialPyqFillIncomplete,
+  withRetryReason,
 } from './officialPyqPendingFill.js'
 import { peekUploadedQuestions, updateUploadedQuestion } from './questionBank.js'
 import { effectiveBankStatus } from './questionUploadFilter.js'
@@ -54,12 +56,21 @@ export function bankDraftsToFill(questions, opts = {}) {
   )
 }
 
-/** The fill request for one bank question; a paragraph question carries its paragraph. @param {any} q */
-export function bankHybridFillRequest(q) {
+/**
+ * A paragraph question with its paragraph: in the bank only the first child keeps it, later ones point at it.
+ * @param {any} q @param {any[]} [bank]
+ */
+export function bankQuestionWithPassage(q, bank = []) {
+  if (String(q?.passageText ?? '').trim() || !q?.passageId) return q
+  const first = (Array.isArray(bank) ? bank : []).find((row) => String(row?.id) === String(q.passageId))
+  const passageText = String(first?.passageText ?? '').trim()
+  return passageText ? { ...q, passageText } : q
+}
+
+/** The fill request for one bank question; a paragraph question carries its paragraph. @param {any} q @param {any[]} [bank] */
+export function bankHybridFillRequest(q, bank = []) {
   const tagsOnly = officialPyqCardTagsOnly(q)
-  const body = hybridFillRequestForQuestion(q, String(q?.examPatternId || ''), { tagsOnly })
-  const passage = String(q?.passageText ?? '').trim()
-  return passage ? { ...body, question_text: `Paragraph:\n${passage}\n\nQuestion:\n${body.question_text}` } : body
+  return hybridFillRequestForQuestion(bankQuestionWithPassage(q, bank), String(q?.examPatternId || ''), { tagsOnly })
 }
 
 function sameValue(a, b) {
@@ -100,11 +111,17 @@ export async function fillBankDraftsWithHybridAi(ids, opts = {}) {
   let filled = 0
   /** @type {string[]} */
   const needsLook = []
-  const rows = await fillPaperQuestionByQuestion(questions, (question) => ask(bankHybridFillRequest(question)), {
+  /** @type {string[]} */
+  const incomplete = []
+  const bank = peekUploadedQuestions()
+  const fillOne = (question, _index, _attempt, retryReason) =>
+    ask(withRetryReason(bankHybridFillRequest(question, bank), retryReason))
+  const rows = await fillPaperQuestionByQuestion(questions, fillOne, {
     concurrency: HYBRID_FILL_PART_SIZE,
     signal: opts.signal,
     isFatal: opts.isFatal,
     tagsOnly: (q) => officialPyqCardTagsOnly(q),
+    incomplete: (q, filled) => officialPyqFillIncomplete(bankQuestionWithPassage(q, bank), filled),
     onProgress: (index) => {
       const from = index - (index % HYBRID_FILL_PART_SIZE) + 1
       opts.onProgress?.({ from, to: Math.min(from + HYBRID_FILL_PART_SIZE - 1, total), total, filled })
@@ -112,6 +129,10 @@ export async function fillBankDraftsWithHybridAi(ids, opts = {}) {
     onApplied: (row) => {
       if (row.skipped) return
       const id = String(row.question?.id ?? '')
+      if (row.incomplete) {
+        incomplete.push(id)
+        return
+      }
       if (row.needsLook) needsLook.push(id)
       if (!row.patch) return
       const card = peekUploadedQuestions().find((q) => String(q?.id) === id)
@@ -128,12 +149,16 @@ export async function fillBankDraftsWithHybridAi(ids, opts = {}) {
       filled += 1
     },
   })
+  const paused = rows.find((row) => row.outage)
   return {
     total,
-    asked: rows.filter((row) => !row.skipped).length,
+    asked: rows.filter((row) => !row.skipped && !row.outage).length,
     filled,
     needsLook,
+    incomplete,
     tagsOnly: rows.filter((row) => row.tagsOnly).length,
+    paused: paused ? { reason: paused.outage, left: total - rows.filter((row) => !row.outage).length } : null,
+    usage: hybridFillUsage(rows),
     stopped: Boolean(opts.signal?.aborted),
   }
 }

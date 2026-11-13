@@ -306,6 +306,34 @@ await test('a hint-like solution is not saved and the question is marked for a l
   assert.equal(card.correctIndex, 2)
 })
 
+await test('a later paragraph child gets the paragraph from the first; an incomplete reply is asked once and listed apart', async () => {
+  const saved = seed([
+    { text: 'First child: find the speed.', passageText: 'A car moves 10 m in 2 s.', passageRole: 'comprehension_child', options: ['1', '5', '10', '20'], questionType: 'single_correct', bankStatus: 'draft' },
+    { text: 'Second child: find the time for 25 m.', passageRole: 'comprehension_child', options: ['1', '5', '10', '20'], questionType: 'single_correct', bankStatus: 'draft' },
+    { text: 'Second child with a lost paragraph.', passageRole: 'comprehension_child', options: ['1', '5', '10', '20'], questionType: 'single_correct', bankStatus: 'draft' },
+    { text: 'What is $3+3$ in the table?', options: ['3', '4', '6', '8'], questionType: 'single_correct', bankStatus: 'draft' },
+  ])
+  updateUploadedQuestion(saved[1].id, { passageId: saved[0].id }, { silent: true, skipHistory: true })
+  updateUploadedQuestion(saved[2].id, { passageId: 'gone' }, { silent: true, skipHistory: true })
+  const bodies = []
+  const result = await fillBankDraftsWithHybridAi(saved.map((q) => q.id), {
+    fillOne: async (body) => {
+      bodies.push(body)
+      return body.question_text.includes('in the table')
+        ? reply({ step_by_step_solution: '', correct_answer: '', missing_info: 'the table is not given' })
+        : reply()
+    },
+  })
+  const second = bodies.find((b) => b.question_text.endsWith('find the time for 25 m.'))
+  assert.equal(second.question_text, 'Paragraph:\nA car moves 10 m in 2 s.\n\nQuestion:\nSecond child: find the time for 25 m.')
+  assert.equal(bodies.filter((b) => b.question_text.includes('in the table')).length, 1, 'not asked a second time')
+  assert.equal(bodies.filter((b) => b.question_text.includes('lost paragraph')).length, 0, 'a child with no paragraph is not asked')
+  assert.deepEqual(result.incomplete.sort(), [saved[2].id, saved[3].id].map(String).sort())
+  assert.deepEqual(result.needsLook, [])
+  assert.equal(byText('What is $3+3$ in the table?').chapter ?? '', '')
+  assert.equal(byText('Second child: find the time for 25 m.').solution, AI_SOLUTION)
+})
+
 await test('upload no longer calls the light Gemini enrich step; Draft view renders the button', () => {
   const pipeline = fs.readFileSync(new URL('../src/utils/mathpixGeminiPipeline.js', import.meta.url), 'utf8')
   assert.equal(pipeline.includes('enrichQuestionsLightClient'), false)

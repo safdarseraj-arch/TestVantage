@@ -280,6 +280,10 @@ class OfficialPyqFillRequest(BaseModel):
         default=False,
         description="Answer and solution are printed on the paper: fill metatags only, no answer or solution.",
     )
+    retry_reason: str | None = Field(
+        default=None,
+        description="Second ask only: what was wrong with the first reply (cut to 300 characters).",
+    )
 
 
 class OfficialPyqReplicaQuestionRequest(BaseModel):
@@ -1220,6 +1224,7 @@ async def official_pyq_fill_tags(body: OfficialPyqFillRequest) -> dict[str, Any]
         "answer_is_official": bool(body.answer_is_official) and not body.tags_only,
         "solution": "" if body.tags_only else body.solution,
         "tags_only": body.tags_only,
+        "retry_reason": "" if body.tags_only else (body.retry_reason or "").strip()[:300],
     }
     try:
         filled = await ai_generator.fill_published_pyq(params)

@@ -4,11 +4,18 @@
  * timeout keeps the work already done. Answers printed on the paper stay.
  */
 import { useRef, useState } from 'react'
-import { fillOfficialPyqApprovedPaperPartByPart } from '../utils/officialPyqPendingFill.js'
+import { HYBRID_FILL_INCOMPLETE_NOTE, fillOfficialPyqApprovedPaperPartByPart } from '../utils/officialPyqPendingFill.js'
 import { getOfficialPyqPendingPaper, updateOfficialPyqPendingPaper } from '../utils/officialPyqPendingStore.js'
+import { HYBRID_FILL_TRIES, hybridFillUsageNote } from '../utils/officialPyqReplica.js'
 
 function keyIsMissing(err) {
   return /GEMINI_API_KEY|API key|api key is missing/i.test(String(err?.message || err || ''))
+}
+
+function notSavedNote(result) {
+  return result.notSaved?.length
+    ? ` Question(s) ${result.notSaved.join(', ')} could not be saved (the card changed while filling). Press the button again.`
+    : ''
 }
 
 export default function OfficialPyqHybridFill({ paperId, onChanged }) {
@@ -54,11 +61,23 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
       })
       onChanged?.()
       const look = result.needsLook.length
-        ? ` Check question(s) ${result.needsLook.join(', ')} — after 3 tries the solution still did not reach the official answer or read as a full solution; their tags were saved. Press the button again to retry them.`
+        ? ` Check question(s) ${result.needsLook.join(', ')} — after ${HYBRID_FILL_TRIES} tries the solution still did not reach the official answer or read as a full solution; their tags were saved. Press the button again to retry them.`
         : ''
-      const notSaved = result.notSaved?.length
-        ? ` Question(s) ${result.notSaved.join(', ')} could not be saved (the card changed while filling). Press the button again.`
+      const failed = result.failed?.length
+        ? ` Question(s) ${result.failed.join(', ')} got no reply (${HYBRID_FILL_TRIES} tries). Press the button again to retry them.`
         : ''
+      const incomplete = result.incomplete?.length
+        ? ` Question(s) ${result.incomplete.join(', ')}: ${HYBRID_FILL_INCOMPLETE_NOTE}. They were not asked again, so nothing was paid twice.`
+        : ''
+      const cost = hybridFillUsageNote(result.usage)
+      if (result.paused) {
+        setError(
+          `Hybrid AI stopped answering at question ${result.paused.at}: ${result.paused.reason} Saved ${result.filled} question(s) before that. When the helper is running again, press the button — it carries on from question ${result.paused.at}; finished questions are not asked (or paid for) again.`,
+        )
+        setNote(`${cost.trim()}${look}${incomplete}${failed}${notSavedNote(result)}`)
+        return
+      }
+      const notSaved = notSavedNote(result)
       const tagsOnly = result.tagsOnly ? ` ${result.tagsOnly} question(s) had a printed answer and solution, so only their tags were filled.` : ''
       const noKey = result.noPrintedAnswer?.length
         ? ` Question(s) ${result.noPrintedAnswer.join(', ')} have no printed answer. Hybrid AI did not answer them because this paper is marked "printed answers and solutions" — type the answer by hand.`
@@ -69,7 +88,7 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
         )
       } else {
         setNote(
-          `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} question(s). The paper is still Approved — press Publish when it looks right.${tagsOnly}${look}${notSaved}${noKey}`,
+          `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} question(s). The paper is still Approved — press Publish when it looks right.${tagsOnly}${look}${incomplete}${failed}${notSaved}${noKey}${cost}`,
         )
       }
     } catch (err) {

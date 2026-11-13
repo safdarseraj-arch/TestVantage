@@ -18,6 +18,7 @@ import {
   mapSubjectSlugToHybridLabel,
 } from '../utils/hybridMetadata.js'
 import { answerFieldsFromHybrid } from '../utils/officialPyqReplica.js'
+import { questionTextWithPassage } from '../utils/officialPyqPendingFill.js'
 import {
   applyOfficialPyqPublishedMeta,
   normalizeBankSubjectId,
@@ -188,7 +189,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
     const examId = Array.isArray(examIds) && examIds.length ? examIds[0] : ''
     try {
       const filled = await fillOfficialPyqTags({
-        question_text: String(question?.text ?? question?.stem ?? ''),
+        question_text: questionTextWithPassage(question?.text ?? question?.stem, question?.passageText),
         options: options.map((opt) => String(opt ?? '')),
         subject: subject ? mapSubjectSlugToHybridLabel(subject, chapter || section) : '',
         unit: section,
@@ -219,10 +220,11 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
       showValues(suggested)
       const answered = String(filled.correct_answer || '').trim()
       const solved = String(filled.step_by_step_solution || '').trim()
+      const missing = String(filled.missing_info || '').trim()
       setNote(
         answered && solved
           ? 'Hybrid AI filled the boxes above. Check them, then press Save tags, answer, and solution.'
-          : 'Hybrid AI filled the tags but could not work out the answer or solution from this question (a picture or text may be missing). Fill them by hand, then press Save.',
+          : `Hybrid AI filled the tags but could not work out the answer or solution from this question (${missing || 'a picture or text may be missing'}). Fill them by hand, then press Save.`,
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Hybrid AI could not fill this question.')
@@ -448,6 +450,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
       <MissingSolutionFill
         hasSolution={Boolean(String(solution || '').trim())}
         questionText={String(question?.text ?? question?.stem ?? '')}
+        passageText={String(question?.passageText ?? '')}
         options={options}
         subject={subject}
         section={section}

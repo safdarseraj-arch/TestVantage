@@ -642,6 +642,7 @@ export default function SavedQuestionContentEditor({
       <MissingSolutionFill
         hasSolution={Boolean(String(solution || '').trim())}
         questionText={text}
+        passageText={isPassageParent ? passageText : linkedPassageText || ''}
         options={options}
         subject={q.subject || ''}
         section={q.section || q.unit || ''}

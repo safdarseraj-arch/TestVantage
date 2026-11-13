@@ -79,9 +79,9 @@ export function queueCloneScaled(payload) {
   return postHybridJson('/questions/clone-scaled', payload)
 }
 
-/** Suggested bank tags, answer, and solution. Does not save the question. */
+/** Suggested bank tags, answer, and solution. Does not save the question. A cut-off code-execution reply is asked again once on the server. */
 export function fillOfficialPyqTags(body) {
-  return postHybridJson('/official-pyq/fill-tags', body, { timeoutMs: 90_000 })
+  return postHybridJson('/official-pyq/fill-tags', body, { timeoutMs: 170_000 })
 }
 
 /** One similar question for a pending replica. Does not approve or publish. */

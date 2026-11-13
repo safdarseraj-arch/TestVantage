@@ -308,6 +308,9 @@ export async function collectPaperHybridFills(questions, fillOne) {
 const HINT_OR_ESSAY_RE =
   /\b(?:hint|think about|try (?:to|using)|you (?:should|can|need to)|let(?:'s| us) (?:think|consider|start|begin|recall)|first,? we need to understand|in this question,? we)\b/i
 
+/** "Wait, …", "Re-evaluating: …": the working reached one answer and the last line may name another. */
+const CHANGES_ITS_MIND_RE = /(?:^|[\s.(])wait\b|\bre-?(?:evaluat|verif|check|consider)(?:e|es|ed|ing|y|ies|ied)?\b|\bon second thought\b/i
+
 /**
  * Why a Hybrid AI solution is not an exam solution yet: '' when it is fine.
  * Official PYQ solutions are short exact working that ends in the result, not a hint or an essay.
@@ -317,24 +320,119 @@ export function officialPyqSolutionProblem(text) {
   const t = String(text ?? '').trim()
   if (!t) return 'No solution came back.'
   if (HINT_OR_ESSAY_RE.test(t)) return 'The solution reads like a hint, not worked steps.'
+  if (CHANGES_ITS_MIND_RE.test(t)) return 'The solution changes its mind, so its answer cannot be trusted.'
   if (t.length > 1800) return 'The solution is an essay. It should be short worked steps.'
   if (t.length < 25) return 'The solution is too short to show the working.'
   return ''
 }
 
+/**
+ * What the second ask tells Gemini about the first reply ('' when there was no problem). At most 300 characters.
+ * @param {unknown} problem
+ */
+export function hybridFillRetryReason(problem) {
+  const said = String(problem ?? '').trim()
+  if (!said) return ''
+  const official = said.match(/official answer is (.+?)\.?$/i)
+  const fix = official
+    ? `Recheck the working; the last line must be "Answer: ${official[1]}".`
+    : 'Give 3 to 8 short worked steps; the last line must be "Answer: " with the result.'
+  return `Your previous reply was not saved: ${said} ${fix}`.slice(0, 300)
+}
+
 /** Two questions in flight at a time; each is still its own Gemini request. */
 export const HYBRID_FILL_PART_SIZE = 2
+
+/** Paid Gemini replies per question when the reply is weak (hint, essay, off the official answer). */
+export const HYBRID_FILL_TRIES = 2
+
+/** Waits before asking again while Hybrid AI or Gemini is not answering; after the last one the run pauses. */
+export const HYBRID_FILL_OUTAGE_WAITS_MS = [5_000, 20_000]
+
+const OUTAGE_RE =
+  /not running|did not answer in time|failed to fetch|fetch failed|network ?error|resource.?exhausted|quota|rate.?limit|too many requests|\bunavailable\b|overloaded|deadline.?exceeded|try again later|\b(?:429|502|504)\b/i
+
+/**
+ * True when the error says Hybrid AI or Gemini is not answering right now (helper restarting,
+ * internet drop, Gemini busy or out of quota), not that this question is hard. Asking the next
+ * question would fail the same way.
+ * @param {unknown} err
+ */
+export function hybridFillOutage(err) {
+  if ([429, 502, 504].includes(Number(/** @type {any} */ (err)?.status))) return true
+  return OUTAGE_RE.test(String(/** @type {any} */ (err)?.message || err || ''))
+}
+
+function waitUnlessStopped(ms, signal) {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve(undefined)
+    const timer = setTimeout(done, ms)
+    function done() {
+      clearTimeout(timer)
+      signal?.removeEventListener?.('abort', done)
+      resolve(undefined)
+    }
+    signal?.addEventListener?.('abort', done, { once: true })
+  })
+}
+
+/** Google list price, USD per 1M tokens (paid tier). Flash doubles from 1 Jan 2027. */
+const GEMINI_USD_PER_M = {
+  flash: { input: 0.75, output: 3.75 },
+  pro: { input: 2, output: 12 },
+}
+const INR_PER_USD = 88
+
+/**
+ * Gemini tokens used by fill replies, summed, with the list-price cost. Each reply carries `usage` from the helper.
+ * @param {{ usage?: { input?: number, output?: number, model?: string }[] }[]} rows
+ */
+export function hybridFillUsage(rows) {
+  const total = { requests: 0, input: 0, output: 0, pro: 0, usd: 0, inr: 0 }
+  for (const row of rows || []) {
+    for (const u of row?.usage || []) {
+      const input = Number(u?.input) || 0
+      const output = Number(u?.output) || 0
+      const pro = /pro/i.test(String(u?.model || ''))
+      const price = pro ? GEMINI_USD_PER_M.pro : GEMINI_USD_PER_M.flash
+      total.requests += 1
+      total.input += input
+      total.output += output
+      if (pro) total.pro += 1
+      total.usd += (input * price.input + output * price.output) / 1e6
+    }
+  }
+  total.inr = total.usd * INR_PER_USD
+  return total
+}
+
+/**
+ * One line for the admin: Gemini replies and their cost at list price.
+ * @param {ReturnType<typeof hybridFillUsage> | null | undefined} usage
+ */
+export function hybridFillUsageNote(usage) {
+  if (!usage?.requests) return ''
+  const rupees = usage.inr < 1 ? usage.inr.toFixed(2) : usage.inr.toFixed(1)
+  const pro = usage.pro ? ` (${usage.pro} on the Pro model for Hard JEE Advanced questions)` : ''
+  return ` Gemini use: ${usage.requests} repl${usage.requests === 1 ? 'y' : 'ies'}${pro}, ${usage.input.toLocaleString('en-IN')} tokens sent and ${usage.output.toLocaleString('en-IN')} received — about ₹${rupees} at Google's list price.`
+}
 
 /**
  * Hybrid AI fill, part by part: `concurrency` questions at a time (default 1),
  * one request per question, so no request carries a whole paper and times out.
- * A failed question is tried up to 2 more times, then marked for a look.
+ * A weak reply is asked again once (HYBRID_FILL_TRIES paid replies), then marked for a look.
+ * When Hybrid AI or Gemini stops answering, the question waits and is asked again
+ * (HYBRID_FILL_OUTAGE_WAITS_MS); if it still does not answer, the run pauses at that question
+ * (`row.outage`) instead of running through the rest of the paper with nothing filled.
  * Each finished part is handed to `onApplied` before the next part starts.
  * A `tagsOnly` question asks for metatags only, so its solution is never judged or retried.
- * `answerProblem` judges the reply's answer (e.g. it misses the official one); a problem is retried like a weak solution.
+ * `answerProblem` judges the reply's answer (e.g. it misses the official one); a problem is retried like a weak solution,
+ * and the second ask carries `retryReason` (what was wrong with the first reply).
+ * `incomplete` says the question itself cannot be solved (asked with `null` before any request, then with each reply):
+ * such a question is not asked, or not asked again, and comes back as `row.incomplete` with nothing to save.
  * @param {object[]} questions
- * @param {(question: object, index: number, attempt: number) => Promise<object>} fillOne
- * @param {{ onProgress?: Function, onApplied?: Function, isFatal?: (err: Error) => boolean, concurrency?: number, signal?: AbortSignal, skip?: (question: object, index: number) => boolean, tagsOnly?: (question: object, index: number) => boolean, answerProblem?: (question: object, filled: object) => string }} [hooks]
+ * @param {(question: object, index: number, attempt: number, retryReason: string) => Promise<object>} fillOne
+ * @param {{ onProgress?: Function, onApplied?: Function, isFatal?: (err: Error) => boolean, concurrency?: number, signal?: AbortSignal, skip?: (question: object, index: number) => boolean, tagsOnly?: (question: object, index: number) => boolean, answerProblem?: (question: object, filled: object) => string, incomplete?: (question: object, filled: object | null) => string, outageWaitsMs?: number[] }} [hooks]
  */
 export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}) {
   const list = Array.isArray(questions) ? questions : []
@@ -346,7 +444,9 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
   const skip = typeof hooks.skip === 'function' ? hooks.skip : () => false
   const tagsOnlyFor = typeof hooks.tagsOnly === 'function' ? hooks.tagsOnly : () => false
   const answerProblem = typeof hooks.answerProblem === 'function' ? hooks.answerProblem : () => ''
+  const incompleteFor = typeof hooks.incomplete === 'function' ? hooks.incomplete : () => ''
   const size = Math.max(1, Math.min(HYBRID_FILL_PART_SIZE, Number(hooks.concurrency) || 1))
+  const outageWaits = Array.isArray(hooks.outageWaitsMs) ? hooks.outageWaitsMs : HYBRID_FILL_OUTAGE_WAITS_MS
 
   async function fillAt(index) {
     const question = list[index]
@@ -354,41 +454,65 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
       return { index, skipped: true, question }
     }
     const tagsOnly = Boolean(tagsOnlyFor(question, index))
+    /** @type {object[]} */
+    const usage = []
+    const missingText = tagsOnly ? '' : incompleteFor(question, null)
+    if (missingText) return { index, skipped: false, needsLook: true, incomplete: missingText, question, patch: null, tagsOnly, usage }
     let filled = null
     let problem = ''
+    let lastProblem = ''
     let error = ''
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    let outage = ''
+    let waits = 0
+    for (let attempt = 0; attempt < HYBRID_FILL_TRIES; ) {
       if (hooks.signal?.aborted) break
       if (onProgress) onProgress(index, total, attempt)
       try {
-        const next = await fillOne(question, index, attempt)
+        const next = await fillOne(question, index, attempt, hybridFillRetryReason(lastProblem))
+        if (next?.usage) usage.push({ ...next.usage, model: next.usage.model || next.model })
+        outage = ''
+        const cannotSolve = tagsOnly ? '' : incompleteFor(question, next)
+        if (cannotSolve) return { index, skipped: false, needsLook: true, incomplete: cannotSolve, question, patch: null, tagsOnly, usage }
         const nextProblem = tagsOnly
           ? ''
           : officialPyqSolutionProblem(next?.step_by_step_solution) || answerProblem(question, next)
+        lastProblem = nextProblem
         if (!filled || !nextProblem) {
           filled = next
           problem = nextProblem
         }
         error = ''
+        attempt += 1
         if (!problem) break
       } catch (err) {
         error = err instanceof Error ? err.message : String(err || '')
         if (isFatal(err)) throw err
+        if (hybridFillOutage(err)) {
+          outage = error
+          if (waits >= outageWaits.length) break
+          await waitUnlessStopped(outageWaits[waits], hooks.signal)
+          waits += 1
+          continue
+        }
+        attempt += 1
       }
     }
-    if (!filled) return { index, skipped: false, needsLook: true, question, error: error || 'Stopped.', patch: null, tagsOnly }
+    if (!filled && outage) return { index, skipped: false, needsLook: false, question, error, outage, patch: null, tagsOnly, usage }
+    if (!filled) return { index, skipped: false, needsLook: true, question, error: error || 'Stopped.', patch: null, tagsOnly, usage }
     const patch = publishedMetaPatchFromHybridFill(question, filled)
-    return { index, skipped: false, needsLook: Boolean(problem), problem, question, filled, patch, tagsOnly }
+    return { index, skipped: false, needsLook: Boolean(problem), problem, question, filled, patch, tagsOnly, usage }
   }
 
   for (let start = 0; start < list.length; start += size) {
     if (hooks.signal?.aborted) break
     const part = []
     for (let index = start; index < Math.min(start + size, list.length); index += 1) part.push(fillAt(index))
-    for (const row of await Promise.all(part)) {
+    const done = await Promise.all(part)
+    for (const row of done) {
       rows.push(row)
       if (onApplied) onApplied(row, rows.slice())
     }
+    if (done.some((row) => row.outage)) break
   }
   return rows
 }

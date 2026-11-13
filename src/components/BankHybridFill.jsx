@@ -5,9 +5,11 @@
  */
 import { useRef, useState } from 'react'
 import { bankDraftsToFill, fillBankDraftsWithHybridAi } from '../utils/bankHybridFill.js'
+import { hybridFillUsageNote } from '../utils/officialPyqReplica.js'
+import { HYBRID_FILL_INCOMPLETE_NOTE } from '../utils/officialPyqPendingFill.js'
 
 function stopsTheFill(err) {
-  return /GEMINI_API_KEY|API key|not running/i.test(String(err?.message || err || ''))
+  return /GEMINI_API_KEY|API key/i.test(String(err?.message || err || ''))
 }
 
 /**
@@ -48,8 +50,17 @@ export default function BankHybridFill({ drafts, onChanged }) {
       const tagsOnly = result.tagsOnly
         ? ` ${result.tagsOnly} question(s) had a printed answer and solution, so only their tags were filled.`
         : ''
+      const incomplete = result.incomplete?.length
+        ? ` ${result.incomplete.length} question(s) (${result.incomplete.join(', ')}): ${HYBRID_FILL_INCOMPLETE_NOTE}. They were not asked again.`
+        : ''
+      const cost = hybridFillUsageNote(result.usage)
+      if (result.paused) {
+        setError(
+          `Hybrid AI stopped answering: ${result.paused.reason} Saved ${result.filled} Draft question(s); ${result.paused.left} still to fill. When the helper is running again, press the button — filled Drafts are not asked (or paid for) again.`,
+        )
+      }
       setNote(
-        `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} Draft question(s). They are still Drafts — review, then Publish.${tagsOnly}${look}`,
+        `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} Draft question(s). They are still Drafts — review, then Publish.${tagsOnly}${look}${incomplete}${cost}`,
       )
     } catch (err) {
       onChanged?.()

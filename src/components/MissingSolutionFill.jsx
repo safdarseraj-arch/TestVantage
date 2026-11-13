@@ -6,11 +6,13 @@ import { useState } from 'react'
 import { isAdminLoggedIn } from '../utils/auth.js'
 import { fillOfficialPyqTags } from '../utils/hybridAiClient.js'
 import { mapExamSlugToHybridLabel, mapSubjectSlugToHybridLabel } from '../utils/hybridMetadata.js'
+import { questionTextWithPassage } from '../utils/officialPyqPendingFill.js'
 import { prepareAndCheckSolution, readSolutionScan } from '../utils/solutionFill.js'
 
 export default function MissingSolutionFill({
   hasSolution = false,
   questionText = '',
+  passageText = '',
   options = [],
   subject = '',
   section = '',
@@ -51,7 +53,7 @@ export default function MissingSolutionFill({
     resetReview()
     try {
       const filled = await fillOfficialPyqTags({
-        question_text: String(questionText || ''),
+        question_text: questionTextWithPassage(questionText, passageText),
         options: (Array.isArray(options) ? options : []).map((opt) => String(opt ?? '')),
         subject: subject ? mapSubjectSlugToHybridLabel(subject, chapter || section) : '',
         unit: section,
@@ -67,7 +69,12 @@ export default function MissingSolutionFill({
       })
       const text = String(filled?.step_by_step_solution || '').trim()
       if (!text) {
-        setError('Hybrid AI did not return a solution. The question was not changed.')
+        const missing = String(filled?.missing_info || '').trim()
+        setError(
+          missing
+            ? `Hybrid AI could not solve this question: ${missing}. Fix the question, or write the solution by hand. The question was not changed.`
+            : 'Hybrid AI did not return a solution. The question was not changed.',
+        )
         return
       }
       setDraft(text)

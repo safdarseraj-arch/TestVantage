@@ -7,7 +7,7 @@
  */
 import { fillOfficialPyqTags } from './hybridAiClient.js'
 import { mapExamSlugToHybridLabel, mapSubjectSlugToHybridLabel } from './hybridMetadata.js'
-import { HYBRID_FILL_PART_SIZE, fillPaperQuestionByQuestion } from './officialPyqReplica.js'
+import { HYBRID_FILL_PART_SIZE, fillPaperQuestionByQuestion, hybridFillUsage } from './officialPyqReplica.js'
 import {
   getOfficialPyqPendingPaper,
   officialPyqAnswerKeyIsReleased,
@@ -105,9 +105,17 @@ export function officialPyqCardTagsOnly(card, paper) {
   return officialPyqCardAnswerIsKept(card) && officialPyqCardSolutionIsKept(card)
 }
 
+/** What Hybrid AI reads as the question: a paragraph question carries its paragraph. @param {unknown} text @param {unknown} [passageText] */
+export function questionTextWithPassage(text, passageText) {
+  const ask = String(text ?? '')
+  const passage = String(passageText ?? '').trim()
+  return passage ? `Paragraph:\n${passage}\n\nQuestion:\n${ask}` : ask
+}
+
 /**
  * The /official-pyq/fill-tags body for one card. `tagsOnly` asks for metatags only: no answer and
  * no solution are sent or asked for. `source` is the paper's own name; Hybrid AI never guesses it.
+ * A paragraph question carries its paragraph: its own line ("The value of n is ____") cannot be solved alone.
  * @param {any} question @param {string} [paperExam] @param {{ tagsOnly?: boolean, source?: string }} [opts]
  */
 export function hybridFillRequestForQuestion(question, paperExam = '', opts = {}) {
@@ -124,8 +132,9 @@ export function hybridFillRequestForQuestion(question, paperExam = '', opts = {}
   }
   const official =
     officialPyqCardAnswerIsKept(question) && question?.bonusMarksToAll !== true && question?.zeroMarksToAll !== true
+  const ask = grid ? gridQuestionText(question) : String(question?.text ?? question?.stem ?? '')
   return {
-    question_text: grid ? gridQuestionText(question) : String(question?.text ?? question?.stem ?? ''),
+    question_text: questionTextWithPassage(ask, question?.passageText),
     options: grid ? [] : (Array.isArray(question?.options) ? question.options : []).map((opt) => String(opt ?? '')),
     subject: question?.subject ? mapSubjectSlugToHybridLabel(question.subject, question.chapter || question.section) : '',
     unit: String(question?.section || question?.unit || ''),
@@ -228,6 +237,54 @@ export function officialPyqFillAnswerProblem(card, filled) {
     return `The solution reaches ${reached}, but the official answer is ${currentAnswerText(card)}.`
   }
   return ''
+}
+
+const PICTURE_RE = /\\includegraphics|!\[[^\]]*\]\([^)]+\)|cdn\.mathpix|\/api\/official-pyq\/original\/crops\/|<svg\b/i
+const NAMES_A_FIGURE_RE =
+  /\b(?:shown in (?:the )?(?:adjacent |given |following )?(?:figure|diagram)|(?:figure|diagram) (?:below|given below|shown)|the (?:given|following|adjacent) (?:figure|diagram))\b/i
+const INCOMPLETE_TAG_RE = /\b(?:incomplete|missing|unreadable|insufficient|cannot be (?:solved|determined))\b/i
+
+/** Shown once for every question in this group. */
+export const HYBRID_FILL_INCOMPLETE_NOTE =
+  'the question text looks incomplete (passage or figure missing) — fix the card, then press Fill again'
+
+/**
+ * What a card lacks before it can be solved ('' when nothing): a paragraph question without its paragraph,
+ * or a stem that names a figure with no picture on the card.
+ * @param {any} card
+ */
+export function officialPyqCardMissingText(card) {
+  const paragraphChild = card?.passageRole === 'comprehension_child' || Boolean(card?.passageGroup || card?.passageId)
+  if (paragraphChild && !String(card?.passageText ?? '').trim()) return 'its paragraph is missing'
+  const own = [card?.passageText, card?.text ?? card?.stem, ...(Array.isArray(card?.options) ? card.options : [])]
+    .map((part) => String(part ?? ''))
+    .join('\n')
+  if (NAMES_A_FIGURE_RE.test(own) && !PICTURE_RE.test(own) && !String(card?.questionImage ?? '').trim()) {
+    return 'it names a figure but the card has no picture'
+  }
+  return ''
+}
+
+/**
+ * Why the question cannot be solved as it stands ('' when it can). With no reply yet the card is checked;
+ * with a reply, Gemini said so: it names what is missing, tags the topic as incomplete, or returns no answer and no solution.
+ * @param {any} card @param {any} filled
+ */
+export function officialPyqFillIncomplete(card, filled) {
+  const what = filled
+    ? String(filled.missing_info ?? '').trim() ||
+      (INCOMPLETE_TAG_RE.test(`${filled.topic ?? ''} ${filled.chapter ?? ''}`) ? 'the reply tagged it as incomplete' : '') ||
+      (!String(filled.step_by_step_solution ?? '').trim() && !String(filled.correct_answer ?? '').trim()
+        ? 'no answer and no solution came back'
+        : '')
+    : officialPyqCardMissingText(card)
+  return what ? `The question text looks incomplete (${what.slice(0, 120)}) — fix the card, then press Fill again.` : ''
+}
+
+/** The fill request, with what was wrong with the first reply when this is the second ask. */
+export function withRetryReason(body, retryReason) {
+  const reason = String(retryReason ?? '').trim().slice(0, 300)
+  return reason && !body?.tags_only ? { ...body, retry_reason: reason } : body
 }
 
 /** With no official answer, the answer is the one the solution reaches. @param {any} card @param {any} filled */
@@ -414,12 +471,16 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
           .filter(Boolean)
       : []
   const tagsOnly = (q) => officialPyqCardTagsOnly(q, paper)
+  /** @type {number[]} */
+  const incomplete = []
   const rows = await fillPaperQuestionByQuestion(
     questions,
-    async (question) =>
+    async (question, _index, _attempt, retryReason) =>
       withAnswerFromSolution(
         question,
-        await fillOfficialPyqTags(hybridFillRequestForQuestion(question, paper.exam, { tagsOnly: tagsOnly(question), source })),
+        await fillOfficialPyqTags(
+          withRetryReason(hybridFillRequestForQuestion(question, paper.exam, { tagsOnly: tagsOnly(question), source }), retryReason),
+        ),
       ),
     {
       concurrency: HYBRID_FILL_PART_SIZE,
@@ -427,6 +488,7 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
       isFatal: opts.isFatal,
       tagsOnly,
       answerProblem: officialPyqFillAnswerProblem,
+      incomplete: officialPyqFillIncomplete,
       skip: (q) => isOfficialPyqPlaceholder(q) || (!opts.redoAll && officialPyqCardIsFilled(q, paper)),
       onProgress: (index) => {
         const from = index - (index % HYBRID_FILL_PART_SIZE) + 1
@@ -434,6 +496,10 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
       },
       onApplied: (row) => {
         if (row.skipped) return
+        if (row.incomplete) {
+          incomplete.push(row.index + 1)
+          return
+        }
         if (row.needsLook) needsLook.push(row.index + 1)
         if (!row.patch) return
         const latest = getOfficialPyqPendingPaper(paperId)
@@ -458,14 +524,19 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
       },
     },
   )
+  const paused = rows.find((row) => row.outage)
   return {
     total,
-    asked: rows.filter((row) => !row.skipped).length,
+    asked: rows.filter((row) => !row.skipped && !row.outage).length,
     filled,
-    needsLook,
+    needsLook: needsLook.filter((n) => !rows.some((row) => row.index + 1 === n && row.error && !row.patch)),
+    failed: rows.filter((row) => !row.skipped && !row.outage && !row.patch && row.error).map((row) => row.index + 1),
+    incomplete,
     notSaved,
     tagsOnly: rows.filter((row) => row.tagsOnly).length,
     noPrintedAnswer,
+    paused: paused ? { at: paused.index + 1, reason: paused.outage } : null,
+    usage: hybridFillUsage(rows),
     stopped: Boolean(opts.signal?.aborted),
   }
 }

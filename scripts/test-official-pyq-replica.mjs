@@ -28,6 +28,11 @@ const {
   officialPyqReplicaChildId,
   collectPaperHybridFills,
   fillPaperQuestionByQuestion,
+  hybridFillOutage,
+  hybridFillRetryReason,
+  hybridFillUsage,
+  hybridFillUsageNote,
+  HYBRID_FILL_TRIES,
   publishedMetaPatchFromHybridFill,
   replicaQuestionIsDuplicate,
   replicaPaperName,
@@ -348,7 +353,7 @@ const walked = await fillPaperQuestionByQuestion(
   async (question) => {
     calls.push(question.text)
     const seen = calls.filter((item) => item === question.text).length
-    if (question.text.startsWith('First') && seen < 3) throw new Error('try again')
+    if (question.text.startsWith('First') && seen < 2) throw new Error('bad reply')
     if (question.text.startsWith('Second')) throw new Error('still missing')
     return {
       subject: 'Mathematics',
@@ -359,12 +364,53 @@ const walked = await fillPaperQuestionByQuestion(
     }
   },
 )
-assert.equal(calls.filter((item) => item.startsWith('First')).length, 3)
-assert.equal(calls.filter((item) => item.startsWith('Second')).length, 3)
+assert.equal(HYBRID_FILL_TRIES, 2)
+assert.equal(calls.filter((item) => item.startsWith('First')).length, 2)
+assert.equal(calls.filter((item) => item.startsWith('Second')).length, 2, 'a failing question is asked twice, not three times')
 assert.equal(walked[0].needsLook, false)
 assert.equal(walked[1].needsLook, true)
 assert.equal(walked[1].patch, null)
 assert.equal(walked[2].skipped, true)
+
+// Hybrid AI not answering (helper restarting, Gemini busy): wait and ask again, then pause the run
+// instead of running through the rest of the paper with nothing filled.
+const HELPER_DOWN = 'TestVantages Hybrid AI (FastAPI on port 8000) is not running. Press F5 and keep the bottom terminal open.'
+assert.equal(hybridFillOutage(new Error(HELPER_DOWN)), true)
+assert.equal(hybridFillOutage(new Error('429 RESOURCE_EXHAUSTED. Quota exceeded')), true)
+assert.equal(hybridFillOutage(new Error('503 UNAVAILABLE. The model is overloaded.')), true)
+assert.equal(hybridFillOutage(new Error('Hybrid AI did not answer in time. Press F5 and keep the bottom terminal open.')), true)
+assert.equal(hybridFillOutage(new Error('Gemini returned a cut-off question, so nothing was saved.')), false)
+let blipCalls = 0
+const blipRows = await fillPaperQuestionByQuestion(
+  [{ text: 'Blip one.' }, { text: 'Blip two.' }],
+  async () => {
+    blipCalls += 1
+    if (blipCalls === 1) throw new Error(HELPER_DOWN)
+    return { correct_answer: 'A', step_by_step_solution: 'Step 1. Expand. The value is 2.', usage: { input: 1200, output: 500, model: 'gemini-3.7-flash' } }
+  },
+  { outageWaitsMs: [1, 1] },
+)
+assert.equal(blipCalls, 3, 'a short outage waits and asks the same question again')
+assert.ok(blipRows.every((row) => row.patch && !row.outage))
+const blipUsage = hybridFillUsage(blipRows)
+assert.equal(blipUsage.requests, 2)
+assert.equal(blipUsage.input, 2400)
+assert.ok(Math.abs(blipUsage.usd - (2400 * 0.75 + 1000 * 3.75) / 1e6) < 1e-9)
+assert.match(hybridFillUsageNote(blipUsage), /2 replies, 2,400 tokens sent and 1,000 received — about ₹0\.49/)
+let downCalls = 0
+const appliedDown = []
+const downRows = await fillPaperQuestionByQuestion(
+  [1, 2, 3, 4, 5, 6].map((n) => ({ text: `Down stem ${n}.` })),
+  async (question) => {
+    downCalls += 1
+    if (question.text !== 'Down stem 1.' && question.text !== 'Down stem 2.') throw new Error(HELPER_DOWN)
+    return { correct_answer: 'A', step_by_step_solution: 'Step 1. Expand. The value is 2.' }
+  },
+  { concurrency: 2, outageWaitsMs: [1, 1], onApplied: (row) => appliedDown.push(row.index) },
+)
+assert.deepEqual(appliedDown, [0, 1, 2, 3], 'the run pauses after the part where Hybrid AI stopped answering')
+assert.equal(downCalls, 2 + 2 * 3, 'questions 3 and 4 are each asked 3 times (two waits), questions 5 and 6 are not asked')
+assert.ok(downRows[2].outage && !downRows[2].needsLook && !downRows[2].patch)
 let fatalCalls = 0
 await assert.rejects(
   fillPaperQuestionByQuestion(
@@ -401,7 +447,9 @@ const {
   fillOfficialPyqApprovedPaperPartByPart,
   hybridFillRequestForQuestion,
   officialPyqCardIsFilled,
+  officialPyqCardMissingText,
   officialPyqFillAnswerProblem,
+  officialPyqFillIncomplete,
   withAnswerFromSolution,
   HYBRID_FILL_NEEDS_APPROVAL,
 } = await import(
@@ -414,6 +462,12 @@ assert.ok(officialPyqSolutionProblem('Hint: think about the determinant of a sca
 assert.ok(officialPyqSolutionProblem("Let us start by recalling what a determinant is. " + 'x'.repeat(40)))
 assert.ok(officialPyqSolutionProblem('x '.repeat(1000)))
 assert.ok(officialPyqSolutionProblem(''))
+// Seen on JEE Advanced 2026 P2 Q14: the working reached 56, then "Wait … Re-evaluating …" and "Answer: 53".
+const MIND_CHANGE = 'So $|A| = 48$ and $|B| = 4$.\nTherefore the value is $56$.\nWait, re-evaluating the count of integers: 53 or 56.\nAnswer: 53'
+assert.match(officialPyqSolutionProblem(MIND_CHANGE), /changes its mind/)
+assert.match(officialPyqSolutionProblem('Sum is 6.\nRe-verify the official answer which is 5 or 6.\nAnswer: 5'), /changes its mind/)
+assert.equal(officialPyqSolutionProblem('The weight is $mg = 20$ N; the tension balances it.\nAnswer: 20'), '')
+assert.equal(officialPyqSolutionProblem('Each await of the queue adds $2$ s; total time $= 3 \\times 2 = 6$ s.\nAnswer: 6'), '')
 
 let inFlight = 0
 let maxInFlight = 0
@@ -596,7 +650,7 @@ assert.equal(savedFill.questions[2].solution, PRINTED_D_SOLUTION)
 assert.equal(savedFill.questions[3].correctIndex, 1)
 assert.equal(getOfficialPyqPendingPaper(pendingFillPaper.id).questions[0].chapter, undefined)
 
-// The solution must reach the official answer: one that keeps reaching another answer is tried 3 times,
+// The solution must reach the official answer: one that keeps reaching another answer is tried twice,
 // then only its tags are saved. Cards that share an id are each saved on their own slot, and the run goes on.
 const officialRunPaper = addOfficialPyqPendingPaper({
   exam: 'jee-advanced',
@@ -613,8 +667,10 @@ const officialRunPaper = addOfficialPyqPendingPaper({
   ],
 })
 let officialCalls = 0
-globalThis.fetch = async () => {
+const officialBodies = []
+globalThis.fetch = async (_url, init) => {
   officialCalls += 1
+  officialBodies.push(JSON.parse(init.body))
   return new Response(
     JSON.stringify({ ok: true, chapter: 'Matrices & Determinants', unit: 'Algebra', topic: 'Determinants', toughness_level: '5', correct_answer: 'B', step_by_step_solution: GOOD_SOLUTION }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -623,7 +679,7 @@ globalThis.fetch = async () => {
 try {
   loginAs('admin')
   const run = await fillOfficialPyqApprovedPaperPartByPart(officialRunPaper.id)
-  assert.equal(officialCalls, 5, 'the off-answer card is asked 3 times, the twins once each')
+  assert.equal(officialCalls, 4, 'the off-answer card is asked twice, the twins once each')
   assert.deepEqual(run.needsLook, [1])
   assert.deepEqual(run.notSaved, [])
   assert.equal(run.filled, 3)
@@ -631,6 +687,14 @@ try {
   globalThis.fetch = realFetch
   sessionStorage.removeItem('testvantage-session')
 }
+// The second ask tells Gemini what was wrong with the first reply; first asks carry no reason.
+const offAnswerAsks = officialBodies.filter((b) => b.question_text === 'Official C stem.')
+assert.equal(offAnswerAsks.length, 2)
+assert.equal(offAnswerAsks[0].retry_reason, undefined)
+assert.match(offAnswerAsks[1].retry_reason, /^Your previous reply was not saved: The solution reaches B, but the official answer is C\./)
+assert.match(offAnswerAsks[1].retry_reason, /the last line must be "Answer: C"\.$/)
+assert.ok(offAnswerAsks[1].retry_reason.length <= 300)
+assert.ok(officialBodies.filter((b) => b.question_text !== 'Official C stem.').every((b) => b.retry_reason === undefined))
 const officialSaved = getOfficialPyqPendingPaper(officialRunPaper.id).questions
 assert.equal(officialSaved[0].correctIndex, 2, 'the official answer stays')
 assert.equal(officialSaved[0].solution, undefined, 'a solution reaching another answer is not saved')
@@ -684,6 +748,165 @@ assert.equal(releasedPatched.answerSource, 'hybrid_ai')
 const draftCard = { ...officialB, text: 'S', solution: '**Answer.** (B) Quick eliminations', solutionSource: 'draft' }
 assert.equal(hybridFillRequestForQuestion(draftCard, 'jee-advanced', { source: 'X' }).solution, '', 'a draft is not sent as a solution')
 assert.equal(hybridFillRequestForQuestion(draftCard, 'jee-advanced', { source: 'X' }).source, 'X')
+
+// A paragraph question (JEE Advanced Section 4) carries its paragraph: its own line cannot be solved alone,
+// so without it every numerical paragraph card came back with no solution and kept tags only.
+const PASSAGE = 'Curves $y=e^{-x}$ and $y=e^{-x}(\\sin x+\\cos x)$ on $[0,10\\pi]$ meet at $n$ points.'
+const paragraphPaper = addOfficialPyqPendingPaper({
+  exam: 'jee-advanced',
+  year: 2026,
+  session: 'Paper 2',
+  paperLabel: 'JEE Advanced 2026 Paper 2',
+  paperId: 'jee-advanced-2026-paragraph-fill',
+  sourceLabel: 'test',
+  status: 'approved',
+  questions: [
+    {
+      text: 'The value of $n$ is ____.',
+      options: ['', '', '', ''],
+      questionType: 'numerical',
+      subject: 'mathematics',
+      answerSource: 'unknown',
+      chapter: 'General',
+      passageText: PASSAGE,
+      passageRole: 'comprehension_child',
+    },
+    { text: 'Numerical stem with its own data: find 2.5 times 2.', options: ['', '', '', ''], questionType: 'numerical', subject: 'mathematics', answerSource: 'unknown' },
+  ],
+})
+const paragraphBodies = []
+globalThis.fetch = async (_url, init) => {
+  const body = JSON.parse(init.body)
+  paragraphBodies.push(body)
+  const paragraph = body.question_text.includes(PASSAGE)
+  const own = body.question_text.startsWith('Numerical stem')
+  const solution = paragraph
+    ? '$e^{-x}\\sin x+e^{-x}\\cos x=e^{-x}$ gives $\\sin(x+\\pi/4)=1/\\sqrt2$.\nTwo roots per $2\\pi$ on $[0,10\\pi]$.\nAnswer: 10'
+    : own
+      ? 'Multiply the two given numbers.\n$2.5 \\times 2 = 5.5 - 0.5$.\nAnswer: 5'
+      : ''
+  return new Response(
+    JSON.stringify({ ok: true, chapter: 'Sequences & Series', unit: 'Algebra', topic: 'Counting roots', toughness_level: '6', correct_answer: solution ? (paragraph ? '10' : '5') : '', step_by_step_solution: solution }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+try {
+  loginAs('admin')
+  const run = await fillOfficialPyqApprovedPaperPartByPart(paragraphPaper.id)
+  assert.deepEqual(run.needsLook, [], 'the paragraph question is answered, not left for a look')
+  assert.equal(run.filled, 2)
+} finally {
+  globalThis.fetch = realFetch
+  sessionStorage.removeItem('testvantage-session')
+}
+assert.equal(paragraphBodies.length, 2, 'one reply each, no retry')
+assert.equal(paragraphBodies[0].question_text, `Paragraph:\n${PASSAGE}\n\nQuestion:\nThe value of $n$ is ____.`)
+assert.equal(paragraphBodies[1].question_text, 'Numerical stem with its own data: find 2.5 times 2.')
+const paragraphSaved = getOfficialPyqPendingPaper(paragraphPaper.id).questions
+assert.equal(paragraphSaved[0].correctInteger, 10, 'the numerical answer is saved')
+assert.match(paragraphSaved[0].solution, /Answer: 10$/)
+assert.equal(paragraphSaved[0].answerSource, 'hybrid_ai')
+assert.equal(paragraphSaved[0].text, 'The value of $n$ is ____.', 'the stem is not changed')
+assert.equal(paragraphSaved[0].passageText, PASSAGE)
+assert.equal(paragraphSaved[1].correctInteger, 5)
+assert.equal(officialPyqCardIsFilled(paragraphSaved[0]), true)
+const tagsOnlyParagraph = hybridFillRequestForQuestion(paragraphSaved[0], 'jee-advanced', { tagsOnly: true })
+assert.ok(tagsOnlyParagraph.question_text.startsWith(`Paragraph:\n${PASSAGE}`), 'tags-only asks see the paragraph too')
+
+// A question that cannot be solved as it stands is not asked again (no second paid reply): Gemini names what is
+// missing, tags it incomplete, or sends no answer and no solution. A card already missing its paragraph or
+// named figure is not asked at all. These are listed on their own, not with "needs a look", and nothing is saved.
+assert.equal(officialPyqCardMissingText({ text: 'The value of $n$ is ____.', passageRole: 'comprehension_child' }), 'its paragraph is missing')
+assert.equal(officialPyqCardMissingText({ text: 'The current in the circuit shown in the figure is', options: ['1', '2', '3', '4'] }), 'it names a figure but the card has no picture')
+assert.equal(officialPyqCardMissingText({ text: 'The circuit shown in the figure \\includegraphics{https://cdn.mathpix.com/cropped/a.jpg}' }), '')
+assert.equal(officialPyqCardMissingText({ text: 'Find the value of $x$.', passageText: PASSAGE, passageRole: 'comprehension_child' }), '')
+assert.equal(officialPyqFillIncomplete({}, { topic: 'Integration', step_by_step_solution: GOOD_SOLUTION, correct_answer: 'B' }), '')
+assert.match(officialPyqFillIncomplete({}, { topic: 'Incomplete Question', step_by_step_solution: '', correct_answer: '' }), /looks incomplete/)
+assert.match(officialPyqFillIncomplete({}, { missing_info: 'the graph of f is not given' }), /\(the graph of f is not given\) — fix the card, then press Fill again\.$/)
+assert.match(officialPyqFillIncomplete({}, { topic: 'Calculus', step_by_step_solution: '', correct_answer: '' }), /no answer and no solution/)
+assert.equal(hybridFillRetryReason(''), '')
+assert.match(hybridFillRetryReason('The solution reads like a hint, not worked steps.'), /hint, not worked steps\. Give 3 to 8 short worked steps; the last line must be "Answer: "/)
+assert.ok(hybridFillRetryReason('x'.repeat(500)).length <= 300)
+
+const incompletePaper = addOfficialPyqPendingPaper({
+  exam: 'jee-advanced',
+  year: 2026,
+  session: 'Paper 1',
+  paperLabel: 'JEE Advanced 2026 Paper 1',
+  paperId: 'jee-advanced-2026-incomplete-fill',
+  sourceLabel: 'test',
+  status: 'approved',
+  questions: [
+    { text: 'Gemini says the table is missing: find $k$.', options: ['', '', '', ''], questionType: 'numerical', subject: 'mathematics', answerSource: 'unknown', chapter: 'General' },
+    { text: 'Gemini tags this one incomplete: find $m$.', options: ['', '', '', ''], questionType: 'numerical', subject: 'mathematics', answerSource: 'unknown', chapter: 'General' },
+    { text: 'The value of $n$ is ____.', options: ['', '', '', ''], questionType: 'numerical', subject: 'mathematics', answerSource: 'unknown', passageRole: 'comprehension_child', passageGroup: 'pyq-para-x' },
+    { text: 'A plain stem whose first reply is a hint: find $p$.', options: ['', '', '', ''], questionType: 'numerical', subject: 'mathematics', answerSource: 'unknown' },
+  ],
+})
+const incompleteBodies = []
+globalThis.fetch = async (_url, init) => {
+  const body = JSON.parse(init.body)
+  incompleteBodies.push(body)
+  const reply = body.question_text.startsWith('Gemini says')
+    ? { chapter: 'Matrices & Determinants', topic: 'Determinants', correct_answer: '', step_by_step_solution: '', missing_info: 'the table of values is missing' }
+    : body.question_text.startsWith('Gemini tags')
+      ? { chapter: 'Sequences & Series', topic: 'Incomplete Question', correct_answer: '', step_by_step_solution: '' }
+      : body.retry_reason
+        ? { chapter: 'Sequences & Series', unit: 'Algebra', topic: 'AP', toughness_level: '5', correct_answer: '7', step_by_step_solution: 'Sum of the first terms gives $p$.\n$p = 3 + 4 = 7$.\nAnswer: 7' }
+        : { chapter: 'Sequences & Series', unit: 'Algebra', topic: 'AP', toughness_level: '5', correct_answer: '7', step_by_step_solution: 'Hint: think about the common difference first.' }
+  return new Response(JSON.stringify({ ok: true, ...reply }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+}
+let incompleteRun
+try {
+  loginAs('admin')
+  incompleteRun = await fillOfficialPyqApprovedPaperPartByPart(incompletePaper.id)
+} finally {
+  globalThis.fetch = realFetch
+  sessionStorage.removeItem('testvantage-session')
+}
+const asksFor = (start) => incompleteBodies.filter((b) => b.question_text.startsWith(start))
+assert.equal(asksFor('Gemini says').length, 1, 'a reply naming what is missing is not asked again')
+assert.equal(asksFor('Gemini tags').length, 1, 'a reply tagged incomplete is not asked again')
+assert.equal(asksFor('The value of').length, 0, 'a paragraph card with no paragraph is not asked at all')
+assert.equal(asksFor('A plain stem').length, 2, 'a hint is still asked a second time')
+assert.match(asksFor('A plain stem')[1].retry_reason, /reads like a hint/)
+assert.deepEqual(incompleteRun.incomplete, [1, 2, 3])
+assert.deepEqual(incompleteRun.needsLook, [])
+assert.deepEqual(incompleteRun.failed, [])
+assert.equal(incompleteRun.filled, 1)
+const incompleteSaved = getOfficialPyqPendingPaper(incompletePaper.id).questions
+assert.equal(incompleteSaved[0].chapter, 'General', 'nothing from an incomplete reply is saved')
+assert.equal(incompleteSaved[1].topic, undefined, '"Incomplete Question" is never saved as a topic')
+assert.equal(incompleteSaved[3].correctInteger, 7)
+assert.match(incompleteSaved[3].solution, /Answer: 7$/)
+
+const fillUi = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/components/OfficialPyqHybridFill.jsx'), 'utf8')
+assert.ok(fillUi.includes('result.incomplete') && fillUi.includes('HYBRID_FILL_INCOMPLETE_NOTE'))
+const bankUi = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/components/BankHybridFill.jsx'), 'utf8')
+assert.ok(bankUi.includes('result.incomplete') && bankUi.includes('HYBRID_FILL_INCOMPLETE_NOTE'))
+// The per-card buttons ("Ask Hybrid AI for Solution", "Ask Hybrid AI to fill") send the paragraph too.
+const missingUi = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/components/MissingSolutionFill.jsx'), 'utf8')
+assert.match(missingUi, /question_text: questionTextWithPassage\(questionText, passageText\)/)
+const metaUi = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/components/OfficialPyqPublishedMetaForm.jsx'), 'utf8')
+assert.match(metaUi, /question_text: questionTextWithPassage\(question\?\.text \?\? question\?\.stem, question\?\.passageText\)/)
+assert.match(metaUi, /passageText=\{String\(question\?\.passageText \?\? ''\)\}/)
+const savedUi = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/components/SavedQuestionContentEditor.jsx'), 'utf8')
+assert.match(savedUi, /passageText=\{isPassageParent \? passageText : linkedPassageText \|\| ''\}/)
+const mainPy = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../main.py'), 'utf8')
+assert.match(mainPy, /retry_reason: str \| None = Field/)
+assert.match(mainPy, /"retry_reason": "" if body\.tags_only else \(body\.retry_reason or ""\)\.strip\(\)\[:300\]/)
+assert.match(source.slice(source.indexOf('def _published_fill_prompt')), /_published_retry_line\(params\)/)
+assert.match(source.slice(source.indexOf('class PublishedPyqFillOutput'), source.indexOf('class PublishedPyqTagsOutput')), /missing_info: str = ""/)
+
+// Code execution can spend the whole 1500-token cap before any JSON ("Gemini returned empty text"):
+// the server asks once more without code execution instead of failing the question twice.
+const fillPy = source.slice(source.indexOf('def fill_published_pyq_sync'), source.indexOf('def _token_usage'))
+assert.match(fillPy, /_published_fill_cut_off\(response, parsed\)/)
+assert.match(fillPy, /use_code_tools=False,\s*max_output_tokens=_MAX_OUTPUT_TOKENS/)
+assert.match(source.slice(source.indexOf('def _published_fill_cut_off')), /MAX_TOKENS/)
+// A reply with no text says why in plain words, never the bare "Gemini returned empty text."
+assert.equal(source.includes('ValueError("Gemini returned empty text.")\n    return joined'), false)
+assert.match(source.slice(source.indexOf('def _no_text_message')), /Gemini ran out of room while calculating/)
 
 const pendingPage = fs.readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/pages/OfficialPyqPending.jsx'),

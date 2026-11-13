@@ -157,7 +157,7 @@ await test('a page that prints no key stops the missing-key alert after one Comp
   assert.deepEqual(getOfficialPyqPendingPaper(paper.id).localQuality.failedGoTo, [])
 })
 
-await test('a try made before Compare read answer keys does not block the key fill; the retry happens once (2013 P2)', async () => {
+await test('a try made before Compare read answer keys does not block the key fill; a try that saw no key gets one more key read (2013 P2, 2012 P2 Q9)', async () => {
   const ocr = scanWithKeys(8)
   const questions = paperItemsFromMathpixOcr(ocr, { examLabel: 'JEE Advanced' }).map((q) => ({ ...q }))
   const paper = addOfficialPyqPendingPaper({ exam: 'jee-advanced', year: 2095, session: 'Paper 1', sourceLabel: 'test', preparedText: ocr, questions })
@@ -171,13 +171,12 @@ await test('a try made before Compare read answer keys does not block the key fi
     })
   const first = await autoFixFlaggedOfficialPyqCards(paper.id, { compare: unread })
   assert.deepEqual(first.needsAdmin.map((n) => n.goTo), [8])
-  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [], 'a try that did not read the key is not repeated')
-  asOldRecord()
-  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [8], 'a try from before keys were read is retried')
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [8], 'a try that saw no key gets one more key read')
   const second = await autoFixFlaggedOfficialPyqCards(paper.id, { compare: unread })
   assert.deepEqual(second.needsAdmin.map((n) => n.goTo), [8])
-  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [], 'only one extra try')
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [], 'two key reads, then it waits for a person')
   asOldRecord()
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [8], 'a try from before keys were read is retried')
   const third = await autoFixFlaggedOfficialPyqCards(paper.id, {
     compare: async () => ({ verdict: 'matches', textMatches: true, printed_answer: 'A', differences: [], pages: [1] }),
   })

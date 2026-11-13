@@ -25,6 +25,7 @@ import { gridColLabels, gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.j
 import {
   formatLetterChoice,
   formatNumericChoice,
+  isZeroMarksToAllKey,
   letterAlternativesOf,
   numericChoiceFields,
   numericalAlternativesOf,
@@ -37,6 +38,7 @@ import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
 export const OFFICIAL_PYQ_CARD_CHANGED_EVENT = 'testvantage:official-pyq-card-changed'
 
 const BONUS_KEY_TEXT = 'Bonus (marks to all)'
+const ZERO_KEY_TEXT = 'Zero marks to all'
 
 const LETTERS = 'ABCDEFGH'
 
@@ -57,6 +59,7 @@ const SNAPSHOT_FIELDS = [
   'numericalAlternatives',
   'correctIndicesAlternatives',
   'bonusMarksToAll',
+  'zeroMarksToAll',
   'matrixRows',
   'matrixCols',
   'matrixAnswerKey',
@@ -357,7 +360,8 @@ export function officialPyqDraftFromSuggestion(card, compare) {
     if (crops.length) return placeCropFigures(before, withoutFigurePlaceholders(suggested) ? suggested : '', crops)
     return withoutFigurePlaceholders(suggested) ? keepCardFigures(before, suggested) : before
   }
-  const printed = officialPyqPrintedAnswerPatch(card, compare)
+  /** The key is checked against the options this fix puts on the card: "C" for four new option pictures (2012 P2 Q9). */
+  const printed = officialPyqPrintedAnswerPatch({ ...card, options }, compare)
   /** A kept card picture must not come back on an option when it is the question's own figure (2013 P1 Q15). */
   return dropOptionFigureRepeatingStem({
     ...base,
@@ -377,6 +381,7 @@ const PRINTED_ANSWER_FIELDS = [
   'numericalAlternatives',
   'correctIndicesAlternatives',
   'bonusMarksToAll',
+  'zeroMarksToAll',
 ]
 
 /**
@@ -423,14 +428,14 @@ export function officialPyqPrintedAnswerPatch(card, compare) {
     ...letterAlternativesOf(fields).flat(),
   ].filter((i) => i != null)
   if (letters.length && letters.some((i) => Number(i) >= Math.max(optionCount, 1))) return null
-  if (!letters.length && fields.bonusMarksToAll !== true && optionCount >= 2) return null
+  if (!letters.length && fields.bonusMarksToAll !== true && fields.zeroMarksToAll !== true && optionCount >= 2) return null
   return formatOfficialPyqAnswerKey(fields) === formatOfficialPyqAnswerKey(card) ? null : fields
 }
 
 /** @param {any} q */
 export function officialPyqCardHasAnswerKey(q) {
   if (!q || typeof q !== 'object') return false
-  if (q.bonusMarksToAll === true) return true
+  if (q.bonusMarksToAll === true || q.zeroMarksToAll === true) return true
   if (isMatrixGridCard(q)) return Object.keys(gridKeyCopy(q.matrixAnswerKey)).length > 0
   if (Array.isArray(q.correctIndices) && q.correctIndices.length) return true
   return [q.correctIndex, q.correctInteger, q.correctNumerical].some(
@@ -442,6 +447,7 @@ export function officialPyqCardHasAnswerKey(q) {
 export function formatOfficialPyqAnswerKey(q) {
   if (!q || typeof q !== 'object') return ''
   if (q.bonusMarksToAll === true) return BONUS_KEY_TEXT
+  if (q.zeroMarksToAll === true) return ZERO_KEY_TEXT
   if (isMatrixGridCard(q)) return gridKeyText(q, q.matrixAnswerKey)
   const alternatives = numericalAlternativesOf(q)
   if (alternatives.length && (q.correctNumerical != null || q.correctInteger != null)) {
@@ -484,8 +490,10 @@ export function parseOfficialPyqAnswerKey(raw, card) {
     numericalAlternatives: undefined,
     correctIndicesAlternatives: undefined,
     bonusMarksToAll: undefined,
+    zeroMarksToAll: undefined,
   }
   if (!text) return { ok: true, patch: cleared }
+  if (isZeroMarksToAllKey(text)) return { ok: true, patch: { ...cleared, zeroMarksToAll: true } }
   const letterSets = parseLetterAnswerChoices(text)
   if (letterSets) {
     const multi = Array.isArray(card?.correctIndices) || /multiple/i.test(String(card?.questionType ?? ''))

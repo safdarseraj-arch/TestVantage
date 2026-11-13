@@ -68,7 +68,9 @@ function ProblemMarkedText({ text, options }) {
 function stemTextForPreview(text, options = []) {
   let t = sanitizeStemForDisplay(text, options)
   if (!parseMatchingListForDisplay(t, options)) {
-    const optStart = findOptionsBlockStart(t)
+    /** Only a card that draws its own options may lose an option list in its text; a passage has none (2012 P2 Q13). */
+    const hasOptions = (Array.isArray(options) ? options : []).filter((o) => String(o ?? '').trim()).length >= 2
+    const optStart = hasOptions ? findOptionsBlockStart(t) : -1
     if (optStart > 40) t = t.slice(0, optStart).trim()
     t = stripTrailingOptionMarkerFromStem(stripLeakedOptionsFromStem(t, options), options)
   }

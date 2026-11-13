@@ -49,6 +49,7 @@ export function gridAnswerText(question, key = question?.matrixAnswerKey) {
 /** Stored answer as Hybrid AI reads it: letter(s), the number, or a grid "A-R; B-P,S". */
 export function currentAnswerText(question) {
   if (question?.bonusMarksToAll === true) return 'Bonus (marks to all)'
+  if (question?.zeroMarksToAll === true) return 'Zero marks to all'
   if (isMatrixGridCard(question)) return gridAnswerText(question)
   const alternatives = numericalAlternativesOf(question)
   if (alternatives.length && (question?.correctNumerical != null || question?.correctInteger != null)) {
@@ -121,7 +122,8 @@ export function hybridFillRequestForQuestion(question, paperExam = '', opts = {}
     } = hybridFillRequestForQuestion(question, paperExam, { source: opts.source })
     return { ...tags, tags_only: true }
   }
-  const official = officialPyqCardAnswerIsKept(question) && question?.bonusMarksToAll !== true
+  const official =
+    officialPyqCardAnswerIsKept(question) && question?.bonusMarksToAll !== true && question?.zeroMarksToAll !== true
   return {
     question_text: grid ? gridQuestionText(question) : String(question?.text ?? question?.stem ?? ''),
     options: grid ? [] : (Array.isArray(question?.options) ? question.options : []).map((opt) => String(opt ?? '')),
@@ -196,7 +198,7 @@ function numberIn(raw) {
 /** The answer a solution reached is the card's answer (any printed alternative counts). @param {any} card @param {string} reached */
 export function answerMatchesCard(card, reached) {
   if (!reached) return false
-  if (card?.bonusMarksToAll === true) return true
+  if (card?.bonusMarksToAll === true || card?.zeroMarksToAll === true) return true
   const stored = currentAnswerText(card)
   if (stored === reached) return true
   if (isMatrixGridCard(card)) return gridAnswerText(card).split('; ').sort().join('; ') === reached
@@ -316,7 +318,7 @@ export function applyHybridPatchToCard(card, patch) {
     }
   }
   const answer = isMatrixGridCard(card) ? '' : currentAnswerText(patch)
-  const printedBonus = card.bonusMarksToAll === true
+  const printedBonus = card.bonusMarksToAll === true || card.zeroMarksToAll === true
   if (!answerHandSet && !printedBonus && !KEPT_SOURCES.has(card.answerSource) && answer && answer !== currentAnswerText(card)) {
     next.correctIndex = patch.correctIndex
     next.correctIndices = patch.correctIndices

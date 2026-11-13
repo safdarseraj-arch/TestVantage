@@ -128,6 +128,7 @@ export function officialPyqAutoFixTodo(paper) {
     const card = questions[goTo - 1]
     if (!card || isOfficialPyqPlaceholder(card)) return false
     if (keyOnly.has(goTo) && storedKeyPatch(card)) return true
+    if (storedNewerCorrection(card)) return true
     if (alreadyTried(card, keyOnly.has(goTo))) return false
     return !officialPyqCardHumanEdited(card) || keyOnly.has(goTo)
   })
@@ -137,6 +138,19 @@ export function officialPyqAutoFixTodo(paper) {
 function storedKeyPatch(card) {
   const compared = officialPyqCurrentCompare(card)
   return compared ? officialPyqPrintedAnswerPatch(card, compared) : null
+}
+
+/**
+ * A Compare report on this version of the card, newer than its last Auto-fix try, with a correction
+ * still to apply: "Compare with original paper" answered after Auto-fix runs timed out (2012 P2 Q26).
+ * It is applied without asking Gemini again. @param {any} card
+ */
+function storedNewerCorrection(card) {
+  if (officialPyqCardHumanEdited(card)) return null
+  const compared = officialPyqCurrentCompare(card)
+  if (!compared || String(compared.verdict) !== 'differs') return null
+  if (!(Number(compared.checkedAt) > (Number(card?.autoFix?.at) || 0))) return null
+  return officialPyqCompareHasSuggestion(compared) ? compared : null
 }
 
 /** A person's wording is never rewritten, but the answer printed on the page may still be filled in. */
@@ -223,7 +237,13 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
     const card = paper.questions[goTo - 1]
     if (!card || isOfficialPyqPlaceholder(card)) continue
     if (officialPyqCardHumanEdited(card) && !keyOnly.has(goTo)) out.skippedAdminEdited.push(goTo)
-    else if (alreadyTried(card, keyOnly.has(goTo)) && !(keyOnly.has(goTo) && storedKeyPatch(card))) out.skippedTried.push(goTo)
+    else if (
+      alreadyTried(card, keyOnly.has(goTo)) &&
+      !(keyOnly.has(goTo) && storedKeyPatch(card)) &&
+      !storedNewerCorrection(card)
+    ) {
+      out.skippedTried.push(goTo)
+    }
     else todo.push(goTo)
   }
   const run = todo.slice(0, Math.max(0, max))
@@ -237,11 +257,12 @@ export async function autoFixFlaggedOfficialPyqCards(paperId, opts = {}) {
     if (!card) continue
     const signature = officialPyqAutoFixSignature(card)
     const keyOnStore = keyOnly.has(goTo) && storedKeyPatch(card)
+    const stored = keyOnStore ? null : storedNewerCorrection(card)
     let result
     let compared
-    if (keyOnStore) {
-      compared = officialPyqCurrentCompare(card)
-      result = { verdict: String(compared?.verdict ?? 'differs') }
+    if (keyOnStore || stored) {
+      compared = stored || officialPyqCurrentCompare(card)
+      result = { verdict: String(compared?.verdict ?? 'differs'), differences: compared?.differences, pages: compared?.pages }
     } else {
       try {
         result = await compare(paperId, index, card, { signal })

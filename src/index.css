@@ -9008,3 +9008,34 @@ body:has(.official-pyq-page) .official-pyq-page {
   background: #fef9c3;
   color: #854d0e;
 }
+
+/* /upload — document type picked first, one choice per row */
+.upload-portal-types h2 {
+  margin: 0 0 0.6rem;
+  font-size: 1.1rem;
+}
+
+.upload-portal-type-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.6rem;
+}
+
+.upload-portal-type {
+  display: block;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border, #d6dbe6);
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--surface, #fff);
+}
+
+.upload-portal-type.is-active {
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary, #2563eb) 25%, transparent);
+}
+
+.upload-portal-type .form-hint {
+  display: block;
+  margin-top: 0.3rem;
+}

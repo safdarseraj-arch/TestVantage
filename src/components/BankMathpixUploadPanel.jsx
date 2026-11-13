@@ -1,26 +1,29 @@
 import { Link } from 'react-router-dom'
 
 /**
- * Question Bank entry for any-paper upload.
- * Full extract / pending / Approve & Publish lives on /any-paper
- * (same Local AI as Official PYQ, not the official archive).
+ * Question Bank entry for PDF upload. Papers and books are uploaded on /upload
+ * (one review screen and Local AI for Official PYQ, any paper and book / question bank PDFs).
  */
 export default function BankMathpixUploadPanel() {
   return (
     <section className="card bank-panel bank-mathpix-upload-panel" aria-labelledby="bank-mathpix-upload-title">
-      <h3 id="bank-mathpix-upload-title">Upload paper</h3>
+      <h3 id="bank-mathpix-upload-title">Upload a PDF</h3>
       <p className="form-hint">
-        Add <strong>any</strong> paper (class test, mock, school paper) — not Official PYQ.
-        We ask the paper name, then extract and clean with the same Local AI as official
-        papers. You review the cards, then <strong>Approve &amp; Publish</strong>.
+        A whole paper or a book goes through <strong>Upload PDF</strong>: pick the document type, the questions
+        are split and checked, you review the cards, then <strong>Approve &amp; Publish</strong>. The tabs
+        below are for typing or pasting single questions.
       </p>
       <p>
-        <Link to="/any-paper" className="btn btn-primary" data-testid="any-paper-open">
-          Upload any paper
+        <Link to="/upload?type=paper" className="btn btn-primary" data-testid="any-paper-open">
+          Any test paper
         </Link>
         {' '}
-        <Link to="/official-pyq" className="btn btn-ghost">
-          Official PYQ archive
+        <Link to="/upload?type=book" className="btn btn-primary" data-testid="book-pdf-open">
+          Book / question bank PDF
+        </Link>
+        {' '}
+        <Link to="/upload?type=official" className="btn btn-ghost">
+          Official PYQ
         </Link>
       </p>
     </section>

@@ -1,0 +1,56 @@
+\section*{Chapter 3 Motion in a Straight Line}
+
+\section*{3.1 Introduction}
+
+Motion is a change in the position of an object with time. In this chapter we study motion along a straight line, where the position of the object can be given by a single coordinate $x$. We define displacement, velocity and acceleration and derive the equations of motion for uniform acceleration.
+
+\section*{3.2 Equations of Motion}
+
+For an object moving with uniform acceleration $a$, the velocity after time $t$ is $v=u+a t$ and the displacement is $s=u t+\frac{1}{2} a t^{2}$. Eliminating $t$ gives $v^{2}=u^{2}+2 a s$.
+
+Example 1 A car starts from rest and accelerates uniformly at $2 \mathrm{~m} / \mathrm{s}^{2}$. Find the distance covered by the car in the first $5 \mathrm{~s}$.
+
+Solution: Here $u=0, a=2 \mathrm{~m} / \mathrm{s}^{2}$ and $t=5 \mathrm{~s}$. Using $s=u t+\frac{1}{2} a t^{2}$ we get $s=\frac{1}{2} \times 2 \times 25=25 \mathrm{~m}$.
+
+Example 2 A ball is dropped from the top of a tower $80 \mathrm{~m}$ high. Taking $g=10 \mathrm{~m} / \mathrm{s}^{2}$, find the time taken by the ball to reach the ground.
+
+Solution: Using $s=\frac{1}{2} g t^{2}$, we get $80=5 t^{2}$, so $t=4 \mathrm{~s}$.
+
+\section*{EXERCISE 3.1}
+
+1. A body starts from rest with a uniform acceleration of $4 \mathrm{~m} / \mathrm{s}^{2}$. Its velocity after $3 \mathrm{~s}$ is
+(a) $4 \mathrm{~m} / \mathrm{s}$
+(b) $8 \mathrm{~m} / \mathrm{s}$
+(c) $12 \mathrm{~m} / \mathrm{s}$
+(d) $16 \mathrm{~m} / \mathrm{s}$
+2. The slope of the position-time graph of a body moving along a straight line gives its
+(a) acceleration
+(b) velocity
+(c) displacement
+(d) distance
+3. A stone is thrown vertically upward with a speed of $30 \mathrm{~m} / \mathrm{s}$. Taking $g=10 \mathrm{~m} / \mathrm{s}^{2}$, the maximum height reached by the stone is
+(a) $30 \mathrm{~m}$
+(b) $45 \mathrm{~m}$
+(c) $60 \mathrm{~m}$
+(d) $90 \mathrm{~m}$
+
+\section*{EXERCISE 3.2}
+
+1. A train moving at $20 \mathrm{~m} / \mathrm{s}$ is brought to rest in $10 \mathrm{~s}$ by uniform braking. The retardation of the train is
+(1) $1 \mathrm{~m} / \mathrm{s}^{2}$
+(2) $2 \mathrm{~m} / \mathrm{s}^{2}$
+(3) $4 \mathrm{~m} / \mathrm{s}^{2}$
+(4) $20 \mathrm{~m} / \mathrm{s}^{2}$
+2. The area under the velocity-time graph of a moving body gives its
+(1) acceleration
+(2) speed
+(3) displacement
+(4) jerk
+
+\section*{ANSWERS}
+
+EXERCISE 3.1
+1. (c) 2. (b) 3. (b)
+
+EXERCISE 3.2
+1. (2) 2. (3)

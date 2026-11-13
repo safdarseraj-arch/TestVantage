@@ -29,6 +29,7 @@ import {
   recoverOfficialPyqQuestionsFromStore,
   findOfficialPyqSiblingWithQuestions,
   countFilledOfficialPyqQuestions,
+  isBookPaper,
   isOtherPaper,
   officialPyqPaperQuestionCount,
 } from '../utils/officialPyqPendingStore'
@@ -50,11 +51,13 @@ import { officialPyqPublishGaps } from '../utils/officialPyqPublishFlow.js'
 const ExtractionSummaryTable = lazy(() => import('../components/ExtractionSummaryTable.jsx'))
 const OfficialPyqOriginalComparePanel = lazy(() => import('../components/OfficialPyqOriginalComparePanel.jsx'))
 const OfficialPyqPaperFactsForm = lazy(() => import('../components/OfficialPyqPaperFactsForm.jsx'))
+const BookIngestPanel = lazy(() => import('../components/BookIngestPanel.jsx'))
 const OFFICIAL_PYQ_CARD_CHANGED_EVENT = 'testvantage:official-pyq-card-changed'
 
 
 const OFFICIAL_PYQ_UI_KEY = 'testvantage-official-pyq-ui'
 const ANY_PAPER_UI_KEY = 'testvantage-any-paper-ui'
+const BOOK_UI_KEY = 'testvantage-book-pdf-ui'
 /** Open paper and tab are remembered apart for official papers and "Upload any paper". */
 let uiKey = OFFICIAL_PYQ_UI_KEY
 
@@ -207,13 +210,17 @@ function lookupSavedPaperSummary(id) {
 }
 
 /**
- * @param {{ kind?: 'official' | 'other' }} props
+ * @param {{ kind?: 'official' | 'other' | 'book', embedded?: boolean }} props
  *   other: "Upload any paper" — a named paper (class test, mock, another institute's paper) through
  *   the same upload, review, Approve, Hybrid AI fill and Publish.
+ *   book: a book / question bank PDF read one page range at a time; each exercise is a paper here
+ *   and publishes to the Question Bank only.
+ *   embedded: shown inside the Upload page, which has its own heading.
  */
-export default function OfficialPyqPending({ kind = 'official' } = {}) {
+export default function OfficialPyqPending({ kind = 'official', embedded = false } = {}) {
+  const bookMode = kind === 'book'
   const otherMode = kind === 'other'
-  uiKey = otherMode ? ANY_PAPER_UI_KEY : OFFICIAL_PYQ_UI_KEY
+  uiKey = bookMode ? BOOK_UI_KEY : otherMode ? ANY_PAPER_UI_KEY : OFFICIAL_PYQ_UI_KEY
   const [tick, setTick] = useState(0)
   const bump = useCallback(() => setTick((t) => t + 1), [])
 
@@ -1279,9 +1286,12 @@ export default function OfficialPyqPending({ kind = 'official' } = {}) {
       return
     }
     const other = isOtherPaper(selected)
+    const book = isBookPaper(selected)
     const warn = !other
       ? `Publish “${selected.paperLabel}”? Every question gets its final Question ID and students can use the paper.`
-      : audience === 'own'
+      : book
+        ? `Publish “${selected.paperLabel}” to the Question Bank? Its questions are tagged with the book, chapter and exercise. No test is made for students.`
+        : audience === 'own'
         ? `Publish “${selected.paperLabel}” as your own paper? Its questions go to the Question Bank, and students see the whole paper under Tests.`
         : `Publish “${selected.paperLabel}” as another institute's paper? Its questions go to the Question Bank and are served to students, but students never see the paper itself.`
     if (typeof window !== 'undefined' && !window.confirm(warn)) return
@@ -1310,7 +1320,9 @@ export default function OfficialPyqPending({ kind = 'official' } = {}) {
       setMessage(
         !other
           ? `Published ${result.pyqCount} question(s) to PYQ and ${result.bankCount} to Question Bank, each with its final Question ID. Students can use them under Prepare → PYQ.`
-          : audience === 'own'
+          : book
+            ? `Published ${result.bankCount} question(s) to the Question Bank, tagged “${selected.bookName || selected.paperLabel}”.`
+            : audience === 'own'
             ? `Published ${result.bankCount} question(s) to the Question Bank. Students see the whole paper under Tests. Students in a class see it after you assign it to their class.`
             : `Published ${result.bankCount} question(s) to the Question Bank. Students get these questions in practice; the paper itself is not shown to them.`,
       )
@@ -1454,8 +1466,18 @@ export default function OfficialPyqPending({ kind = 'official' } = {}) {
   return (
     <div className="page official-pyq-page">
       <header className="page-header">
-        <h1>{otherMode ? 'Upload any paper' : 'Approve official papers'}</h1>
-        {otherMode ? (
+        {embedded ? null : (
+          <h1>{bookMode ? 'Book / question bank PDF' : otherMode ? 'Upload any paper' : 'Approve official papers'}</h1>
+        )}
+        {bookMode ? (
+          <p className="form-hint">
+            Upload a whole book or question bank PDF. It is kept on this computer and read{' '}
+            <strong>one page range at a time</strong>. Each exercise (and the solved examples) becomes a paper below
+            that goes through the same steps as official papers: Quality check, Auto-fix, Compare with the pages,{' '}
+            <strong>Reviewed — Approve</strong>, <strong>Hybrid AI</strong> fill, then <strong>Publish</strong> to
+            the <Link to="/question-bank">Question Bank</Link> only, tagged with the book, chapter and exercise.
+          </p>
+        ) : otherMode ? (
           <p className="form-hint">
             Upload any question paper (yours or another institute&apos;s). It follows the same steps as official
             papers: <strong>Reviewed — Approve</strong>, then <strong>Hybrid AI</strong> fills answers, solutions and
@@ -1485,7 +1507,7 @@ export default function OfficialPyqPending({ kind = 'official' } = {}) {
       {error && <p className="upload-error">{error}</p>}
       {message && <p className="form-hint upload-success-hint">{message}</p>}
 
-      {otherMode ? null : (
+      {otherMode || bookMode ? null : (
       <section className="card official-pyq-portals">
         <h2>Official portals</h2>
         <ul className="cc-official-ref-list">
@@ -1504,6 +1526,17 @@ export default function OfficialPyqPending({ kind = 'official' } = {}) {
       </section>
       )}
 
+      {bookMode ? (
+        <Suspense fallback={<p className="form-hint">Loading book reader…</p>}>
+          <BookIngestPanel
+            onImported={(paperIds) => {
+              bump()
+              const first = paperIds.map((id) => lookupSavedPaperSummary(id)).find(Boolean)
+              if (first) openOfficialPaper(first)
+            }}
+          />
+        </Suspense>
+      ) : (
       <section className="card official-pyq-import">
         <h2>1. Import into pending bank</h2>
         <div className="pyq-paper-setup-grid">
@@ -1666,6 +1699,7 @@ export default function OfficialPyqPending({ kind = 'official' } = {}) {
           </div>
         )}
       </section>
+      )}
 
       <section className="card official-pyq-list">
         <h2>2. Review &amp; approve</h2>
@@ -1799,7 +1833,18 @@ export default function OfficialPyqPending({ kind = 'official' } = {}) {
                             }}
                           />
                         ) : null}
-                        {isAdminLoggedIn() && isOtherPaper(selected) ? (
+                        {isAdminLoggedIn() && isBookPaper(selected) ? (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            data-testid="book-paper-publish"
+                            disabled={approveBusy}
+                            aria-busy={approveBusy}
+                            onClick={() => void onPublish()}
+                          >
+                            {approveBusy ? 'Publishing…' : 'Publish to the Question Bank'}
+                          </button>
+                        ) : isAdminLoggedIn() && isOtherPaper(selected) ? (
                           <div className="official-pyq-publish-audience" data-testid="other-paper-publish-choice">
                             <p className="form-hint">
                               <strong>Publish — whose paper is this?</strong>
@@ -1857,7 +1902,14 @@ export default function OfficialPyqPending({ kind = 'official' } = {}) {
                     ) : null}
                     {selected.status === 'published' ? (
                       <div className="official-pyq-actions" data-testid="official-pyq-published-actions">
-                        {isOtherPaper(selected) ? (
+                        {isBookPaper(selected) ? (
+                          <p className="form-hint" data-testid="book-paper-published">
+                            Published to the Question Bank, tagged with {selected.bookName || 'the book'}
+                            {selected.bookChapter ? ` · ${selected.bookChapter}` : ''}
+                            {selected.bookExercise ? ` · ${selected.bookExercise}` : ''}. To change anything, press
+                            Unpublish first.
+                          </p>
+                        ) : isOtherPaper(selected) ? (
                           <p className="form-hint" data-testid="other-paper-published-audience">
                             {selected.publishAudience === 'own'
                               ? 'Published as our own paper — its questions are in the Question Bank and students see the whole paper under Tests.'

@@ -45,6 +45,7 @@ import {
   removeOlderDuplicateOfficialPyqPublishes,
 } from './officialPyqPublishOnce.js'
 import {
+  BOOK_PAPER_BANK_SOURCE,
   OTHER_PAPER_BANK_SOURCE,
   officialPyqFinalIdContext,
   officialPyqKeptIdsWithCards,
@@ -67,6 +68,8 @@ import { officialPyqReplicaChildId } from './officialPyqReplica.js'
 import { pyqId, stripFounderIdSuffixes } from './questionId.js'
 import {
   addOfficialPyqPendingPaper,
+  bookPaperFields,
+  isBookPaper,
   isOtherPaper,
   getOfficialPyqPendingPaper,
   getOfficialPyqPendingOcrText,
@@ -822,16 +825,36 @@ function otherPaperBankRow(paper, card, index, audience) {
     sub_bank_type: _subBank,
     ...row
   } = pyqItemToBankQuestion(paper, item, index)
-  return {
+  const base = {
     ...row,
     id: String(card.id),
     paperId: paper.paperId,
     paperLabel: name,
     paperName: name,
-    source: name,
-    tags: ['Uploaded paper', name, paper.exam].filter(Boolean),
     officialPyq: false,
     imported: false,
+  }
+  if (isBookPaper(paper)) {
+    const book = String(paper.bookName || name).trim()
+    return {
+      ...base,
+      source: book,
+      bookId: paper.bookId,
+      bookName: book,
+      bookChapter: paper.bookChapter || undefined,
+      bookExercise: paper.bookExercise || undefined,
+      bookPages: paper.bookPageStart ? `${paper.bookPageStart}-${paper.bookPageEnd || paper.bookPageStart}` : undefined,
+      tags: ['Book', book, paper.bookChapter, paper.bookExercise, paper.bookPartKind === 'examples' ? 'Solved example' : '']
+        .map((t) => String(t || '').trim())
+        .filter(Boolean),
+      bankSource: BOOK_PAPER_BANK_SOURCE,
+      paperAudience: 'other_institute',
+    }
+  }
+  return {
+    ...base,
+    source: name,
+    tags: ['Uploaded paper', name, paper.exam].filter(Boolean),
     bankSource: OTHER_PAPER_BANK_SOURCE,
     paperAudience: audience,
   }
@@ -845,7 +868,9 @@ function otherPaperBankRow(paper, card, index, audience) {
  * @param {{ audience?: OtherPaperAudience }} opts
  */
 function* otherPaperPublishStages(paper, opts) {
-  const audience = opts?.audience
+  const book = isBookPaper(paper)
+  /** A book part goes to the Question Bank only; it is never a student test. */
+  const audience = book ? 'other_institute' : opts?.audience
   if (audience !== 'own' && audience !== 'other_institute') {
     return {
       ok: false,
@@ -899,7 +924,7 @@ function* otherPaperPublishStages(paper, opts) {
     allowPublishedQuestionWrite: true,
     status: 'published',
     publishedAt: Date.now(),
-    publishAudience: audience,
+    publishAudience: book ? undefined : audience,
     publishedTestId: testId || undefined,
   })
   if (!saved || saved.status !== 'published') {
@@ -1217,7 +1242,9 @@ export function importQuestionsToOfficialPyqPending(input) {
         ? expectedPyqPaperQuestionTarget(input.exam, input.session, '')
         : undefined
   const saved = addOfficialPyqPendingPaper({
-    ...(isOtherPaper(input) ? { paperKind: 'other', paperName: input.paperName } : {}),
+    ...(isOtherPaper(input)
+      ? { paperKind: isBookPaper(input) ? 'book' : 'other', paperName: input.paperName, ...bookPaperFields(input) }
+      : {}),
     exam: input.exam,
     year: input.year,
     session: input.session,

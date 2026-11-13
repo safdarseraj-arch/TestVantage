@@ -20,6 +20,7 @@ import {
   writeQuestionBankSnapshot,
 } from './officialPyqPublishOnce.js'
 import {
+  isBookPaper,
   isOtherPaper,
   loadOfficialPyqPendingPapers,
   updateOfficialPyqPendingPapersMeta,
@@ -27,6 +28,8 @@ import {
 
 /** Question Bank rows of a paper from "Upload any paper". */
 export const OTHER_PAPER_BANK_SOURCE = 'any_paper'
+/** Question Bank rows of one exercise of an uploaded book / question bank PDF. */
+export const BOOK_PAPER_BANK_SOURCE = 'book_pdf'
 
 const CLASSIFIED_ID_RE = /^[A-Z]{3}\d{5}$/
 
@@ -84,7 +87,8 @@ export function officialPyqRowBelongsToPaper(paper, row) {
   if (!row || !paper) return false
   if (isOtherPaper(paper)) {
     const paperKey = String(paper.paperId || '').trim()
-    return row.bankSource === OTHER_PAPER_BANK_SOURCE && Boolean(paperKey) && String(row.paperId || '').trim() === paperKey
+    const source = isBookPaper(paper) ? BOOK_PAPER_BANK_SOURCE : OTHER_PAPER_BANK_SOURCE
+    return row.bankSource === source && Boolean(paperKey) && String(row.paperId || '').trim() === paperKey
   }
   const replica = row.aiReplicaPaper === true || row.bankSource === 'ai_replica_paper'
   if (row.officialPyq !== true && row.bankSource !== 'official_pyq' && !replica) return false

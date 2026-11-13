@@ -68,31 +68,65 @@ function knownOfficialPyqStatus(status) {
  *   notes?: string
  *   preparedText?: string
  *   questions: OfficialPyqPendingQuestion[]
- *   paperKind?: 'other'
+ *   paperKind?: 'other' | 'book'
  *   paperName?: string
  *   publishAudience?: 'other_institute' | 'own'
  *   publishedTestId?: string
+ *   bookId?: string
+ *   bookName?: string
+ *   bookChapter?: string
+ *   bookExercise?: string
+ *   bookPartKind?: 'exercise' | 'examples'
+ *   bookPageStart?: number
+ *   bookPageEnd?: number
  * }} OfficialPyqPendingPaper
  */
 
 /**
- * A paper uploaded through "Upload any paper" (class test, mock, another institute's paper).
- * It goes through the same upload, review, Approve, Hybrid AI fill and Publish as an official
- * paper; only Publish differs (see officialPyqApproval.js).
+ * A named paper that is not an official exam sitting: "Upload any paper" (class test, mock,
+ * another institute's paper) or one exercise of a book / question bank PDF. It goes through the
+ * same upload, review, Quality check, Auto-fix, Approve, Hybrid AI fill and Publish as an
+ * official paper; only Approve and Publish differ (see officialPyqApproval.js).
  * @param {{ paperKind?: unknown } | null | undefined} paper
  */
 export function isOtherPaper(paper) {
-  return paper?.paperKind === 'other'
+  return paper?.paperKind === 'other' || paper?.paperKind === 'book'
+}
+
+/**
+ * One exercise (or the solved examples) of a book page range. Answers are not needed to
+ * approve; it publishes to the Question Bank only, tagged with book, chapter and exercise.
+ * @param {{ paperKind?: unknown } | null | undefined} paper
+ */
+export function isBookPaper(paper) {
+  return paper?.paperKind === 'book'
 }
 
 /**
  * @param {{ paperKind?: unknown } | null | undefined} paper
- * @param {'official' | 'other' | 'all' | undefined} kind
+ * @param {'official' | 'other' | 'book' | 'all' | undefined} kind
  */
 export function officialPyqPaperKindMatches(paper, kind) {
-  if (kind === 'other') return isOtherPaper(paper)
+  if (kind === 'other') return paper?.paperKind === 'other'
+  if (kind === 'book') return isBookPaper(paper)
   if (kind === 'official') return !isOtherPaper(paper)
   return true
+}
+
+/** @param {Partial<OfficialPyqPendingPaper> | null | undefined} paper */
+export function bookPaperFields(paper) {
+  if (!isBookPaper(paper)) return {}
+  const text = (v) => String(v ?? '').replace(/\s+/g, ' ').trim()
+  const page = (v) => (Number(v) >= 1 ? Math.floor(Number(v)) : undefined)
+  return {
+    bookId: text(paper.bookId) || undefined,
+    bookName: text(paper.bookName) || undefined,
+    bookChapter: text(paper.bookChapter) || undefined,
+    bookExercise: text(paper.bookExercise) || undefined,
+    bookPartKind: paper.bookPartKind === 'examples' ? 'examples' : 'exercise',
+    bookPageStart: page(paper.bookPageStart),
+    bookPageEnd: page(paper.bookPageEnd),
+  }
 }
 
 /** @param {unknown} raw */
@@ -450,8 +484,9 @@ function paperToLightRecord(paper) {
 function otherPaperFields(paper) {
   if (!isOtherPaper(paper)) return {}
   return {
-    paperKind: 'other',
+    paperKind: isBookPaper(paper) ? 'book' : 'other',
     paperName: paper?.paperName,
+    ...bookPaperFields(paper),
     ...(paper?.publishAudience ? { publishAudience: paper.publishAudience } : {}),
     ...(paper?.publishedTestId ? { publishedTestId: paper.publishedTestId } : {}),
   }
@@ -594,6 +629,9 @@ const STATUS_RANK = { published: 4, approved: 3, pending_review: 2, rejected: 1 
 export function officialPyqSittingKey(paper) {
   if (paper?.aiReplicaPaper === true || String(paper?.replicaParentPaperId || '').trim()) {
     return `replica|${String(paper.id || paper.paperId || '').trim()}`
+  }
+  if (isBookPaper(paper)) {
+    return `book|${String(paper?.bookId || '').trim()}|${normalizeOtherPaperName(paper?.paperName).toLowerCase()}`
   }
   if (isOtherPaper(paper)) return `other|${normalizeOtherPaperName(paper?.paperName).toLowerCase()}`
   const exam = String(paper?.exam || '').trim().toLowerCase()
@@ -947,22 +985,27 @@ export function addOfficialPyqPendingPaper(input) {
     throw new Error('Year is required (e.g. 2024).')
   }
   const other = isOtherPaper(input)
+  const book = isBookPaper(input)
   const paperName = normalizeOtherPaperName(input.paperName)
   if (other && !paperName) throw new Error('Type the name of this paper. It cannot be empty.')
+  if (book && !String(input.bookId || '').trim()) throw new Error('A book part needs its book id.')
   const questions = Array.isArray(input.questions) ? input.questions : []
   const uniq = `${now}-${Math.random().toString(36).slice(2, 9)}`
   const session = !other && input.session ? String(input.session) : undefined
+  const slug = paperName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
   const paperId = String(
     input.paperId ||
-      (other
-        ? `other-${paperName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || uniq}`
-        : `${exam}-${year}-${String(session || 'paper')
-            .toLowerCase()
-            .replace(/\s+/g, '-')}`),
+      (book
+        ? `book-${String(input.bookId).trim()}-${slug || uniq}`
+        : other
+          ? `other-${slug || uniq}`
+          : `${exam}-${year}-${String(session || 'paper')
+              .toLowerCase()
+              .replace(/\s+/g, '-')}`),
   )
   /** @type {OfficialPyqPendingPaper} */
   const draft = {
-    ...(other ? { paperKind: 'other', paperName } : {}),
+    ...(other ? { paperKind: book ? 'book' : 'other', paperName, ...bookPaperFields(input) } : {}),
     id: String(input.id ?? `opyq-${uniq}`),
     exam,
     year,

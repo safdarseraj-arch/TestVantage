@@ -860,6 +860,94 @@ async def ingest_book_cached(
     }
 
 
+def _book_http_error(exc: BaseException) -> HTTPException:
+    import book_ingest_store as bis
+
+    if isinstance(exc, bis.BookNotFoundError):
+        return HTTPException(status_code=404, detail={"code": "book_missing", "message": str(exc)})
+    return HTTPException(status_code=400, detail={"code": "bad_book_request", "message": str(exc)})
+
+
+class BookRangesRequest(BaseModel):
+    ranges: list[dict[str, Any]] = Field(default_factory=list, max_length=2000)
+    name: str | None = Field(default=None, max_length=200)
+
+
+@app.post("/api/ingest/books", tags=["Book ingest"])
+async def book_upload(
+    file: UploadFile = File(...),
+    name: str = Form(default=""),
+    range_pages: int = Form(default=20),
+) -> dict[str, Any]:
+    """Keep a whole book PDF on disk and propose page ranges (bookmarks / chapter headings). Local; no AI."""
+    import asyncio
+
+    import book_ingest_store as bis
+
+    try:
+        book = await asyncio.to_thread(bis.save_book, name, file.filename or "book.pdf", file.file, range_pages)
+    except ValueError as exc:
+        raise _book_http_error(exc) from exc
+    return {"ok": True, "book": book}
+
+
+@app.get("/api/ingest/books", tags=["Book ingest"])
+async def book_list() -> dict[str, Any]:
+    import book_ingest_store as bis
+
+    return {"ok": True, "books": bis.list_books()}
+
+
+@app.get("/api/ingest/books/{book_id}", tags=["Book ingest"])
+async def book_get(book_id: str) -> dict[str, Any]:
+    import book_ingest_store as bis
+
+    try:
+        return {"ok": True, "book": bis.get_book(book_id)}
+    except (bis.BookNotFoundError, ValueError) as exc:
+        raise _book_http_error(exc) from exc
+
+
+@app.put("/api/ingest/books/{book_id}/ranges", tags=["Book ingest"])
+async def book_save_ranges(book_id: str, body: BookRangesRequest) -> dict[str, Any]:
+    """The admin's page ranges and progress per range."""
+    import book_ingest_store as bis
+
+    try:
+        return {"ok": True, "book": bis.save_ranges(book_id, body.ranges, body.name)}
+    except (bis.BookNotFoundError, ValueError) as exc:
+        raise _book_http_error(exc) from exc
+
+
+@app.get("/api/ingest/books/{book_id}/slice", tags=["Book ingest"])
+async def book_slice(book_id: str, start: int = Query(..., ge=1), end: int = Query(..., ge=1)) -> Response:
+    """Pages start..end of the stored book as their own PDF (copied, not redrawn)."""
+    import asyncio
+
+    import book_ingest_store as bis
+
+    try:
+        data = await asyncio.to_thread(bis.slice_pdf, book_id, start, end)
+    except (bis.BookNotFoundError, ValueError) as exc:
+        raise _book_http_error(exc) from exc
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{book_id}-p{start}-{end}.pdf"'},
+    )
+
+
+@app.delete("/api/ingest/books/{book_id}", tags=["Book ingest"])
+async def book_delete(book_id: str) -> dict[str, Any]:
+    import book_ingest_store as bis
+
+    try:
+        bis.delete_book(book_id)
+    except (bis.BookNotFoundError, ValueError) as exc:
+        raise _book_http_error(exc) from exc
+    return {"ok": True}
+
+
 def _resolve_student_id(
     student_id: str | None,
     x_student_id: str | None = Header(default=None, alias="X-Student-Id"),

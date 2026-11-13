@@ -20,9 +20,15 @@ import {
   writeQuestionBankSnapshot,
 } from './officialPyqPublishOnce.js'
 import {
+  isOtherPaper,
   loadOfficialPyqPendingPapers,
   updateOfficialPyqPendingPapersMeta,
 } from './officialPyqPendingStore.js'
+
+/** Question Bank rows of a paper from "Upload any paper". */
+export const OTHER_PAPER_BANK_SOURCE = 'any_paper'
+
+const CLASSIFIED_ID_RE = /^[A-Z]{3}\d{5}$/
 
 /** Also read in main.jsx before the app starts, so the move runs before any student page. */
 export const OFFICIAL_PYQ_PUBLISH_SPLIT_KEY = 'testvantage-official-pyq-publish-split'
@@ -76,6 +82,10 @@ export function officialPyqStemsMatch(a, b) {
  */
 export function officialPyqRowBelongsToPaper(paper, row) {
   if (!row || !paper) return false
+  if (isOtherPaper(paper)) {
+    const paperKey = String(paper.paperId || '').trim()
+    return row.bankSource === OTHER_PAPER_BANK_SOURCE && Boolean(paperKey) && String(row.paperId || '').trim() === paperKey
+  }
   const replica = row.aiReplicaPaper === true || row.bankSource === 'ai_replica_paper'
   if (row.officialPyq !== true && row.bankSource !== 'official_pyq' && !replica) return false
   const paperKey = String(paper.paperId || '').trim()
@@ -231,6 +241,39 @@ export function pickOfficialPyqFinalId(paper, card, index, ctx) {
   ctx.taken.add(id)
   ctx.peers.push({ ...idBucketFields(card), id })
   return id
+}
+
+/**
+ * Final id for a card of an uploaded other paper: a plain Question Bank id (MAQ00012), no exam
+ * letter or year, since it is not a previous-year question. A card keeps the id it already has
+ * while its Subject / Unit / Chapter letters still fit.
+ * @param {any} card
+ * @param {{ taken: Set<string>, peers: any[], reserved?: Set<string> }} ctx
+ */
+export function pickOtherPaperFinalId(card, ctx) {
+  const row = idBucketFields(card)
+  const prefix = classifiedIdPrefix(row)
+  const current = String(card?.id ?? '').trim()
+  let id = CLASSIFIED_ID_RE.test(current) && current.startsWith(prefix) && !ctx.taken.has(current) ? current : ''
+  for (let seq = nextClassifiedSequence(ctx.peers, row); !id && seq <= 99999; seq += 1) {
+    const next = prefix + String(seq).padStart(5, '0')
+    if (!ctx.taken.has(next) && !ctx.reserved?.has(next)) id = next
+  }
+  ctx.taken.add(id)
+  ctx.peers.push({ ...row, id })
+  return id
+}
+
+/**
+ * 1-based numbers of the cards with no answer (and no "marks to all"). Students are marked
+ * against the answer, so an uploaded other paper is not published while any are left.
+ * @param {any} paper
+ */
+export function otherPaperUnansweredNumbers(paper) {
+  const cards = Array.isArray(paper?.questions) ? paper.questions : []
+  return cards
+    .map((q, i) => (String(q?.text ?? '').trim() && !hasAnswer(q) && q?.bonusMarksToAll !== true ? i + 1 : 0))
+    .filter(Boolean)
 }
 
 /** @param {any} q */

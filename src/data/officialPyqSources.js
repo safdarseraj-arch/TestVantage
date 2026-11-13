@@ -210,6 +210,7 @@ export function getOfficialPyqExamLabel(exam) {
  * @param {{ exam?: string, year?: number | string, session?: string, pyqDate?: string, pyqShift?: string | number } | null | undefined} paper
  */
 export function officialPyqPaperSourceName(paper) {
+  if (paper?.paperKind === 'other') return String(paper.paperName || paper.paperLabel || '').trim()
   const year = Number(paper?.year) || ''
   const session = String(paper?.session ?? '').trim().replace(/^paper\b/i, 'Paper')
   const date = String(paper?.pyqDate ?? '').trim()

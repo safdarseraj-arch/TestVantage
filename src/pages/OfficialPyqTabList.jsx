@@ -24,18 +24,18 @@ const UI_KEY = 'testvantage-official-pyq-ui'
 
 const VALID_FILTERS = new Set(TABS.map(([id]) => id))
 
-function readUi() {
+function readUi(key = UI_KEY) {
   try {
-    const raw = sessionStorage.getItem(UI_KEY)
+    const raw = sessionStorage.getItem(key)
     return raw ? JSON.parse(raw) : {}
   } catch {
     return {}
   }
 }
 
-function writeUi(patch) {
+function writeUi(patch, key = UI_KEY) {
   try {
-    sessionStorage.setItem(UI_KEY, JSON.stringify({ ...readUi(), ...patch }))
+    sessionStorage.setItem(key, JSON.stringify({ ...readUi(key), ...patch }))
   } catch {
     /* ignore */
   }
@@ -66,6 +66,8 @@ function paperListTitle(paper) {
 }
 
 function OfficialPyqTabList({
+  kind = 'official',
+  uiKey = UI_KEY,
   selectedId = null,
   listTick = 0,
   onOpen,
@@ -74,42 +76,42 @@ function OfficialPyqTabList({
   qualityBusyId = '',
 }) {
   const [filter, setFilter] = useState(() => {
-    const saved = readUi().filter
+    const saved = readUi(uiKey).filter
     return VALID_FILTERS.has(saved)
       ? saved
       : 'pending_review'
   })
 
   useEffect(() => {
-    const saved = readUi().filter
+    const saved = readUi(uiKey).filter
     if (VALID_FILTERS.has(saved)) {
       setFilter((cur) => (cur === saved ? cur : saved))
     }
-  }, [listTick])
+  }, [listTick, uiKey])
 
   const papers = useMemo(() => {
     void listTick
     try {
-      return listOfficialPyqPendingSummaries(filter === 'all' ? 'all' : filter)
+      return listOfficialPyqPendingSummaries(filter === 'all' ? 'all' : filter, kind)
     } catch {
       return []
     }
-  }, [filter, listTick])
+  }, [filter, listTick, kind])
 
   const tabCounts = useMemo(() => {
     void listTick
     try {
-      return countOfficialPyqPendingByStatus()
+      return countOfficialPyqPendingByStatus(kind)
     } catch {
       return {}
     }
-  }, [listTick])
+  }, [listTick, kind])
 
   const changeFilter = useCallback((next) => {
     if (next === filter) return
     setFilter(next)
-    writeUi({ filter: next })
-  }, [filter])
+    writeUi({ filter: next }, uiKey)
+  }, [filter, uiKey])
 
   return (
     <>

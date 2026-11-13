@@ -19,6 +19,7 @@ dist-ssr
 data/gemini-scq-trial-progress.json
 data/gemini-scq-trial-drafts.json
 data/official_pyq_originals/
+data/books/
 
 # Python (python/localai)
 __pycache__/

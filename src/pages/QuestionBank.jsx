@@ -9287,6 +9287,11 @@ D) Fourth option`}</pre>
             <strong> Local AI</strong> splits questions. <strong>Gemini</strong> fills tags, answers, and
             solutions (not OCR). Drafts are not published. Pick LaTeX (default) or Word below.
           </p>
+          <p className="form-hint" data-testid="bank-file-upload-portal-hint">
+            Whole test paper or a book / question bank PDF? Use{' '}
+            <Link to="/upload?type=paper">Upload PDF → Any test paper</Link> or{' '}
+            <Link to="/upload?type=book">Book / question bank PDF</Link> — same checks and review as Official PYQ.
+          </p>
           <OcrOutputFormatPicker id="bank-file-ocr-format" />
           <div
             className="upload-dropzone"

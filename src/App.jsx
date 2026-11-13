@@ -135,7 +135,7 @@ const GeneratorDashboard = lazyPage(
   () => import('./components/GeneratorDashboard.jsx'),
   'Hybrid AI',
 )
-const BookUpload = lazyPage(() => import('./pages/BookUpload.jsx'), 'Book ingest')
+const UploadPortal = lazyPage(() => import('./pages/UploadPortal.jsx'), 'Upload a PDF')
 
 function RouteLoading({ label = 'Loading…' }) {
   const [stuck, setStuck] = useState(false)
@@ -270,14 +270,7 @@ export default function App() {
             </RequirePermission>
           }
         />
-        <Route
-          path="question-bank/book-ingest"
-          element={
-            <RequirePermission permission={PERMS.UPLOAD_QUESTIONS}>
-              {withSuspense(<BookUpload />, 'Loading book ingest…')}
-            </RequirePermission>
-          }
-        />
+        <Route path="question-bank/book-ingest" element={<Navigate to="/upload?type=book" replace />} />
         <Route path="generator" element={<Navigate to="/question-bank/ai-generate" replace />} />
         <Route path="testvantages" element={<Navigate to="/question-bank/ai-generate" replace />} />
         <Route
@@ -296,7 +289,14 @@ export default function App() {
             </RequirePermission>
           }
         />
-        <Route path="upload" element={<Navigate to="/question-bank?hub=upload&tab=single" replace />} />
+        <Route
+          path="upload"
+          element={
+            <RequirePermission permission={PERMS.UPLOAD_QUESTIONS}>
+              {withSuspense(<UploadPortal />, 'Loading upload…')}
+            </RequirePermission>
+          }
+        />
         <Route path="tests" element={withSuspense(<TestList />, 'Loading tests…')} />
         <Route path="practice" element={withSuspense(<Practice />, 'Loading practice…')} />
         <Route

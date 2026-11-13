@@ -163,7 +163,7 @@ export default function GeneratorDashboard() {
           Part of <strong>TestVantages</strong> — queue new questions into the AI sub_bank (pending review).
           No typing: pick exam metadata, then queue a batch. API:{' '}
           <code>/api/generate/batch</code> ·{' '}
-          <Link to="/question-bank/book-ingest">Book ingest</Link>
+          <Link to="/upload?type=book">Book / question bank PDF</Link>
         </p>
       </header>
 

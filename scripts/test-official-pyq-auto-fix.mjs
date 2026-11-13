@@ -260,6 +260,19 @@ await test('a Gemini timeout does not use up the try: the next run asks again, t
   assert.deepEqual(second.asked, [2])
   assert.match(out2.needsAdmin[0].reason, /failed 2 times/)
   assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [])
+
+  // 2012 P2 Q26: "Compare with original paper" answered later; its correction is applied without asking Gemini again.
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  const { saveOfficialPyqCompareResult } = await import('../src/utils/officialPyqOriginalCompare.js')
+  const card = getOfficialPyqPendingPaper(paper.id).questions[1]
+  saveOfficialPyqCompareResult(paper.id, 1, { verdict: 'differs', differences: [{ kind: 'math', detail: 'x' }], suggested_text: FIXED }, card)
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [2])
+  const third = stubCompare({})
+  const out3 = await autoFixFlaggedOfficialPyqCards(paper.id, { compare: third.compare })
+  assert.deepEqual(third.asked, [], 'the saved Compare answer is used, Gemini is not asked again')
+  assert.equal(getOfficialPyqPendingPaper(paper.id).questions[1].text, FIXED)
+  assert.ok(out3.fixed.includes(2) || out3.stillFlagged.includes(2), JSON.stringify(out3))
+  assert.deepEqual(officialPyqAutoFixTodo(getOfficialPyqPendingPaper(paper.id)), [], 'a used Compare answer is not applied twice')
 })
 await test('a re-split that shifts card numbers keeps each fixed card on its own question, once, still labelled auto-fixed', async () => {
   const { keepAdminEditedCards, copyAnswersOntoCanonical } = await import('../src/utils/officialPyqLocalReparse.js')

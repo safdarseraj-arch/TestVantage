@@ -98,10 +98,59 @@ check("ranges saved sorted, unknown status reset", [(r["start"], r["status"]) fo
 check("overlapping ranges refused", raises(lambda: bis.save_ranges(hb["id"], [{"start": 1, "end": 9}, {"start": 9, "end": 12}]), "overlap"))
 check("progress kept on disk", bis.get_book(hb["id"])["ranges"][1]["status"] == "done")
 check("book list", {b["id"] for b in bis.list_books()} == {book["id"], hb["id"]})
+check("a book with no solutions read yet", bis.get_solution_blocks(hb["id"]) == [])
+
+saved = bis.save_ranges(hb["id"], [{"start": 1, "end": 8, "status": "done", "lastExercise": "Exercise 2", "lastChapter": "Chapter 1"}])
+check("where a range ended (exercise and chapter) is kept", saved["ranges"][0]["lastChapter"] == "Chapter 1"
+      and saved["ranges"][0]["lastExercise"] == "Exercise 2")
+
+# A separate solutions PDF, linked to its book.
+sol_pdf = make_pdf(12, {1: "Chapter 1 Electrostatics", 7: "Chapter 2 Capacitors"})
+sol = bis.save_book("Physics Book – Solutions", "sol.pdf", io.BytesIO(sol_pdf), 20, book["id"])
+parent = bis.get_book(book["id"])
+check("solutions PDF stored and linked both ways", sol["role"] == "solutions" and sol["forBook"] == book["id"]
+      and parent["solutionsBookId"] == sol["id"])
+check("its own page ranges", sol["pages"] == 12 and len(sol["ranges"]) >= 1)
+again = bis.save_book("", "sol.pdf", io.BytesIO(sol_pdf), 20, book["id"])
+check("the same solutions PDF again keeps it", again["id"] == sol["id"] and again["existing"] is True)
+check("the book itself refused as its own solutions", raises(lambda: bis.save_book("", "phys.pdf", io.BytesIO(toc_pdf), 20, book["id"]), "book itself"))
+check("a solutions PDF cannot have its own solutions PDF",
+      raises(lambda: bis.save_book("", "x.pdf", io.BytesIO(make_pdf(3, {})), 20, sol["id"]), "itself a solutions PDF"))
+try:
+    bis.save_book("", "x.pdf", io.BytesIO(make_pdf(3, {})), 20, "bk-ffffffffffffffff")
+    check("solutions for a missing book refused", False)
+except bis.BookNotFoundError:
+    check("solutions for a missing book refused", True)
+
+blocks = bis.save_solution_blocks(book["id"], "solutions", 1, 6, [
+    {"title": "Exercise 1", "chapter": "Chapter 1", "key": "exercise1", "text": "1. (b) 2. (c)"},
+    {"title": "", "chapter": "Chapter 1", "key": "", "text": "   "},
+])
+check("solution blocks kept, empty ones dropped, tagged with source and pages", len(blocks) == 1
+      and blocks[0]["source"] == "solutions" and blocks[0]["start"] == 1 and blocks[0]["end"] == 6)
+bis.save_solution_blocks(book["id"], "book", 25, 30, [{"title": "Exercise 2", "chapter": "Part B", "key": "exercise2", "text": "1. (a)"}])
+blocks = bis.save_solution_blocks(book["id"], "solutions", 1, 6, [
+    {"title": "Exercise 1", "chapter": "Chapter 1", "key": "exercise1", "text": "1. (d) 2. (c)"},
+])
+check("reading the same range again replaces its blocks, others stay",
+      [(b["source"], b["text"]) for b in bis.get_solution_blocks(book["id"])] == [("book", "1. (a)"), ("solutions", "1. (d) 2. (c)")])
+check("unknown source refused", raises(lambda: bis.save_solution_blocks(book["id"], "web", 1, 2, []), "Unknown"))
+check("blocks are kept on the book, not on its solutions PDF",
+      raises(lambda: bis.save_solution_blocks(sol["id"], "solutions", 1, 2, []), "question book"))
+
+bis.delete_book(sol["id"])
+parent = bis.get_book(book["id"])
+check("removing the solutions PDF unlinks it and keeps what was read", "solutionsBookId" not in parent
+      and len(bis.get_solution_blocks(book["id"])) == 2)
+sol = bis.save_book("", "sol.pdf", io.BytesIO(sol_pdf), 20, book["id"])
+check("book list includes the solutions PDF with its role",
+      {b["id"]: b.get("role") for b in bis.list_books()}.get(sol["id"]) == "solutions")
 
 check("not a PDF refused", raises(lambda: bis.save_book("x", "x.pdf", io.BytesIO(b"hello"), 20), "PDF"))
 check("bad id refused", raises(lambda: bis.get_book("../etc"), "Invalid"))
 bis.delete_book(hb["id"])
-check("delete removes the book", {b["id"] for b in bis.list_books()} == {book["id"]})
+check("delete removes the book", {b["id"] for b in bis.list_books()} == {book["id"], sol["id"]})
+bis.delete_book(book["id"])
+check("removing a book removes its solutions PDF too", bis.list_books() == [])
 check("no upload leftovers", not list(tmp.glob("*.part")))
 print("all book store checks passed")

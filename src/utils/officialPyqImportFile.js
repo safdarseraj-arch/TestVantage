@@ -184,6 +184,7 @@ function savePendingPaper(meta, { questions, preparedText, notes }) {
           bookPartKind: meta.bookPartKind,
           bookPageStart: meta.bookPageStart,
           bookPageEnd: meta.bookPageEnd,
+          bookNumberOffset: meta.bookNumberOffset,
         }
       : {}),
     exam: meta.exam,

@@ -877,22 +877,56 @@ class BookRangesRequest(BaseModel):
     name: str | None = Field(default=None, max_length=200)
 
 
+class BookSolutionsRequest(BaseModel):
+    source: str = Field(max_length=20)
+    start: int = Field(ge=1)
+    end: int = Field(ge=1)
+    blocks: list[dict[str, Any]] = Field(default_factory=list, max_length=2000)
+
+
 @app.post("/api/ingest/books", tags=["Book ingest"])
 async def book_upload(
     file: UploadFile = File(...),
     name: str = Form(default=""),
     range_pages: int = Form(default=20),
+    for_book: str = Form(default=""),
 ) -> dict[str, Any]:
-    """Keep a whole book PDF on disk and propose page ranges (bookmarks / chapter headings). Local; no AI."""
+    """Keep a whole book PDF on disk and propose page ranges (bookmarks / chapter headings). Local; no AI.
+    With `for_book` the PDF is that book's separate solutions PDF."""
     import asyncio
 
     import book_ingest_store as bis
 
     try:
-        book = await asyncio.to_thread(bis.save_book, name, file.filename or "book.pdf", file.file, range_pages)
-    except ValueError as exc:
+        book = await asyncio.to_thread(
+            bis.save_book, name, file.filename or "book.pdf", file.file, range_pages, for_book.strip() or None
+        )
+    except (bis.BookNotFoundError, ValueError) as exc:
         raise _book_http_error(exc) from exc
     return {"ok": True, "book": book}
+
+
+@app.get("/api/ingest/books/{book_id}/solutions", tags=["Book ingest"])
+async def book_solutions_get(book_id: str) -> dict[str, Any]:
+    """Answers / solutions read so far for the book (its later pages and its solutions PDF)."""
+    import book_ingest_store as bis
+
+    try:
+        return {"ok": True, "blocks": bis.get_solution_blocks(book_id)}
+    except (bis.BookNotFoundError, ValueError) as exc:
+        raise _book_http_error(exc) from exc
+
+
+@app.put("/api/ingest/books/{book_id}/solutions", tags=["Book ingest"])
+async def book_solutions_save(book_id: str, body: BookSolutionsRequest) -> dict[str, Any]:
+    """Keep the answer / solution blocks of one page range; replaces what the same range gave before."""
+    import book_ingest_store as bis
+
+    try:
+        blocks = bis.save_solution_blocks(book_id, body.source, body.start, body.end, body.blocks)
+    except (bis.BookNotFoundError, ValueError) as exc:
+        raise _book_http_error(exc) from exc
+    return {"ok": True, "blocks": blocks}
 
 
 @app.get("/api/ingest/books", tags=["Book ingest"])

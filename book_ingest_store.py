@@ -28,6 +28,9 @@ _lock = threading.Lock()
 _CHAPTER_RE = re.compile(r"^\s*(?:chapter|unit|lesson)\s*[-:#.]?\s*(\d{1,3}|[ivxlc]{1,6})\b", re.I)
 _HEADING_SCAN_LINES = 8
 _RANGE_STATUSES = {"new", "reading", "done", "skipped", "failed"}
+_SOLUTION_SOURCES = {"book", "solutions"}
+MAX_SOLUTION_BLOCK_CHARS = 200_000
+MAX_SOLUTION_STORE_BYTES = 40 * 1024 * 1024
 
 
 class BookNotFoundError(LookupError):
@@ -46,6 +49,10 @@ def _meta_path(book_id: str) -> Path:
 
 def _pdf_path(book_id: str) -> Path:
     return _book_dir(book_id) / "book.pdf"
+
+
+def _solutions_path(book_id: str) -> Path:
+    return _book_dir(book_id) / "solutions.json"
 
 
 def _read_meta(book_id: str) -> dict[str, Any]:
@@ -132,7 +139,8 @@ def propose_ranges(pages: int, chapters: list[dict[str, Any]], max_pages: int = 
 
 
 def _summary(meta: dict[str, Any]) -> dict[str, Any]:
-    return {k: meta[k] for k in ("id", "name", "fileName", "pages", "textLayer", "chapterSource", "chapters", "ranges", "createdAt", "updatedAt") if k in meta}
+    keys = ("id", "name", "fileName", "pages", "textLayer", "chapterSource", "chapters", "ranges", "role", "forBook", "solutionsBookId", "createdAt", "updatedAt")
+    return {k: meta[k] for k in keys if k in meta}
 
 
 def _read_outline(path: Path) -> tuple[int, bool, list[dict[str, Any]], str]:
@@ -156,8 +164,40 @@ def _read_outline(path: Path) -> tuple[int, bool, list[dict[str, Any]], str]:
     return pages, text_layer, chapters, source
 
 
-def save_book(name: str, file_name: str, stream: BinaryIO, max_pages: int = DEFAULT_RANGE_PAGES) -> dict[str, Any]:
-    """Store the PDF (same file → same book, progress kept) and propose page ranges."""
+def _link_solutions(questions_id: str, solutions_id: str) -> None:
+    """Call with the lock held. A book has at most one solutions PDF; a new one replaces the link."""
+    book = _read_meta(questions_id)
+    sol = _read_meta(solutions_id)
+    if sol.get("role") != "solutions" and (sol.get("solutionsBookId") or any(r.get("status") == "done" for r in sol.get("ranges") or [])):
+        raise ValueError(f"“{sol.get('name')}” is stored as a question book with pages already read. Upload the solutions PDF itself.")
+    old = book.get("solutionsBookId")
+    if old and old != solutions_id and _meta_path(old).is_file():
+        prev = _read_meta(old)
+        prev.pop("forBook", None)
+        _write_meta(prev)
+    now = int(time.time() * 1000)
+    book["solutionsBookId"] = solutions_id
+    book["updatedAt"] = now
+    _write_meta(book)
+    sol["role"] = "solutions"
+    sol["forBook"] = questions_id
+    sol["updatedAt"] = now
+    _write_meta(sol)
+
+
+def save_book(
+    name: str,
+    file_name: str,
+    stream: BinaryIO,
+    max_pages: int = DEFAULT_RANGE_PAGES,
+    for_book: str | None = None,
+) -> dict[str, Any]:
+    """Store the PDF (same file → same book, progress kept) and propose page ranges.
+    With `for_book` the PDF is that book's separate solutions PDF."""
+    if for_book:
+        parent = _read_meta(for_book)
+        if parent.get("role") == "solutions":
+            raise ValueError("That PDF is itself a solutions PDF. Open the question book first.")
     BOOKS_DIR.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha256()
     tmp = BOOKS_DIR / f"upload-{time.time_ns()}.part"
@@ -177,6 +217,8 @@ def save_book(name: str, file_name: str, stream: BinaryIO, max_pages: int = DEFA
             if fh.read(5) != b"%PDF-":
                 raise ValueError("Upload a PDF file for a book.")
         book_id = f"bk-{digest.hexdigest()[:16]}"
+        if for_book and book_id == for_book:
+            raise ValueError("This is the book itself. Upload the separate solutions PDF.")
         with _lock:
             folder = _book_dir(book_id)
             if _meta_path(book_id).is_file():
@@ -186,6 +228,9 @@ def save_book(name: str, file_name: str, stream: BinaryIO, max_pages: int = DEFA
                     meta["name"] = _clean_title(name)
                     meta["updatedAt"] = int(time.time() * 1000)
                     _write_meta(meta)
+                if for_book:
+                    _link_solutions(for_book, book_id)
+                    meta = _read_meta(book_id)
                 return {**_summary(meta), "existing": True}
             folder.mkdir(parents=True, exist_ok=True)
             tmp.replace(_pdf_path(book_id))
@@ -210,6 +255,9 @@ def save_book(name: str, file_name: str, stream: BinaryIO, max_pages: int = DEFA
                 "updatedAt": now,
             }
             _write_meta(meta)
+            if for_book:
+                _link_solutions(for_book, book_id)
+                meta = _read_meta(book_id)
             return {**_summary(meta), "existing": False}
     finally:
         tmp.unlink(missing_ok=True)
@@ -250,6 +298,7 @@ def _clean_range(raw: dict[str, Any], pages: int) -> dict[str, Any]:
         "paperIds": ids,
         **({"note": _clean_title(raw.get("note"))} if raw.get("note") else {}),
         **({"lastExercise": _clean_title(raw.get("lastExercise"))} if raw.get("lastExercise") else {}),
+        **({"lastChapter": _clean_title(raw.get("lastChapter"))} if raw.get("lastChapter") else {}),
         **({"found": max(0, int(raw.get("found") or 0))} if raw.get("found") else {}),
     }
 
@@ -283,11 +332,83 @@ def slice_pdf(book_id: str, start: int, end: int) -> bytes:
         return out.tobytes(garbage=3, deflate=True)
 
 
+def _clean_block(raw: dict[str, Any]) -> dict[str, Any] | None:
+    text = str(raw.get("text") or "").strip()[:MAX_SOLUTION_BLOCK_CHARS]
+    if not text:
+        return None
+    return {
+        "title": _clean_title(raw.get("title")),
+        "chapter": _clean_title(raw.get("chapter")),
+        "key": re.sub(r"[^a-z0-9]", "", str(raw.get("key") or "").lower())[:80],
+        **({"continued": True} if raw.get("continued") else {}),
+        "text": text,
+    }
+
+
+def get_solution_blocks(book_id: str) -> list[dict[str, Any]]:
+    """Answers / solutions read so far for a book: from its own later pages and from its solutions PDF."""
+    _read_meta(book_id)
+    path = _solutions_path(book_id)
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [b for b in data.get("blocks") or [] if isinstance(b, dict)]
+
+
+def save_solution_blocks(book_id: str, source: str, start: int, end: int, blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep the answer / solution blocks read from one page range (of the book or of its solutions
+    PDF), replacing what that same range gave before, so they reach an exercise read later."""
+    if source not in _SOLUTION_SOURCES:
+        raise ValueError("Unknown solutions source.")
+    start, end = int(start), int(end)
+    if not (1 <= start <= end):
+        raise ValueError(f"Page range {start}-{end} is not valid.")
+    with _lock:
+        meta = _read_meta(book_id)
+        if meta.get("role") == "solutions":
+            raise ValueError("Keep solutions on the question book, not on its solutions PDF.")
+        kept = [
+            b
+            for b in get_solution_blocks(book_id)
+            if not (b.get("source") == source and int(b.get("start") or 0) == start and int(b.get("end") or 0) == end)
+        ]
+        fresh = [{**c, "source": source, "start": start, "end": end} for c in (_clean_block(b) for b in blocks) if c]
+        out = kept + fresh
+        raw = json.dumps({"blocks": out}, ensure_ascii=False)
+        if len(raw.encode("utf-8")) > MAX_SOLUTION_STORE_BYTES:
+            raise ValueError("Too many solutions stored for this book. Remove the book and upload it again in two parts.")
+        path = _solutions_path(book_id)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(raw, encoding="utf-8")
+        tmp.replace(path)
+        return out
+
+
+def _remove_folder(book_id: str) -> None:
+    folder = _book_dir(book_id)
+    for child in folder.iterdir():
+        child.unlink(missing_ok=True)
+    folder.rmdir()
+
+
 def delete_book(book_id: str) -> None:
+    """Remove the stored PDF. A question book takes its solutions PDF with it; removing a
+    solutions PDF keeps the solutions already read from it on the book."""
     folder = _book_dir(book_id)
     with _lock:
         if not folder.is_dir():
             raise BookNotFoundError("Book not found.")
-        for child in folder.iterdir():
-            child.unlink(missing_ok=True)
-        folder.rmdir()
+        meta = _read_meta(book_id)
+        parent = meta.get("forBook")
+        if parent and _meta_path(parent).is_file():
+            book = _read_meta(parent)
+            if book.get("solutionsBookId") == book_id:
+                book.pop("solutionsBookId", None)
+                _write_meta(book)
+        sol = meta.get("solutionsBookId")
+        if sol and _meta_path(sol).is_file() and _read_meta(sol).get("forBook") == book_id:
+            _remove_folder(sol)
+        _remove_folder(book_id)

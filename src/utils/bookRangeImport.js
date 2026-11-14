@@ -9,8 +9,8 @@
 
 import { pendingPaperFromExtract } from './officialPyqImportFile.js'
 import { extractPyqFileWithGemini } from './pyqGeminiExtract.js'
-import { bookExerciseKey, normalizeBookAnswerKey, splitBookRangeText } from './bookRangeSplit.js'
-import { loadOfficialPyqPendingPapers, isBookPaper } from './officialPyqPendingStore.js'
+import { bookExerciseKey, splitBookRangeText, splitBookSolutionsText } from './bookRangeSplit.js'
+import { applyBookSolutionBlocks } from './bookSolutions.js'
 
 const API = '/api/ingest/books'
 
@@ -26,17 +26,40 @@ async function readJson(res) {
 }
 
 /**
- * @typedef {{ start: number, end: number, title: string, chapter: string, status: 'new' | 'reading' | 'done' | 'skipped' | 'failed', paperIds: string[], note?: string }} BookRange
- * @typedef {{ id: string, name: string, fileName: string, pages: number, textLayer: boolean, chapterSource: string, chapters: Array<{ title: string, page: number }>, ranges: BookRange[], existing?: boolean }} StoredBook
+ * @typedef {{ start: number, end: number, title: string, chapter: string, status: 'new' | 'reading' | 'done' | 'skipped' | 'failed', paperIds: string[], note?: string, found?: number, lastExercise?: string, lastChapter?: string }} BookRange
+ * @typedef {{ id: string, name: string, fileName: string, pages: number, textLayer: boolean, chapterSource: string, chapters: Array<{ title: string, page: number }>, ranges: BookRange[], role?: 'solutions', forBook?: string, solutionsBookId?: string, existing?: boolean }} StoredBook
+ * @typedef {import('./bookRangeSplit.js').BookSolutionBlock & { source?: 'book' | 'solutions', start?: number, end?: number }} StoredSolutionBlock
+ * @typedef {{
+ *   load: (bookId: string) => Promise<StoredSolutionBlock[]>
+ *   save: (bookId: string, entry: { source: 'book' | 'solutions', start: number, end: number, blocks: import('./bookRangeSplit.js').BookSolutionBlock[] }) => Promise<unknown>
+ * }} BookSolutionStore
  */
 
-/** @param {File} file @param {string} name @param {number} [rangePages] @returns {Promise<StoredBook>} */
-export async function uploadBook(file, name, rangePages = 20) {
+/**
+ * @param {File} file @param {string} name @param {number} [rangePages]
+ * @param {string} [forBook] the PDF is this book's separate solutions PDF
+ * @returns {Promise<StoredBook>}
+ */
+export async function uploadBook(file, name, rangePages = 20, forBook = '') {
   const form = new FormData()
   form.append('file', file, file.name || 'book.pdf')
   form.append('name', name || '')
   form.append('range_pages', String(rangePages))
+  if (forBook) form.append('for_book', forBook)
   return (await readJson(await fetch(API, { method: 'POST', body: form }))).book
+}
+
+/** Answers / solutions kept on the server per book, so they reach an exercise read later. @type {BookSolutionStore} */
+export const serverBookSolutionStore = {
+  load: async (bookId) => (await readJson(await fetch(`${API}/${encodeURIComponent(bookId)}/solutions`))).blocks || [],
+  save: async (bookId, entry) =>
+    readJson(
+      await fetch(`${API}/${encodeURIComponent(bookId)}/solutions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry),
+      }),
+    ),
 }
 
 /** @returns {Promise<StoredBook[]>} */
@@ -83,11 +106,6 @@ export function bookPartPaperName(bookName, chapter, title) {
   return parts.join(' – ')
 }
 
-/** Pending book papers of this book, for answer keys printed in a later range. */
-function bookPapersFor(bookId) {
-  return loadOfficialPyqPendingPapers().filter((p) => isBookPaper(p) && p.bookId === bookId && p.status !== 'published')
-}
-
 /**
  * The scan of one part, shaped like a whole upload so the shared build step reads it the
  * same way. The range's structured questions belong to the whole range, so they are not passed.
@@ -117,6 +135,7 @@ function partExtract(extracted, text) {
  *   file?: File the range's PDF (fetched from the server when omitted)
  *   extracted?: any an already-read scan (tests)
  *   storeOriginal?: (paperId: string, file: File) => Promise<unknown>
+ *   solutionStore?: BookSolutionStore | null where answers for other ranges are kept (the server when omitted; null: none)
  *   onProgress?: (pct: number, label?: string) => void
  *   signal?: AbortSignal
  * }} args
@@ -163,6 +182,7 @@ export async function importBookRange(args) {
           bookNoOptions: part.kind === 'examples' || !/\(\s*[A-Da-d]\s*\)/.test(part.text.split(/\\section\*\{(?:ANSWER KEY|HINTS)/)[0]),
           bookPageStart: range.start,
           bookPageEnd: range.end,
+          bookNumberOffset: part.numberOffset || undefined,
         },
         file?.name || `${book.name} p${range.start}-${range.end}.pdf`,
       )
@@ -193,35 +213,106 @@ export async function importBookRange(args) {
     }
   }
 
-  /** An answer key printed in this range for an exercise read in an earlier range. */
-  const lateAnswers = []
-  if (split.unmatchedAnswers.length) {
-    const { applyAnswerFileToOfficialPyqPaper } = await import('./officialPyqAnswerFile.js')
-    const earlier = bookPapersFor(book.id)
-    for (const ans of split.unmatchedAnswers) {
-      const key = bookExerciseKey(ans.title)
-      const target =
-        earlier.find((p) => key && bookExerciseKey(p.bookExercise) === key && (!ans.chapter || p.bookChapter === ans.chapter)) ||
-        earlier.find((p) => key && bookExerciseKey(p.bookExercise) === key)
-      if (!target) {
-        lateAnswers.push({ title: ans.title, applied: false })
-        continue
-      }
-      try {
-        const numericOptions =
-          /\(\s*[1-4]\s*\)/.test(ans.text) &&
-          !/\(\s*[a-dA-D]\s*\)/.test(ans.text) &&
-          (target.questions || []).some((q) => (q.options || []).filter((o) => String(o).trim()).length >= 4)
-        const res = applyAnswerFileToOfficialPyqPaper(target.id, normalizeBookAnswerKey(ans.text, { numericOptions }), {
-          fileName: `${book.name} p${range.start}-${range.end}`,
-        })
-        lateAnswers.push({ title: ans.title, applied: res?.ok !== false, paperLabel: target.paperLabel })
-      } catch {
-        lateAnswers.push({ title: ans.title, applied: false, paperLabel: target.paperLabel })
-      }
+  // Answer keys printed here for an exercise of another range: kept, so an exercise read
+  // later gets them too; and what was kept from other ranges or the solutions PDF goes on
+  // the exercises just read.
+  const late = split.unmatchedAnswers.map((a) => ({ title: a.title, chapter: a.chapter, key: bookExerciseKey(a.title), text: a.text }))
+  const solutionStore = args.solutionStore === undefined ? serverBookSolutionStore : args.solutionStore
+  /** @type {StoredSolutionBlock[]} */
+  let stored = []
+  let storeError = ''
+  if (solutionStore) {
+    try {
+      await solutionStore.save(book.id, { source: 'book', start: range.start, end: range.end, blocks: late })
+      stored = await solutionStore.load(book.id)
+    } catch (e) {
+      storeError = e instanceof Error ? e.message : String(e)
+    }
+  }
+  const lateAnswers = applyBookSolutionBlocks({ bookId: book.id, blocks: late, fileName: `${book.name} p${range.start}-${range.end}` }).map(
+    (r) => ({
+      title: r.title,
+      chapter: r.chapter,
+      applied: r.applied.some((x) => x.ok),
+      paperLabel: r.applied.map((x) => x.paperLabel).join(', '),
+      ...(r.reason ? { reason: r.reason } : {}),
+    }),
+  )
+  const ids = parts.map((p) => p.paperId).filter(Boolean)
+  const fromOtherRanges = stored.filter((b) => !(b.source === 'book' && b.start === range.start && b.end === range.end))
+  const keptApplied = ids.length
+    ? applyBookSolutionBlocks({
+        bookId: book.id,
+        blocks: fromOtherRanges.map((b) => ({ ...b, fileName: storedBlockFileName(book, b) })),
+        onlyPaperIds: /** @type {string[]} */ (ids),
+      })
+        .filter((r) => r.applied.some((x) => x.ok))
+        .map((r) => ({ title: r.title, paperLabel: r.applied.map((x) => x.paperLabel).join(', ') }))
+    : []
+  if (keptApplied.length) {
+    const { getOfficialPyqPendingPaper } = await import('./officialPyqPendingStore.js')
+    for (const p of parts) {
+      const cards = p.paperId ? getOfficialPyqPendingPaper(p.paperId)?.questions || [] : []
+      if (!cards.length) continue
+      p.answered = cards.filter(hasCardAnswer).length
+      p.solved = cards.filter((q) => String(q.solution || '').trim()).length
     }
   }
 
   const lastExercise = [...split.parts].reverse().find((p) => p.kind === 'exercise')?.title || ''
-  return { parts, skipped: split.skipped, lateAnswers, lastExercise }
+  return { parts, skipped: split.skipped, lateAnswers, keptApplied, storeError, lastExercise }
+}
+
+/** @param {Record<string, any>} q */
+function hasCardAnswer(q) {
+  return q.correctIndex != null || q.correctInteger != null || q.correctNumerical != null || Boolean(q.correctIndices?.length)
+}
+
+/** @param {StoredBook} book @param {StoredSolutionBlock} b */
+function storedBlockFileName(book, b) {
+  return b.source === 'solutions' ? `${book.name} solutions PDF p${b.start}-${b.end}` : `${book.name} p${b.start}-${b.end}`
+}
+
+/**
+ * Read one page range of the book's separate solutions PDF: each exercise's answers and
+ * solutions are kept on the server and put on that exercise's pending paper when it has been
+ * read (else when it is read later).
+ * @param {{
+ *   book: StoredBook the question book
+ *   solutionsBook: StoredBook
+ *   range: BookRange a range of the solutions PDF
+ *   continues?: { title?: string, chapter?: string } where the previous range of the solutions PDF ended
+ *   file?: File
+ *   text?: string already-read text (tests)
+ *   solutionStore?: BookSolutionStore
+ *   onProgress?: (pct: number, label?: string) => void
+ *   signal?: AbortSignal
+ * }} args
+ */
+export async function importSolutionsRange(args) {
+  const { book, solutionsBook, range } = args
+  let text = args.text
+  if (text == null) {
+    const file = args.file || (await fetchBookSlice(solutionsBook, range.start, range.end))
+    const { recognizeWithMathpix } = await import('./mathpixOcr.js')
+    text = await recognizeWithMathpix(file, (p) => args.onProgress?.(Math.min(90, Number(p) || 0), 'Reading with Mathpix…'), {
+      signal: args.signal,
+      format: 'latex',
+    })
+  }
+  if (args.signal?.aborted) throw new DOMException('Stopped', 'AbortError')
+  const split = splitBookSolutionsText(String(text ?? ''), { chapter: range.chapter, continues: args.continues })
+  args.onProgress?.(95, 'Putting the solutions on the exercises…')
+  await (args.solutionStore || serverBookSolutionStore).save(book.id, {
+    source: 'solutions',
+    start: range.start,
+    end: range.end,
+    blocks: split.blocks,
+  })
+  const results = applyBookSolutionBlocks({
+    bookId: book.id,
+    blocks: split.blocks,
+    fileName: `${book.name} solutions PDF p${range.start}-${range.end}`,
+  })
+  return { blocks: results, last: split.last }
 }

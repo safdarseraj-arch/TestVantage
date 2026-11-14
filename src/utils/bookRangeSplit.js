@@ -453,6 +453,62 @@ export function splitBookRangeText(raw, opts = {}) {
 }
 
 /**
+ * @typedef {{ title: string, chapter: string, key: string, text: string, continued?: boolean }} BookSolutionBlock
+ */
+
+/**
+ * One page range of a separate solutions PDF, cut per exercise: a chapter heading sets the
+ * chapter, an exercise heading ("Exercise 3.1", "Solutions to Exercise 2", "Answers – Level 1")
+ * opens that exercise's block. A plain "Answers" / "Hints & Solutions" heading stays in the
+ * block it is in. Text before the first heading belongs to the exercise the previous range
+ * ended in.
+ * @param {string} raw Mathpix text
+ * @param {{ chapter?: string, continues?: { title?: string, chapter?: string } }} [opts]
+ * @returns {{ blocks: BookSolutionBlock[], last: { title: string, chapter: string } }}
+ */
+export function splitBookSolutionsText(raw, opts = {}) {
+  const from = opts.continues || {}
+  let chapter = clean(from.chapter) || clean(opts.chapter)
+  /** @type {Array<{ title: string, chapter: string, lines: string[], continued?: boolean }>} */
+  const blocks = []
+  let cur = { title: clean(from.title), chapter, lines: [], continued: Boolean(clean(from.title)) }
+  const push = () => {
+    if (cur.lines.some((l) => l.trim())) blocks.push(cur)
+  }
+  for (const line of String(raw ?? '').replace(/\r\n?/g, '\n').split('\n')) {
+    const head = classifyBookHeading(line, true)
+    if (head?.kind === 'chapter') {
+      push()
+      chapter = head.title
+      cur = { title: '', chapter, lines: [] }
+      continue
+    }
+    let title = ''
+    if (head?.kind === 'exercise' || head?.kind === 'examples') title = head.title
+    else if (head?.kind === 'answers') {
+      const named = clean(head.title.match(ANSWERS_HEAD_RE)?.[1] || head.title.match(/\bto\s+(.+)$/i)?.[1] || '')
+      if (EXERCISE_RE.test(named) || EXAMPLES_HEAD_RE.test(named)) title = named
+      else continue
+    }
+    if (!title) {
+      cur.lines.push(line)
+      continue
+    }
+    push()
+    cur = { title, chapter, lines: [] }
+  }
+  push()
+  const out = blocks.map((b) => ({
+    title: b.title,
+    chapter: b.chapter,
+    key: b.title ? bookExerciseKey(b.title) : '',
+    text: b.lines.join('\n').trim(),
+    ...(b.continued ? { continued: true } : {}),
+  }))
+  return { blocks: out, last: { title: cur.title, chapter: cur.chapter } }
+}
+
+/**
  * An answer block names its exercise ("Answers – Exercise 2", or "Exercise 2" lines inside
  * one key for the whole chapter); without a name it is the key of the exercise just before it.
  * @param {{ title: string, chapter: string, lines: string[] }} block

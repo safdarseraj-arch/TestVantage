@@ -79,6 +79,7 @@ function knownOfficialPyqStatus(status) {
  *   bookPartKind?: 'exercise' | 'examples'
  *   bookPageStart?: number
  *   bookPageEnd?: number
+ *   bookNumberOffset?: number questions of this exercise printed before this part (a part that continues an exercise)
  * }} OfficialPyqPendingPaper
  */
 
@@ -126,6 +127,7 @@ export function bookPaperFields(paper) {
     bookPartKind: paper.bookPartKind === 'examples' ? 'examples' : 'exercise',
     bookPageStart: page(paper.bookPageStart),
     bookPageEnd: page(paper.bookPageEnd),
+    bookNumberOffset: page(paper.bookNumberOffset),
   }
 }
 

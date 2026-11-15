@@ -11,7 +11,15 @@ const SUBJECT_RE =
   /^(?:PART\s*[-\u2013\u2014]?\s*(?:IV|I{1,3}|[A-D1-4])\s*[:.\-\u2013\u2014]?\s*)?(PHYSICS|CHEMISTRY|MATHEMATICS|MATHS?|BIOLOGY)\s*(?:[:\-\u2013\u2014(|][^\n]{0,24})?$/i
 /** Section instructions and paragraph headings sit between one solution and the next question. */
 const SKIP_HEAD_RE =
-  /^(?:SECTION\b|Section\s*[-\u2013\u2014:]?\s*(?:[IVX]+|[A-D1-4])\b|PARAGRAPH\b|Paragraph\s+(?:for|\d|[IVX]+\b)|PASSAGE\b|Passage\s+(?:for|\d|[IVX]+\b)|COMPREHENSION\b)/
+  /^(?:SECTION\b|Section\s*[-\u2013\u2014:^]?\s*(?:[IVX]+|[A-D1-4])\b|PARAGRAPH\b|Paragraph\s+(?:for|\d|[IVX]+\b)|PASSAGE\b|Passage\s+(?:for|\d|[IVX]+\b)|COMPREHENSION\b|.*\bMaximum\s+Marks\b)/i
+/** Marking-scheme / next-section chrome that Mathpix sometimes leaves after Sol. */
+const SOLUTION_TAIL_CHROME_RE =
+  /(?:^|\n)\s*(?:\\(?:sub)*section\*?\{)?\s*SECTION[\s^]*\d|\\(?:sub)*section\*?\{[^}\n]*SECTION[\s^]*\d|\\(?:sub)*section\*?\{(?:PHYSICS|CHEMISTRY|MATHEMATICS|MATHS?|BIOLOGY)\}|(?:^|\n)\s*\([A-D]\)(?:\s*,\s*\([A-D]\))*(?:\s+and\s+\([A-D]\))?\.?\s*(?:ONE OR MORE|ONLY three options|ONLY ONE)|(?:^|\n)\s*ONE OR MORE THAN ONE of these four|(?:^|\n)\s*ONLY ONE of these four|(?:^|\n)\s*Answer to each question will be evaluated|(?:^|\n)\s*For each question,\s*choose the option|(?:^|\n)\s*\\item\[-\]\s*(?:This section|Answer to each|For each question)|(?:^|\n)\s*(?:Full Marks|Maximum\s+Marks)\s*:|(?:^|\n)\s*[^\n]{0,40}marking scheme/i
+/** A later question marker left inside a solution ("*Q.3", "\item[] *Q. 4", "*Q^7."). */
+const MERGED_Q_IN_SOL_RE =
+  /(?:^|\n)\s*(?:\\item\s*\[[^\]]*\]\s*)?\*{0,2}\s*Q\s*(?:\^\s*\{?\s*|\.?\s*)?\d{1,3}\s*\}?\s*[.):]?(?=\s|$|[A-Z\\$])/im
+const SMASHED_DELTA_RE =
+  /(?:\\\\\s*Delta\s*\\mathrm\{ORT\}|(?:\\mathrm\{)?Delta\}?\s*\\mathrm\{ORT\}|(?<![A-Za-z\\])Delta\s*\\mathrm\{ORT\}|(?<![A-Za-z\\])Delta(?=\s*(?:ORT|\()))/i
 /**
  * Question starts as institutes print them: "Q.1", "Q 1", "1.", and FIITJEE's class-XI mark
  * "*Q.3" / "*Q8." (star, optional dot after Q). Plain "1." / "2." still count for Allen-style files.
@@ -280,20 +288,13 @@ function readBlock(lines) {
     }
     rest.push(raw)
   }
-  let solution = rest
-    .join('\n')
-    .replace(/\\(?:begin|end)\{(?:itemize|enumerate)\}/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  let solution = rest.join('\n').replace(/\n{3,}/g, '\n\n').trim()
   if (!solMarked) solution = solution.replace(SOLUTION_RE, '').replace(BARE_SOL_RE, '').trim()
   // Never keep the next question inside this solution (Mathpix sometimes leaves "\item[] *Q. 4 …").
   const cut = solution.search(MERGED_Q_IN_SOL_RE)
   if (cut > 0) solution = solution.slice(0, cut).trim()
   else if (cut === 0) solution = ''
-  solution = solution
-    .replace(/(?:\$\$\s*)?(?:\\item\s*\[[^\]]*\]\s*)+$/g, '')
-    .replace(/(?:\$\$\s*)+$/g, '')
-    .trim()
+  solution = cleanInstituteSolutionBody(solution)
   return { question, answer, solution }
 }
 
@@ -305,8 +306,66 @@ export function instituteAnswerCount(read) {
   return n
 }
 
-/** A later question marker left inside a solution ("*Q.3", "\item[] *Q. 4"). */
-const MERGED_Q_IN_SOL_RE = /(?:^|\n)\s*(?:\\item\s*\[[^\]]*\]\s*)?\*{0,2}\s*Q\.?\s*\d{1,3}\b/m
+/**
+ * Drop section / marking-scheme chrome, the next question, empty pictures, and smashed "Delta ORT"
+ * OCR so students never see "SECTION 1 (Maximum Marks…)" or the word "Delta" in a solution.
+ * @param {unknown} text
+ */
+export function cleanInstituteSolutionBody(text) {
+  let s = String(text ?? '')
+  if (!s.trim()) return ''
+  const cutAt = (re) => {
+    const at = s.search(re)
+    if (at > 0) s = s.slice(0, at)
+    else if (at === 0) s = ''
+  }
+  cutAt(SOLUTION_TAIL_CHROME_RE)
+  cutAt(MERGED_Q_IN_SOL_RE)
+  // Mathpix row-break turns \Delta / \triangle into "\\ Delta \mathrm{ORT}".
+  s = s.replace(/\\\\\s*Delta\s*\\mathrm\{ORT\}/gi, '\\triangle\\mathrm{ORT}')
+  s = s.replace(/(?:\\mathrm\{)?Delta\}?\s*\\mathrm\{ORT\}/gi, '\\triangle\\mathrm{ORT}')
+  s = s.replace(/(?<![A-Za-z])Delta\s*\\mathrm\{ORT\}/gi, '\\triangle\\mathrm{ORT}')
+  s = s.replace(/(?<![A-Za-z\\])Delta(?=\s*(?:ORT|ORT\b|\())/g, '\\triangle ')
+  s = s.replace(/!\[\]\(\s*\)/g, '')
+  s = s.replace(/\\item\s*\[[^\]]*\]\s*/g, '')
+  s = s.replace(/\\end\{aligned\}\$\$/g, '\\end{aligned}')
+  s = s
+    .replace(/\\(?:begin|end)\{(?:itemize|enumerate)\}/g, '')
+    .replace(/(?:\$\$\s*)+$/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return s
+}
+
+/**
+ * Human reason when a stored solution still has institute chrome / smashed symbols ('' when clean).
+ * Used by Quality check and Auto-fix.
+ * @param {unknown} text
+ */
+export function instituteSolutionDirtyReason(text) {
+  const raw = String(text ?? '')
+  if (!raw.trim()) return ''
+  const cleaned = cleanInstituteSolutionBody(raw)
+  if (cleaned === raw.trim()) return ''
+  if (SOLUTION_TAIL_CHROME_RE.test(raw) || /Maximum\s+Marks|marking scheme/i.test(raw)) {
+    return 'The solution still has section instructions or a marking scheme after Sol.; they are removed'
+  }
+  if (MERGED_Q_IN_SOL_RE.test(raw)) {
+    return 'The next question was glued into this solution; it is cut off'
+  }
+  if (SMASHED_DELTA_RE.test(raw)) {
+    return 'A smashed “Delta” in the solution is drawn as △'
+  }
+  if (/!\[\]\(\s*\)/.test(raw)) {
+    return 'Empty picture placeholders are removed from the solution'
+  }
+  return ''
+}
+
+/** @param {unknown} text */
+export function instituteSolutionLooksDirty(text) {
+  return Boolean(instituteSolutionDirtyReason(text))
+}
 
 /** Solutions that still contain the next question — the split failed. */
 export function instituteSolutionsMergedCount(read) {
@@ -450,7 +509,8 @@ export function readInstituteSolutions(raw, opts = {}) {
     const key = `${b.subject || `#${b.segment}`}:${b.n}`
     if (!entries.has(key)) entries.set(key, read)
   }
-  if (entries.size >= 2) return { entries, subjects, layout: 'repeated_questions', sectionText: '' }
+  // One Sol. block is enough; do not replace it with an answer-key read of the marking scheme.
+  if (entries.size >= 1) return { entries, subjects, layout: 'repeated_questions', sectionText: '' }
   const plain = readAnswerFileSection(raw)
   if (plain?.entries?.size) {
     /** @type {Map<string, { answer: string, solution: string, question: string }>} */
@@ -458,7 +518,7 @@ export function readInstituteSolutions(raw, opts = {}) {
     for (const [key, e] of plain.entries) asRead.set(key, { answer: e.answer || '', solution: e.solution || '', question: '' })
     return { entries: asRead, subjects: plain.subjects, layout: 'answers_only', sectionText: plain.sectionText }
   }
-  return entries.size ? { entries, subjects, layout: 'repeated_questions', sectionText: '' } : null
+  return null
 }
 
 /** The institute's question without its options (the suggestion an admin may take by hand). @param {unknown} text */

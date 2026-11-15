@@ -106,7 +106,7 @@ const saved = applyOfficialPyqPublishedMeta(paper.id, 0, {
   questionType: 'single_correct',
   examIds: ['jee-advanced'],
   toughnessLevel: 6,
-  source: 'Official PYQ',
+  source: 'JEE Advanced 2024 Paper 2',
   correctIndex: 2,
   correctIndices: [],
   correctInteger: '',
@@ -124,12 +124,19 @@ assert.equal(row.topic, 'Determinants')
 assert.equal(row.questionType, 'single_correct')
 assert.deepEqual(row.examIds, ['jee-advanced'])
 assert.equal(row.toughnessLevel, 6)
-assert.equal(row.source, 'Official PYQ')
+assert.equal(row.source, 'JEE Advanced 2024 Paper 1', 'Hybrid AI Paper 2 guess is replaced by the upload session')
 assert.equal(row.correctIndex, 2)
 assert.equal(row.solution, 'Updated solution')
 assert.equal(row.text, stem)
 assert.deepEqual(row.options, options)
 assert.equal(getOfficialPyqPendingPaper(paper.id).status, 'approved')
+
+updateOfficialPyqPendingPaper(paper.id, {
+  questions: getOfficialPyqPendingPaper(paper.id).questions.map((q, i) =>
+    i === 1 ? { ...q, source: 'JEE Advanced 2024 Paper 2' } : q,
+  ),
+  allowPublishedQuestionWrite: true,
+})
 
 const again = applyOfficialPyqPublishedMeta(paper.id, 0, {
   questionId: row.id,
@@ -141,7 +148,7 @@ const again = applyOfficialPyqPublishedMeta(paper.id, 0, {
   questionType: 'single_correct',
   examIds: ['jee-advanced'],
   toughnessLevel: 6,
-  source: 'Official PYQ',
+  source: 'JEE Advanced 2024 Paper 2',
   correctIndex: 2,
   solution: 'Updated solution',
 })
@@ -150,6 +157,11 @@ assert.equal(getOfficialPyqPendingPaper(paper.id).questions[0].id, row.id)
 assert.equal(getOfficialPyqPendingPaper(paper.id).questions[0].section, 'Calculus')
 assert.equal(getOfficialPyqPendingPaper(paper.id).questions[0].text, stem)
 assert.equal(getOfficialPyqPendingPaper(paper.id).status, 'approved')
+assert.equal(
+  getOfficialPyqPendingPaper(paper.id).questions[1].source,
+  'JEE Advanced 2024 Paper 1',
+  'saving one card also aligns every neighbour to the paper source',
+)
 
 const kept = applyOfficialPyqPublishedMeta(paper.id, 1, {
   questionId: 'MAM00007A2024',
@@ -162,6 +174,7 @@ const kept = applyOfficialPyqPublishedMeta(paper.id, 1, {
 assert.equal(kept.ok, true)
 assert.equal(getOfficialPyqPendingPaper(paper.id).questions[1].id, 'MAM00007A2024')
 assert.equal(getOfficialPyqPendingPaper(paper.id).questions[1].text, 'Already numbered question.')
+assert.equal(getOfficialPyqPendingPaper(paper.id).questions[1].source, 'JEE Advanced 2024 Paper 1')
 
 updateOfficialPyqPendingPaper(paper.id, { status: 'published' })
 const locked = applyOfficialPyqPublishedMeta(paper.id, 0, {

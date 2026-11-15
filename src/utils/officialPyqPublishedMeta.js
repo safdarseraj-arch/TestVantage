@@ -6,6 +6,7 @@
  */
 
 import { ALL_SUBJECTS, LEGACY_SUBJECTS } from '../data/subjects.js'
+import { officialPyqPaperSourceName } from '../data/officialPyqSources.js'
 import { isAdminLoggedIn } from './auth.js'
 import { isTemporaryQuestionId } from './classifiedQuestionId.js'
 import {
@@ -13,6 +14,12 @@ import {
   officialPyqCardIsAdminEdited,
   updateOfficialPyqPendingPaper,
 } from './officialPyqPendingStore.js'
+
+/** Official / replica papers use the paper's own name; Hybrid AI must not invent Paper 1 vs Paper 2. */
+function lockedPaperSource(paper) {
+  if (paper?.paperKind === 'other' || paper?.paperKind === 'book') return ''
+  return officialPyqPaperSourceName(paper)
+}
 
 const BODY_KEYS = [
   'text',
@@ -195,7 +202,11 @@ export function applyOfficialPyqPublishedMeta(paperId, index, patch) {
     return { ok: false, error: 'This question changed. Reopen the preview and try again.' }
   }
 
-  const tagged = overlayOfficialPyqPublishedMeta(prev, patch)
+  const paperSource = lockedPaperSource(paper)
+  const tagged = overlayOfficialPyqPublishedMeta(
+    prev,
+    paperSource ? { ...patch, source: paperSource } : patch,
+  )
   if (prev.id !== undefined) tagged.id = prev.id
   restoreBody(tagged, prev)
   // keepAdminEditedOfficialPyqCards puts back an edited card's old answer unless this save is newer.
@@ -210,6 +221,14 @@ export function applyOfficialPyqPublishedMeta(paperId, index, patch) {
   }
 
   questions[idx] = tagged
+  // One wrong Hybrid AI "Paper 2" guess used to leave neighbours on "Paper 1". Keep every card aligned.
+  if (paperSource) {
+    for (let i = 0; i < questions.length; i += 1) {
+      if (questions[i] && String(questions[i].source ?? '') !== paperSource) {
+        questions[i] = { ...questions[i], source: paperSource }
+      }
+    }
+  }
   const saved = updateOfficialPyqPendingPaper(paper.id, {
     questions,
     allowPublishedQuestionWrite: true,

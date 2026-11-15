@@ -37,6 +37,8 @@ if (typeof globalThis.window === 'undefined') globalThis.window = globalThis
 
 const {
   instituteCardNotes,
+  cleanInstituteSolutionBody,
+  instituteSolutionDirtyReason,
   instituteStemOnly,
   instituteTextDifference,
   normalizeInstituteAnswer,
@@ -749,6 +751,51 @@ await test('when Mathpix is thin, the PDF text with more answers is preferred', 
     { institute: 'FIITJEE', fileName: 'JA2024P1.pdf', textSource: 'pdf' },
   )
   assert.match(note, /PDF's own text|PDF’s own text/)
+})
+
+await test('FIITJEE Sol. with smashed Delta and SECTION marking scheme drops chrome and draws triangle', () => {
+  const messy = [
+    'Mathematics',
+    '*Q.4 Consider the ellipse.',
+    '(A) q=2 (B) p=3 (C) area (D) none',
+    'Ans. A, C',
+    'Sol.',
+    'Let T be $(3 \\cos \\theta, 2 \\sin \\theta)$\\begin{aligned}',
+    '& \\Rightarrow \\operatorname{Ar}( \\\\ Delta \\mathrm{ORT})=\\frac{3}{2} \\\\',
+    '& \\Rightarrow p=3 \\sqrt{3}, q=2',
+    '\\end{aligned}$$',
+    ' SECTION^1 (Maximum Marks: 12)',
+    '',
+    '(B),',
+    '(C) and',
+    '(D). ONE OR MORE THAN ONE of these four option(s) is(are) correct answer(s).',
+    '\\item[-] For each question, choose the option(s).',
+  ].join('\n')
+  const sol = readInstituteSolutions(messy, { institute: 'FIITJEE' }).entries.get('mathematics:4').solution
+  assert.ok(sol, 'Q.4 solution is kept (not replaced by a marking-scheme answer-key read)')
+  assert.doesNotMatch(sol, /SECTION|Maximum Marks|ONE OR MORE|For each question/i)
+  assert.doesNotMatch(sol, /(?<![\\A-Za-z])Delta(?![A-Za-z])/)
+  assert.match(sol, /\\triangle\\mathrm\{ORT\}/)
+  assert.match(sol, /p=3 \\sqrt\{3\}/)
+  const healed = cleanInstituteSolutionBody(
+    'done.$$\n SECTION^1 (Maximum Marks: 12)\n\n(B),\n(C) and\n(D). ONE OR MORE THAN ONE of these four',
+  )
+  assert.equal(healed, 'done.')
+  const swallowed = cleanInstituteSolutionBody('Area is 3/2.\n*Q^7. Next stem starts here\nAns. A')
+  assert.equal(swallowed, 'Area is 3/2.')
+  assert.match(
+    instituteSolutionDirtyReason('done.\n SECTION^1 (Maximum Marks: 12)\nFor each question, choose the option'),
+    /section instructions|marking scheme/i,
+  )
+  assert.equal(instituteSolutionDirtyReason('Clean solution with \\triangle ORT only.'), '')
+  const midLine = cleanInstituteSolutionBody(
+    'x=L/18\n\\end{aligned} \\section*{SECTION^4 (Maximum Marks: 12)}\n\n(B),\n(C) and\n(D). ONLY ONE of these four',
+  )
+  assert.equal(midLine, 'x=L/18\n\\end{aligned}')
+  assert.doesNotMatch(midLine, /SECTION|Maximum Marks|ONLY ONE/i)
+  const subjectTail = cleanInstituteSolutionBody('V_0=200 volts\n\\end{aligned}\n\n \\section*{Chemistry} \\section*{SECTION^1 (Maximum Marks: 12)}')
+  assert.equal(subjectTail, 'V_0=200 volts\n\\end{aligned}')
+  assert.doesNotMatch(subjectTail, /Chemistry|SECTION/i)
 })
 
 await test('Mathpix glued "\\item[] *Q. 4" onto Q.2 is split; Q.2 solution does not keep Q.3/Q.4', () => {

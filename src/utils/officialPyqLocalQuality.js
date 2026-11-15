@@ -71,7 +71,11 @@ import { officialPyqDrawnCutOff, officialPyqDrawnProblems } from './officialPyqD
 import { officialPyqMatchListLayoutProblems, withoutHeadingOnRowLabel } from './matchListLayoutCheck.js'
 import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
 import { officialPyqScanStructureReason } from './officialPyqScanStructures.js'
-import { instituteQualityLines } from './instituteSolutionsParse.js'
+import {
+  cleanInstituteSolutionBody,
+  instituteQualityLines,
+  instituteSolutionDirtyReason,
+} from './instituteSolutionsParse.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
@@ -223,7 +227,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 41
+export const LOCAL_QUALITY_REVISION = 42
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -971,6 +975,8 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, ite
   }
   const printed = solutionRules ? printedSolutionReason(q, fresh) : ''
   if (printed) return printed
+  const instituteSol = instituteSolutionDirtyReason(q?.solution)
+  if (instituteSol) return instituteSol
   if (isMatrixGridCard(q)) return drawnReason(q)
   const leak = stemLeakReason(q, fresh, items)
   if (leak) return leak
@@ -983,6 +989,15 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, ite
   if (stemMissingScanFigures(q, fresh)) return 'The scan prints a figure for this question that the card lost; it is put back'
   if (optionsCutShortOfScan(q, fresh)) return 'An option is cut short; the scan prints more of it, which is put back'
   return (originalConfirmsWording(q) ? '' : scanLossReason(q)) || drawnReason(q)
+}
+
+/** Strip SECTION / marking-scheme / next-Q / smashed Delta left in an institute (or Hybrid) solution. */
+function withInstituteSolutionRepaired(q) {
+  const raw = String(q?.solution ?? '')
+  if (!raw.trim() || !instituteSolutionDirtyReason(raw)) return q
+  const cleaned = cleanInstituteSolutionBody(raw)
+  if (cleaned === raw.trim()) return q
+  return { ...q, solution: cleaned }
 }
 
 /** Named after every other problem: one reason shows per card, and a missing key is fixed without touching the wording. */
@@ -1052,6 +1067,7 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
     next = { ...rest, answerSource: 'unknown' }
   }
   next = withPrintedSolutionRepaired(next, fresh)
+  next = withInstituteSolutionRepaired(next)
   if (isMatrixGridCard(next)) return next
   next = withStemLeaksRepaired(next, fresh, items)
   const unnumbered = stemWithoutPrintedNumber(next, ocr)
@@ -1363,6 +1379,7 @@ function cardSignature(q) {
 function repairFailingCard(q, ocr) {
   if (q?.adminEdited === true || isMatrixGridCard(q)) return q
   let next = { ...applyStoredOcrCardFixes(q, ocr) }
+  next = withInstituteSolutionRepaired(next)
   const peeled = peelPrintedAnswerFromStem(stripCheckerSentences(String(q?.text ?? '')))
   if (peeled !== String(q?.text ?? '')) next.text = peeled
   const passage = stripCheckerSentences(String(q?.passageText ?? ''))
@@ -1757,6 +1774,7 @@ export function persistOfficialPyqQualityRun(paper) {
           if (!stored[i]) return -1
           if (hasScrapOption(stored[i]) && !hasScrapOption(q)) return i
           if (scanDamageRepaired(stored[i], q)) return i
+          if (instituteSolutionDirtyReason(stored[i]?.solution) && !instituteSolutionDirtyReason(q?.solution)) return i
           if (dropOptionFigureRepeatingStem(stored[i]) !== stored[i] && dropOptionFigureRepeatingStem(q) === q) return i
           const source = ocr || String(full?.preparedText ?? '')
           const fresh = freshCardFor(stored, i, source)

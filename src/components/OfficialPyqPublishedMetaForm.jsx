@@ -17,14 +17,26 @@ import {
   mapHybridSubjectLabelToSlug,
   mapSubjectSlugToHybridLabel,
 } from '../utils/hybridMetadata.js'
+import { officialPyqPaperSourceName } from '../data/officialPyqSources.js'
+import { cleanInstituteSolutionBody } from '../utils/instituteSolutionsParse.js'
 import { answerFieldsFromHybrid } from '../utils/officialPyqReplica.js'
-import { questionTextWithPassage } from '../utils/officialPyqPendingFill.js'
+import {
+  questionTextWithPassage,
+  saveOfficialPyqPaperSource,
+} from '../utils/officialPyqPendingFill.js'
 import {
   applyOfficialPyqPublishedMeta,
   normalizeBankSubjectId,
 } from '../utils/officialPyqPublishedMeta.js'
 import { isOfficialPyqFinalQuestionId } from '../utils/officialPyqPublishFlow.js'
+import { getOfficialPyqPendingPaper } from '../utils/officialPyqPendingStore.js'
 import { loadQuestionBank } from '../utils/questionBank.js'
+
+function paperLockedSource(paperId) {
+  const paper = getOfficialPyqPendingPaper(paperId)
+  if (!paper || paper.paperKind === 'other' || paper.paperKind === 'book') return ''
+  return officialPyqPaperSourceName(paper)
+}
 
 function optionLabel(opt, index) {
   const letter = String.fromCharCode(65 + index)
@@ -45,6 +57,14 @@ function answerKind(questionType) {
 
 function readMeta(question) {
   const q = question && typeof question === 'object' ? question : {}
+  let solution = String(q.solution || '')
+  // Institute OCR often leaves SECTION / marking-scheme chrome and "Delta ORT" after Sol.
+  if (
+    q.solutionSource === 'institute' ||
+    /SECTION[\s^]*\d|Maximum Marks|ONE OR MORE THAN ONE|\\\\\s*Delta\s*\\mathrm\{ORT\}/i.test(solution)
+  ) {
+    solution = cleanInstituteSolutionBody(solution)
+  }
   return {
     subject: normalizeBankSubjectId(q.subject),
     section: String(q.section || q.unit || '').trim(),
@@ -62,7 +82,7 @@ function readMeta(question) {
         : q.correctInteger != null && q.correctInteger !== ''
           ? String(q.correctInteger)
           : '',
-    solution: String(q.solution || ''),
+    solution,
   }
 }
 
@@ -95,7 +115,11 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
 
   const resetKey = paperId + ':' + questionIndex + ':' + String(question?.id ?? '')
   useEffect(() => {
+    if (canEdit && paperId) saveOfficialPyqPaperSource(paperId)
+  }, [canEdit, paperId])
+  useEffect(() => {
     const next = readMeta(question)
+    const locked = paperLockedSource(paperId)
     setSubject(next.subject)
     setSection(next.section)
     setChapter(next.chapter)
@@ -103,7 +127,7 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
     setQuestionType(next.questionType)
     setExamIds(next.examIds)
     setToughness(next.toughness)
-    setSource(next.source)
+    setSource(locked || next.source)
     setAnswerIndex(next.index)
     setAnswerIndices(next.indices)
     setAnswerNumber(next.number)
@@ -111,7 +135,36 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
     setQuestionId(String(question?.id ?? ''))
     setPrevious(null)
     setHybridValues(null)
-  }, [resetKey, question])
+    // Persist a one-time chrome strip so the dirty SECTION / Delta text does not return on reload.
+    const raw = String(question?.solution || '')
+    if (
+      canEdit &&
+      paperId &&
+      next.solution &&
+      next.solution !== raw &&
+      (question?.solutionSource === 'institute' ||
+        /SECTION[\s^]*\d|Maximum Marks|ONE OR MORE THAN ONE/i.test(raw))
+    ) {
+      applyOfficialPyqPublishedMeta(paperId, questionIndex, {
+        questionId: question?.id,
+        expectText: question?.text ?? question?.stem,
+        subject: next.subject || question?.subject,
+        section: next.section || question?.section || question?.unit,
+        chapter: next.chapter || question?.chapter,
+        topic: next.topic || question?.topic,
+        questionType: next.questionType || question?.questionType,
+        examIds: next.examIds.length ? next.examIds : question?.examIds,
+        toughnessLevel: next.toughness || question?.toughnessLevel,
+        source: locked || next.source || question?.source,
+        correctIndex: question?.correctIndex,
+        correctIndices: question?.correctIndices,
+        correctInteger: question?.correctInteger,
+        correctNumerical: question?.correctNumerical,
+        solution: next.solution,
+        solutionSource: question?.solutionSource || 'institute',
+      })
+    }
+  }, [resetKey, question, paperId, canEdit, questionIndex])
 
   const bankQuestions = useMemo(() => {
     try {
@@ -286,7 +339,8 @@ export default function OfficialPyqPublishedMetaForm({ paperId, questionIndex, q
     const examRaw = String(suggestion.exam || '').trim()
     const nextExamIds = examRaw ? [mapHybridExamLabelToSlug(examRaw)] : examIds
     const nextToughness = filledOrKept(suggestion.toughness_level, toughness)
-    const nextSource = filledOrKept(suggestion.source, source)
+    // Never take Hybrid AI's guessed "Paper 1" / "Paper 2" — the upload's session is the source.
+    const nextSource = paperLockedSource(paperId) || source
     const nextSolution = String(suggestion.step_by_step_solution || '').trim() ? String(suggestion.step_by_step_solution).trim() : solution
     const answerRaw = String(suggestion.correct_answer || '').trim()
     const mapped = answerRaw ? answerFieldsFromHybrid(answerRaw) : null

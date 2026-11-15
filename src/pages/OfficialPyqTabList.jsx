@@ -197,9 +197,9 @@ function OfficialPyqTabList({
                     ) : null}
                     <span className="official-pyq-open-label">Open preview</span>
                   </button>
-                  {p.status === 'pending_review' || p.status === 'rejected' ? (
+                  {p.status === 'pending_review' || p.status === 'rejected' || p.status === 'approved' ? (
                     <div className="official-pyq-row-actions">
-                      {p.status === 'pending_review' && onQualityFix ? (
+                      {(p.status === 'pending_review' || p.status === 'approved') && onQualityFix ? (
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"

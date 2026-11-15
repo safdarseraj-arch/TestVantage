@@ -11,6 +11,7 @@
 import { endKeyAnswerFields } from './printedEndSolutions.js'
 import {
   INSTITUTE_NOTE_FIELDS,
+  cleanInstituteSolutionBody,
   instituteAnswerAgrees,
   instituteAnswerText,
   instituteTextDifference,
@@ -18,8 +19,11 @@ import {
   readInstituteSolutions,
 } from './instituteSolutionsParse.js'
 import { instituteOptionOrder, mapInstituteAnswerLetters, matchInstituteEntries } from './instituteSolutionsMatch.js'
+import {
+  officialPyqCardAnswerIsKept,
+  saveOfficialPyqPaperSource,
+} from './officialPyqPendingFill.js'
 import { getOfficialPyqPendingPaper, isOtherPaper, updateOfficialPyqPendingPaper } from './officialPyqPendingStore.js'
-import { officialPyqCardAnswerIsKept } from './officialPyqPendingFill.js'
 import { isOfficialPyqPlaceholder } from './officialPyqMissingSlots.js'
 import { isMatrixGridCard } from './matrixGridPyq.js'
 import { solutionIsOnlyPrintedKeyLine } from './printedAnswerKey.js'
@@ -168,10 +172,15 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
       if (q.answerSource !== 'institute' || before !== instituteAnswerText(next)) answers += 1
     }
     if (entry.solution && !disagrees && !(shuffled && NAMES_OPTION_RE.test(entry.solution)) && solutionIsReplaceable(q)) {
-      if (String(q.solution ?? '').trim() !== entry.solution.trim() || q.solutionSource !== 'institute') solutions += 1
-      next.solution = entry.solution
-      next.solutionSource = 'institute'
-      next.solutionInstitute = institute
+      const solution = cleanInstituteSolutionBody(entry.solution)
+      if (!solution) {
+        /* empty after chrome strip — leave the card as it was */
+      } else {
+        if (String(q.solution ?? '').trim() !== solution || q.solutionSource !== 'institute') solutions += 1
+        next.solution = solution
+        next.solutionSource = 'institute'
+        next.solutionInstitute = institute
+      }
     }
     if (entry.question && instituteTextDifference(q, entry.question)?.differs) {
       next.instituteQuestionText = entry.question
@@ -219,7 +228,12 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
     instituteSolutions: summary,
   })
   if (!saved) return { ok: false, error: 'Could not save the institute answers. Nothing was changed.' }
-  return { ok: true, paper: saved, answers, solutions, disagreements, notFound, textDiffers, noAnswer, layout: read.layout, ...counts }
+  // Keep every card on the paper's own name (Hybrid AI must not leave mixed Paper 1 / Paper 2).
+  if (saved.status === 'approved' || saved.status === 'pending_review') {
+    saveOfficialPyqPaperSource(saved.id)
+  }
+  const latest = getOfficialPyqPendingPaper(saved.id) || saved
+  return { ok: true, paper: latest, answers, solutions, disagreements, notFound, textDiffers, noAnswer, layout: read.layout, ...counts }
 }
 
 /**

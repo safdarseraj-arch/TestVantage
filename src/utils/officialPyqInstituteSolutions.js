@@ -14,6 +14,7 @@ import {
   instituteAnswerAgrees,
   instituteAnswerText,
   instituteTextDifference,
+  pickInstituteSolutionsText,
   readInstituteSolutions,
 } from './instituteSolutionsParse.js'
 import { instituteOptionOrder, mapInstituteAnswerLetters, matchInstituteEntries } from './instituteSolutionsMatch.js'
@@ -228,7 +229,7 @@ export function applyInstituteSolutionsToOfficialPyqPaper(paperId, text, opts) {
  *   notFound: number[], textDiffers: number[], noAnswer?: number[], byContent?: number, byNumber?: number,
  *   unmatched?: string[], unsure?: Array<{ n: number, label: string }>, reordered?: number[], optionsUnmatched?: number[],
  * }} result
- * @param {{ institute: string, fileName?: string, pictures?: { kept: number, failed: number }, pdfStored?: boolean }} info
+ * @param {{ institute: string, fileName?: string, pictures?: { kept: number, failed: number }, pdfStored?: boolean, textSource?: string }} info
  */
 export function instituteResultNote(result, info) {
   const list = (nums) => `Q ${nums.slice(0, 15).join(', ')}${nums.length > 15 ? ' …' : ''}`
@@ -239,6 +240,9 @@ export function instituteResultNote(result, info) {
     `Read ${info.institute} solutions${info.fileName ? ` (“${info.fileName}”)` : ''}: ${result.answers} answer(s) filled, ${result.solutions} solution(s) filled.`,
     `Matched ${result.byContent ?? 0} question(s) by wording and ${result.byNumber ?? 0} by number; ${unmatched.length} institute question(s) not matched; ${unsure.length} not sure.`,
   ]
+  if (info.textSource === 'pdf' || info.textSource === 'pdf-only') {
+    parts.push('Read from the PDF’s own text (clearer than the scan for this file).')
+  }
   if (unsure.length) {
     const shown = unsure
       .slice(0, 6)
@@ -338,8 +342,46 @@ export async function keepInstitutePicturesLocal(paperId, links, opts = {}) {
 }
 
 /**
- * Whole upload: store the PDF, read it with Mathpix, cut its pictures, then put it on the paper.
- * Pictures are cut before the cards are saved, so a background sweep never cuts them from the original.
+ * Read an institute PDF: Mathpix for maths clarity, plus the PDF's own text when the file is
+ * digital (FIITJEE / Allen print PDFs). The scan that yields more answers is used, so a thin
+ * Mathpix read of a long solutions booklet does not drop most questions.
+ * @param {File} file @param {string} institute @param {(pct: number) => void} [onProgress]
+ */
+export async function readInstituteSolutionsFileText(file, institute, onProgress) {
+  const name = cleanInstituteName(institute)
+  const isPdf = /\.pdf$/i.test(file?.name || '') || file?.type === 'application/pdf'
+  /** @type {string} */
+  let pdfText = ''
+  /** @type {string} */
+  let mathpixText = ''
+  if (isPdf) {
+    try {
+      onProgress?.(4)
+      const { extractTextFromPdf } = await import('./extractDocument.js')
+      pdfText = await extractTextFromPdf(file, (p) => onProgress?.(Math.min(35, 4 + Math.round(Number(p) * 0.3))), undefined, {
+        textLayerOnly: true,
+        maxPages: 120,
+      })
+    } catch {
+      pdfText = ''
+    }
+  }
+  try {
+    const { readAnswerFileText } = await import('./officialPyqAnswerFile.js')
+    mathpixText = await readAnswerFileText(file, (p) => onProgress?.(Math.min(92, 40 + Math.round(Number(p) * 0.5))))
+  } catch (e) {
+    if (!String(pdfText).trim()) throw e
+    mathpixText = ''
+  }
+  const picked = pickInstituteSolutionsText(mathpixText, pdfText, { institute: name })
+  onProgress?.(95)
+  return picked
+}
+
+/**
+ * Whole upload: store the PDF, read it (Mathpix and/or the PDF text), cut its pictures, then put
+ * it on the paper. Pictures are cut before the cards are saved, so a background sweep never cuts
+ * them from the original.
  * @param {string} paperId @param {File} file @param {string} institute @param {(pct: number) => void} [onProgress]
  */
 export async function addInstituteSolutionsToOfficialPyqPaper(paperId, file, institute, onProgress) {
@@ -351,9 +393,9 @@ export async function addInstituteSolutionsToOfficialPyqPaper(paperId, file, ins
     return applyInstituteSolutionsToOfficialPyqPaper(paperId, '', { institute: name })
   }
   const stored = await storeInstitutePdf(paperId, file, name)
-  const { readAnswerFileText } = await import('./officialPyqAnswerFile.js')
-  const text = await readAnswerFileText(file, onProgress)
-  const read = readInstituteSolutions(text, { institute: name })
+  const picked = await readInstituteSolutionsFileText(file, name, onProgress)
+  const text = picked.text
+  const read = picked.read || readInstituteSolutions(text, { institute: name })
   const links = read ? mathpixPictureLinksIn([...read.entries.values()].map((e) => [e.solution, e.question])) : []
   const pictures = links.length ? await keepInstitutePicturesLocal(paperId, links, { pdfStored: stored.ok }) : { kept: 0, failed: 0 }
   const result = applyInstituteSolutionsToOfficialPyqPaper(paperId, text, { institute: name, fileName: file.name, pdfStored: stored.ok })
@@ -362,6 +404,7 @@ export async function addInstituteSolutionsToOfficialPyqPaper(paperId, file, ins
     ...result,
     pictures,
     pdfStored: stored.ok,
-    note: instituteResultNote(result, { institute: name, fileName: file.name, pictures, pdfStored: stored.ok }),
+    textSource: picked.source,
+    note: instituteResultNote(result, { institute: name, fileName: file.name, pictures, pdfStored: stored.ok, textSource: picked.source }),
   }
 }

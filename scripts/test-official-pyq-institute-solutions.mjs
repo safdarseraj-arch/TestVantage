@@ -40,6 +40,7 @@ const {
   instituteStemOnly,
   instituteTextDifference,
   normalizeInstituteAnswer,
+  pickInstituteSolutionsText,
   readInstituteSolutions,
 } = await import('../src/utils/instituteSolutionsParse.js')
 const {
@@ -61,6 +62,7 @@ const { clearImportedPyqs, loadImportedPyqs } = await import('../src/utils/pyqSt
 const { clearQuestionBank } = await import('../src/utils/questionBank.js')
 
 const ALLEN = fs.readFileSync(new URL('./fixtures/institute-solutions-allen-mathpix.txt', import.meta.url), 'utf8')
+const FIITJEE = fs.readFileSync(new URL('./fixtures/institute-solutions-fiitjee-mathpix.txt', import.meta.url), 'utf8')
 const PICTURE = 'https://cdn.mathpix.com/cropped/1111aaaa-2222-3333-4444-555566667777-02.jpg?height=200&width=300&top_left_y=400&top_left_x=500'
 
 let failed = 0
@@ -693,6 +695,88 @@ await test('the matcher on its own: entries without text follow the numbers only
   assert.equal(plan.numbersAgree, false)
   assert.equal(plan.byNumber, 0, 'the numbers are the institute\'s own: answer-only entries are not guessed')
   assert.deepEqual(plan.unmatched, ['Q.11', 'Q.12'])
+})
+
+await test('FIITJEE layout: *Q.3, Ans.. then Sol. (A), *Q8., and a lowercase "answer." in the stem stay questions', () => {
+  const read = readInstituteSolutions(FIITJEE, { institute: 'FIITJEE' })
+  assert.ok(read)
+  assert.equal(read.layout, 'repeated_questions')
+  assert.deepEqual(read.subjects, [MATH, PHYS, CHEM])
+  assert.deepEqual([...read.entries.keys()], [
+    'mathematics:1',
+    'mathematics:2',
+    'mathematics:3',
+    'mathematics:4',
+    'mathematics:5',
+    'mathematics:6',
+    'mathematics:7',
+    'mathematics:8',
+    'physics:1',
+    'physics:2',
+    'chemistry:1',
+    'chemistry:2',
+    'chemistry:3',
+    'chemistry:4',
+  ])
+  const e = (k) => read.entries.get(k)
+  assert.equal(e('mathematics:2').answer, 'C')
+  assert.match(e('mathematics:2').question, /true-false type questions/)
+  assert.doesNotMatch(e('mathematics:2').question, /^answer\./i, 'the stem keeps its own "answer." words')
+  assert.doesNotMatch(e('mathematics:2').solution, /\*Q\.3|cot x/, 'starred Q.3 is not swallowed by Q.2')
+  assert.equal(e('mathematics:3').answer, 'B')
+  assert.match(e('mathematics:3').question, /^Let \$x/)
+  assert.equal(e('mathematics:5').answer, 'A, C, D', 'Ans.. then Sol. (A, C, D) is the answer')
+  assert.equal(e('mathematics:6').answer, 'B, C, D')
+  assert.equal(e('mathematics:7').answer, 'A, B, C, D', 'Q.7 is not blocked by a "6." line in Q.6\'s solution')
+  assert.equal(e('mathematics:8').answer, '18', '*Q8. without a dot after Q')
+  assert.equal(e('physics:2').answer, '18')
+  assert.equal(e('chemistry:2').answer, '8120')
+  assert.equal(e('chemistry:3').answer, '7')
+  assert.equal(e('chemistry:4').answer, '9')
+  assert.doesNotMatch(e('mathematics:1').solution, /Answer to each question/, 'section instructions are not the answer')
+})
+
+await test('when Mathpix is thin, the PDF text with more answers is preferred', () => {
+  const thin = 'Mathematics\nQ.1 A short one?\nAns.\n2\nSol.\nTwo.\n'
+  const picked = pickInstituteSolutionsText(thin, FIITJEE, { institute: 'FIITJEE' })
+  assert.equal(picked.source, 'pdf')
+  assert.ok(picked.read.entries.size >= 10, `expected many FIITJEE entries, got ${picked.read.entries.size}`)
+  const rich = pickInstituteSolutionsText(FIITJEE, thin, { institute: 'FIITJEE' })
+  assert.ok(rich.source === 'mathpix' || rich.source === 'mathpix-only')
+  assert.equal(pickInstituteSolutionsText('', '', { institute: 'FIITJEE' }).source, 'empty')
+  const note = instituteResultNote(
+    { answers: 1, solutions: 1, disagreements: [], notFound: [], textDiffers: [], byContent: 1, byNumber: 0, unmatched: [], unsure: [] },
+    { institute: 'FIITJEE', fileName: 'JA2024P1.pdf', textSource: 'pdf' },
+  )
+  assert.match(note, /PDF's own text|PDF’s own text/)
+})
+
+await test('Mathpix glued "\\item[] *Q. 4" onto Q.2 is split; Q.2 solution does not keep Q.3/Q.4', () => {
+  const glued = [
+    'Mathematics',
+    'Q.2 A student appears for a quiz of true-false questions. The probability is',
+    '(A) 1/12 (B) 1/7 (C) 1/6 (D) 5/7',
+    'Ans. C',
+    'Sol. Let $E_1$ be that he knows the answer. Then $P=5/7$.',
+    '$$ \\item[] *Q. 3 Let $x$ be such that $\\cot x = 5/11$. Then the value is',
+    '(A) 1 (B) 2 (C) 3 (D) 4',
+    'Ans. B \\item[] Sol. From $\\cot x$ we get option (B).',
+    '\\item[] *Q. 4 Consider the ellipse $x^2/9+y^2/4=1$. Then',
+    '(A) q=2 (B) p=3 (C) area=3/2 (D) none',
+    'Ans. A, C',
+    'Sol. The area condition gives $q=2$.',
+  ].join('\n')
+  const read = readInstituteSolutions(glued, { institute: 'FIITJEE' })
+  assert.deepEqual([...read.entries.keys()], ['mathematics:2', 'mathematics:3', 'mathematics:4'])
+  assert.equal(read.entries.get('mathematics:2').answer, 'C')
+  assert.doesNotMatch(read.entries.get('mathematics:2').solution, /\*?Q\.?\s*[34]\b|ellipse|\\item/i)
+  assert.doesNotMatch(read.entries.get('mathematics:3').solution, /\\item|\*?Q\.?\s*4\b|ellipse/i)
+  assert.equal(read.entries.get('mathematics:3').answer, 'B')
+  assert.match(read.entries.get('mathematics:3').question, /cot x/)
+  assert.equal(read.entries.get('mathematics:4').answer, 'A, C')
+  assert.match(read.entries.get('mathematics:4').question, /ellipse/)
+  const merged = pickInstituteSolutionsText(glued.replace(/\n(?=\\item|\$\$|Ans\. B)/g, ' '), FIITJEE, { institute: 'FIITJEE' })
+  assert.ok(merged.source === 'pdf' || merged.read.entries.get('mathematics:2') && !/\*?Q\.?\s*4\b/.test(merged.read.entries.get('mathematics:2').solution || ''))
 })
 
 await test('page and helper wiring', () => {

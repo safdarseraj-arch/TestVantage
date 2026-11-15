@@ -418,8 +418,13 @@ function chromeCommandToProse(chunk) {
 
 function wrapExistingAlignedEnvs(text) {
   return String(text ?? '').replace(
-    /(?<!\$)\\begin\{(aligned|align\*?|eqnarray)\}([\s\S]*?)\\end\{\1\}/g,
-    (_, name, body) => `$$\\begin{${name}}${body}\\end{${name}}$$`,
+    /(?<!\$\$)\\begin\{(aligned|align\*?|eqnarray)\}([\s\S]*?)\\end\{\1\}(?!\$\$)/g,
+    (full, name, body, offset, str) => {
+      const before = String(str).slice(Math.max(0, offset - 2), offset)
+      // `$…$\begin{aligned}` must not become `$…$$\begin` (one $ eaten by parsers).
+      const sep = before.endsWith('$') && !before.endsWith('$$') ? '\n' : ''
+      return `${sep}$$\\begin{${name}}${body}\\end{${name}}$$`
+    },
   )
 }
 
@@ -453,6 +458,13 @@ export function stripRepeatedQuestionNumberPrefix(text) {
 export function repairOrphanAlignedBody(text) {
   let s = unescapeAccidentalDoubleBackslash(text)
   if (!s) return s
+
+  // `$…6$$\begin{aligned}` is close+open glued. Split so $ parsers keep `\end{aligned}$$`.
+  // Do not touch `=$$\begin{cases}` / prose `$$\begin`.
+  s = s.replace(
+    /([0-9A-Za-z}\])])\$\$(\\begin\{(?:aligned|align\*?|eqnarray)\})/g,
+    (_, pre, begin) => `${pre}$\n$$${begin}`,
+  )
 
   const opens = (s.match(/\\begin\{aligned\}/g) || []).length
   const closes = (s.match(/\\end\{aligned\}/g) || []).length
@@ -1020,7 +1032,13 @@ export function wrapBareLatexRuns(text) {
           block = `${pulled[0]}${block}`
         }
         const already = out.endsWith('$$') || t.slice(Math.max(0, i - 2), i) === '$$'
-        out += already || /\$\$/.test(block) ? block : `$$${block}$$`
+        if (already || /\$\$/.test(block)) {
+          out += block
+        } else {
+          // Separate `$inline$` from `$$\begin…$$` so dollar parsers keep both.
+          const sep = out.endsWith('$') && !out.endsWith('$$') ? '\n' : ''
+          out += `${sep}$$${block}$$`
+        }
         i = after > 0 ? after + 1 : endEnv
         continue
       }
@@ -1087,8 +1105,14 @@ export function wrapBareLatexRuns(text) {
     if (t[i] === '$') {
       const end = t.indexOf('$', i + 1)
       if (end !== -1) {
-        out += t.slice(i, end + 1)
-        i = end + 1
+        // `$inline$$\begin…$$`: closer is also the display opener — keep $$ for next step.
+        if (t.startsWith('$$', end)) {
+          out += `${t.slice(i, end)}$`
+          i = end
+        } else {
+          out += t.slice(i, end + 1)
+          i = end + 1
+        }
         continue
       }
     }

@@ -12,8 +12,19 @@ const SUBJECT_RE =
 /** Section instructions and paragraph headings sit between one solution and the next question. */
 const SKIP_HEAD_RE =
   /^(?:SECTION\b|Section\s*[-\u2013\u2014:]?\s*(?:[IVX]+|[A-D1-4])\b|PARAGRAPH\b|Paragraph\s+(?:for|\d|[IVX]+\b)|PASSAGE\b|Passage\s+(?:for|\d|[IVX]+\b)|COMPREHENSION\b)/
-const QUESTION_START_RE = /^(?:Q(?:ue(?:stion)?)?\s*\.?\s*(?:No\.?\s*)?(\d{1,3})(?!\d)\s*[.):\-]?|(\d{1,3})\s*[.):](?!\d))\s*/i
-const ANSWER_RE = /^(?:Ans(?:wer)?s?|Correct\s+(?:answer|option))(?![a-z])\s*(?:is\b\s*)?([.:\-=)\]]*)\s*([\s\S]*)$/i
+/**
+ * Question starts as institutes print them: "Q.1", "Q 1", "1.", and FIITJEE's class-XI mark
+ * "*Q.3" / "*Q8." (star, optional dot after Q). Plain "1." / "2." still count for Allen-style files.
+ * A bare "1.KTdT" in a maths solution is not a new question (needs a space or end after the mark).
+ */
+const QUESTION_START_RE =
+  /^(?:\*{1,2}\s*)?(?:Q(?:ue(?:stion)?)?\s*\.?\s*(?:No\.?\s*)?(\d{1,3})(?!\d)\s*[.):\-]?|(\d{1,3})\s*[.):](?!\d)(?=\s|$))\s*/i
+/**
+ * Answer markers only: "Ans." / "Ans.." / "ANS." (capital A — a lowercase "answer." in a stem is
+ * not a marker), "Answer:" / "Answers.", or "Correct answer:". "Answer to each question…" is not.
+ */
+const ANSWER_RE =
+  /^(?:Ans\.?|ANS\.?)(?![a-zA-Z])\s*([.:\-=)\]]*)\s*([\s\S]*)$|^(?:Answers?|Correct\s+(?:answer|option))\s*[.:\-=]\s*(?:is\b\s*)?([\s\S]*)$/i
 const SOLUTION_RE =
   /^(?:Sol(?:ution)?s?|Soln|Explanation|Hints?)(?:\s*(?:\$|\\\()?\s*\^\s*\{?\s*n\s*\}?\s*(?:\$|\\\))?)?\s*(?:[.:\-\u2013]+|$)\s*/i
 const BARE_SOL_RE = /^Soln?\b\s*/i
@@ -55,8 +66,26 @@ function probeOf(line) {
   let s = String(line).trim()
   const sec = s.match(/^\\(?:sub)*section\*?\{([\s\S]*)\}$/)
   if (sec) s = sec[1].trim()
+  // Mathpix often writes "\item[] *Q. 3 …" or "\item *Q.3".
   s = s.replace(/^\\item\s*\[([^\]]*)\]\s*/, '$1 ').replace(/^\\item\b\s*/, '')
   return s.replace(/\\textbf\{([^{}]*)\}/g, '$1').replace(/^\*\*([^*]+)\*\*/, '$1').trim()
+}
+
+/**
+ * Mathpix often glues the next question onto the previous solution on the same line
+ * ("… $$ \item[] *Q. 4 Consider…", "Ans. B \item[] Sol. …"). Put those markers on their own
+ * line so Q.3 / Q.4 never stay inside Q.2's solution. (Do not break every mid-line "Q.1" —
+ * that cuts Allen's maths answers.)
+ * @param {string} raw
+ */
+function breakInstituteMarkers(raw) {
+  return String(raw ?? '')
+    .replace(/\r\n?/g, '\n')
+    // "$$ \item[] *Q. 4" / "… \item[] *Q.3" / "Ans. B \item[] Sol."
+    .replace(/\\item\s*\[[^\]]*\]\s*(?=\*?Q\.?\s*\d)/gi, '\n\\item[] ')
+    .replace(/\\item\s*\[[^\]]*\]\s*(?=Sol\.)/gi, '\n\\item[] ')
+    .replace(/([^\n$])(\*{1,2}\s*Q\.?\s*\d{1,3}\b)/g, '$1\n$2')
+    .replace(/([^\n])(Ans\.\s*[A-Da-d1-9](?:\s*,\s*[A-Da-d])*)\s*(?=\\item|Sol\.)/g, '$1\n$2\n')
 }
 
 function escapeRe(s) {
@@ -70,6 +99,32 @@ function isMarker(probe) {
 function questionNumberOf(probe) {
   const m = probe.match(QUESTION_START_RE)
   return m ? Number(m[1] || m[2]) : 0
+}
+
+/** "Q.1" / "*Q.3" (not a bare "1." step in a solution). @param {string} probe */
+function hasQPrefix(probe) {
+  return /^(?:\*{1,2}\s*)?Q(?:ue(?:stion)?)?\b/i.test(String(probe ?? ''))
+}
+
+/**
+ * A real next question (Allen "2. A ball is thrown…", FIITJEE "Q.7 …") rather than a short
+ * numbered step in the working ("1. Find the friction first.", bare "6.", "2. Then a=…").
+ * @param {string} probe
+ */
+function looksLikeNextQuestion(probe) {
+  if (hasQPrefix(probe)) return true
+  const after = String(probe ?? '').replace(QUESTION_START_RE, '').trim()
+  if (!after) return false
+  if (OPTION_LINE_RE.test(after) || /\?\s*$/.test(after)) return true
+  return after.length >= 28 && !isMarker(after)
+}
+
+/** Numbered line that continues the working ("2. Then a = …"), not a new question. @param {string} probe */
+function looksLikeSolutionStep(probe) {
+  const after = String(probe ?? '').replace(QUESTION_START_RE, '').trim()
+  return /^(?:then|so|hence|find|now|from|using|also|therefore|thus|we\b|let us|substitut|integrat|differenti|put\b|here\b)/i.test(
+    after,
+  )
 }
 
 /** Page headers and footers the institute prints on every page. @param {string} raw @param {string} [institute] */
@@ -107,10 +162,12 @@ function cleanLines(raw, institute = '') {
 function answerLine(probe) {
   const m = String(probe).match(ANSWER_RE)
   if (!m) return null
-  const cut = m[2].search(SOL_IN_LINE_RE)
-  const value = (cut >= 0 ? m[2].slice(0, cut) : m[2]).trim()
-  const tail = cut >= 0 ? m[2].slice(cut).trim() : ''
-  if (!m[1] && value && !normalizeInstituteAnswer(value)) return null
+  const punct = m[1] || ''
+  const body = String(m[2] ?? m[3] ?? '')
+  const cut = body.search(SOL_IN_LINE_RE)
+  const value = (cut >= 0 ? body.slice(0, cut) : body).trim()
+  const tail = cut >= 0 ? body.slice(cut).trim() : ''
+  if (!punct && value && !normalizeInstituteAnswer(value)) return null
   return { value, tail }
 }
 
@@ -144,13 +201,28 @@ export function normalizeInstituteAnswer(raw) {
   return parts.join(' OR ')
 }
 
-/** "4.0 to 4.4" written by Mathpix without its brackets, or a cut-off line: the value from the next line. */
+/**
+ * Value after a bare "Ans." / "Ans.." (FIITJEE often puts the letter on the next line, or on
+ * "Sol. (A)" when "Ans.." is empty). Skips blank lines; stops at the next question / subject.
+ * @returns {{ index: number, value: string } | null}
+ */
 function answerFromNextLine(lines, k) {
   for (let j = k + 1; j < lines.length; j += 1) {
-    if (!lines[j].probe) continue
-    return normalizeInstituteAnswer(lines[j].probe) ? j : -1
+    const probe = lines[j].probe
+    if (!probe) continue
+    if (questionNumberOf(probe) || (SUBJECT_RE.test(probe) && probe.length <= 48) || SKIP_HEAD_RE.test(probe)) {
+      return null
+    }
+    let valueProbe = probe
+    if (SOLUTION_RE.test(probe) || BARE_SOL_RE.test(probe)) {
+      valueProbe = probe.replace(SOLUTION_RE, '').replace(BARE_SOL_RE, '').trim()
+      if (!valueProbe) continue
+    }
+    const value = normalizeInstituteAnswer(valueProbe)
+    if (value) return { index: j, value }
+    if (!SOLUTION_RE.test(probe) && !BARE_SOL_RE.test(probe)) return null
   }
-  return -1
+  return null
 }
 
 /** The part before "Ans." / "Sol." is the repeated question; the answer and the working follow. */
@@ -167,11 +239,20 @@ function readBlock(lines) {
     const line = !answer ? answerLine(probe) : null
     if (line) {
       let value = normalizeInstituteAnswer(line.value)
-      if (!line.value && !line.tail) {
+      if (!value && !line.tail) {
         const next = answerFromNextLine(lines, k)
-        if (next > 0) {
-          value = normalizeInstituteAnswer(lines[next].probe)
-          k = next
+        if (next) {
+          value = next.value
+          k = next.index
+          // "Ans.." then "Sol. (A) …" — the letter is the answer; anything after it is the working.
+          if (SOLUTION_RE.test(lines[k].probe) || BARE_SOL_RE.test(lines[k].probe)) {
+            answer = value
+            solMarked = true
+            const after = lines[k].probe.replace(SOLUTION_RE, '').replace(BARE_SOL_RE, '').trim()
+            const leftover = after.replace(/^\(?\s*[A-Da-d](?:\s*,\s*[A-Da-d])*\s*\)?\s*/, '').trim()
+            if (leftover) rest.push(leftover)
+            continue
+          }
         }
       }
       if (value) {
@@ -183,6 +264,17 @@ function readBlock(lines) {
     if (!solMarked && SOLUTION_RE.test(probe)) {
       solMarked = true
       const after = probe.replace(SOLUTION_RE, '')
+      // "Sol. (A)" with no "Ans." line: the letter is the answer, the rest is the working.
+      if (!answer) {
+        const asAns = normalizeInstituteAnswer(after)
+        if (asAns && /^(?:[A-H](?:, [A-H])*|-?\d+(?:\.\d+)?)$/.test(asAns)) {
+          answer = asAns
+          const leftover = after.replace(/^\(?\s*[A-Da-d1-4](?:\s*,\s*[A-Da-d])*\s*\)?\s*/, '').trim()
+          if (leftover && leftover !== after) rest.push(leftover)
+          else if (leftover && !/^[A-Da-d1-4,\s()]+$/.test(after.trim())) rest.push(leftover)
+          continue
+        }
+      }
       if (after) rest.push(after)
       continue
     }
@@ -194,7 +286,65 @@ function readBlock(lines) {
     .replace(/\n{3,}/g, '\n\n')
     .trim()
   if (!solMarked) solution = solution.replace(SOLUTION_RE, '').replace(BARE_SOL_RE, '').trim()
+  // Never keep the next question inside this solution (Mathpix sometimes leaves "\item[] *Q. 4 …").
+  const cut = solution.search(MERGED_Q_IN_SOL_RE)
+  if (cut > 0) solution = solution.slice(0, cut).trim()
+  else if (cut === 0) solution = ''
+  solution = solution
+    .replace(/(?:\$\$\s*)?(?:\\item\s*\[[^\]]*\]\s*)+$/g, '')
+    .replace(/(?:\$\$\s*)+$/g, '')
+    .trim()
   return { question, answer, solution }
+}
+
+/** How many answers a read produced (for choosing Mathpix vs the PDF's own text). @param {ReturnType<typeof readInstituteSolutions>} read */
+export function instituteAnswerCount(read) {
+  if (!read?.entries?.size) return 0
+  let n = 0
+  for (const e of read.entries.values()) if (String(e.answer || '').trim() || String(e.solution || '').trim()) n += 1
+  return n
+}
+
+/** A later question marker left inside a solution ("*Q.3", "\item[] *Q. 4"). */
+const MERGED_Q_IN_SOL_RE = /(?:^|\n)\s*(?:\\item\s*\[[^\]]*\]\s*)?\*{0,2}\s*Q\.?\s*\d{1,3}\b/m
+
+/** Solutions that still contain the next question — the split failed. */
+export function instituteSolutionsMergedCount(read) {
+  if (!read?.entries?.size) return 0
+  let n = 0
+  for (const e of read.entries.values()) {
+    if (MERGED_Q_IN_SOL_RE.test(String(e.solution || ''))) n += 1
+  }
+  return n
+}
+
+/**
+ * Prefer the scan that found more answers without gluing the next question into a solution.
+ * Mathpix is preferred when the two are close and clean (better maths for wording matches); a
+ * thin or merged Mathpix read of a long FIITJEE PDF loses to the PDF text.
+ * @param {string} mathpixText
+ * @param {string} pdfText
+ * @param {{ institute?: string }} [opts]
+ * @returns {{ text: string, source: 'mathpix' | 'pdf' | 'mathpix-only' | 'pdf-only' | 'empty', read: ReturnType<typeof readInstituteSolutions> }}
+ */
+export function pickInstituteSolutionsText(mathpixText, pdfText, opts = {}) {
+  const mp = String(mathpixText ?? '').trim()
+  const pdf = String(pdfText ?? '').trim()
+  const readMp = mp ? readInstituteSolutions(mp, opts) : null
+  const readPdf = pdf ? readInstituteSolutions(pdf, opts) : null
+  const score = (read) => instituteAnswerCount(read) - 3 * instituteSolutionsMergedCount(read)
+  const nMp = score(readMp)
+  const nPdf = score(readPdf)
+  if (!instituteAnswerCount(readMp) && !instituteAnswerCount(readPdf)) {
+    return { text: mp || pdf, source: 'empty', read: readMp || readPdf }
+  }
+  if (!instituteAnswerCount(readPdf)) return { text: mp, source: 'mathpix-only', read: readMp }
+  if (!instituteAnswerCount(readMp)) return { text: pdf, source: 'pdf-only', read: readPdf }
+  // Prefer Mathpix only when it is at least as clean/complete as the PDF text.
+  if (nMp >= nPdf && instituteSolutionsMergedCount(readMp) <= instituteSolutionsMergedCount(readPdf)) {
+    return { text: mp, source: 'mathpix', read: readMp }
+  }
+  return { text: pdf, source: 'pdf', read: readPdf }
 }
 
 /**
@@ -204,12 +354,13 @@ function readBlock(lines) {
  * statements in a question are not new questions. A subject line (or a long run) restarts the numbering.
  * Same shape as the end-of-paper key, with the repeated question as `question`.
  * A file that prints only answers and solutions ("1. (B)", "Q.1 Sol. …") is read as an answer file.
+ * FIITJEE: "*Q.3" / "*Q8." are question starts; "Ans.." then "Sol. (A)" is the answer letter.
  * @param {unknown} raw Mathpix text
  * @param {{ institute?: string }} [opts]
  * @returns {{ entries: Map<string, { answer: string, solution: string, question: string }>, subjects: string[], layout: 'repeated_questions' | 'answers_only', sectionText: string } | null}
  */
 export function readInstituteSolutions(raw, opts = {}) {
-  const lines = cleanLines(raw, opts.institute)
+  const lines = cleanLines(breakInstituteMarkers(raw), opts.institute)
   const starts = lines.map((l) => questionNumberOf(l.probe))
   const marks = lines.map((l, i) => {
     if (isMarker(l.probe)) return true
@@ -257,11 +408,15 @@ export function readInstituteSolutions(raw, opts = {}) {
       // A question whose "Ans." Mathpix lost still ends at the next number, unless that number counts solution steps.
       const ahead = answeredAhead(i, n)
       const stepRun = Boolean(cur?.lines.some((c) => questionNumberOf(c.probe) === n - 1))
-      const nextQuestion = !cur
-        ? ahead
-        : cur.marked
-          ? ahead || (n === last + 1 && !stepRun)
-          : n === last + 1 && ahead
+      // Once this question reached "Ans." / "Sol.", only the next number in order may open a new
+      // question. A bare "1." inside the working must not steal the rest; a new subject may still
+      // restart at "Q.1" (or "1." right after a subject heading).
+      const subjectRestart = n === 1 && ahead && (fresh || (last >= 8 && hasQPrefix(l.probe)))
+      // A bare "6." / "2. Then a=…" in the working is a step; Allen's "2. A ball…" and FIITJEE's "Q.7" are not.
+      const nextInOrder =
+        n === last + 1 &&
+        (!stepRun || hasQPrefix(l.probe) || (looksLikeNextQuestion(l.probe) && !looksLikeSolutionStep(l.probe)))
+      const nextQuestion = !cur ? ahead : cur.marked ? nextInOrder || subjectRestart : n === last + 1 && ahead
       if (inSequence && nextQuestion) {
         close()
         if (!subject && last > 0 && n <= last) segment += 1

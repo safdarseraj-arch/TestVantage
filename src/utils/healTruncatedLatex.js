@@ -55,8 +55,14 @@ function mapOutsideMath(text, fn) {
     if (t[i] === '$') {
       const end = t.indexOf('$', i + 1)
       if (end !== -1) {
-        out += t.slice(i, end + 1)
-        i = end + 1
+        // `$inline$$\begin…$$`: the closer is also the display opener. Keep both.
+        if (t.startsWith('$$', end)) {
+          out += `${t.slice(i, end)}$`
+          i = end
+        } else {
+          out += t.slice(i, end + 1)
+          i = end + 1
+        }
         continue
       }
     }
@@ -66,7 +72,12 @@ function mapOutsideMath(text, fn) {
     if (d !== -1) next = Math.min(next, d)
     if (s !== -1) next = Math.min(next, s)
     out += fn(t.slice(i, next))
-    i = next === i ? i + 1 : next
+    if (next === i) {
+      out += t[i]
+      i += 1
+    } else {
+      i = next
+    }
   }
   return out
 }

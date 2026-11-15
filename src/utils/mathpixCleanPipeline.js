@@ -193,7 +193,11 @@ function wrapBareMatrixEnvs(text) {
       if (offsetIsInsideMath(str, offset)) return block
       const after = str.slice(offset + block.length, offset + block.length + 4)
       if (/^\s*\$/.test(after)) return block
-      return `$$${block}$$`
+      const before = str.slice(Math.max(0, offset - 2), offset)
+      if (before.endsWith('$$')) return block
+      // `$…$\begin{aligned}` → `$…$\n$$\begin…$$` (never `$…$$\begin`, which drops a $).
+      const sep = before.endsWith('$') ? '\n' : ''
+      return `${sep}$$${block}$$`
     },
   )
 }

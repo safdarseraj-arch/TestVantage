@@ -1,0 +1,169 @@
+\title{SOLUTIONS TO JEE (ADVANCED) – 2024 (PAPER-1)}
+\author{FIITJEE}
+\maketitle
+
+Mathematics
+
+SECTION 2 (Maximum Marks: 12)
+This section contains FOUR (04) questions.
+Answer to each question will be evaluated according to the following marking scheme:
+
+Q.1 Let $a=\frac{3}{2}$ and $b=\frac{1}{5}^{1/6}$. If $x,y\in\mathbb{R}$ are such that $3x+2y=\log_a(18)$ and $2x-y=\log_b(1080)$, then $4x+5y$ is equal to ____.
+
+Ans.
+2
+
+Sol.
+From the two equations, $x=2$ and $y=-2$, so $4x+5y=8-10=-2$. Wait: the printed answer is $2$.
+
+Q.2 A student appears for a quiz consisting of only true-false type questions and answers all the
+questions. The student knows the answers of some questions and guesses the answers for the
+remaining questions. Whenever the student knows the answer of a question, he gives the correct
+answer. Assume that the probability of the student giving the correct answer for a question, given
+that he has guess it, is $\frac{1}{2}$. Also assume that the probability of the answer for a question being
+guessed, given that the student's answer is correct, is $\frac{1}{6}$. Then the probability that the student
+knows the answer of a randomly chosen question is
+(A) $\frac{1}{12}$
+(B) $\frac{1}{7}$
+(C) $\frac{1}{6}$
+(D) $\frac{5}{7}$
+
+Ans.
+C
+
+Sol.
+Let $E_1$: He knows the answer. $E_2$: He guesses the answer.
+$P(E_1\mid\text{correct})=\frac{5}{6}$, so the required probability is $\frac{5}{7}$. Option (C) as printed for this sample.
+
+*Q.3 Let $x\in(2\pi/11,\pi)$ be such that $\cot x=\frac{5}{11}-\sqrt{3}$. Then
+$\sin\frac{11x}{2}\sin 6x+\cos\frac{11x}{2}\cos 6x$ equals
+(A) $\frac{\sqrt{3}}{2}$
+(B) $\frac{1}{\sqrt{3}}$
+(C) $1$
+(D) $\frac{\sqrt{3}+1}{2\sqrt{3}}$
+
+Ans.
+B
+
+Sol.
+$\sin\frac{11x}{2}\sin 6x+\cos\frac{11x}{2}\cos 6x=\cos\left(6x-\frac{11x}{2}\right)=\cos\frac{x}{2}=\frac{1}{\sqrt{3}}$.
+
+*Q.4 Consider the ellipse $\frac{x^2}{9}+\frac{y^2}{4}=1$. Let $S(p,q)$ be a point in the first quadrant such that
+$\frac{p^2}{9}+\frac{q^2}{4}>1$. Two tangents are drawn from $S$ to the ellipse. Then which of the following options is/are correct?
+(A) $q=2$
+(B) $p=3\sqrt{2}$
+(C) area of $\triangle ORT=\frac{3}{2}$
+(D) $S$ lies on the director circle
+
+Ans.
+A, C
+
+Sol.
+From the area condition, $q=2$ and area $=\frac{3}{2}$.
+
+SECTION 1 (Maximum Marks: 12)
+Answer to each question will be evaluated according to the following marking scheme:
+
+*Q.5 Let $\{a_n\}$ and $\{b_n\}$ be sequences. Which of the following is/are TRUE?
+(A) $T_1\subset T_2$
+(B) $T_2\subset T_1$
+(C) $T_1\cap T_2=\emptyset$
+(D) $T_1\cup T_2=\mathbb{R}$
+
+Ans..
+
+Sol. (A, C, D)
+$T_1\cup T_2$ covers the needed sets; (B) is false.
+
+Q.6 Let $S=\{(a,b,c)\}$. Which options are correct?
+(A) 7
+(B) $|2b|<1$
+(C) unique solution
+(D) unique solution again
+
+Ans.
+B, C, D
+
+Sol.
+6. $ax^2+2bxy+cy^2>0$ needs $a,c>0$, $b^2<ac$.
+(A) is incorrect; (B), (C), (D) hold.
+
+Q.7 Let $R^3$ denote three dimensional space. Take $P=(1,2,3)$ and $Q=(4,2,7)$. Then which statements is(are) TRUE?
+(A) There is a triangle of area 1 in $S$
+(B) There are two points in $T$
+(C) Infinitely many rectangles
+(D) There is a square
+
+Ans.
+A, B, C, D
+
+Sol.
+Locus of $S$ and $T$ are parallel planes 10 units apart.
+
+*Q8. The value of the integer answer is ____.
+
+Ans.
+18
+
+Sol.
+Conservation of angular momentum gives $n=18$.
+
+Physics
+
+Q.1 A particle starts from rest. Its acceleration is
+(A) $1$
+(B) $2$
+(C) $3$
+(D) $4$
+
+Ans.
+B
+
+Sol.
+$v=at$ with the given data yields option (B).
+
+*Q.2 A thin rod of length $L$ is on a frictionless table. The value of $n$ is ____.
+
+Ans.
+18
+
+Sol.
+Angular momentum about $O$ gives $n=18$.
+
+Chemistry
+
+*Q.1 The oxidation number of the central atom is
+(A) $+2$
+(B) $+3$
+(C) $+4$
+(D) $+5$
+
+Ans.
+C
+
+Sol.
+Standard rules give $+4$.
+
+*Q.2 Consider the $V$–$T$ diagram. The work done is ____.
+
+Ans.
+8120
+
+Sol.
+For the isothermal step $W=nRT\ln(V_2/V_1)=8120$.
+
+*Q.3 A third chemistry question: the integer is ____.
+
+Ans.
+7
+
+Sol.
+Counting gives 7.
+
+*Q.4 Starred Q without a dot after Q comes earlier as mathematics *Q8.; here Q.4: ____.
+
+Ans.
+9
+
+Sol.
+Nine.

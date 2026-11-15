@@ -647,6 +647,35 @@ assert.doesNotMatch(q8Visible, /\\sqrt/)
 assert.equal(latexExtractionIncomplete(q8Prepared), false)
 assert.equal(repairOrphanAlignedBody(q8Repaired), q8Repaired, 'aligned repair is idempotent')
 
+// FIITJEE / Mathpix solution: `$…$\begin{aligned}` or glued `$…$$\begin{aligned}…$$`
+// must render as math, not raw \\begin / \\sin code in the student preview.
+const FIITJEE_SOL_BARE_ALIGNED =
+  '$\\cot \\mathrm{x}=\\frac{-5}{\\sqrt{11}}, \\mathrm{x} \\in\\left(\\frac{\\pi}{2}, \\pi\\right) \\Rightarrow \\cos \\mathrm{x}=\\frac{-5}{6}$\\begin{aligned}\n' +
+  '& \\Rightarrow \\sin \\frac{x}{2}=\\frac{\\sqrt{11}}{2 \\sqrt{3}} \\text { and } \\cos \\frac{x}{2}=\\frac{1}{2 \\sqrt{3}} \\\\\n' +
+  '& =\\cos \\frac{x}{2}+\\sin \\frac{x}{2}=\\frac{\\sqrt{11}+1}{2 \\sqrt{3}}\n' +
+  '\\end{aligned}'
+const FIITJEE_SOL_GLUED_ALIGNED = FIITJEE_SOL_BARE_ALIGNED.replace(
+  '\\frac{-5}{6}$\\begin{aligned}',
+  '\\frac{-5}{6}$$\\begin{aligned}',
+) + '$$'
+for (const [label, sample] of [
+  ['bare', FIITJEE_SOL_BARE_ALIGNED],
+  ['glued', FIITJEE_SOL_GLUED_ALIGNED],
+]) {
+  const prepared = prepareTextForMathTextDisplay(sample)
+  assert.match(prepared, /\$\$\\begin\{aligned\}/, `${label}: aligned opens in $$`)
+  assert.match(prepared, /\\end\{aligned\}\$\$/, `${label}: aligned closes with $$`)
+  const visible = prepared.replace(/\$\$[\s\S]*?\$\$/g, ' ').replace(/\$[^$]*\$/g, ' ')
+  assert.doesNotMatch(visible, /\\begin\{aligned\}/, `${label}: no raw \\begin in prose`)
+  assert.doesNotMatch(visible, /\\Rightarrow/, `${label}: no raw \\Rightarrow in prose`)
+  assert.doesNotMatch(visible, /\\sin\b/, `${label}: no raw \\sin in prose`)
+}
+assert.match(
+  spaceLatexCommandsAfterWords(FIITJEE_SOL_GLUED_ALIGNED),
+  /\\end\{aligned\}\$\$/,
+  'spaceLatexCommandsAfterWords must not eat the display closer',
+)
+
 const q8Light = lightRepairOfficialPyqQuestions(
   [
     { text: Q8_ORPHAN_ALIGNED, options: [] },

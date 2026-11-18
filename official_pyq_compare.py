@@ -1119,6 +1119,8 @@ _INK_DPI = 100
 _INK_LEVEL = 200
 _INK_STEP = 0.004
 _INK_REACH = 0.05
+# Option boxes must not grow into the stem line above (Q63/Q71/Q79 hatch + prose leak).
+_INK_REACH_OPTION = 0.02
 _INK_MARGIN = 0.008
 _LABEL_WORD_RE = re.compile(r"^(?:\([A-Ha-h1-4]\)|Q\.?\d{1,3})$")
 
@@ -1155,11 +1157,14 @@ def figure_box_fraction(box_2d: Any) -> Box | None:
     return x0, y0, x1, y1
 
 
-def snap_box_to_ink(ink: Any, box: Box, labels: list[Box] | None = None) -> Box | None:
+def snap_box_to_ink(
+    ink: Any, box: Box, labels: list[Box] | None = None, *, place: str = ""
+) -> Box | None:
     """Grow edges that cut through a drawing (a little), keep option letters / question numbers out,
     then trim white space. ink: 2-D bool array of the page. None if the box holds no drawing."""
     rows, cols = ink.shape
     x0, y0, x1, y1 = box
+    reach = _INK_REACH_OPTION if re.fullmatch(r"[A-H]", str(place or "")) else _INK_REACH
 
     def px(v: float, n: int) -> int:
         return int(round(min(1.0, max(0.0, v)) * n))
@@ -1175,15 +1180,15 @@ def snap_box_to_ink(ink: Any, box: Box, labels: list[Box] | None = None) -> Box 
         return bool(ink[min(r1 - 1, rows - 1), c0:c1].any())
 
     start = box
-    for _ in range(int(_INK_REACH / _INK_STEP)):
+    for _ in range(int(reach / _INK_STEP)):
         grew = False
-        if edge_has_ink("left") and x0 > 0 and start[0] - x0 < _INK_REACH:
+        if edge_has_ink("left") and x0 > 0 and start[0] - x0 < reach:
             x0, grew = max(0.0, x0 - _INK_STEP), True
-        if edge_has_ink("right") and x1 < 1 and x1 - start[2] < _INK_REACH:
+        if edge_has_ink("right") and x1 < 1 and x1 - start[2] < reach:
             x1, grew = min(1.0, x1 + _INK_STEP), True
-        if edge_has_ink("top") and y0 > 0 and start[1] - y0 < _INK_REACH:
+        if edge_has_ink("top") and y0 > 0 and start[1] - y0 < reach:
             y0, grew = max(0.0, y0 - _INK_STEP), True
-        if edge_has_ink("bottom") and y1 < 1 and y1 - start[3] < _INK_REACH:
+        if edge_has_ink("bottom") and y1 < 1 and y1 - start[3] < reach:
             y1, grew = min(1.0, y1 + _INK_STEP), True
         if not grew:
             break
@@ -1260,10 +1265,16 @@ def crop_suggested_figures(paper_id: str, pages: list[int], figures: list[Any]) 
         if page not in ink_cache:
             ink_cache[page] = _page_ink_and_labels(path, page)
         ink, labels = ink_cache[page]
-        snapped = snap_box_to_ink(ink, box, labels)
+        snapped = snap_box_to_ink(ink, box, labels, place=place)
         if snapped is None:
             logger.info("Compare figure box holds no drawing: %s", data)
             continue
+        # Reject option/stem boxes that ballooned into a watermark slab or two structures.
+        sx0, sy0, sx1, sy1 = snapped
+        if place in ("text", "passage") or re.fullmatch(r"[A-H]", place or ""):
+            if (sx1 - sx0) >= 0.34 or (sy1 - sy0) >= 0.16 or ((sx1 - sx0) / max(sy1 - sy0, 1e-6) >= 2.4):
+                logger.info("Compare figure box looks clubbed/watermark slab: %s", data)
+                continue
         try:
             crop = crop_original_page(paper_id, page, dict(zip(("x0", "y0", "x1", "y1"), snapped)))
         except (ValueError, OriginalMissingError) as exc:

@@ -36,6 +36,15 @@ import {
   gluedMatchLettersRemain,
 } from './mathpixCleanPipeline.js'
 import { labelNumberedQuestions } from './numberedQuestionMarkers.js'
+import { restoreAssertionStatementsFromSource } from './assertionCombinationMcq.js'
+import {
+  preferOcrSmilesOverBadOptionCrops,
+  preferOcrSmilesOverBadStemCrops,
+  restoreRankingOptionsFromSource,
+} from './restorePyqOptionFiguresFromOcr.js'
+import { cleanInstituteSolutionBody } from './instituteSolutionsParse.js'
+import { stripTrailingPyqSectionHeader } from './bulkExtractClean.js'
+import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
 
 export { matchQuestionMissingListI }
 
@@ -127,28 +136,51 @@ function mathBreakWindow(stem, rawSource) {
  */
 export function applyStoredOcrCardFixes(q, source) {
   if (isMatrixGridCard(q)) return q
-  const window = questionScanWindow(q?.text, source)
-  const optionWindow = optionRowsWindow(q?.text, source)
+  let withStatements = restoreAssertionStatementsFromSource(q, source)
+  withStatements = restoreRankingOptionsFromSource(withStatements, source)
+  withStatements = preferOcrSmilesOverBadOptionCrops(withStatements, source)
+  withStatements = preferOcrSmilesOverBadStemCrops(withStatements, source)
+  // After SMILES/crop swaps (and when figures were restored into the stem), peel
+  // option pictures that still sit in the stem while options already hold them (Q39).
+  withStatements = restoreLabelledFigureOptions(withStatements, source)
+  const window = questionScanWindow(withStatements?.text, source)
+  const optionWindow = optionRowsWindow(withStatements?.text, source)
   const scanText = repairScanStructureCodes(
     unwrapReactionStepTables(
       restoreScanMathBreaks(
-        restoreDisplayCloseBeforeInline(restoreMissingGivenLine(q?.text ?? '', window), window),
-        mathBreakWindow(q?.text, source),
+        restoreDisplayCloseBeforeInline(restoreMissingGivenLine(withStatements?.text ?? '', window), window),
+        mathBreakWindow(withStatements?.text, source),
       ),
     ),
   )
   const restoredOptions = restoreClosedOptionFraction(
-    restoreGluedMatchOptionSpacing(q?.options, optionWindow),
-    optionWindow || mathBreakWindow(q?.text, source),
+    restoreGluedMatchOptionSpacing(withStatements?.options, optionWindow),
+    optionWindow || mathBreakWindow(withStatements?.text, source),
   )
   const options = Array.isArray(restoredOptions)
     ? restoredOptions.map((opt) => repairScanStructureCodes(opt))
     : restoredOptions
   const text = restoreStructureLabels({ text: scanText, options }).text
+  const rawSol = String(withStatements?.solution ?? q?.solution ?? '')
+  const solution = rawSol
+    ? stripTrailingPyqSectionHeader(cleanInstituteSolutionBody(rawSol) || rawSol)
+    : rawSol
+  const rawInst = String(withStatements?.solutionInstitute ?? q?.solutionInstitute ?? '')
+  const solutionInstitute = rawInst
+    ? stripTrailingPyqSectionHeader(cleanInstituteSolutionBody(rawInst) || rawInst)
+    : rawInst
   const sameText = text === String(q?.text ?? '')
   const sameOpts = options === q?.options || JSON.stringify(options) === JSON.stringify(q?.options ?? [])
-  if (sameText && sameOpts) return q
-  return { ...q, text, options }
+  const sameSol = solution === String(q?.solution ?? '')
+  const sameInst = solutionInstitute === String(q?.solutionInstitute ?? '')
+  if (sameText && sameOpts && sameSol && sameInst) return q
+  return {
+    ...withStatements,
+    text,
+    options,
+    ...(solution ? { solution } : {}),
+    ...(solutionInstitute ? { solutionInstitute } : {}),
+  }
 }
 
 /** The scan still has a Given line or a separated match letter that the card dropped. */

@@ -159,8 +159,21 @@ export function stemRepeatsOptionPictures(q) {
   if (!/single_correct|multiple_correct/.test(String(q?.questionType ?? ''))) return null
   const options = (Array.isArray(q.options) ? q.options : []).map((o) => String(o ?? ''))
   if (options.length !== LETTERS.length || !options.every((o) => PICTURE_ONLY_RE.test(o))) return null
-  const trailing = trailingFigureOptions(String(q.text ?? ''))
-  return trailing && trailing.stem.length >= 20 ? trailing.stem : null
+  const text = String(q.text ?? '')
+  const trailing = trailingFigureOptions(text)
+  if (trailing?.stem && trailing.stem.length >= 20) return trailing.stem
+  // Circuit / structure MCQs often have uneven option heights, so the size gate above fails.
+  // When options already hold the four crops, keep only the prose before the first figure (Q39).
+  const figures = [...text.matchAll(FIGURE_RE)]
+  if (figures.length < 4) return null
+  const firstAt = figures[0].index ?? -1
+  if (firstAt < 20) return null
+  const prose = text.slice(0, firstAt).replace(FIGURE_RE, ' ').replace(/\n{3,}/g, '\n\n').trim()
+  if (prose.length < 20) return null
+  if (!ASKS_FOR_A_PICTURE_RE.test(prose) && !/\b(?:circuit|biased|structure|compound)\b/i.test(prose)) {
+    return null
+  }
+  return prose
 }
 
 /**

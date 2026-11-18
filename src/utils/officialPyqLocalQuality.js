@@ -73,9 +73,15 @@ import { dropOptionFigureRepeatingStem } from './optionRepeatsStemFigure.js'
 import { officialPyqScanStructureReason } from './officialPyqScanStructures.js'
 import {
   cleanInstituteSolutionBody,
+  healInstituteSolutionMath,
   instituteQualityLines,
+  instituteSolutionChromeFixable,
   instituteSolutionDirtyReason,
+  instituteSolutionLooksLikeRawPdf,
+  salvageInstituteSolutionBody,
 } from './instituteSolutionsParse.js'
+import { wrapBareLatexRuns } from './wrapBareLatexRuns.js'
+import { stripTrailingPyqSectionHeader } from './bulkExtractClean.js'
 
 const RUNNING_HEAD_TAIL_RE = /\s+(?:PHYSICS|CHEMISTRY|MATHEMATICS|BIOLOGY)\s*$/
 const LIST_TAIL_RE = /\s*\\(?:begin|end)\{(?:itemize|enumerate)\}[\s\S]*$/
@@ -84,9 +90,9 @@ const TRAILING_LINE_BREAK_RE = /(?:\s*\\\\)+\s*$/
 /** Page furniture the scan glued to the last option or line: "Space for rough work", an empty \author{ }. */
 const PAGE_FURNITURE_TAIL_RE = /(?:\s*(?:\$\s*\\(?:author|title|date)\{[^}]*\}\s*\$|\\(?:author|title|date)\{[^}]*\}|Space\s+for\s+rough\s+work))+\s*$/i
 const PAGE_FURNITURE_LINE_RE = /^[ \t]*Space\s+for\s+rough\s+work[ \t]*$/gim
-/** "PART-2 CHEMISTRY" / "SECTION -1 (Only One Option Correct Type)": the next part's heading, never question words. */
+/** "PART-2 CHEMISTRY" / "PART - C (CHEMISTRY)" / "SECTION -1 …": next-part heading, never question words. */
 const PAPER_HEADING_LINE_RE =
-  /^[ \t]*(?:\\section\*?\{\s*)?(?:(?:PART|SECTION)\s*[-–]?\s*(?:\d|[IVX]+)\b[^\n]*|END OF THE QUESTION PAPER\.?\}?)[ \t]*$/gm
+  /^[ \t]*(?:\\(?:sub)*section\*?\{\s*)?(?:(?:PART|SECTION)\s*[-–]?\s*(?:\d|[IVX]+|[A-D])\b[^\n]*|END OF THE QUESTION PAPER\.?\}?)[ \t]*$/gm
 
 const MATHPIX_FIGURE_RE =
   /\\includegraphics(?:\[[^\]]*\])?\{https:\/\/cdn\.mathpix\.com\/cropped\/[^}]*?-(\d{2,3})\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)[^}]*\}|!\[[^\]]*\]\(https:\/\/cdn\.mathpix\.com\/cropped\/[^)]*?-(\d{2,3})\.jpg\?height=(\d+)&width=(\d+)&top_left_y=(\d+)&top_left_x=(\d+)[^)]*\)/g
@@ -169,13 +175,20 @@ function withoutFiguresInMath(text) {
  */
 function withoutPageLeftovers(q) {
   let next = q
-  for (const key of ['text', 'passageText']) {
+  for (const key of ['text', 'passageText', 'solution']) {
     const raw = q?.[key]
     if (typeof raw !== 'string') continue
-    let cleaned = withoutFiguresInMath(withoutDuplicateFigures(raw)).replace(PAGE_FURNITURE_TAIL_RE, '')
+    let cleaned =
+      key === 'solution'
+        ? cleanInstituteSolutionBody(raw) || raw
+        : withoutFiguresInMath(withoutDuplicateFigures(raw)).replace(PAGE_FURNITURE_TAIL_RE, '')
     const unfurnished = cleaned.replace(PAGE_FURNITURE_LINE_RE, '').replace(PAPER_HEADING_LINE_RE, '')
     if (unfurnished !== cleaned) cleaned = unfurnished.replace(/\n{3,}/g, '\n\n').trim()
-    if (/\\begin\{tabular\}/.test(cleaned)) cleaned = stripAnswerBoxTables(cleaned).replace(/\n{3,}/g, '\n\n').trim()
+    if (key !== 'solution' && /\\begin\{tabular\}/.test(cleaned)) {
+      cleaned = stripAnswerBoxTables(cleaned).replace(/\n{3,}/g, '\n\n').trim()
+    }
+    // Trailing subject banner under a worked solution (Q60 Physics → "PART - C (CHEMISTRY)").
+    if (key === 'solution') cleaned = stripTrailingPyqSectionHeader(cleaned)
     if (cleaned && cleaned !== raw && cleaned !== raw.trim()) next = { ...next, [key]: cleaned }
   }
   if (Array.isArray(q?.options)) {
@@ -227,7 +240,7 @@ function hasScrapOption(q) {
   )
 }
 
-export const LOCAL_QUALITY_REVISION = 42
+export const LOCAL_QUALITY_REVISION = 44
 const MAX_QUALITY_PASSES = 4
 const SAME_CHECK = 'banner-v4'
 const RECHECK_ONCE = new Set([
@@ -977,6 +990,9 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, ite
   if (printed) return printed
   const instituteSol = instituteSolutionDirtyReason(q?.solution)
   if (instituteSol) return instituteSol
+  if (visibleLatexSourceHits(q?.solution).length > 0) {
+    return 'The solution still shows raw maths code on screen; it is cleaned for display'
+  }
   if (isMatrixGridCard(q)) return drawnReason(q)
   const leak = stemLeakReason(q, fresh, items)
   if (leak) return leak
@@ -991,12 +1007,48 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, ite
   return (originalConfirmsWording(q) ? '' : scanLossReason(q)) || drawnReason(q)
 }
 
-/** Strip SECTION / marking-scheme / next-Q / smashed Delta left in an institute (or Hybrid) solution. */
+/** Strip SECTION / marking-scheme / next-Q / smashed Delta, heal broken $$, salvage PDF junk, or clear only when unusable. */
 function withInstituteSolutionRepaired(q) {
   const raw = String(q?.solution ?? '')
-  if (!raw.trim() || !instituteSolutionDirtyReason(raw)) return q
-  const cleaned = cleanInstituteSolutionBody(raw)
-  if (cleaned === raw.trim()) return q
+  if (!raw.trim()) return q
+  if (instituteSolutionLooksLikeRawPdf(raw)) {
+    const salvaged = salvageInstituteSolutionBody(raw)
+    if (salvaged) {
+      try {
+        return {
+          ...q,
+          solution: wrapBareLatexRuns(healInstituteSolutionMath(salvaged)),
+          solutionSource: q.solutionSource || 'institute',
+        }
+      } catch {
+        return { ...q, solution: salvaged, solutionSource: q.solutionSource || 'institute' }
+      }
+    }
+    // Unreadable after salvage — clear so Mathpix re-upload or Hybrid AI can fill.
+    const next = { ...q, solution: '' }
+    delete next.solutionSource
+    delete next.solutionInstitute
+    return next
+  }
+  let cleaned = raw
+  if (instituteSolutionChromeFixable(raw) || visibleLatexSourceHits(raw).length > 0) {
+    cleaned = cleanInstituteSolutionBody(raw) || raw
+    try {
+      cleaned = wrapBareLatexRuns(healInstituteSolutionMath(cleaned))
+    } catch {
+      cleaned = healInstituteSolutionMath(cleaned)
+    }
+  }
+  if (!cleaned.trim()) return q
+  if (cleaned === raw.trim() || cleaned === raw) return q
+  // Prefer a version that no longer shows raw commands.
+  if (
+    visibleLatexSourceHits(cleaned).length > 0 &&
+    visibleLatexSourceHits(cleaned).length >= visibleLatexSourceHits(raw).length &&
+    cleaned.length < raw.length * 0.5
+  ) {
+    return q
+  }
   return { ...q, solution: cleaned }
 }
 
@@ -1069,6 +1121,14 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   next = withPrintedSolutionRepaired(next, fresh)
   next = withInstituteSolutionRepaired(next)
   if (isMatrixGridCard(next)) return next
+  // Cards rebuilt from an institute solutions OCR already have Ans./Sol./options from that
+  // booklet. Re-splitting the same OCR as a "paper scan" wipes good options (JEE Main FIITJEE).
+  if (isInstituteOcrCard(next)) {
+    if (siblingPassage && !FIGURE_IN_TEXT_RE.test(String(next.passageText ?? ''))) {
+      next = { ...next, passageText: siblingPassage }
+    }
+    return next
+  }
   next = withStemLeaksRepaired(next, fresh, items)
   const unnumbered = stemWithoutPrintedNumber(next, ocr)
   if (unnumbered) next = { ...next, text: unnumbered }
@@ -1376,8 +1436,15 @@ function cardSignature(q) {
   })
 }
 
+function isInstituteOcrCard(q) {
+  return (
+    String(q?.typeSource ?? '') === 'institute_ocr' ||
+    (String(q?.solutionSource ?? '') === 'institute' && String(q?.answerSource ?? '') === 'institute')
+  )
+}
+
 function repairFailingCard(q, ocr) {
-  if (q?.adminEdited === true || isMatrixGridCard(q)) return q
+  if (q?.adminEdited === true || isMatrixGridCard(q) || isInstituteOcrCard(q)) return q
   let next = { ...applyStoredOcrCardFixes(q, ocr) }
   next = withInstituteSolutionRepaired(next)
   const peeled = peelPrintedAnswerFromStem(stripCheckerSentences(String(q?.text ?? '')))
@@ -1712,7 +1779,10 @@ export function persistOfficialPyqQualityRun(paper) {
   let ocr = getOfficialPyqPendingOcrText(paper.id) || String(full?.preparedText ?? '')
   const status = String(full?.status ?? '')
   const countOff = status === 'pending_review' ? countOffFacts(full, stripHindiOcr(ocr)) : 0
-  const requireCount = status === 'pending_review' ? rebuildTarget(full, stripHindiOcr(ocr)) : 0
+  // Never re-split a paper already rebuilt from institute solutions OCR (FIITJEE JEE Main booklet).
+  const skipOcrResplit = Boolean(full?.instituteSolutions?.rebuiltFromOcr)
+  const requireCount =
+    status === 'pending_review' && !skipOcrResplit ? rebuildTarget(full, stripHindiOcr(ocr)) : 0
   const attempt = `${full.id}|${requireCount}|${full.questions?.length ?? 0}|${ocr.length}`
   if (requireCount && !countRepairTried.has(attempt)) {
     let rebuilt = false

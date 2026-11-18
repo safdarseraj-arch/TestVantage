@@ -2307,6 +2307,12 @@ export function healUploadQuestionCard(q, source, map) {
   let options = Array.isArray(peeled.options)
     ? peeled.options.map((o) => stripTrailingPyqSectionHeader(ensureOptionMathDelimiters(o)))
     : q.options
+  // Option drawings restored into the stem must peel when options already hold the crops (Q39).
+  {
+    const afterFigs = restoreLabelledFigureOptions({ ...q, text, options }, src)
+    text = String(afterFigs.text ?? text)
+    if (Array.isArray(afterFigs.options)) options = afterFigs.options
+  }
   const fromOcr = restoreMissingMatchOptionsFromSource(text, options, src)
   text = fromOcr.text
   options = fromOcr.options.map((o) => stripTrailingPyqSectionHeader(String(o ?? '')))

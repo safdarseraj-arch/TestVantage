@@ -289,4 +289,78 @@ const q73Restored = restoreMissingFiguresFromSource(q73Stem, q73Ocr, 73)
 assert.match(q73Restored, /q73-compound-p\.jpg/)
 assert.doesNotMatch(q73Restored, /q73-sol\.jpg/)
 
+// Q39: figure restore must not leave option circuit crops in the stem when options already hold them.
+const { officialPyqCardAsShown } = await import('../src/utils/officialPyqCardAsShown.js')
+const { preferOcrSmilesOverBadStemCrops } = await import('../src/utils/restorePyqOptionFiguresFromOcr.js')
+const { stripTrailingPyqSectionHeader } = await import('../src/utils/bulkExtractClean.js')
+const CROP_A = '/api/official-pyq/original/crops/q39-a.png'
+const CROP_B = '/api/official-pyq/original/crops/q39-b.png'
+const CROP_C = '/api/official-pyq/original/crops/q39-c.png'
+const CROP_D = '/api/official-pyq/original/crops/q39-d.png'
+const q39Ocr = [
+  '\\item[39.] Which of the following circuits is reverse - biased ?',
+  '(1) ![](https://cdn.mathpix.com/cropped/q39-1.jpg?height=239&width=247&top_left_y=736&top_left_x=508)',
+  '(2) ![](https://cdn.mathpix.com/cropped/q39-2.jpg?height=173&width=329&top_left_y=762&top_left_x=1174)',
+  '(3) ![](https://cdn.mathpix.com/cropped/q39-3.jpg?height=95&width=235&top_left_y=1031&top_left_x=487)',
+  '(4) ![](https://cdn.mathpix.com/cropped/q39-4.jpg?height=331&width=255&top_left_y=985&top_left_x=1172)',
+  'Ans. (3)',
+].join('\n')
+const q39Shown = officialPyqCardAsShown(
+  {
+    text: 'Which of the following circuits is reverse - biased ?',
+    options: [
+      `\\includegraphics{${CROP_A}}`,
+      `\\includegraphics{${CROP_B}}`,
+      `\\includegraphics{${CROP_C}}`,
+      `\\includegraphics{${CROP_D}}`,
+    ],
+    questionType: 'single_correct',
+    printedNumber: 39,
+    adminEdited: true,
+  },
+  q39Ocr,
+)
+assert.equal(String(q39Shown.text).trim(), 'Which of the following circuits is reverse - biased ?')
+assert.equal(
+  (String(q39Shown.text).match(/includegraphics|!\[/g) || []).length,
+  0,
+  'Q39 stem has no extra circuit images',
+)
+assert.equal(
+  q39Shown.options.filter((o) => /cdn\.mathpix\.com/.test(String(o))).length,
+  4,
+  'Q39 swaps clubbed paper crops for Mathpix CDN option figures',
+)
+
+// Q78: bare stem crop → cyclohexene SMILES, not an earlier enol SMILES from a wide OCR window.
+const q78Ocr = [
+  'Highest enol content will be shown by:',
+  '(1) <smiles>O=C1CC(=O)CC(=O)C1</smiles>',
+  'Ans. (1)',
+  '\\item[] *78. Cyclohexene',
+  '<smiles>C1=CCCCC1</smiles>',
+  'is ______ type of an organic compound.',
+  '(1) Benzenoid aromatic',
+  '(2) Acyclic',
+  '(3) Alicyclic',
+  '(4) Benzenoid non-aromatic',
+  'Ans. (3)',
+].join('\n')
+const q78Fixed = preferOcrSmilesOverBadStemCrops(
+  {
+    text: 'Cyclohexene \\includegraphics{/api/official-pyq/original/crops/q78.png?y0=0.1&y1=0.4} is ______ type of an organic compound.',
+    options: ['Benzenoid aromatic', 'Acyclic', 'Alicyclic', 'Benzenoid non-aromatic'],
+    printedNumber: 78,
+  },
+  q78Ocr,
+)
+assert.match(String(q78Fixed.text), /<smiles>C1=CCCCC1<\/smiles>/)
+assert.doesNotMatch(String(q78Fixed.text), /O=C1CC\(=O\)/)
+
+// Q60: PART - C (CHEMISTRY) under a Physics solution / institute field.
+const cleanedPart = stripTrailingPyqSectionHeader(
+  '$$v=\\sqrt{673}$$\n\nPART - C (CHEMISTRY)',
+)
+assert.doesNotMatch(cleanedPart, /PART\s*-\s*C/i)
+
 console.log('test-glued-mcq-figures: ok')

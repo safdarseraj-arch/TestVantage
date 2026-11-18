@@ -4,10 +4,11 @@
  * Approve, which saves this view so the approved card never changes.
  */
 
-import { healUploadQuestionCard } from './uploadQualityGuards.js'
+import { applyStoredOcrCardFixes, healUploadQuestionCard } from './uploadQualityGuards.js'
 import { extractMathpixImageUrls } from './mathpixMedia.js'
 import { officialPyqCardAllowsPassage, peelOfficialPyqCardForDisplay } from './passage.js'
 import { restoreMissingFiguresFromSource } from './extendTruncatedStem.js'
+import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
 
 /**
  * @param {any} q
@@ -27,6 +28,8 @@ export function officialPyqCardAsShown(q, rawSourceText = '') {
     }
   }
   // Admin edits must not wipe OCR figure restore (Q73 compound drawing, Q59 circuit).
+  // Still heal options / assertion stems / PART banners from OCR — Compare crops and
+  // truncated Assertion (A) text are not intentional admin wording.
   const sourceText = String(rawSourceText ?? '')
   let healed
   try {
@@ -36,6 +39,11 @@ export function officialPyqCardAsShown(q, rawSourceText = '') {
       const nextText = restoreMissingFiguresFromSource(healed?.text ?? q?.text, sourceText, printed)
       if (nextText !== String(healed?.text ?? '')) {
         healed = { ...healed, text: nextText }
+      }
+      // Figure restore can copy option drawings into the stem; peel when options already hold them.
+      healed = restoreLabelledFigureOptions(healed, sourceText)
+      if (sourceText.length >= 40) {
+        healed = applyStoredOcrCardFixes(healed, sourceText)
       }
     } else {
       healed = peelOfficialPyqCardForDisplay(healUploadQuestionCard(q, sourceText), sourceText)

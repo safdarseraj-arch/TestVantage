@@ -344,6 +344,79 @@ function structureOnlyListTwo(text) {
   return { index: found.index ?? 0, block }
 }
 
+/** Height of an original-page crop, as a page fraction (0 when unknown). @param {string} url */
+function cropHeightFraction(url) {
+  const m = String(url ?? '').match(/[?&]y0=([0-9.]+).*?[?&]y1=([0-9.]+)/i) || String(url ?? '').match(/[?&]y1=([0-9.]+).*?[?&]y0=([0-9.]+)/i)
+  if (!m) return 0
+  const a = Number(m[1])
+  const b = Number(m[2])
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0
+  return Math.abs(b - a)
+}
+
+/** Width of an original-page crop, as a page fraction (0 when unknown). @param {string} url */
+function cropWidthFraction(url) {
+  const m = String(url ?? '').match(/[?&]x0=([0-9.]+).*?[?&]x1=([0-9.]+)/i) || String(url ?? '').match(/[?&]x1=([0-9.]+).*?[?&]x0=([0-9.]+)/i)
+  if (!m) return 0
+  const a = Number(m[1])
+  const b = Number(m[2])
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0
+  return Math.abs(b - a)
+}
+
+/**
+ * True when a crop looks like two structures clubbed together or a tall watermark slab
+ * (FIITJEE hatch + two molecules in one Gemini box).
+ * @param {string} url
+ */
+export function originalCropLooksClubbedOrWatermarkSlab(url) {
+  const h = cropHeightFraction(url)
+  const w = cropWidthFraction(url)
+  if (w >= 0.34) return true
+  if (h >= 0.16) return true
+  if (w > 0 && h > 0 && w / h >= 2.4) return true
+  return false
+}
+
+/**
+ * Numbered stem compounds drawn from scan codes (JEE Main numerical Q81-style "(1) <smiles>…"):
+ * one original-page crop per code. Tall / wide boxes that grabbed two structures + the page
+ * watermark are dropped. Leftover codes are removed rather than left for students.
+ * '' when there are no codes or not enough clean single-structure crops.
+ * @param {unknown} text
+ * @param {unknown} urls
+ */
+export function stemSmilesWithOriginalCrops(text, urls) {
+  const t = String(text ?? '')
+  const smilesCount = (t.match(/<smiles\b/gi) || []).length
+  if (!smilesCount) return ''
+  const crops = originalPageCrops(urls)
+  if (!crops.length) {
+    // Do not strip SMILES with nothing to put in their place — keep the flag for Compare / manual crop.
+    return ''
+  }
+  const singles = crops.filter((u) => !originalCropLooksClubbedOrWatermarkSlab(u))
+  const use =
+    singles.length >= smilesCount
+      ? singles.slice(0, smilesCount)
+      : singles.length >= Math.min(smilesCount, 2)
+        ? singles
+        : []
+  // Prefer leaving SMILES flagged over applying clubbed / watermark slabs as a "fix".
+  if (use.length < smilesCount) return ''
+  let i = 0
+  const out = t
+    .replace(/<smiles>[\s\S]*?<\/smiles>/gi, () => {
+      if (i < use.length) return `\\includegraphics{${use[i++]}}`
+      return ''
+    })
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  if (/<smiles\b/i.test(out)) return ''
+  return out && out !== t.trim() ? out : ''
+}
+
 /**
  * A drawing the scan cut into pieces, and a List-II that is only molecule codes, shown from the
  * original page (2014 P2 Q37). The first picture replaces the pieces. One picture left over

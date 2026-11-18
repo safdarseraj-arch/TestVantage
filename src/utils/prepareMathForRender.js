@@ -34,6 +34,10 @@ import {
   stripSheetConfigHtml,
 } from './latexTabularDisplay.js'
 import { sanitizeStemForDisplay } from './sanitizeStemForDisplay.js'
+import {
+  optionLooksLikeAssertionCombination,
+  optionLooksLikeAssertionReason,
+} from './assertionCombinationMcq.js'
 import { repairCasesLatex } from './repairCasesLatex.js'
 import { ensureVmatrixStemDelimiters } from './repairDeterminantOcr.js'
 import {
@@ -730,10 +734,29 @@ function stripHlineOutsideTables(text) {
   return out
 }
 
+/** Keep a leading (A)/(C) when it is part of the choice wording, not the slot letter. */
+function keepLeadingOptionLetter(body) {
+  const s = String(body ?? '').trim()
+  if (!s) return false
+  if (optionLooksLikeAssertionCombination(s) || optionLooksLikeAssertionReason(s)) return true
+  // Acidity / ranking chains: "(C) < (A) < (D) < …" — stripping left "< (A) < …" (Q77).
+  if (/^<\s*\(\s*[A-E]\s*\)/.test(s) || /\(\s*[A-E]\s*\)\s*</.test(s)) return true
+  if (/^(?:true|false)\b/i.test(s) && /\(\s*R\s*\)/i.test(s)) return true
+  return false
+}
+
 /** Strip option label; fix short numeric / corrupted fraction options for preview */
 export function normalizeMcqOptionForRender(text) {
   if (!text?.trim()) return text ?? ''
-  let out = text.trim().replace(/^\([A-D]\)\s*/i, '')
+  let out = text.trim()
+  // Keep "(A), (B) and (C) only" — stripping the leading (A) left ", (B) and (C) only" (Q33).
+  const lead = out.match(/^\(\s*([A-D])\s*\)\s*/i)
+  if (lead) {
+    const rest = out.slice(lead[0].length)
+    if (!keepLeadingOptionLetter(rest) && !keepLeadingOptionLetter(out)) {
+      out = rest
+    }
+  }
   out = out.replace(/\\text\s*\{\s*frac\s*\}/gi, '\\frac')
   out = out.replace(/^\$\$(\\frac\{[^}]+\}\{[^}]+\})\$$/, '$$$1$')
   out = out.replace(/^\$\$(\\sqrt\{[^}]+\})\$$/, '$$$1$')

@@ -19,7 +19,8 @@ import {
 } from './officialPyqLocalQuality.js'
 import { officialPyqCardAsShown } from './officialPyqCardAsShown.js'
 import { ORIGINAL_CROP_URL_PREFIX, consumeIncludeGraphics, isOriginalCropUrl } from './mathpixMedia.js'
-import { textWithOriginalFigureCrops } from './officialPyqCardTidy.js'
+import { stemSmilesWithOriginalCrops, textWithOriginalFigureCrops } from './officialPyqCardTidy.js'
+import { officialPyqScanStructurePlace } from './officialPyqScanStructures.js'
 import { paperItemsFromMathpixOcr } from './mathpixQuestionSplit.js'
 import { gridColLabels, gridFieldsOf, isMatrixGridCard } from './matrixGridPyq.js'
 import {
@@ -190,6 +191,33 @@ const SMILES_MARKUP = /<smiles>[\s\S]*?<\/smiles>/gi
 const FIGURE_PLACEHOLDER = /\[\s*figure\s*\d*\s*\]/gi
 const OPTION_LABEL = /^\s*(?:\(\s*[A-Da-d1-4]\s*\)|[A-Da-d][.)])\s*/
 
+/**
+ * Strip only a real slot label like "(1)" / "A." — not assertion choice text that starts with
+ * "(A), (B) and (C) only" (JEE Main Q33-style). Stripping those left broken ", (B) and (C) only".
+ * @param {unknown} option
+ */
+export function stripOfficialPyqOptionSlotLabel(option) {
+  const s = String(option ?? '')
+  const m = s.match(/^\s*(?:\(\s*([A-Da-d1-4])\s*\)|([A-Da-d])[.)])\s*/)
+  if (!m) return s.trim()
+  const rest = s.slice(m[0].length)
+  const letter = String(m[1] || m[2] || '')
+  // Assertion / ranking / "which of the following" choice bodies keep their leading (A)/(B)/(C)/(D).
+  if (
+    /^[A-Da-d]$/.test(letter) &&
+    (/^,\s*\(\s*[A-Da-d]\s*\)/.test(rest) ||
+      /\(\s*[A-Da-dEe]\s*\)/.test(rest) ||
+      /\band\b/i.test(rest) ||
+      /\bonly\b/i.test(rest) ||
+      /^<\s*\(\s*[A-E]\s*\)/.test(rest) ||
+      /^is\s+(?:true|false)\b/i.test(rest) ||
+      /\(\s*R\s*\)/i.test(rest))
+  ) {
+    return s.trim()
+  }
+  return rest.trim()
+}
+
 /** @param {unknown} text */
 function withoutFigurePlaceholders(text) {
   return String(text ?? '').replace(FIGURE_PLACEHOLDER, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
@@ -197,7 +225,7 @@ function withoutFigurePlaceholders(text) {
 
 /** @param {unknown} option */
 export function officialPyqOptionHasContent(option) {
-  return Boolean(withoutFigurePlaceholders(String(option ?? '').replace(OPTION_LABEL, '')))
+  return Boolean(withoutFigurePlaceholders(stripOfficialPyqOptionSlotLabel(option)))
 }
 
 /** @param {unknown} urls */
@@ -331,10 +359,21 @@ function suggestionDropsTheLists(before, suggested) {
   return cardHasLists && (addsTable || addsCodes)
 }
 
+/** Drop leftover structure codes so students never see SMILES when a crop path was available. */
+function withoutLeftoverSmiles(text) {
+  const next = String(text ?? '')
+    .replace(/<smiles>[\s\S]*?<\/smiles>/gi, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return next
+}
+
 /**
  * Draft from a Compare suggestion: corrected words from the page, and pictures cut out of the
  * original page where the card had broken SMILES / pictures. Nothing is drawn by Gemini.
  * A suggestion that turns a match list into a code table is not used; the pictures still are.
+ * Stem structure codes (Q81-style) take one crop each; leftover SMILES are stripped.
  * @param {any} card
  * @param {{ suggestedText?: string, suggestedOptions?: string[], suggestedPassage?: string, suggestedFigures?: any }} compare
  */
@@ -351,21 +390,51 @@ export function officialPyqDraftFromSuggestion(card, compare) {
   const count = Math.max(base.options.length, opts.length, figures.options.length)
   /** Gemini sends "(A)" or "" for a drawing it cannot write; the card's own option stays then. */
   const options = Array.from({ length: count }, (_, i) => {
-    const suggested = String(opts[i] ?? '').replace(OPTION_LABEL, '')
+    const suggested = stripOfficialPyqOptionSlotLabel(opts[i])
     const crops = figures.options[i] || []
-    if (crops.length) return placeCropFigures('', officialPyqOptionHasContent(suggested) ? suggested : '[figure]', crops)
-    return officialPyqOptionHasContent(suggested) ? keepCardFigures(base.options[i], suggested) : String(base.options[i] ?? '')
+    if (crops.length) {
+      const placed = placeCropFigures('', officialPyqOptionHasContent(suggested) ? suggested : '[figure]', crops)
+      return /<smiles>/i.test(placed) ? withoutLeftoverSmiles(placed) || placed : placed
+    }
+    // Never keep a SMILES "correction" for a structure option — leave empty for a manual crop.
+    if (officialPyqOptionHasContent(suggested)) {
+      const kept = keepCardFigures(base.options[i], suggested)
+      if (/<smiles>/i.test(suggested) || (/<smiles>/i.test(String(base.options[i] ?? '')) && /<smiles>/i.test(kept))) {
+        return withoutLeftoverSmiles(kept)
+      }
+      return kept
+    }
+    return /<smiles>/i.test(String(base.options[i] ?? '')) && officialPyqScanStructurePlace(card) === 'options'
+      ? ''
+      : String(base.options[i] ?? '')
   })
   const fix = (before, suggested, crops) => {
-    if (crops.length) return placeCropFigures(before, withoutFigurePlaceholders(suggested) ? suggested : '', crops)
+    if (crops.length) {
+      // Q81-style: numbered stem compounds — one crop per SMILES beats Gemini's [figure] layout
+      // when that layout boxed watermark / two structures in one box.
+      if (/<smiles>/i.test(before)) {
+        const bySmiles = stemSmilesWithOriginalCrops(before, crops)
+        if (bySmiles) return bySmiles
+        // Prefer keeping the flag over applying clubbed / watermark slabs as a "fix".
+        return before
+      }
+      const placed = placeCropFigures(before, withoutFigurePlaceholders(suggested) ? suggested : '', crops)
+      return /<smiles>/i.test(placed) ? withoutLeftoverSmiles(placed) || placed : placed
+    }
     return withoutFigurePlaceholders(suggested) ? keepCardFigures(before, suggested) : before
+  }
+  let nextText = fix(base.text, text, figures.text)
+  // Strip leftover SMILES only when every code was replaced by a crop (never leave empty (1)(2)(3)(4) holes).
+  if (/<smiles>/i.test(nextText) && /\\includegraphics\{[^}]*original\/crops/i.test(nextText)) {
+    const stripped = withoutLeftoverSmiles(nextText)
+    if (stripped && !/<smiles>/i.test(stripped)) nextText = stripped
   }
   /** The key is checked against the options this fix puts on the card: "C" for four new option pictures (2012 P2 Q9). */
   const printed = officialPyqPrintedAnswerPatch({ ...card, options }, compare)
   /** A kept card picture must not come back on an option when it is the question's own figure (2013 P1 Q15). */
   return dropOptionFigureRepeatingStem({
     ...base,
-    text: fix(base.text, text, figures.text),
+    text: nextText,
     passageText: fix(base.passageText, passage, figures.passage),
     options,
     ...(printed ? { answerKey: formatOfficialPyqAnswerKey(printed), answerFromPage: true } : {}),

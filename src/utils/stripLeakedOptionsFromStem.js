@@ -1,6 +1,8 @@
 import { latexExtractionIncomplete } from './healTruncatedLatex.js'
 import { findOptionsBlockStart } from './mcqOptionMarkers.js'
 import { peelFiguresFromBand } from './peelGluedMcqOptions.js'
+import { optionsLookLikeAssertionCombinations } from './assertionCombinationMcq.js'
+import { keepLabelledStemStructures } from './restorePyqOptionFiguresFromOcr.js'
 
 /**
  * Remove option tails accidentally appended to the question stem.
@@ -73,25 +75,38 @@ export function stripLeakedOptionsFromStem(stem, options = []) {
   const multiline = String(stem ?? '').replace(/\r\n/g, '\n')
 
   // Full (A)–(D) block duplicated onto the stem while options are already stored.
-  if (opts.length >= 2) {
+  // Exception: assertion-combination MCQs keep (A)–(D) statements in the stem; the
+  // stored options are "(A), (B) and (C) only" etc. Cutting would leave ", (B)…" style gaps.
+  // Ranking acidity MCQs keep (A)–(E) compound drawings in the stem (Q77).
+  if (
+    opts.length >= 2 &&
+    !optionsLookLikeAssertionCombinations(opts) &&
+    !keepLabelledStemStructures(multiline, opts)
+  ) {
     const start = findOptionsBlockStart(multiline)
     if (start > 24) {
       const after = multiline.slice(start)
-      if (
+      const lettered =
         /\(\s*A\s*\)/i.test(after) &&
         /\(\s*B\s*\)/i.test(after) &&
         /\(\s*[CD]\s*\)/i.test(after)
-      ) {
-        // Peel only the first A–D band — keep a glued following question for the splitter.
+      const numbered =
+        /^\(\s*1\s*\)/.test(after.trimStart()) &&
+        /\(\s*2\s*\)/.test(after) &&
+        /\(\s*[34]\s*\)/.test(after)
+      if (lettered || numbered) {
+        // Peel only the first A–D / 1–4 band — keep a glued following question for the splitter.
         let band = after
-        const dAt = after.search(/\(\s*D\s*\)/i)
-        if (dAt >= 0) {
-          const afterD = after.slice(dAt + 3)
-          const secondAt = afterD.search(
+        const lastMark = lettered
+          ? after.search(/\(\s*D\s*\)/i)
+          : after.search(/\(\s*4\s*\)/)
+        if (lastMark >= 0) {
+          const afterLast = after.slice(lastMark + 3)
+          const secondAt = afterLast.search(
             /\n(?=(?:Let|If(?!\s+and\s+only)|Which|Consider|Suppose|For the|Match\s+|How many|What is|The value|An integer)\b)/i,
           )
           if (secondAt >= 1) {
-            band = after.slice(0, dAt + 3 + secondAt)
+            band = after.slice(0, lastMark + 3 + secondAt)
           }
         }
         const peeled = peelFiguresFromBand(band)

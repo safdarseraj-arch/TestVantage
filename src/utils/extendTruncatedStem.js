@@ -239,9 +239,26 @@ export function stemLooksCutOff(text) {
   const t = String(text ?? '').trim()
   if (!t) return false
   if (latexExtractionIncomplete(t)) return true
-  if (/\bThen\s*[:.]?\s*$/i.test(t)) return true
+  // Bare "Then" with nothing after — truncated. "then :" / "then." that open an MCQ are complete.
+  if (/\bThen\s*$/i.test(t)) return true
   const thenAt = t.search(/\bThen\b/i)
-  if (thenAt >= 0 && t.length - thenAt < 28 && !/\$/.test(t.slice(thenAt))) return true
+  if (thenAt >= 0) {
+    const after = t.slice(thenAt)
+    const finishedCloser =
+      /\bthen\s*[:.]\s*$/i.test(after) ||
+      /\bthen\b[\s\S]{0,48}(?:is equal to|equals?)\s*(?:_{2,}|\.{3}|…|____|\\underline)\s*$/i.test(
+        after,
+      ) ||
+      /\bthen\b[\s\S]{0,48}(?:_{2,}|\.{3}|…|____|\\underline)\s*$/i.test(after)
+    if (
+      !finishedCloser &&
+      after.length < 28 &&
+      !/\$/.test(after) &&
+      !/\bthen\s*[:.]/i.test(after)
+    ) {
+      return true
+    }
+  }
   if (looksLikeMatchingListStem(t) && !hasListTwoEntries(t)) return true
   if (/\bsuch that\s*$/i.test(t)) return true
   if (/[-–=]\s*$/.test(t) && t.length < 500) return true
@@ -409,7 +426,7 @@ function indexStemInSource(src, needle, from = 0) {
   return -1
 }
 
-/** Stop before (A)–(D), SECTION headers, or the next numbered / Let-If question. */
+/** Stop before (A)–(D), SECTION headers, Ans/Sol, or the next numbered / Let-If question. */
 function sliceUntilStemEnd(taken) {
   const rawTaken = String(taken)
   const t = rawTaken.length > STEM_EXTEND_MAX ? rawTaken.slice(0, STEM_EXTEND_MAX) : rawTaken
@@ -435,6 +452,11 @@ function sliceUntilStemEnd(taken) {
   if (nextOpener >= 0) end = Math.min(end, 40 + nextOpener)
   const nextBlankEnglish = t.slice(40).search(/\n{2,}(?:The|A|An) [A-Za-z]/)
   if (nextBlankEnglish >= 0) end = Math.min(end, 40 + nextBlankEnglish)
+  // Printed key / solution after the stem must not ride along (Q13/Q26 over-extend).
+  const ansAt = t.slice(20).search(/\n\s*(?:Ans(?:wer)?\.?|Sol(?:ution)?\.?)\b/i)
+  if (ansAt >= 0) end = Math.min(end, 20 + ansAt)
+  const itemizeEnd = t.slice(20).search(/\\end\{itemize\}/i)
+  if (itemizeEnd >= 0) end = Math.min(end, 20 + itemizeEnd)
   return stripPageBreakAndSectionGlue(t.slice(0, end))
 }
 
@@ -671,11 +693,12 @@ function looksLikeOrphanListTwo(q) {
   if (looksLikeMatchInstructionOnly(t)) return false
   const hasIIHeader = /(?:^|\n)\s*(?:List|Column)\s*[-–]?\s*II\b/i.test(t)
   if (hasIIHeader) return true
+  // "(1) 35" glued SCQ choices are not List-II. Real orphan List-II uses math ($…) or "infinite".
   if (
     t.length < 640 &&
     hasListTwoValueRows(t) &&
     countListMarkers(t, ['P', 'Q', 'R', 'S']) < 2 &&
-    /(?:^List-II\b|\(1\)\s*\$?\s*\d|\binfinite\b)/i.test(t)
+    /(?:^List-II\b|\(1\)\s*\$|\binfinite\b)/i.test(t)
   ) {
     return true
   }
@@ -691,6 +714,15 @@ export function matchQuestionMissingListI(q) {
   if (!t) return false
   if (hasListIEntries(t, q?.options)) return false
   if (hasOriginalPageCrop(t)) return false
+  // Ordinary SCQ/MCQ (meter bridge, etc.) must not look like a match column missing List-I.
+  const filledOpts = (Array.isArray(q?.options) ? q.options : []).filter((o) => String(o ?? '').trim()).length
+  if (
+    filledOpts >= 3 &&
+    !/match\s+(?:the|each)\b|List-I|List-II|Column\s*[-–]?\s*I/i.test(t) &&
+    !looksLikeMatchingListStem(t)
+  ) {
+    return false
+  }
   if (looksLikeOrphanListTwo(q)) return true
   if (looksLikeMatchInstructionOnly(t) && !hasListIEntries(t, q?.options)) return true
   if (looksLikeMatchingListStem(t) && !hasListIEntries(t, q?.options)) return true

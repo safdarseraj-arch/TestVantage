@@ -24,7 +24,7 @@ import {
 import { unwrapReactionStepTables } from './latexTabularDisplay.js'
 import { enrichMatchListsFromOcr } from './restoreMatchListsOcr.js'
 import { isMatrixGridCard } from './matrixGridPyq.js'
-import { repairScanStructureCodes } from './smilesDisplay.js'
+import { normalizeNumberedStemSmiles, repairScanStructureCodes } from './smilesDisplay.js'
 import { restoreStructureLabels } from './structureLabels.js'
 import {
   missingBracketedGivenLine,
@@ -145,11 +145,13 @@ export function applyStoredOcrCardFixes(q, source) {
   withStatements = restoreLabelledFigureOptions(withStatements, source)
   const window = questionScanWindow(withStatements?.text, source)
   const optionWindow = optionRowsWindow(withStatements?.text, source)
-  const scanText = repairScanStructureCodes(
-    unwrapReactionStepTables(
-      restoreScanMathBreaks(
-        restoreDisplayCloseBeforeInline(restoreMissingGivenLine(withStatements?.text ?? '', window), window),
-        mathBreakWindow(withStatements?.text, source),
+  const scanText = normalizeNumberedStemSmiles(
+    repairScanStructureCodes(
+      unwrapReactionStepTables(
+        restoreScanMathBreaks(
+          restoreDisplayCloseBeforeInline(restoreMissingGivenLine(withStatements?.text ?? '', window), window),
+          mathBreakWindow(withStatements?.text, source),
+        ),
       ),
     ),
   )

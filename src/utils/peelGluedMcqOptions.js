@@ -7,6 +7,8 @@
 import { findOptionsBlockStart } from './mcqOptionMarkers.js'
 import { consumeIncludeGraphics } from './mathpixMedia.js'
 import { parseQuestionText } from './parseQuestionText.js'
+import { optionsLookLikeAssertionCombinations } from './assertionCombinationMcq.js'
+import { keepLabelledStemStructures } from './restorePyqOptionFiguresFromOcr.js'
 
 const MCQ_OPTION_PROMPT_RE =
   /(?:Which of the following option\(s\) is\(are\) correct|The option\(s\) with correct sequence of reagents[\s\S]{0,160}?is\(are\))\s*\??/i
@@ -204,6 +206,10 @@ export function peelGluedMcqOptions(text, options = [], source = '') {
   const raw = String(text ?? '')
   const existing = pad4(options)
   if (!raw.trim()) return { text: raw, options: existing }
+  // "(A), (B) and (C) only" choices — stem keeps the field statements (A)–(D).
+  if (optionsLookLikeAssertionCombinations(existing)) return { text: raw, options: existing }
+  // Ranking chains "(C) < (A) < …" — stem keeps labelled compound drawings (A)–(E) (Q77).
+  if (keepLabelledStemStructures(raw, existing)) return { text: raw, options: existing }
 
   const promptEnd = findPromptEnd(raw)
   let stem = raw
@@ -247,20 +253,26 @@ export function peelGluedMcqOptions(text, options = [], source = '') {
     }
     if (start > 24) {
       const after = raw.slice(start)
-      if (
+      const lettered =
         /\(\s*A\s*\)/i.test(after) &&
         /\(\s*B\s*\)/i.test(after) &&
         /\(\s*[CD]\s*\)/i.test(after)
-      ) {
-        // Peel only the first A–D band; keep a glued following question for the splitter.
+      const numbered =
+        /^\(\s*1\s*\)/.test(after.trimStart()) &&
+        /\(\s*2\s*\)/.test(after) &&
+        /\(\s*[34]\s*\)/.test(after)
+      if (lettered || numbered) {
+        // Peel only the first A–D / 1–4 band; keep a glued following question for the splitter.
         let bandEnd = after.length
-        const dAt = after.search(/\(\s*D\s*\)/i)
-        if (dAt >= 0) {
-          const afterD = after.slice(dAt + 3)
-          const secondAt = afterD.search(
+        const lastMark = lettered
+          ? after.search(/\(\s*D\s*\)/i)
+          : after.search(/\(\s*4\s*\)/)
+        if (lastMark >= 0) {
+          const afterLast = after.slice(lastMark + 3)
+          const secondAt = afterLast.search(
             /\n(?=(?:Let|If(?!\s+and\s+only)|Which|Consider|Suppose|For the|Match\s+|How many|What is|The value|An integer)\b)/i,
           )
-          if (secondAt >= 1) bandEnd = dAt + 3 + secondAt
+          if (secondAt >= 1) bandEnd = lastMark + 3 + secondAt
         }
         const bandOnly = after.slice(0, bandEnd)
         const leftover = after.slice(bandEnd).trim()

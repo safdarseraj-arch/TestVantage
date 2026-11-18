@@ -36,6 +36,8 @@ import {
 import { peelForeignComprehensionFromStem, stripOfficialPyqPaperChrome } from './passage.js'
 import { peelGluedMcqOptions } from './peelGluedMcqOptions.js'
 import { stripLeakedOptionsFromStem } from './stripLeakedOptionsFromStem.js'
+import { optionsLookLikeAssertionCombinations } from './assertionCombinationMcq.js'
+import { keepLabelledStemStructures } from './restorePyqOptionFiguresFromOcr.js'
 import {
   cleanMathpixCardText,
 } from './mathpixCleanPipeline.js'
@@ -110,8 +112,15 @@ export function sanitizeStemForDisplay(text, options = []) {
     t = wrapBareLatexRuns(repairOrphanAlignedBody(t))
     t = wrapOrDropLeftoverArray(t)
     t = normalizeSmashedChemDollars(t)
-    t = peelGluedMcqOptions(t, options).text
-    t = stripLeakedOptionsFromStem(t, options)
+    // Assertion-combination / ranking MCQs keep (A)–(E) statements or drawings in the stem.
+    const keepStemLabels =
+      optionsLookLikeAssertionCombinations(options) || keepLabelledStemStructures(t, options)
+    if (!keepStemLabels) {
+      t = peelGluedMcqOptions(t, options).text
+    }
+    if (!keepStemLabels) {
+      t = stripLeakedOptionsFromStem(t, options)
+    }
     t = wrapOrDropLeftoverArray(t)
     if (/\\begin\{array\}/i.test(t) && !/\\end\{array\}/i.test(t)) {
       t = t.replace(

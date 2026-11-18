@@ -167,6 +167,47 @@ export function isMcqOptionBlockStart(text, index) {
   return (hasB ? 1 : 0) + (hasC ? 1 : 0) + (hasD ? 1 : 0) >= 2
 }
 
+/** List-II / match-column (1)–(4) rows — not JEE Main SCQ choices. */
+function isListTwoNumberedContext(text, index) {
+  const before = String(text ?? '').slice(Math.max(0, index - 160), index)
+  if (/(?:List|Column)\s*[-–]?\s*II\b/i.test(before)) return true
+  if (/\bMatch\s+(?:each|the)\b/i.test(String(text ?? '').slice(Math.max(0, index - 500), index))) {
+    return true
+  }
+  if (
+    /(?:List|Column)\s*[-–]?\s*I(?!I)\b/i.test(String(text ?? '').slice(0, index)) &&
+    /\(\s*[PQRS]\s*\)/.test(String(text ?? '').slice(0, index))
+  ) {
+    return true
+  }
+  return false
+}
+
+/**
+ * JEE Main often prints choices as (1)(2)(3)(4) instead of (A)–(D).
+ * @param {string} text
+ * @param {number} index — index of "(" before 1
+ */
+export function isNumberedMcqOptionBlockStart(text, index) {
+  if (index < 8) return false
+  if (isFunctionStyleParen(text, index) || isNamedPartLabel(text, index)) return false
+  if (isListTwoNumberedContext(text, index)) return false
+  const tail = text.slice(index, index + 700)
+  if (!/^\(\s*1\s*\)/.test(tail)) return false
+  const has2 = /\(\s*2\s*\)/.test(tail)
+  const has3 = /\(\s*3\s*\)/.test(tail)
+  const has4 = /\(\s*4\s*\)/.test(tail)
+  if ((has2 ? 1 : 0) + (has3 ? 1 : 0) + (has4 ? 1 : 0) < 2) return false
+  const vals = [...tail.matchAll(/\(\s*[1-4]\s*\)\s*([^\n(]{0,100})/g)].map((m) =>
+    String(m[1] ?? '').trim(),
+  )
+  if (vals.length < 3) return false
+  // Short SCQ values (35 / 63 / …). Long rows are usually List-II.
+  if (vals.filter((v) => v.length > 0 && v.length <= 80).length >= 3) return true
+  const before = text.slice(Math.max(0, index - 40), index)
+  return /(?::|\?)\s*$/.test(before.trimEnd())
+}
+
 /** Index of first plausible (A) or misread (4) / zero-based (0) option block. */
 export function findOptionsBlockStart(text) {
   const candidates = []
@@ -190,16 +231,29 @@ export function findOptionsBlockStart(text) {
     if (/\(\s*1\s*\)/.test(tail)) return m.index
   }
 
+  // JEE Main numbered choices (1)–(4) when letters are absent.
+  const numbered = []
+  const re1 = /\(\s*1\s*\)/g
+  while ((m = re1.exec(text)) !== null) {
+    if (!isNumberedMcqOptionBlockStart(text, m.index)) continue
+    numbered.push(m.index)
+  }
+  if (numbered.length) return numbered[numbered.length - 1]
+
   return -1
 }
 
-/** First (A)…(D) block — used when splicing a cut stem so later questions are not eaten. */
+/** First (A)…(D) or (1)…(4) block — used when splicing a cut stem so later questions are not eaten. */
 export function findFirstOptionsBlockStart(text) {
   const t = String(text ?? '')
   const reA = /\(\s*A\s*\)/gi
   let m
   while ((m = reA.exec(t)) !== null) {
     if (isMcqOptionBlockStart(t, m.index)) return m.index
+  }
+  const re1 = /\(\s*1\s*\)/g
+  while ((m = re1.exec(t)) !== null) {
+    if (isNumberedMcqOptionBlockStart(t, m.index)) return m.index
   }
   const fallback = findOptionsBlockStart(t)
   return fallback

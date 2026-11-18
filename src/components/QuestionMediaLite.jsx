@@ -17,6 +17,8 @@ import { reviewMarkSpans, sliceTextByFlagSpans } from '../utils/officialPyqRevie
 import { sanitizeStemForDisplay, shownStemLooksIncomplete } from '../utils/sanitizeStemForDisplay.js'
 import { stripLeakedOptionsFromStem } from '../utils/stripLeakedOptionsFromStem.js'
 import { stripTrailingOptionMarkerFromStem } from '../utils/optionStemLeak.js'
+import { optionsLookLikeAssertionCombinations } from '../utils/assertionCombinationMcq.js'
+import { keepLabelledStemStructures } from '../utils/restorePyqOptionFiguresFromOcr.js'
 
 const FLAG_MARK_STYLE = {
   background: '#fecaca',
@@ -70,9 +72,14 @@ function stemTextForPreview(text, options = []) {
   if (!parseMatchingListForDisplay(t, options)) {
     /** Only a card that draws its own options may lose an option list in its text; a passage has none (2012 P2 Q13). */
     const hasOptions = (Array.isArray(options) ? options : []).filter((o) => String(o ?? '').trim()).length >= 2
-    const optStart = hasOptions ? findOptionsBlockStart(t) : -1
+    // Assertion-combination / ranking MCQs keep (A)–(E) statements or drawings in the stem.
+    const keepStatements =
+      optionsLookLikeAssertionCombinations(options) || keepLabelledStemStructures(t, options)
+    const optStart = hasOptions && !keepStatements ? findOptionsBlockStart(t) : -1
     if (optStart > 40) t = t.slice(0, optStart).trim()
-    t = stripTrailingOptionMarkerFromStem(stripLeakedOptionsFromStem(t, options), options)
+    if (!keepStatements) {
+      t = stripTrailingOptionMarkerFromStem(stripLeakedOptionsFromStem(t, options), options)
+    }
   }
   return t
 }

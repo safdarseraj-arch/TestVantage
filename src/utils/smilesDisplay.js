@@ -146,6 +146,102 @@ export function extractSmilesStrings(raw) {
     .filter(Boolean)
 }
 
+/**
+ * Put each "(n)<smiles>…" on its own line so labels are not glued to the prior drawing
+ * (`</smiles>(2)` → `</smiles>\n(2)`). Used by heal and by the numbered-grid peeler.
+ * @param {unknown} text
+ */
+export function normalizeNumberedStemSmiles(text) {
+  return String(text ?? '')
+    .replace(/<\/smiles>\s*\(\s*([1-4A-E])\s*\)/gi, '</smiles>\n($1)')
+    .replace(/\(\s*([1-4A-E])\s*\)\s*<smiles>/gi, '($1)\n<smiles>')
+    // "(A) $Bu-OH$(B)" → keep Bu-OH on (A), put (B) on its own line before the next drawing.
+    .replace(/(\$\s*[^$\n]{1,80}\$)\s*\(\s*([B-E])\s*\)/g, '$1\n($2)')
+    .replace(/\n{3,}/g, '\n\n')
+}
+
+/**
+ * JEE Main integer stems that list compounds as "(1) <smiles>… (2) <smiles>…" (Q81).
+ * Returns prose + labelled items for a 2×2 grid, or null when the stem is not that pattern.
+ * @param {unknown} text
+ * @returns {{ prose: string, items: { label: string, smiles: string }[] } | null}
+ */
+/**
+ * @param {unknown} text
+ * @param {'digit' | 'letter'} kind
+ */
+function peelLabelledStemStructures(text, kind) {
+  const t = normalizeNumberedStemSmiles(text)
+  const labelRe = kind === 'digit' ? '([1-4])' : '([A-E])'
+  const re = new RegExp(
+    `(?:^|\\n)\\s*\\(\\s*${labelRe}\\s*\\)\\s*\\n?\\s*(?:(\\$[^$\\n]{1,120}\\$)\\s*)?<smiles>\\s*([\\s\\S]*?)\\s*<\\/smiles>`,
+    'gi',
+  )
+  /** @type {{ label: string, smiles: string, formula: string, index: number, end: number }[]} */
+  const hits = []
+  for (const m of t.matchAll(re)) {
+    const smiles = String(m[3] ?? '').replace(/\s+/g, '').trim()
+    if (smiles.length < 4) continue
+    hits.push({
+      label: String(m[1]).toUpperCase(),
+      formula: String(m[2] ?? '').trim(),
+      smiles,
+      index: m.index ?? 0,
+      end: (m.index ?? 0) + m[0].length,
+    })
+  }
+  // Letter stems often start with a formula-only (A) Bu-OH then SMILES for (B)–(E).
+  if (kind === 'letter' && hits.length >= 2) {
+    const aOnly = t.match(/(?:^|\n)\s*\(\s*A\s*\)\s*\n?\s*(\$[^$\n]{1,120}\$)(?!\s*<smiles>)/i)
+    if (aOnly && aOnly.index != null && aOnly.index < hits[0].index) {
+      hits.unshift({
+        label: 'A',
+        formula: String(aOnly[1] ?? '').trim(),
+        smiles: '',
+        index: aOnly.index,
+        end: aOnly.index + aOnly[0].length,
+      })
+    }
+  }
+  if (hits.length < 3) return null
+  const first = hits[0]
+  const last = hits[hits.length - 1]
+  const between = t.slice(first.index, last.end)
+  const leftover = between
+    .replace(re, '\n')
+    .replace(/(?:^|\n)\s*\(\s*[A-E1-4]\s*\)\s*\n?\s*\$[^$\n]{1,120}\$/gi, '\n')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (leftover.length > 24) return null
+  const prose = t.slice(0, first.index).trim()
+  const tail = t.slice(last.end).trim()
+  if (
+    tail &&
+    !/^(?:Ans\.|Sol\.|Choose the correct|Options:|$)/i.test(tail) &&
+    tail.length > 80 &&
+    !/^Choose\b/i.test(tail)
+  ) {
+    // Allow a short "Choose the correct answer…" trailer after Q77 compounds.
+    if (!/^Choose\s+the\s+correct\b/i.test(tail)) return null
+  }
+  const labels = hits.map((h) => h.label)
+  if (new Set(labels).size !== labels.length) return null
+  return {
+    prose,
+    items: hits.map(({ label, smiles, formula }) => ({ label, smiles, formula })),
+    layout: kind === 'digit' ? 'grid' : 'list',
+  }
+}
+
+export function peelNumberedStemStructures(text) {
+  return peelLabelledStemStructures(text, 'digit')
+}
+
+/** Q77-style "(A) Bu-OH (B) <smiles>… (E) <smiles>" under a ranking stem. */
+export function peelLetteredStemStructures(text) {
+  return peelLabelledStemStructures(text, 'letter')
+}
+
 export function splitSmilesDisplaySegments(text) {
   const t = String(text ?? '')
   const parts = []

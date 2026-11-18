@@ -36,7 +36,7 @@ import {
 import ErrorBoundary from '../components/ErrorBoundary.jsx'
 import OfficialPyqReplicaControls from '../components/OfficialPyqReplicaControls.jsx'
 import OfficialPyqHybridFill from '../components/OfficialPyqHybridFill.jsx'
-import OfficialPyqTabList from './OfficialPyqTabList.jsx'
+import OfficialPyqTabList, { paperListTitle } from './OfficialPyqTabList.jsx'
 import OfficialPyqPreviewPager from './OfficialPyqPreviewPager.jsx'
 import { resetOfficialPyqSplitWorker, peekOfficialPyqSplitKeep } from '../utils/officialPyqSplitWorker.js'
 import {
@@ -119,9 +119,21 @@ function isReParseProgressLabel(label) {
 /** Let React paint busy/spinner before heavy dynamic imports. */
 function yieldToUi() {
   return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(resolve)
-    })
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      resolve()
+    }
+    // rAF can stall in a background / throttled tab — always fall back to a short timer.
+    try {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(finish)
+      })
+    } catch {
+      /* ignore */
+    }
+    setTimeout(finish, 48)
   })
 }
 
@@ -135,6 +147,26 @@ function expectedMinOfficialPyqCount(exam, other = false) {
   if (exam === 'jee-main') return 20
   if (exam === 'neet') return 30
   return 8
+}
+
+/** @param {string} iso YYYY-MM-DD */
+function jeeMainSessionFromDate(iso) {
+  const m = Number(String(iso || '').slice(5, 7))
+  if (m >= 1 && m <= 2) return 'January Session'
+  if (m >= 3 && m <= 4) return 'April Session'
+  return ''
+}
+
+/**
+ * @param {number} year
+ * @param {string} iso
+ * @param {number} shift
+ * @param {(d: string) => string} [pretty]
+ */
+function jeeMainPaperLabel(year, iso, shift, pretty) {
+  const dateBit = pretty && iso ? pretty(iso) : iso || ''
+  const shiftBit = shift === 1 || shift === 2 ? `Shift ${shift}` : ''
+  return [`JEE Main ${year}`, dateBit, shiftBit].filter(Boolean).join(' · ')
 }
 
 function paperIsApprovedOrPublished(paper) {
@@ -317,19 +349,25 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
     setReParseBusy(false)
     setProgressPct(0)
     setProgressLabel('')
-    setOpenedPaper(
+    const opened =
       summary || {
         id,
         paperLabel: 'Paper',
         status: 'pending_review',
         exam: 'jee-advanced',
         questionCount: 0,
-      },
-    )
+      }
+    setOpenedPaper(opened)
+    const fresh = getOfficialPyqPendingPaper(id) || (paperOrId && typeof paperOrId === 'object' ? paperOrId : null)
+    if (fresh?.exam === 'jee-main') {
+      if (fresh.pyqDate) setPyqDate(String(fresh.pyqDate))
+      if (fresh.pyqShift === 1 || fresh.pyqShift === 2) setPyqShift(fresh.pyqShift)
+      if (fresh.year) setYear(Number(fresh.year) || year)
+    }
     setSelectedId(id)
     setPreviewOpen(true)
     writeOfficialPyqUi({ openId: id })
-  }, [selectedId])
+  }, [selectedId, year])
 
   useEffect(() => {
     return () => resetOfficialPyqSplitWorker()
@@ -579,8 +617,16 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
       errors.push('Quality check by local AI has not passed.')
     }
     setApproveBlockers((prev) => {
+      // Content-review Go-to-Q lines belong to the idle effect below; do not resurrect
+      // a stale "math did not draw" banner when only paper/localQuality state changes.
       const content = prev.filter((line) => CARD_REVIEW_LINE.test(line))
-      return [...errors, ...content]
+      const qualityPassed =
+        selected.localQuality?.revision === LOCAL_QUALITY_REVISION &&
+        selected.localQuality?.passed === true
+      const keptContent = qualityPassed
+        ? content.filter((line) => !/The math did not draw/i.test(String(line)))
+        : content
+      return [...errors, ...keptContent]
     })
   }, [previewOpen, selected, previewMeta.filled, previewExpected])
 
@@ -593,19 +639,18 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
     const cancelIdle = scheduleIdleWork(() => {
       Promise.all([
         import('../utils/officialPyqReviewFlags.js'),
-        import('../utils/uploadQualityGuards.js'),
-        import('../utils/passage.js'),
+        import('../utils/officialPyqCardAsShown.js'),
       ])
-        .then(([{ officialPyqContentReviewMessages, officialPyqMissingListMessage }, { healUploadQuestionCard }, { peelOfficialPyqCardForDisplay }]) => {
+        .then(([{ officialPyqContentReviewMessages, officialPyqMissingListMessage }, { officialPyqCardAsShown }]) => {
           if (cancelled) return
           const preview = getOfficialPyqPendingPreviewPaper(selectedId)
           const qs = Array.isArray(preview?.questions) ? preview.questions : []
           const ocr =
             getOfficialPyqPendingOcrText(selectedId) || String(preview?.preparedText ?? '')
+          // Same heal path as the preview card (adminEdited still gets OCR structure/math fixes).
           const shown = qs.map((q) => {
-            const src = q?.adminEdited === true ? '' : ocr
             try {
-              return peelOfficialPyqCardForDisplay(healUploadQuestionCard(q, src), src)
+              return officialPyqCardAsShown(q, ocr).healed || q
             } catch {
               return q
             }
@@ -618,8 +663,17 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
           ]
           setApproveBlockers((prev) => {
             const kept = prev.filter((line) => !CARD_REVIEW_LINE.test(line))
-            return content.length ? [...kept, ...content] : kept
+            // Always replace prior Go-to-Q / marked-part lines — empty content clears a stale banner.
+            return [...kept, ...content]
           })
+          // A failed Approve left a Go-to-Q / missing-list line in `error`; clear when cards pass.
+          if (!content.length) {
+            setError((prev) =>
+              /The math did not draw|missing List-I|match-the-column/i.test(String(prev || ''))
+                ? ''
+                : prev,
+            )
+          }
         })
         .catch(() => {})
     }, { timeoutMs: 700, fallbackMs: 60 })
@@ -627,7 +681,17 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
       cancelled = true
       cancelIdle()
     }
-  }, [previewOpen, selectedId, selected?.status, previewReload, cardEditTick, 'drawn-reaction-ok'])
+    // Re-run after quality check / card edits so a cleared math-draw flag does not stick.
+  }, [
+    previewOpen,
+    selectedId,
+    selected?.status,
+    selected?.localQuality?.checkedAt,
+    selected?.localQuality?.passed,
+    previewReload,
+    cardEditTick,
+    previewMeta.filled,
+  ])
 
   useEffect(() => {
     let cancelled = false
@@ -886,9 +950,10 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
   }
 
   async function onUploadFile(ev) {
-    const file = ev.target.files?.[0]
+    const picked = [...(ev.target.files || [])].filter(Boolean).slice(0, 3)
     ev.target.value = ''
-    if (!file) return
+    if (!picked.length) return
+    const file = picked[0]
     const named =
       otherPaperName.replace(/\s+/g, ' ').trim() ||
       String(file.name || '').replace(/\.[^.]+$/, '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim()
@@ -904,38 +969,41 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
     setError('')
     setMessage('')
     setProgressPct(2)
-    setProgressLabel('Starting…')
+    setProgressLabel(picked.length > 1 ? `Starting ${picked.length} parts…` : 'Starting…')
     try {
-      const [{ importFileToPending }, { formatOfficialPyqExtractSummary, formatOfficialPyqProgress }] =
+      const [{ importFilesToPending }, { formatOfficialPyqExtractSummary, formatOfficialPyqProgress }] =
         await Promise.all([
           import('../utils/officialPyqImportFile.js'),
           loadOfficialPyqExtractHelpers(),
         ])
+      // JEE Main is date + shift only — never store Advanced-style "Paper 1".
+      const mainSession =
+        exam === 'jee-main' ? jeeMainSessionFromDate(pyqDate) || undefined : session
+      const mainLabel =
+        exam === 'jee-main' && !String(paperLabel || '').trim()
+          ? jeeMainPaperLabel(year, pyqDate, pyqShift, formatPyqDate)
+          : paperLabel
       const uploadMeta = otherMode
         ? { paperKind: 'other', paperName: named, exam, year, session: '', sourceUrl: '', sourceLabel: '', paperLabel: named }
         : {
             exam,
             year,
-            session,
+            session: exam === 'jee-main' ? mainSession : session,
             pyqDate: exam === 'jee-main' ? pyqDate : undefined,
             pyqShift: exam === 'jee-main' ? pyqShift : undefined,
             sourceUrl,
             sourceLabel,
-            paperLabel,
+            paperLabel: mainLabel,
           }
-      const { paper, summary, cloudNote } = await importFileToPending(
-        file,
-        uploadMeta,
-        {
-          signal: uploadCtl.signal,
-          onProgress: (pct, label) => {
-            if (uploadStalledRef.current) return
-            const formatted = formatOfficialPyqProgress(pct, label)
-            if (formatted.pct >= 0) setProgressPct(formatted.pct)
-            if (formatted.label) setProgressLabel(formatted.label)
-          },
+      const { paper, summary, cloudNote } = await importFilesToPending(picked, uploadMeta, {
+        signal: uploadCtl.signal,
+        onProgress: (pct, label) => {
+          if (uploadStalledRef.current) return
+          const formatted = formatOfficialPyqProgress(pct, label)
+          if (formatted.pct >= 0) setProgressPct(formatted.pct)
+          if (formatted.label) setProgressLabel(formatted.label)
         },
-      )
+      })
       if (paper?.id && /\.(pdf|png|jpe?g|webp)$/i.test(String(file.name || ''))) {
         // Auto-fix compares with this file, so it must be stored before the paper opens.
         setProgressLabel('Storing the original paper for Compare…')
@@ -949,15 +1017,16 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
       setExtractSummary(extractSummaryFromNotes(paper.notes) || (summary ? formatOfficialPyqExtractSummary(summary) : ''))
       const expected = Number(paper.expectedQuestionCount) || paper.questions.length
       const min = expectedMinOfficialPyqCount(exam, otherMode)
+      const partsNote = picked.length > 1 ? ` Merged ${picked.length} files.` : ''
       if (paper.questions.length < min) {
         setError(
-          `Found only ${paper.questions.length} question(s) (this paper’s OCR count is ${expected}). Do not approve if under ${min}. Use Re-parse stored OCR if the PDF text was saved, or upload again.`,
+          `Found only ${paper.questions.length} question(s) (this paper’s OCR count is ${expected}). Do not approve if under ${min}. Use Re-parse stored OCR if the PDF text was saved, or upload again. If this was an institute solutions booklet, try “Add institute solutions” on a paper upload instead.`,
         )
-        setMessage(cloudNote || '')
+        setMessage((cloudNote || '') + partsNote)
       } else {
         setError('')
         setMessage(
-          `Imported ${paper.questions.length} question(s) into Pending approval — not published yet.${cloudNote ? ` ${cloudNote}` : ''}`,
+          `Imported ${paper.questions.length} question(s) into Pending approval — not published yet.${cloudNote ? ` ${cloudNote}` : ''}${partsNote}`,
         )
       }
       bump()
@@ -1242,9 +1311,9 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
 
   /** Answers and / or solutions printed in a separate file (answer-key PDF or solutions booklet). */
   async function onAnswerFile(ev) {
-    const file = ev.target.files?.[0]
+    const files = [...(ev.target.files || [])].filter(Boolean).slice(0, 3)
     ev.target.value = ''
-    if (!file || !selected || answerFileBusy) return
+    if (!files.length || !selected || answerFileBusy) return
     const paperId = selected.id
     setAnswerFileBusy(true)
     setError('')
@@ -1252,8 +1321,19 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
     setAnswerFilePct(2)
     try {
       const { applyAnswerFileToOfficialPyqPaper, readAnswerFileText } = await import('../utils/officialPyqAnswerFile.js')
-      const text = await readAnswerFileText(file, (p) => setAnswerFilePct(Math.max(2, Math.min(95, Number(p) || 0))))
-      const result = applyAnswerFileToOfficialPyqPaper(paperId, text, { fileName: file.name })
+      const { combinePyqPreparedOcrText } = await import('../utils/pyqGeminiExtract.js')
+      /** @type {string[]} */
+      const parts = []
+      for (let i = 0; i < files.length; i += 1) {
+        const text = await readAnswerFileText(files[i], (p) => {
+          const slice = 100 / files.length
+          setAnswerFilePct(Math.max(2, Math.min(95, Math.round(i * slice + (Number(p) || 0) * (slice / 100)))))
+        })
+        if (text) parts.push(String(text))
+      }
+      const text = combinePyqPreparedOcrText(...parts)
+      const fileName = files.length === 1 ? files[0].name : files.map((f) => f.name).join(' + ')
+      const result = applyAnswerFileToOfficialPyqPaper(paperId, text, { fileName })
       if (!result.ok) {
         setError(result.error)
         return
@@ -1266,10 +1346,11 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
       const left = result.noAnswer.length
         ? ` Still no answer: Q ${result.noAnswer.slice(0, 12).join(', ')}${result.noAnswer.length > 12 ? ' …' : ''} — Hybrid AI can fill them after Approve.`
         : ' Every question now has an answer.'
+      const partsNote = files.length > 1 ? ` Merged ${files.length} parts.` : ''
       setMessage(
         result.unchanged
-          ? `“${file.name}” matches the answers already on this paper. Nothing new to add.${left}`
-          : `Read “${file.name}”: ${result.answers} answer(s) and ${result.solutions} solution(s) put on the questions, marked as printed on the paper.${left}`,
+          ? `“${fileName}” matches the answers already on this paper. Nothing new to add.${left}${partsNote}`
+          : `Read “${fileName}”: ${result.answers} answer(s) and ${result.solutions} solution(s) put on the questions, marked as printed on the paper.${left}${partsNote}`,
       )
       setPreviewReload((n) => n + 1)
       bump()
@@ -1283,9 +1364,9 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
 
   /** A coaching institute's solutions PDF: fills answers and solutions, the official key wins. */
   async function onInstituteFile(ev) {
-    const file = ev.target.files?.[0]
+    const files = [...(ev.target.files || [])].filter(Boolean).slice(0, 3)
     ev.target.value = ''
-    if (!file || !selected || instituteBusy) return
+    if (!files.length || !selected || instituteBusy) return
     const institute = (instituteName || selected.instituteSolutions?.institute || '').trim()
     if (!institute) {
       setError('Type the institute name first (for example Allen or Resonance), then choose the PDF.')
@@ -1298,7 +1379,7 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
     setInstitutePct(2)
     try {
       const { addInstituteSolutionsToOfficialPyqPaper } = await import('../utils/officialPyqInstituteSolutions.js')
-      const result = await addInstituteSolutionsToOfficialPyqPaper(paperId, file, institute, (p) =>
+      const result = await addInstituteSolutionsToOfficialPyqPaper(paperId, files, institute, (p) =>
         setInstitutePct(Math.max(2, Math.min(95, Number(p) || 0))),
       )
       if (!result.ok) {
@@ -1320,6 +1401,88 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
       setInstituteBusy(false)
       setInstitutePct(0)
     }
+  }
+
+  /** Separate from Quality check — Mathpix re-read of the stored institute PDF (does not hang “Checking…”). */
+  async function onRereadInstituteMathpix() {
+    if (!selected || instituteBusy || qualityBusyId) return
+    const institute = (instituteName || selected.instituteSolutions?.institute || '').trim()
+    if (!institute) {
+      setError('Type the institute name first, then re-read with Mathpix.')
+      return
+    }
+    const paperId = selected.id
+    setInstituteBusy(true)
+    setError('')
+    setMessage('Re-reading institute solutions with Mathpix…')
+    setInstitutePct(2)
+    try {
+      const { rereadStoredInstituteSolutions, clearPoorInstituteSolutionsForHybrid } = await import(
+        '../utils/officialPyqInstituteSolutions.js'
+      )
+      const reread = await rereadStoredInstituteSolutions(paperId, institute, (p) =>
+        setInstitutePct(Math.max(2, Math.min(95, Number(p) || 0))),
+      )
+      clearPoorInstituteSolutionsForHybrid(paperId)
+      const fresh = getOfficialPyqPendingPaper(paperId)
+      if (fresh?.status === 'pending_review' || fresh?.status === 'approved') {
+        const { persistOfficialPyqQualityRun } = await import('../utils/officialPyqLocalQuality.js')
+        persistOfficialPyqQualityRun(fresh)
+      }
+      setOpenedPaper((prev) => (prev?.id === paperId ? lookupSavedPaperSummary(paperId) || prev : prev))
+      setPreviewReload((n) => n + 1)
+      bump()
+      if (reread?.ok === false) {
+        setError(reread.error || 'Mathpix re-read of institute PDF failed.')
+        setMessage(
+          'Institute Mathpix re-read did not finish — add the institute PDF again, or use Hybrid AI for leftover empty solutions.',
+        )
+      } else {
+        const cleared = Number(reread?.clearedPoor || 0)
+        setMessage(
+          `${reread?.note || 'Institute solutions re-read with Mathpix.'} Hybrid AI should only fill leftover empty solutions (${cleared ? `${cleared} cleared as unreadable` : 'gaps only'}).`,
+        )
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not re-read institute solutions.')
+    } finally {
+      setInstituteBusy(false)
+      setInstitutePct(0)
+    }
+  }
+
+  /** Save JEE Main date / shift on an already uploaded paper (from the Date / Shift controls above). */
+  function onSavePyqDateShift() {
+    if (!selected || selected.exam !== 'jee-main' || isOtherPaper(selected)) return
+    if (selected.status === 'published') {
+      setError('Unpublish first, then change the exam date or shift.')
+      return
+    }
+    const date = String(pyqDate || '').trim()
+    const shift = pyqShift === 1 || pyqShift === 2 ? pyqShift : 1
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      setError('Pick or type a valid exam date (YYYY-MM-DD).')
+      return
+    }
+    const y = Number(String(date).slice(0, 4)) || selected.year || year
+    const sess = jeeMainSessionFromDate(date)
+    const label = jeeMainPaperLabel(y, date, shift, formatPyqDate)
+    const next = updateOfficialPyqPendingPaper(selected.id, {
+      pyqDate: date,
+      pyqShift: shift,
+      // Drop leftover "Paper 1" from older uploads; Main uses January/April session or blank.
+      session: sess || '',
+      paperLabel: label,
+      year: y,
+    })
+    if (!next) {
+      setError('Could not save the exam date.')
+      return
+    }
+    setOpenedPaper(officialPyqPaperToSummary(next))
+    setMessage(`Saved exam date ${formatPyqDate(date)} · Shift ${shift}.`)
+    setError('')
+    bump()
   }
 
   /** @param {'other_institute' | 'own'} [audience] who an uploaded other paper is for */
@@ -1346,7 +1509,13 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
     setApprovePct(2)
     await yieldToUi()
     try {
-      const { publishOfficialPyqPaperAsync } = await loadOfficialPyqApproval()
+      const { publishOfficialPyqPaperAsync, validateOfficialPyqForPublish } = await loadOfficialPyqApproval()
+      const preview = getOfficialPyqPendingPaper(selected.id) || selected
+      const early = validateOfficialPyqForPublish(preview)
+      if (!early.ok) {
+        setError(early.errors.join(' ') || 'Could not publish.')
+        return
+      }
       const result = await publishOfficialPyqPaperAsync(selected.id, {
         audience,
         onProgress: (pct, label) => {
@@ -1597,7 +1766,23 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
           ) : null}
           <label>
             Exam
-            <select value={exam} onChange={(e) => setExam(/** @type {any} */ (e.target.value))}>
+            <select
+              value={exam}
+              onChange={(e) => {
+                const next = /** @type {'jee-main' | 'jee-advanced' | 'neet'} */ (e.target.value)
+                setExam(next)
+                if (next === 'jee-main') {
+                  setSourceUrl('https://jeemain.nta.ac.in/')
+                  setSourceLabel('Official NTA JEE Main')
+                } else if (next === 'jee-advanced') {
+                  setSourceUrl('https://jeeadv.ac.in/archive.html')
+                  setSourceLabel('Official JEE Advanced archive')
+                } else if (next === 'neet') {
+                  setSourceUrl('https://exams.nta.ac.in/NEET/')
+                  setSourceLabel('Official NTA NEET')
+                }
+              }}
+            >
               {OFFICIAL_PYQ_EXAMS.map((ex) => (
                 <option key={ex.id} value={ex.id}>
                   {ex.label}
@@ -1617,14 +1802,34 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
           </label>
           {!otherMode && exam === 'jee-main' ? (
             <label>
-              Date
-              <select value={pyqDate} onChange={(e) => setPyqDate(e.target.value)}>
+              Date of exam
+              <select
+                value={mainDates.includes(pyqDate) ? pyqDate : ''}
+                onChange={(e) => {
+                  if (e.target.value) setPyqDate(e.target.value)
+                }}
+              >
+                <option value="">Pick from list…</option>
                 {mainDates.map((d) => (
                   <option key={d} value={d}>
                     {formatPyqDate(d)}
                   </option>
                 ))}
               </select>
+            </label>
+          ) : null}
+          {!otherMode && exam === 'jee-main' ? (
+            <label>
+              Or type date
+              <input
+                type="date"
+                value={/^\d{4}-\d{2}-\d{2}$/.test(pyqDate) ? pyqDate : ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v) setPyqDate(v)
+                }}
+                data-testid="official-pyq-date-input"
+              />
             </label>
           ) : null}
           {!otherMode && exam === 'jee-main' ? (
@@ -1681,16 +1886,24 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
           </p>
         ) : (
         <p className="form-hint">
-          Download the official PDF from NTA / Advanced archive, then upload it here (or JSON/CSV).
-          Stored OCR is split on this computer (Re-parse does not wait for Gemini).
-          Papers stay <strong>Pending approval</strong> until you approve, and students see them only
-          after you publish. Upload only splits the paper into questions and keeps answers printed on
-          it. Hybrid AI can fill tags, answers, and solutions after you approve, and its answers are
-          labelled separately from official keys.
+          <strong>1. Paper PDF</strong> — download from{' '}
+          <a href="https://jeemain.nta.ac.in/" target="_blank" rel="noreferrer">
+            jeemain.nta.ac.in
+          </a>{' '}
+          (JEE Main) or the Advanced archive, then upload here. NTA does not keep one permanent PDF link per
+          shift — open the portal, find the notice for your date, download, then upload.
           {' '}
-          <strong>Do not approve a JEE Advanced paper if it has under 40 questions</strong>
+          <strong>2. Date + Shift</strong> — for JEE Main, set the exam date and shift before upload (or edit
+          them later on the open paper).
           {' '}
-          (a full paper is about 51).
+          <strong>3. Solutions</strong> — if answers/solutions are in a separate institute PDF, upload the
+          paper first, then use “Add institute solutions”. If solutions are split into Physics / Chemistry /
+          Maths PDFs, select all three at once (max 3). If you upload a solutions booklet as the paper by
+          mistake, we try to rebuild from Ans./Sol. automatically.
+          {' '}
+          <strong>4. Hybrid AI</strong> — fills only leftover empty tags/answers/solutions after Approve.
+          {' '}
+          Do not approve a JEE Advanced paper under 40 questions (full paper ~51).
         </p>
         )}
         <Suspense fallback={<p className="form-hint">Loading OCR options…</p>}>
@@ -1703,11 +1916,12 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
               ? (progressLabel || 'Working…')
               : otherMode
                 ? 'Upload paper PDF / Word / JSON / CSV'
-                : 'Upload official PDF / Word / JSON / CSV'}
+                : 'Upload official PDF / Word / JSON / CSV (1–3 files)'}
             <input
               type="file"
               accept=".pdf,.doc,.docx,.json,.csv,application/pdf,application/json,text/csv,image/*"
               hidden
+              multiple
               disabled={busy}
               onChange={onUploadFile}
             />
@@ -1777,23 +1991,47 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
           onDelete={onDeleteSitting}
           qualityBusyId={qualityBusyId}
           onQualityFix={(summary) => {
+            // Local quality only — never await Mathpix here (that hung “Checking…”).
             const id = String(summary?.id || '')
             if (!id || qualityBusyId) return
             const paper = getOfficialPyqPendingPaper(id)
             if (!paper || paper.status === 'published') return
             if (paper.status === 'approved' && !isAdminLoggedIn()) return
             setQualityBusyId(id)
-            void import('../utils/officialPyqLocalQuality.js')
-              .then(({ persistOfficialPyqQualityRun }) => {
-                persistOfficialPyqQualityRun(paper)
+            setError('')
+            void (async () => {
+              try {
+                const { instituteSolutionLooksLikeRawPdf } = await import('../utils/instituteSolutionsParse.js')
+                const { clearPoorInstituteSolutionsForHybrid } = await import(
+                  '../utils/officialPyqInstituteSolutions.js'
+                )
+                const { persistOfficialPyqQualityRun } = await import('../utils/officialPyqLocalQuality.js')
+                let fresh = getOfficialPyqPendingPaper(id) || paper
+                persistOfficialPyqQualityRun(fresh)
+                clearPoorInstituteSolutionsForHybrid(id)
+                fresh = getOfficialPyqPendingPaper(id) || fresh
+                if (fresh.status === 'pending_review' || fresh.status === 'approved') {
+                  persistOfficialPyqQualityRun(fresh)
+                }
                 bump()
                 if (openPreviewIdRef.current === id) setPreviewReload((n) => n + 1)
                 setOpenedPaper((prev) =>
                   prev?.id === id ? lookupSavedPaperSummary(id) || prev : prev,
                 )
-              })
-              .catch(() => {})
-              .finally(() => setQualityBusyId(''))
+                const rawPdfSols = (fresh.questions || []).some((q) =>
+                  instituteSolutionLooksLikeRawPdf(q?.solution),
+                )
+                setMessage(
+                  rawPdfSols
+                    ? 'Quality check finished. Some institute solutions still look like raw PDF letters — use “Re-read institute with Mathpix” below (or add the PDF again). Hybrid AI fills only leftovers.'
+                    : 'Quality check and local fix finished. Unreadable institute solutions were cleared for Hybrid AI gap-fill.',
+                )
+              } catch {
+                setError('Quality check could not finish. Try again.')
+              } finally {
+                setQualityBusyId('')
+              }
+            })()
           }}
         />
       </section>
@@ -1808,10 +2046,49 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
             >
               {selected ? (
                 <>
-                    <h3>
-                      Preview — {selected.paperLabel}
-                      {selected.session ? ` · ${selected.session}` : ''}
-                    </h3>
+                    <h3>Preview — {paperListTitle(selected)}</h3>
+                    {!isOtherPaper(selected) &&
+                    selected.exam === 'jee-main' &&
+                    (selected.status === 'pending_review' ||
+                      (selected.status === 'approved' && isAdminLoggedIn())) ? (
+                      <div className="official-pyq-actions" data-testid="official-pyq-edit-date">
+                        <p className="form-hint">
+                          JEE Main exam date and shift (change if needed, then Save). Current:{' '}
+                          {selected.pyqDate ? formatPyqDate(String(selected.pyqDate)) : 'not set'}
+                          {selected.pyqShift ? ` · Shift ${selected.pyqShift}` : ''}.
+                        </p>
+                        <label className="official-pyq-edit-field">
+                          Date{' '}
+                          <input
+                            type="date"
+                            value={/^\d{4}-\d{2}-\d{2}$/.test(pyqDate) ? pyqDate : ''}
+                            onChange={(e) => {
+                              if (e.target.value) setPyqDate(e.target.value)
+                            }}
+                            disabled={busy || approveBusy}
+                          />
+                        </label>
+                        <label className="official-pyq-edit-field">
+                          Shift{' '}
+                          <select
+                            value={String(pyqShift)}
+                            onChange={(e) => setPyqShift(Number(e.target.value))}
+                            disabled={busy || approveBusy}
+                          >
+                            <option value="1">Shift 1</option>
+                            <option value="2">Shift 2</option>
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={busy || approveBusy}
+                          onClick={onSavePyqDateShift}
+                        >
+                          Save date &amp; shift
+                        </button>
+                      </div>
+                    ) : null}
                     <p className="form-hint" role="status">
                       Opened <strong>{filledPreviewCount}</strong> filled question(s)
                       {previewMeta.count > filledPreviewCount
@@ -1831,16 +2108,18 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
                         <p className="form-hint">
                           Answers or solutions printed under each question, or after the last question, are read
                           with the paper. If they are in a <strong>separate file</strong> (answer key or solutions
-                          PDF), add it here. They go on the questions by question number.
+                          PDF), add it here. They go on the questions by question number. Subject-wise parts
+                          (Physics / Chemistry / Maths): select up to <strong>3 files</strong> at once.
                         </p>
                         <label className="btn btn-ghost btn-sm">
                           {answerFileBusy
                             ? `Reading answer file… ${Math.round(answerFilePct)}%`
-                            : 'Add answers / solutions from another file'}
+                            : 'Add answers / solutions from another file (1–3)'}
                           <input
                             type="file"
                             accept=".pdf,.doc,.docx,.txt,application/pdf,text/plain,image/*"
                             hidden
+                            multiple
                             disabled={answerFileBusy || busy || approveBusy}
                             data-testid="official-pyq-answer-file-input"
                             onChange={onAnswerFile}
@@ -1853,14 +2132,13 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
                       <div className="official-pyq-actions" data-testid="official-pyq-institute-solutions">
                         <p className="form-hint">
                           Have a <strong>solutions PDF from a coaching institute</strong> (Allen, Resonance, FIITJEE…)?
-                          Its answers fill questions that have none, and its solutions fill questions with no solution
-                          (or only an AI one). The official answer key always wins: a different institute answer is
-                          listed in the Quality check. After the file is read, Quality check flags leftover section
-                          instructions, a glued next question, or a smashed “Delta”, and{' '}
-                          <strong>Run quality check and fix</strong> strips them (also runs on its own after this
-                          upload). Questions are matched by their wording, so the institute may number them its own
-                          way; a match it is not sure of is listed, not used. Each question&apos;s text is also
-                          checked against the institute&apos;s copy.
+                          Same idea as PYQ upload: <strong>Mathpix first</strong> for clear drawn maths. If solutions
+                          are in <strong>three subject PDFs</strong>, select all three at once (max 3). FIITJEE font-junk
+                          PDF text never becomes a student solution — only answers from that layer.{' '}
+                          <strong>Run quality check and fix</strong> is local only. If solutions still look like raw
+                          letters, press <strong>Re-read institute with Mathpix</strong>. Unreadable leftovers are
+                          cleared so <strong>Hybrid AI</strong> fills only the remaining gap (~5–10%). The official
+                          answer key always wins.
                           {selected.instituteSolutions?.institute
                             ? ` Last added: ${selected.instituteSolutions.institute}${
                                 selected.instituteSolutions.fileName ? ` (“${selected.instituteSolutions.fileName}”)` : ''
@@ -1885,11 +2163,12 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
                         >
                           {instituteBusy
                             ? `Reading institute solutions… ${Math.round(institutePct)}%`
-                            : 'Add institute solutions (PDF)'}
+                            : 'Add institute solutions (1–3 PDFs)'}
                           <input
                             type="file"
                             accept=".pdf,application/pdf"
                             hidden
+                            multiple
                             disabled={
                               instituteBusy ||
                               busy ||
@@ -1900,6 +2179,20 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
                             onChange={onInstituteFile}
                           />
                         </label>
+                        {selected.instituteSolutions?.pdfStored !== false &&
+                        (selected.instituteSolutions?.institute || instituteName) ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            disabled={instituteBusy || busy || approveBusy || Boolean(qualityBusyId)}
+                            data-testid="official-pyq-institute-mathpix-reread"
+                            onClick={() => void onRereadInstituteMathpix()}
+                          >
+                            {instituteBusy
+                              ? `Mathpix re-read… ${Math.round(institutePct)}%`
+                              : 'Re-read institute with Mathpix'}
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
                     {selected.status === 'approved' ? (

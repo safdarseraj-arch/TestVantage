@@ -12,7 +12,11 @@ import { wrapBareLatexRuns, repairOrphanAlignedBody } from '../utils/wrapBareLat
 import { hasMathpixMedia, splitMathpixMediaSegments, stripMathpixFigureChrome } from '../utils/mathpixMedia'
 import { figureRowShare, groupSideBySideFigureSegments } from '../utils/figureLayout.js'
 import { showLocalPictureOnError, washedPaperFigureSrc } from '../utils/mathpixLocalPictures.js'
-import { splitSmilesDisplaySegments } from '../utils/smilesDisplay.js'
+import {
+  peelLetteredStemStructures,
+  peelNumberedStemStructures,
+  splitSmilesDisplaySegments,
+} from '../utils/smilesDisplay.js'
 import { displayMathStandsAlone } from '../utils/sanitizeMathDelimiters.js'
 import SmilesStructure from './SmilesStructure.jsx'
 import {
@@ -422,6 +426,41 @@ export default function MathText({ text, questionContext, optionLetter }) {
     )
   }
   if (/<smiles>/i.test(raw)) {
+    // Integer (1)–(4) grid (Q81) or lettered (A)–(E) list with drawings (Q77).
+    const labelled =
+      peelNumberedStemStructures(raw) || peelLetteredStemStructures(raw)
+    if (labelled && labelled.items.length >= 3) {
+      const layoutClass =
+        labelled.layout === 'list'
+          ? 'numbered-stem-structures numbered-stem-structures--list'
+          : 'numbered-stem-structures'
+      return (
+        <span className="math-text-flow math-text-with-smiles">
+          {labelled.prose ? (
+            <MathText
+              text={labelled.prose}
+              questionContext={questionContext}
+              optionLetter={optionLetter}
+            />
+          ) : null}
+          <span className={layoutClass} data-testid="numbered-stem-structures">
+            {labelled.items.map((item) => (
+              <span key={`ns-${item.label}`} className="numbered-stem-structure">
+                <span className="numbered-stem-structure-label">({item.label})</span>
+                {item.formula ? (
+                  <MathText
+                    text={item.formula}
+                    questionContext={questionContext}
+                    optionLetter={optionLetter}
+                  />
+                ) : null}
+                {item.smiles ? <SmilesStructure smiles={item.smiles} /> : null}
+              </span>
+            ))}
+          </span>
+        </span>
+      )
+    }
     const segs = splitSmilesDisplaySegments(raw)
     const looping =
       segs.length === 1 &&

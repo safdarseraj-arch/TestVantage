@@ -6,6 +6,7 @@
 
 import { isOriginalCropUrl } from './mathpixMedia.js'
 import { originalCropLooksClubbedOrWatermarkSlab } from './officialPyqCardTidy.js'
+import { normalizeNumberedStemSmiles } from './smilesDisplay.js'
 
 const SMILES_OPT_RE =
   /(?:^|\n)\s*(?:\\item\s*\[\s*)?\(?\s*([1-4A-E])\s*\)?\s*\]?\s*\n?\s*<smiles>\s*([\s\S]*?)\s*<\/smiles>/gi
@@ -175,7 +176,55 @@ export function preferOcrSmilesOverBadStemCrops(q, source) {
       (full, a, b) => (looksLikeBadOptionCrop(a || b) || isOriginalCropUrl(a || b) ? only : full),
     )
   }
-  return next !== text ? { ...q, text: next } : q
+  if (next === text) return q
+  return { ...q, text: normalizeNumberedStemSmiles(next) }
+}
+
+/** Ranking choice rows: "(C) < (A) < (D) < (B) < (E)" (JEE Main Q77). */
+export function optionLooksLikeRankingChain(option) {
+  const s = String(option ?? '').replace(/\s+/g, ' ').trim()
+  if (!s) return false
+  if (!/^\(\s*[A-E]\s*\)\s*[<>]/i.test(s)) return false
+  const letters = [...s.matchAll(/\(\s*[A-E]\s*\)/gi)]
+  return letters.length >= 3 && /[<>]/.test(s)
+}
+
+/** @param {unknown} options */
+export function optionsLookLikeRankingChains(options) {
+  const opts = (Array.isArray(options) ? options : []).map((o) => String(o ?? '').trim()).filter(Boolean)
+  if (opts.length < 2) return false
+  const hits = opts.filter(optionLooksLikeRankingChain).length
+  return hits >= 2 && hits >= Math.ceil(opts.length * 0.5)
+}
+
+/**
+ * Stem lists compounds as "(A) … (B) <smiles>/crop … (E) …" — not MCQ answer choices.
+ * Peeling those as an (A)–(D) option band drops the drawings students need (Q77).
+ * @param {unknown} text
+ */
+export function stemHasLabelledCompoundDrawings(text) {
+  const t = String(text ?? '')
+  if (!t.trim()) return false
+  // Structures only (SMILES / figure crops). Do not treat ordinary math MCQ
+  // rows like "(A) $\\tan\\theta=…$" as compound drawings — those must peel.
+  const hits = [
+    ...t.matchAll(
+      /(?:^|\n)\s*\(\s*([A-E])\s*\)\s*(?:\n\s*)?(?:<smiles>|\\includegraphics|!\[[^\]]*\]\()/gi,
+    ),
+  ]
+  if (hits.length >= 3) return true
+  // Glued after a prior smiles: </smiles>(C)\n<smiles>
+  const glued = [
+    ...t.matchAll(
+      /<\/smiles>\s*\(\s*([A-E])\s*\)\s*(?:\n\s*)?<smiles>/gi,
+    ),
+  ]
+  return glued.length >= 2 && /(?:^|\n)\s*\(\s*A\s*\)/i.test(t)
+}
+
+/** Keep lettered stem drawings when options are ranking chains or the stem holds (A)–(E) structures. */
+export function keepLabelledStemStructures(text, options) {
+  return optionsLookLikeRankingChains(options) || stemHasLabelledCompoundDrawings(text)
 }
 
 /**

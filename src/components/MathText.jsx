@@ -11,7 +11,7 @@ import {
 import { wrapBareLatexRuns, repairOrphanAlignedBody } from '../utils/wrapBareLatexRuns.js'
 import { hasMathpixMedia, splitMathpixMediaSegments, stripMathpixFigureChrome } from '../utils/mathpixMedia'
 import { figureRowShare, groupSideBySideFigureSegments } from '../utils/figureLayout.js'
-import { showLocalPictureOnError } from '../utils/mathpixLocalPictures.js'
+import { showLocalPictureOnError, washedPaperFigureSrc } from '../utils/mathpixLocalPictures.js'
 import { splitSmilesDisplaySegments } from '../utils/smilesDisplay.js'
 import { displayMathStandsAlone } from '../utils/sanitizeMathDelimiters.js'
 import SmilesStructure from './SmilesStructure.jsx'
@@ -457,25 +457,37 @@ export default function MathText({ text, questionContext, optionLetter }) {
         {groupSideBySideFigureSegments(splitMathpixMediaSegments(raw), stripMathpixFigureChrome).map((seg, i) =>
           seg.kind === 'row' ? (
             <span key={`row-${i}`} className="mathpix-figure-row" data-testid="mathpix-figure-row">
-              {seg.value.map((fig, j) => (
-                <img
-                  key={`fig-${i}-${j}`}
-                  className="mathpix-paper-figure"
-                  src={fig.url}
-                  alt=""
-                  style={{ maxWidth: `calc(${figureRowShare(seg.value, j)}% - 0.75rem)` }}
-                  onError={showLocalPictureOnError}
-                />
-              ))}
+              {seg.value.map((fig, j) => {
+                const src = washedPaperFigureSrc(fig.url)
+                const cdn = src !== fig.url ? String(fig.url ?? '') : ''
+                return (
+                  <img
+                    key={`fig-${i}-${j}`}
+                    className="mathpix-paper-figure"
+                    src={src}
+                    alt=""
+                    data-cdn-src={cdn || undefined}
+                    style={{ maxWidth: `calc(${figureRowShare(seg.value, j)}% - 0.75rem)` }}
+                    onError={showLocalPictureOnError}
+                  />
+                )
+              })}
             </span>
           ) : seg.kind === 'img' ? (
-            <img
-              key={`fig-${i}`}
-              className="mathpix-paper-figure"
-              src={seg.value}
-              alt=""
-              onError={showLocalPictureOnError}
-            />
+            (() => {
+              const src = washedPaperFigureSrc(seg.value)
+              const cdn = src !== seg.value ? String(seg.value ?? '') : ''
+              return (
+                <img
+                  key={`fig-${i}`}
+                  className="mathpix-paper-figure"
+                  src={src}
+                  alt=""
+                  data-cdn-src={cdn || undefined}
+                  onError={showLocalPictureOnError}
+                />
+              )
+            })()
           ) : (
             <span key={`tx-${i}`}>
               {renderPreparedMath(stripMathpixFigureChrome(seg.value), questionContext, optionLetter)}

@@ -102,4 +102,14 @@ with tempfile.TemporaryDirectory() as tmp:
     again = opc.keep_mathpix_pictures([bank], fetch=fake_fetch)
     check("a link with a local copy is not downloaded again", again["kept"] == [bank] and not asked)
 
+    # Mid-gray hatch (FIITJEE-style) must wash toward white before split / review.
+    hatch = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 8, 8), False)
+    hatch.set_rect(hatch.irect, (150, 150, 150))
+    hatch.set_rect(fitz.IRect(2, 2, 6, 6), (20, 20, 20))  # real ink stays
+    washed = fitz.Pixmap(opc._picture_png(hatch.tobytes("png")))
+    check(
+        "watermark wash clears mid-gray hatch before split",
+        washed.pixel(0, 0)[:3] == (255, 255, 255) and washed.pixel(3, 3)[:3] == (20, 20, 20),
+    )
+
 print("\nAll Mathpix crop tests passed")

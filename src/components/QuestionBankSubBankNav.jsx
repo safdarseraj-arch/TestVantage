@@ -5,7 +5,7 @@ import {
 } from '../utils/questionBankSubBank.js'
 
 /**
- * Sub-bank slice tabs: All | Main | Official PYQ | Hybrid AI | Similar PYQ.
+ * Sub-bank slice tabs: All | Main | PYQ | Hybrid AI | Similar PYQ.
  * @param {{
  *   activeSubBank: string
  *   onSubBankChange?: (id: string) => void

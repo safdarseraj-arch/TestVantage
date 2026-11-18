@@ -17,7 +17,7 @@ export const SUB_BANK_FILTER_ALL = ''
 export const QUESTION_BANK_SUB_BANK_TABS = /** @type {const} */ ([
   { id: SUB_BANK_FILTER_ALL, label: 'All', short: 'Every slice' },
   { id: SUB_BANK_TYPE_NORMAL, label: 'Main', short: 'Teacher uploads & compose' },
-  { id: SUB_BANK_TYPE_PYQ, label: 'Official PYQ', short: 'Imported NTA papers' },
+  { id: SUB_BANK_TYPE_PYQ, label: 'PYQ', short: 'Imported NTA papers' },
   { id: SUB_BANK_TYPE_AI, label: 'Hybrid AI', short: 'Postgres AI sub_bank' },
   { id: SUB_BANK_TYPE_SIMILAR_PYQ, label: 'Similar PYQ', short: 'AI similar / clone rows' },
 ])

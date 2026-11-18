@@ -245,4 +245,48 @@ Q. 30 A rod of length L rotates about O as shown in the figure.
   'A point source S emits unpolarized light uniformly in all directions. At two points A and B, the ratio of the intensities of light is 2.',
 )
 
+const q59Stem =
+  'The charge accumulated on the\n\ncapacitor connected in the following circuit is ____ $\\mu C$. (Given $C=150 \\mu \\mathrm{F}$ )'
+const q59Ocr = `charge accumulated on the
+![](https://cdn.mathpix.com/cropped/q59-stem.jpg?height=280&width=662&top_left_y=244&top_left_x=1097)
+capacitor connected in the following circuit is \\_\\_\\_\\_ $\\mu \\mathrm{C}$. (Given $\\mathrm{C}=150$ $\\mu \\mathrm{F}$ )
+\\end{itemize}
+
+Ans. 400
+Sol. At steady state
+![](https://cdn.mathpix.com/cropped/q59-sol.jpg?height=280&width=663&top_left_y=559&top_left_x=1097)
+`
+const q59Restored = restoreMissingFiguresFromSource(q59Stem, q59Ocr)
+assert.match(q59Restored, /q59-stem\.jpg/)
+assert.doesNotMatch(q59Restored, /q59-sol\.jpg/)
+
+// Prior question Ans/Sol in the lookbehind must not wipe this stem's figure (Q73).
+const q73Stem = 'IUPAC name of following compound (P) is:'
+const q73Ocr = `oxidation state is:
+(1) Chlorine
+(2) Fluorine
+\\end{itemize}
+
+Ans. (2)
+Sol. Fluorine does not show variable oxidation state.
+\\begin{itemize}
+\\item[] *73. IUPAC name of following compound $(\\mathrm{P})$ is:
+
+\\begin{figure}
+\\includegraphics[alt={},max width=\\textwidth]{https://cdn.mathpix.com/cropped/q73-compound-p.jpg?height=199&width=258&top_left_y=1575&top_left_x=372}
+
+\\caption{(P)}
+\\end{figure}
+(1) 3-Ethyl-1,1-dimethylcyclohexane
+\\end{itemize}
+
+Ans. (1)
+
+Sol.
+![](https://cdn.mathpix.com/cropped/q73-sol.jpg?height=100&width=100&top_left_y=1&top_left_x=1)
+`
+const q73Restored = restoreMissingFiguresFromSource(q73Stem, q73Ocr, 73)
+assert.match(q73Restored, /q73-compound-p\.jpg/)
+assert.doesNotMatch(q73Restored, /q73-sol\.jpg/)
+
 console.log('test-glued-mcq-figures: ok')

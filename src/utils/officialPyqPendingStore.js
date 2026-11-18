@@ -274,9 +274,12 @@ export function releaseUnprintedAnswerKeys(questions) {
   return list.map((q) => (fake.has(q) ? { .../** @type {any} */ (q), answerSource: 'unknown', answerKeyReleased: true } : q))
 }
 
+/** Sources that mean someone (paper, admin, institute, or Hybrid AI) has set a real answer since release. */
+const ANSWER_SET_SINCE_RELEASE = new Set(['from_paper', 'manual', 'admin_edit', 'hybrid_ai', 'institute', 'ai_generated'])
+
 /** The card's answer was marked unchecked by {@link releaseUnprintedAnswerKeys} and nobody has set it since. @param {any} q */
 export function officialPyqAnswerKeyIsReleased(q) {
-  return q?.answerKeyReleased === true && !['from_paper', 'manual', 'admin_edit'].includes(String(q?.answerSource ?? ''))
+  return q?.answerKeyReleased === true && !ANSWER_SET_SINCE_RELEASE.has(String(q?.answerSource ?? ''))
 }
 
 /** An admin approved this one card as shown: no quality alarms, nothing may change it. @param {unknown} q */
@@ -903,14 +906,62 @@ export function countOfficialPyqPendingByStatus(kind = 'all') {
   return out
 }
 
+/** How complete tags/solutions look — used to prefer the fresher item cache over a stale memoryRoot. */
+function officialPyqPaperFillScore(paper) {
+  const qs = Array.isArray(paper?.questions) ? paper.questions : []
+  let score = 0
+  let newestEdit = 0
+  for (const q of qs) {
+    if (!q || typeof q !== 'object') continue
+    if (String(/** @type {any} */ (q).solution ?? '').trim().length >= 40) score += 4
+    if (String(/** @type {any} */ (q).chapter ?? '').trim() && !/^general$/i.test(String(/** @type {any} */ (q).chapter))) {
+      score += 2
+    }
+    if (String(/** @type {any} */ (q).topic ?? '').trim()) score += 1
+    newestEdit = Math.max(newestEdit, Number(/** @type {any} */ (q).adminEditedAt) || 0)
+  }
+  return score * 1e13 + newestEdit
+}
+
 /** @param {string} id */
 export function getOfficialPyqPendingPaper(id) {
   const needle = String(id ?? '').trim()
   if (!needle) return null
+  const light = readLightPaper(needle)
   if (memoryRoot) {
     const found = memoryRoot.papers.find((p) => p.id === needle) ?? null
-    if (found) rememberPaper(found)
-    return found
+    if (found && light && officialPyqPaperFillScore(light) > officialPyqPaperFillScore(found)) {
+      const idx = memoryRoot.papers.findIndex((p) => p.id === needle)
+      const merged = {
+        ...found,
+        ...light,
+        preparedText: String(found.preparedText ?? '').trim() || String(light.preparedText ?? ''),
+        questions: Array.isArray(light.questions) ? light.questions : found.questions,
+      }
+      if (idx >= 0) memoryRoot.papers[idx] = merged
+      rememberPaper(merged)
+      return merged
+    }
+    if (found) {
+      rememberPaper(found)
+      return found
+    }
+  }
+  if (light) {
+    if (String(light.preparedText ?? '').trim().length >= 80) return light
+    // Light preview rows omit OCR; pull preparedText from the fat store when present.
+    try {
+      const found = loadRoot().papers.find((p) => p.id === needle)
+      const ocr = String(found?.preparedText ?? '').trim()
+      if (ocr.length >= 80) {
+        const merged = { ...found, ...light, preparedText: ocr, questions: light.questions }
+        rememberPaper(merged)
+        return merged
+      }
+    } catch {
+      /* keep light */
+    }
+    return light
   }
   const cached = memoryPaperById?.get(needle)
   if (cached && String(cached.preparedText ?? '').trim()) return cached
@@ -955,6 +1006,22 @@ export function getOfficialPyqPendingPreviewPaper(id) {
   return full ? paperToLightRecord(full) : null
 }
 
+/** Read preparedText from fat localStorage even when memoryRoot holds a light/stripped copy. */
+function readPreparedTextFromFatStore(id) {
+  const needle = String(id ?? '').trim()
+  if (!needle || typeof localStorage === 'undefined') return ''
+  try {
+    const raw = localStorage.getItem(OFFICIAL_PYQ_PENDING_KEY)
+    if (!raw || raw.length < 80) return ''
+    const data = JSON.parse(raw)
+    const papers = Array.isArray(data) ? data : Array.isArray(data?.papers) ? data.papers : []
+    const found = papers.find((p) => p && String(p.id) === needle)
+    return String(found?.preparedText ?? '').trim()
+  } catch {
+    return ''
+  }
+}
+
 /** OCR blob only — idle List-I / figure restore. Never call from a tab click. */
 export function getOfficialPyqPendingOcrText(id) {
   const needle = String(id ?? '').trim()
@@ -963,7 +1030,42 @@ export function getOfficialPyqPendingOcrText(id) {
   const fromCache = String(cached?.preparedText ?? '').trim()
   if (fromCache.length >= 80) return fromCache
   const full = getOfficialPyqPendingPaper(needle)
-  return String(full?.preparedText ?? '').trim()
+  const fromFull = String(full?.preparedText ?? '').trim()
+  if (fromFull.length >= 80) return fromFull
+  // Preview remembers a light copy without preparedText; OCR may still sit on the item
+  // key (legacy) or the fat pending store — needed to restore missing figures (Q59/Q73).
+  try {
+    const light = readLightPaper(needle)
+    const fromLight = String(light?.preparedText ?? '').trim()
+    if (fromLight.length >= 80) {
+      if (cached) rememberPaper({ ...cached, preparedText: fromLight })
+      return fromLight
+    }
+  } catch {
+    /* optional */
+  }
+  try {
+    const found = loadRoot().papers.find((p) => p.id === needle)
+    const fromRoot = String(found?.preparedText ?? '').trim()
+    if (fromRoot.length >= 80) {
+      rememberPaper({ ...(cached || found || { id: needle }), preparedText: fromRoot })
+      return fromRoot
+    }
+  } catch {
+    /* fall through — memoryRoot may be a stripped light copy */
+  }
+  const fromFat = readPreparedTextFromFatStore(needle)
+  if (fromFat.length >= 80) {
+    rememberPaper({ ...(cached || full || { id: needle }), preparedText: fromFat })
+    if (memoryRoot?.papers) {
+      const idx = memoryRoot.papers.findIndex((p) => p.id === needle)
+      if (idx >= 0) {
+        memoryRoot.papers[idx] = { ...memoryRoot.papers[idx], preparedText: fromFat }
+      }
+    }
+    return fromFat
+  }
+  return ''
 }
 
 /** @param {string} sourceSlotId */

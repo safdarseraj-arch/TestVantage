@@ -861,7 +861,12 @@ function stemMentionsFigure(text) {
       t,
     ) ||
     /\bfigure\b/i.test(t) ||
-    /conversion of P to Q|sequence of reagents/i.test(t)
+    /conversion of P to Q|sequence of reagents/i.test(t) ||
+    // JEE Main stems that point at a drawing without saying "figure"
+    /\bfollowing (?:compound|circuit|structure|organic compounds?)\b/i.test(t) ||
+    /\bIUPAC name of following\b/i.test(t) ||
+    /\b(?:circuits?|compound)\s+(?:is|are)\s+(?:reverse\s*-?\s*biased|aromatic)\b/i.test(t) ||
+    /\bgiven organic compounds\b/i.test(t)
   )
 }
 
@@ -1003,16 +1008,20 @@ function probeIsGenericMatch(probe) {
   return /^match each/i.test(s) && s.length < 56
 }
 
+function foldStemProbeText(x) {
+  return String(x ?? '')
+    .replace(/\\includegraphics[\s\S]*?(?:\}|$)/gi, ' ')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
+    .replace(/\$+/g, '')
+    // OCR often wraps a lone letter as $\mathrm{P}$ while the card has (P).
+    .replace(/\\(?:mathrm|mathbf|text|operatorname|mathsf|textbf)\s*\{([^{}]*)\}/gi, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function windowBelongsToStem(window, stem) {
-  const fold = (x) =>
-    String(x ?? '')
-      .replace(/\\includegraphics[\s\S]*?(?:\}|$)/gi, ' ')
-      .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
-      .replace(/\$+/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-  const s = fold(stem)
-  const w = fold(window)
+  const s = foldStemProbeText(stem)
+  const w = foldStemProbeText(window)
   if (s.length < 24) return true
   const unique = s.slice(Math.min(20, s.length - 1), Math.min(s.length, 54)).trim()
   if (unique.length >= 14 && w.includes(unique)) return true
@@ -1174,8 +1183,44 @@ function findProbeInSource(src, probe) {
     const at = src.indexOf(noDollar)
     if (at >= 0) return at
   }
-  const compact = raw.replace(/\$+/g, '').replace(/\s+/g, ' ').trim()
+  const compact = foldStemProbeText(raw)
   if (compact.length < 12) return -1
+  // Fold OCR the same way so "(P)" finds "$\mathrm{P}$" spans; map index back approximately.
+  const foldedSrc = foldStemProbeText(src)
+  const noArticle = compact.replace(/^(?:the|a|an)\s+/i, '')
+  const foldedNeedle =
+    noArticle.length >= 16 && foldedSrc.indexOf(compact) < 0 && foldedSrc.indexOf(noArticle) >= 0
+      ? noArticle
+      : compact
+  const foldedAt = foldedSrc.indexOf(foldedNeedle)
+  if (foldedAt >= 0) {
+    // foldedSrc is shorter; search a distinctive head in the raw source.
+    // Prefer a short head: a mid-stem ![](…) can split a longer opener across the image.
+    for (const n of [28, 22, 18, 14]) {
+      if (foldedNeedle.length < n) continue
+      const head = foldedNeedle.slice(0, n)
+      const rawAt = src.indexOf(head)
+      if (rawAt >= 0) return rawAt
+      const loose = head.replace(/\(\s*([A-Za-z])\s*\)/g, '(')
+      const looseAt = src.indexOf(loose)
+      if (looseAt >= 0) return looseAt
+    }
+    // Mid-stem figure can split the opener ("charge … ![](…) capacitor"); use a later chunk.
+    for (const start of [12, 20, 28]) {
+      if (foldedNeedle.length < start + 12) continue
+      const mid = foldedNeedle.slice(start, Math.min(start + 28, foldedNeedle.length)).trim()
+      if (mid.length < 12) continue
+      const midAt = src.indexOf(mid)
+      if (midAt >= 0) return Math.max(0, midAt - 80)
+    }
+  }
+  if (noArticle.length >= 16 && noArticle !== compact) {
+    for (const n of [28, 22, 18]) {
+      if (noArticle.length < n) continue
+      const articleAt = src.indexOf(noArticle.slice(0, n))
+      if (articleAt >= 0) return articleAt
+    }
+  }
   const beforeThen = compact.split(/\bthen\b/i)[0].trim()
   const genericThen =
     /^(?:a particle of charge|let |if |match each)\b/i.test(beforeThen) && beforeThen.length < 40
@@ -1414,6 +1459,22 @@ function ocrSpanForCard(source, printedNumber, map, stemHint = '') {
  * @param {number} [printedNumber]
  * @param {{ passageRanges?: Array<{ from: number, to: number }> }} [map]
  */
+/**
+ * Drop Ans/Sol tails so a solution drawing is not copied into the stem (Q59 circuit).
+ * Only cut markers that appear AFTER the stem probe — a prior question's Ans/Sol
+ * often sits in the 200-char lookbehind and must not wipe this card's figure (Q73).
+ */
+function clipOcrWindowBeforeAnswerKey(window, afterIndex = 0) {
+  const t = String(window ?? '')
+  const from = Math.max(0, Math.min(t.length, Number(afterIndex) || 0))
+  const tail = t.slice(from)
+  const m = tail.match(/\n\s*(?:Ans\.|Answer\s*:|Sol\.|Solution\s*:)/i)
+  if (!m || m.index == null) return t
+  // Keep a little stem body before Ans; ignore a match glued to the probe.
+  if (m.index < 24) return t
+  return t.slice(0, from + m.index)
+}
+
 export function restoreMissingFiguresFromSource(stem, source, printedNumber, map) {
   const text = String(stem ?? '').trim()
   const src = String(source ?? '')
@@ -1433,7 +1494,11 @@ export function restoreMissingFiguresFromSource(stem, source, printedNumber, map
       if (idx < 0) break
       const abs = from + idx
       const winStart = Math.max(0, abs - 200)
-      const window = clipOcrWindowToQuestion(hay.slice(winStart, abs + 1400), abs - winStart)
+      const probeAt = abs - winStart
+      const window = clipOcrWindowBeforeAnswerKey(
+        clipOcrWindowToQuestion(hay.slice(winStart, abs + 1400), probeAt),
+        probeAt,
+      )
       from = abs + Math.max(1, short.length)
       if (!windowBelongsToStem(window, text)) continue
       if (figureSubjectConflictsStem(text, window)) continue

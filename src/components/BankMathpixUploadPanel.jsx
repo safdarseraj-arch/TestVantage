@@ -23,7 +23,7 @@ export default function BankMathpixUploadPanel() {
         </Link>
         {' '}
         <Link to="/upload?type=official" className="btn btn-ghost">
-          Official PYQ
+          PYQ
         </Link>
       </p>
     </section>

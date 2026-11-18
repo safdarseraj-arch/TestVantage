@@ -7,6 +7,7 @@
 import { healUploadQuestionCard } from './uploadQualityGuards.js'
 import { extractMathpixImageUrls } from './mathpixMedia.js'
 import { officialPyqCardAllowsPassage, peelOfficialPyqCardForDisplay } from './passage.js'
+import { restoreMissingFiguresFromSource } from './extendTruncatedStem.js'
 
 /**
  * @param {any} q
@@ -25,10 +26,20 @@ export function officialPyqCardAsShown(q, rawSourceText = '') {
       healError: '',
     }
   }
-  const sourceText = q?.adminEdited === true ? '' : String(rawSourceText ?? '')
+  // Admin edits must not wipe OCR figure restore (Q73 compound drawing, Q59 circuit).
+  const sourceText = String(rawSourceText ?? '')
   let healed
   try {
-    healed = peelOfficialPyqCardForDisplay(healUploadQuestionCard(q, sourceText), sourceText)
+    if (q?.adminEdited === true) {
+      healed = peelOfficialPyqCardForDisplay(q, '')
+      const printed = Number(q?.printedNumber ?? q?.questionNumber)
+      const nextText = restoreMissingFiguresFromSource(healed?.text ?? q?.text, sourceText, printed)
+      if (nextText !== String(healed?.text ?? '')) {
+        healed = { ...healed, text: nextText }
+      }
+    } else {
+      healed = peelOfficialPyqCardForDisplay(healUploadQuestionCard(q, sourceText), sourceText)
+    }
   } catch (err) {
     console.error('Official PYQ preview heal failed', err)
     healed = {

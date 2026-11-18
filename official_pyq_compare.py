@@ -327,6 +327,41 @@ def institute_status(paper_id: str) -> dict[str, Any]:
     }
 
 
+def institute_pdf_text(paper_id: str, *, max_pages: int = 120) -> dict[str, Any]:
+    """Plain text of the stored institute solutions PDF (PyMuPDF). Browser PDF.js often misses FIITJEE pages."""
+    path = _institute_file(paper_id)
+    if path is None:
+        raise OriginalMissingError(INSTITUTE_MISSING_MESSAGE)
+    try:
+        with fitz.open(path) as doc:
+            limit = min(int(doc.page_count or 0), max(1, int(max_pages or 120)))
+            parts = [(doc[i].get_text("text") or "").strip() for i in range(limit)]
+            pages = int(doc.page_count or 0)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("That institute PDF could not be read.") from exc
+    text = "\n\n".join(p for p in parts if p).strip()
+    meta = _read_institute_meta(paper_id)
+    return {
+        "text": text,
+        "pages": pages,
+        "chars": len(text),
+        "institute": meta.get("institute") or "",
+        "file_name": meta.get("file_name") or "",
+    }
+
+
+def institute_pdf_bytes(paper_id: str) -> tuple[bytes, str]:
+    """Raw stored institute PDF and a safe download name."""
+    path = _institute_file(paper_id)
+    if path is None:
+        raise OriginalMissingError(INSTITUTE_MISSING_MESSAGE)
+    meta = _read_institute_meta(paper_id)
+    name = str(meta.get("file_name") or f"{_safe_id(paper_id)}-institute.pdf")
+    if not name.lower().endswith(".pdf"):
+        name = f"{name}.pdf"
+    return path.read_bytes(), name
+
+
 def _institute_picture_ids(paper_id: str) -> set[str]:
     ids = _read_institute_meta(paper_id).get("picture_ids")
     return {str(i) for i in ids} if isinstance(ids, list) else set()
@@ -640,11 +675,49 @@ def crop_original_page(paper_id: str, page: int, box: dict[str, Any]) -> dict[st
         return _save_crop(paper_id, page, pdf_page, clip, scale, (x0, y0, x1, y1))
 
 
+def _lighten_crop_watermark(pix: fitz.Pixmap) -> None:
+    """Wash light/mid gray hatch watermarks (FIITJEE diagonal grid) toward white; keep dark ink.
+
+    Runs on every figure crop *before* it is saved, and again when crops are served, so Mathpix
+    CDN watermarks and original-PDF stamps never show in review / option pictures.
+    """
+    if pix.n < 3:
+        return
+    mv = pix.samples_mv
+    step = pix.n
+    for i in range(0, len(mv) - 2, step):
+        r, g, b = mv[i], mv[i + 1], mv[i + 2]
+        mx, mn = max(r, g, b), min(r, g, b)
+        # Keep real ink and coloured pixels; wash gray hatch / stamp toward white.
+        # Allow a little color cast on hatch (scanner / JPEG) — still wash near-gray.
+        if mx - mn > 40 or mn < 58 or mx > 252:
+            continue
+        if mn >= 88:
+            mv[i] = 255
+            mv[i + 1] = 255
+            mv[i + 2] = 255
+        elif mn >= 58:
+            # Lift mid-gray hatch without erasing soft pencil / light print.
+            lift = int((255 - mn) * 0.95)
+            mv[i] = min(255, r + lift)
+            mv[i + 1] = min(255, g + lift)
+            mv[i + 2] = min(255, b + lift)
+
+
+def _pixmap_png_washed(pix: fitz.Pixmap) -> bytes:
+    """PNG bytes for a crop after watermark wash (used by original cuts and Mathpix downloads)."""
+    try:
+        _lighten_crop_watermark(pix)
+    except Exception:
+        logger.debug("Crop watermark wash skipped", exc_info=True)
+    return pix.tobytes("png")
+
+
 def _save_crop(
     paper_id: str, page: int, pdf_page: fitz.Page, clip: fitz.Rect, scale: float, box: tuple[float, float, float, float]
 ) -> dict[str, Any]:
     pix = pdf_page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip, alpha=False)
-    data = pix.tobytes("png")
+    data = _pixmap_png_washed(pix)
     digest = hashlib.sha1(data).hexdigest()[:16]
     name = f"{_safe_id(paper_id)}-p{page}-{digest}.png"
     CROPS_DIR.mkdir(parents=True, exist_ok=True)
@@ -731,6 +804,192 @@ def crops_for_mathpix_links(paper_id: str, urls: list[str], institute: bool = Fa
     return {"crops": out, "skipped": skipped}
 
 
+# FIITJEE / Allen solution diagrams are often vector drawings (no Mathpix includegraphics).
+# Short figure labels like (0,2), O, R, (p,q), T(...) mark those drawings on the page.
+_SOL_FIG_LABEL_RE = re.compile(
+    r"^(?:"
+    r"\(\s*[-\d.]+(?:\s*,\s*[-\d.pq]+)+\s*\)"
+    r"|\(\s*[pq]\s*,\s*[pq]\s*\)"
+    r"|[A-Z]"
+    r"|T\([^)]{0,60}\)"
+    r"|S\([^)]{0,40}\)"
+    r")$",
+    re.I,
+)
+_SOL_FIG_Q_RE = re.compile(r"^\*?Q\.?\s*(\d{1,2})$", re.I)
+_SOL_FIG_SUBJECT_RE = re.compile(r"^(Mathematics|Physics|Chemistry)\b", re.I)
+
+
+def _institute_sol_label_rects(page: fitz.Page) -> list[fitz.Rect]:
+    out: list[fitz.Rect] = []
+    for block in page.get_text("blocks"):
+        text = str(block[4] or "").strip()
+        if not text or len(text) > 80:
+            continue
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if not lines or len(lines) > 4:
+            continue
+        if all(_SOL_FIG_LABEL_RE.match(ln) or re.match(r"^\([^)]{1,30}\)$", ln) for ln in lines):
+            out.append(fitz.Rect(block[:4]))
+    return out
+
+
+def _cluster_rects(rects: list[fitz.Rect], gap: float = 28.0) -> list[fitz.Rect]:
+    if not rects:
+        return []
+    used = [False] * len(rects)
+    clusters: list[fitz.Rect] = []
+    for i, rect in enumerate(rects):
+        if used[i]:
+            continue
+        cur = fitz.Rect(rect)
+        used[i] = True
+        changed = True
+        while changed:
+            changed = False
+            for j, other in enumerate(rects):
+                if used[j]:
+                    continue
+                grow = fitz.Rect(cur)
+                grow.x0 -= gap
+                grow.y0 -= gap
+                grow.x1 += gap
+                grow.y1 += gap
+                if grow.intersects(other):
+                    cur |= other
+                    used[j] = True
+                    changed = True
+        clusters.append(cur)
+    return clusters
+
+
+def _expand_sol_figure_box(page: fitz.Page, seed: fitz.Rect) -> fitz.Rect | None:
+    pad = 12.0
+    box = fitz.Rect(seed.x0 - pad, seed.y0 - pad, seed.x1 + pad, seed.y1 + pad)
+    for drawing in page.get_drawings():
+        rect = drawing.get("rect")
+        if not rect:
+            continue
+        rr = fitz.Rect(rect)
+        if rr.width > page.rect.width * 0.55:
+            continue
+        if rr.height < 1.5 and rr.width > page.rect.width * 0.35:
+            continue
+        grow = fitz.Rect(box)
+        grow.x0 -= 22
+        grow.y0 -= 22
+        grow.x1 += 22
+        grow.y1 += 22
+        if grow.intersects(rr):
+            box |= rr
+    box &= page.rect
+    if box.width < 50 or box.height < 50:
+        return None
+    if box.width * box.height > page.rect.width * page.rect.height * 0.4:
+        return None
+    return box
+
+
+def _institute_page_sol_owners(page: fitz.Page) -> list[dict[str, Any]]:
+    """Sol. blocks on one page with their printed question number and subject."""
+    words = page.get_text("words")
+    subject = ""
+    current_q = 0
+    owners: list[dict[str, Any]] = []
+    for word in words:
+        token = str(word[4] or "").strip()
+        subj = _SOL_FIG_SUBJECT_RE.match(token)
+        if subj:
+            subject = subj.group(1).lower()
+            continue
+        q_match = _SOL_FIG_Q_RE.match(token)
+        if q_match:
+            current_q = int(q_match.group(1))
+            continue
+        if re.fullmatch(r"Sol\.?", token, re.I) and current_q > 0:
+            owners.append({"n": current_q, "subject": subject, "y0": float(word[1]), "y1": float(word[3])})
+    for i, owner in enumerate(owners):
+        stop = page.rect.y1
+        for later in owners[i + 1 :]:
+            stop = min(stop, later["y0"])
+            break
+        for word in words:
+            token = str(word[4] or "").strip()
+            if word[1] <= owner["y1"] + 8:
+                continue
+            if _SOL_FIG_Q_RE.match(token) or token.upper().startswith("SECTION"):
+                stop = min(stop, float(word[1]))
+                break
+        owner["y_stop"] = stop
+    return owners
+
+
+def crop_institute_solution_figures(paper_id: str) -> dict[str, Any]:
+    """Cut vector solution diagrams (label islands) from the stored institute PDF.
+
+    Mathpix often OCR's FIITJEE drawings as labels only and never emits includegraphics.
+    Returns one crop URL per (subject, question) that has a clear figure in its Sol. block.
+    """
+    path = _institute_file(paper_id)
+    if path is None or path.suffix != ".pdf":
+        raise OriginalMissingError(INSTITUTE_MISSING_MESSAGE)
+    figures: list[dict[str, Any]] = []
+    seen: set[tuple[str, int]] = set()
+    with fitz.open(str(path)) as doc:
+        for page_index, page in enumerate(doc):
+            owners = _institute_page_sol_owners(page)
+            if not owners:
+                continue
+            labels = _institute_sol_label_rects(page)
+            if len(labels) < 3:
+                continue
+            # Gap a little wider so FIITJEE labels around a drawing still form one island.
+            for cluster in _cluster_rects(labels, gap=42.0):
+                box = _expand_sol_figure_box(page, cluster)
+                if box is None:
+                    continue
+                # Count labels inside the expanded drawing box (not only the seed cluster).
+                n_labels = sum(1 for rect in labels if (fitz.Rect(rect) & box).get_area() > 0)
+                if n_labels < 3:
+                    continue
+                mid_y = (box.y0 + box.y1) / 2.0
+                owner = next((o for o in owners if o["y0"] - 6 <= mid_y <= o["y_stop"] + 6), None)
+                if owner is None:
+                    continue
+                key = (str(owner.get("subject") or ""), int(owner["n"]))
+                if key in seen:
+                    continue
+                rect = page.rect
+                frac = (
+                    (box.x0 - rect.x0) / rect.width,
+                    (box.y0 - rect.y0) / rect.height,
+                    (box.x1 - rect.x0) / rect.width,
+                    (box.y1 - rect.y0) / rect.height,
+                )
+                if frac[2] - frac[0] < _MIN_CROP_FRACTION or frac[3] - frac[1] < _MIN_CROP_FRACTION:
+                    continue
+                crop = _save_crop(
+                    f"{paper_id}-institute",
+                    page_index + 1,
+                    page,
+                    box,
+                    _CROP_DPI / 72.0,
+                    frac,
+                )
+                seen.add(key)
+                figures.append(
+                    {
+                        "page": page_index + 1,
+                        "number": int(owner["n"]),
+                        "subject": key[0] or None,
+                        "url": crop["url"],
+                        "width": crop["width"],
+                        "height": crop["height"],
+                    }
+                )
+    return {"figures": figures, "count": len(figures)}
+
+
 MATHPIX_LINKS_FILE = CROPS_DIR / "mathpix-links.json"
 _MATHPIX_LINKS_LOCK = threading.Lock()
 _MAX_PICTURE_BYTES = 8 * 1024 * 1024
@@ -781,7 +1040,8 @@ def _picture_png(data: bytes) -> bytes:
         pix = fitz.Pixmap(fitz.csRGB, pix)
     if pix.width < 2 or pix.height < 2:
         raise ValueError("Picture too small.")
-    return pix.tobytes("png")
+    # Wash hatch watermarks before the local copy is used in card split / review.
+    return _pixmap_png_washed(pix)
 
 
 def keep_mathpix_pictures(urls: list[str], fetch: Any = None) -> dict[str, Any]:
@@ -843,7 +1103,12 @@ def read_crop(name: str) -> bytes:
     path = CROPS_DIR / name
     if not path.is_file():
         raise OriginalMissingError("That cropped picture is not on this computer.")
-    return path.read_bytes()
+    raw = path.read_bytes()
+    # Older crops may still hold hatch stamps; wash on serve so review never shows them.
+    try:
+        return _picture_png(raw)
+    except Exception:
+        return raw
 
 
 _MAX_FIGURE_BOXES = 12

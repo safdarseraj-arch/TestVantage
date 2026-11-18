@@ -1388,7 +1388,12 @@ async def official_pyq_original_crop_file(name: str) -> Response:
         data = opc.read_crop(name)
     except (opc.OriginalMissingError, ValueError) as exc:
         raise _compare_http_error(exc) from exc
-    return Response(content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    # Do not mark crops immutable: wash improves over time and a year-long cache kept old hatch stamps.
+    return Response(
+        content=data,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=300, must-revalidate"},
+    )
 
 
 @app.post("/api/official-pyq/original/{paper_id}/crop", tags=["Official PYQ"])
@@ -1425,10 +1430,22 @@ async def official_pyq_mathpix_crops(paper_id: str, body: OfficialPyqMathpixCrop
 
 @app.get("/api/official-pyq/original/mathpix-picture", tags=["Official PYQ"])
 async def official_pyq_mathpix_picture(u: str = Query(..., max_length=600)) -> Response:
-    """The local copy of a Mathpix picture link, once it was cut from the original PDF."""
+    """Washed local copy of a Mathpix picture (download+wash on first request if needed)."""
+    import asyncio
+
     import official_pyq_compare as opc
 
     local = opc.local_crop_for_mathpix(u)
+    if not local:
+        # CDN JPEGs keep hatch watermarks — keep a washed PNG the first time review asks for it.
+        try:
+            result = await asyncio.to_thread(opc.keep_mathpix_pictures, [u])
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=502,
+                detail={"code": "mathpix_keep_failed", "message": f"Could not keep this picture: {exc}"},
+            ) from exc
+        local = result.get("saved", {}).get(u) or opc.local_crop_for_mathpix(u)
     if not local:
         raise HTTPException(status_code=404, detail={"code": "no_local_picture", "message": "No local copy of this picture."})
     name = local[len(opc.CROP_URL_PREFIX) :].split("?", 1)[0]
@@ -1472,6 +1489,38 @@ async def official_pyq_institute_status(paper_id: str) -> dict[str, Any]:
         raise _institute_http_error(exc) from exc
 
 
+@app.get("/api/official-pyq/original/{paper_id}/institute/text", tags=["Official PYQ"])
+async def official_pyq_institute_text(paper_id: str) -> dict[str, Any]:
+    """Full text of the stored institute solutions PDF (PyMuPDF). Used when browser PDF.js reads too little."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    try:
+        result = await asyncio.to_thread(opc.institute_pdf_text, paper_id)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _institute_http_error(exc) from exc
+    return {"ok": True, **result}
+
+
+@app.get("/api/official-pyq/original/{paper_id}/institute/file", tags=["Official PYQ"])
+async def official_pyq_institute_file(paper_id: str):
+    """Download the stored institute solutions PDF (for a Mathpix re-read without asking the admin to pick the file again)."""
+    from fastapi.responses import Response
+
+    import official_pyq_compare as opc
+
+    try:
+        data, name = opc.institute_pdf_bytes(paper_id)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _institute_http_error(exc) from exc
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{name}"'},
+    )
+
+
 @app.post("/api/official-pyq/original/{paper_id}/institute", tags=["Official PYQ"])
 async def official_pyq_institute_upload(
     paper_id: str,
@@ -1499,6 +1548,20 @@ async def official_pyq_institute_mathpix_crops(paper_id: str, body: OfficialPyqM
 
     try:
         result = await asyncio.to_thread(opc.crops_for_mathpix_links, paper_id, body.urls, True)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _institute_http_error(exc) from exc
+    return {"ok": True, **result}
+
+
+@app.post("/api/official-pyq/original/{paper_id}/institute/solution-figures", tags=["Official PYQ"])
+async def official_pyq_institute_solution_figures(paper_id: str) -> dict[str, Any]:
+    """Cut vector solution diagrams from the stored institute PDF when Mathpix omitted includegraphics."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    try:
+        result = await asyncio.to_thread(opc.crop_institute_solution_figures, paper_id)
     except (opc.OriginalMissingError, ValueError) as exc:
         raise _institute_http_error(exc) from exc
     return {"ok": True, **result}

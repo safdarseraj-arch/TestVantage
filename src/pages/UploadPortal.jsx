@@ -1,6 +1,6 @@
 /**
  * /upload — one place to upload a PDF. Pick what the document is:
- *   Official PYQ   — a previous-year paper from NTA / JEE Advanced (admin only)
+ *   PYQ            — a previous-year paper from NTA / JEE Advanced (admin only)
  *   Any paper      — class test, mock, another institute's paper
  *   Book / Q-bank  — a whole book or question bank, read one page range at a time
  * All three use the same pipeline and review screen (upload → Quality check → Auto-fix →
@@ -15,7 +15,7 @@ export const UPLOAD_PORTAL_TYPES = [
   {
     id: 'official',
     kind: 'official',
-    label: 'Official PYQ',
+    label: 'PYQ',
     hint: 'JEE Main / JEE Advanced / NEET previous-year paper from the official archive. Goes to the PYQ Bank and the Question Bank.',
     adminOnly: true,
   },

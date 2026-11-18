@@ -6,13 +6,15 @@
  * Stored card text keeps the Mathpix links (checks read the page and box from them).
  */
 
-import { cleanMathpixImageUrl } from './mathpixMedia.js'
+import { cleanMathpixImageUrl, isOriginalCropUrl } from './mathpixMedia.js'
 
 const LOCAL_PICTURE_ROUTE = '/api/official-pyq/original/mathpix-picture?u='
 const KEEP_PICTURES_ROUTE = '/api/official-pyq/original/mathpix-picture/keep'
 const MATHPIX_CROP_LINK = /^https?:\/\/cdn\.mathpix\.com\/cropped\/[A-Za-z0-9._~\-/?=&%]+$/i
 const MATHPIX_CROP_LINKS_RE = /https?:\/\/cdn\.mathpix\.com\/cropped\/[^\s)}"'<>\]]+/gi
 const LINKS_PER_REQUEST = 200
+/** Bump when crop wash / serve headers change so browsers drop old immutable hatch caches. */
+const ORIGINAL_CROP_WASH_QUERY = 'wash=2'
 /** Links the helper already answered for in this session (kept, saved, or gone). */
 const keptThisSession = new Set()
 let storedSweepDone = false
@@ -23,20 +25,47 @@ export function mathpixLocalPictureUrl(url) {
   return MATHPIX_CROP_LINK.test(clean) ? `${LOCAL_PICTURE_ROUTE}${encodeURIComponent(clean)}` : ''
 }
 
-/** <img onError>: swap a dead Mathpix link for the local copy, once. @param {{ currentTarget?: any }} event */
+/**
+ * Prefer the washed local copy for Mathpix CDN links (CDN JPEGs keep hatch watermarks).
+ * Original PDF crops get a wash= query so year-old immutable caches are refreshed.
+ * @param {unknown} url
+ */
+export function washedPaperFigureSrc(url) {
+  const clean = cleanMathpixImageUrl(url)
+  const local = mathpixLocalPictureUrl(clean)
+  if (local) return local
+  if (isOriginalCropUrl(clean) && !/[?&]wash=\d+/i.test(clean)) {
+    return `${clean}${clean.includes('?') ? '&' : '?'}${ORIGINAL_CROP_WASH_QUERY}`
+  }
+  return clean
+}
+
+/** <img onError>: if washed local failed, fall back to the CDN link once. @param {{ currentTarget?: any }} event */
 export function showLocalPictureOnError(event) {
   const img = event?.currentTarget
-  if (!img || img.dataset?.localPicture) return
+  if (!img || img.dataset?.cdnFallback) return
+  const cdn = String(img.dataset?.cdnSrc || '').trim()
+  if (cdn && MATHPIX_CROP_LINK.test(cdn)) {
+    img.dataset.cdnFallback = '1'
+    img.src = cdn
+    return
+  }
+  // Legacy: CDN was the primary src — swap to washed local once.
+  if (img.dataset?.localPicture) return
   const local = mathpixLocalPictureUrl(img.getAttribute('src'))
   if (!local) return
   img.dataset.localPicture = '1'
   img.src = local
 }
 
-/** The same swap for pictures written as HTML strings. @param {unknown} url */
+/** The same swap for pictures written as HTML strings. Prefer washed local src. @param {unknown} url */
 export function localPictureOnErrorAttr(url) {
-  const local = mathpixLocalPictureUrl(url)
-  return local ? ` onerror="this.onerror=null;this.src='${local}'"` : ''
+  const clean = cleanMathpixImageUrl(url)
+  const local = mathpixLocalPictureUrl(clean)
+  if (!local) return ''
+  // Primary src is already local; if it 404s before keep finishes, fall back to CDN once.
+  const safeCdn = clean.replace(/'/g, '%27')
+  return ` data-cdn-src="${safeCdn}" onerror="if(this.dataset.cdnFallback)return;this.dataset.cdnFallback='1';this.src='${safeCdn}'"`
 }
 
 /** Every Mathpix picture link in a value: text, or cards with any text field. @param {...unknown} values */
@@ -59,14 +88,27 @@ export function mathpixPictureLinksIn(...values) {
 
 /**
  * Every Mathpix picture link in the cards (any text field) and the stored OCR. Institute solutions
- * were read from another PDF, so their links are not cut from this paper's original.
+ * were read from another PDF, so their links are not cut from this paper's original — unless the
+ * paper upload itself was the solutions booklet (rebuiltFromOcr), in which case the same PDF holds
+ * the Sol. drawings (JEE Main 27 Jan Shift 1 / FIITJEE).
  * @param {any} paper @param {string} [ocrText]
  */
+/** True when institute Sol. pictures live on the paper original (booklet uploaded as the paper). */
+function paperLooksLikeBookletAsOriginal(paper) {
+  if (paper?.instituteSolutions?.rebuiltFromOcr === true) return true
+  if (/Rebuilt\s+\d+\s+questions from institute solutions OCR/i.test(String(paper?.notes ?? ''))) return true
+  const qs = Array.isArray(paper?.questions) ? paper.questions : []
+  if (qs.length < 20) return false
+  const inst = qs.filter((q) => String(q?.solutionSource ?? '') === 'institute').length
+  return inst >= Math.floor(qs.length * 0.5)
+}
+
 export function mathpixPictureLinksOfPaper(paper, ocrText = '') {
+  const bookletIsPaper = paperLooksLikeBookletAsOriginal(paper)
   const cards = (Array.isArray(paper?.questions) ? paper.questions : []).map((q) => {
     if (!q || typeof q !== 'object') return q
     const { instituteQuestionText: _copy, ...rest } = q
-    return q.solutionSource === 'institute' ? { ...rest, solution: '' } : rest
+    return q.solutionSource === 'institute' && !bookletIsPaper ? { ...rest, solution: '' } : rest
   })
   return mathpixPictureLinksIn(cards, String(ocrText ?? ''))
 }

@@ -13,6 +13,7 @@ import {
   getOfficialPyqPendingPreviewPaper,
 } from '../utils/officialPyqPendingStore.js'
 import { repairOrphanAlignedBody, stripRepeatedQuestionNumberPrefix } from '../utils/wrapBareLatexRuns.js'
+import { formatOfficialPyqAnswerKey, officialPyqCardHasAnswerKey } from '../utils/officialPyqCardEdit.js'
 
 const PAGE_SIZE = 1
 const OfficialPyqPreviewMath = lazy(() => import('./OfficialPyqPreviewMath.jsx'))
@@ -65,6 +66,8 @@ const PlainQuestionCard = memo(function PlainQuestionCard({ q }) {
   const showOptions =
     options.some((o) => String(o ?? '').trim()) && !matchOptionsProbablyFolded(text, options)
   const plain = plainPreviewText(text)
+  const answerKey = officialPyqCardHasAnswerKey(q) ? formatOfficialPyqAnswerKey(q) : ''
+  const solution = String(q?.solution ?? '').trim()
   return (
     <>
       <p className="official-pyq-plain-stem">{plain || '(Question text)'}</p>
@@ -76,6 +79,21 @@ const PlainQuestionCard = memo(function PlainQuestionCard({ q }) {
           })}
         </ol>
       ) : null}
+      {answerKey || solution ? (
+        <div className="official-pyq-review-key" data-testid="official-pyq-review-key-plain">
+          {answerKey ? (
+            <p className="official-pyq-review-answer">
+              <strong>Answer:</strong> {answerKey}
+            </p>
+          ) : null}
+          {solution ? (
+            <p className="official-pyq-review-solution-plain">
+              <strong>Solution:</strong> {plainPreviewText(solution).slice(0, 280)}
+              {plainPreviewText(solution).length > 280 ? '…' : ''}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </>
   )
 })
@@ -86,7 +104,6 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
   onMeta,
 }) {
   const questionsRef = useRef(/** @type {unknown[]} */ ([]))
-  const sourceTextRef = useRef('')
   const pageRef = useRef(0)
   const onMetaRef = useRef(onMeta)
   onMetaRef.current = onMeta
@@ -95,6 +112,7 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
   const [total, setTotal] = useState(0)
   const [ready, setReady] = useState(false)
   const [showMath, setShowMath] = useState(false)
+  const [sourceText, setSourceText] = useState('')
   const [sourceTick, setSourceTick] = useState(0)
   const [approved, setApproved] = useState(false)
   const [published, setPublished] = useState(false)
@@ -109,12 +127,12 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
     setPage(0)
     setTotal(0)
     setSourceTick(0)
+    setSourceText('')
     setApproved(false)
     setPublished(false)
     keptIdsRef.current = {}
     pageRef.current = 0
     questionsRef.current = []
-    sourceTextRef.current = ''
     let loaded = false
     const loadPaper = () => {
       if (cancelled || loaded) return
@@ -159,7 +177,7 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
       try {
         const ocr = getOfficialPyqPendingOcrText(paperId)
         if (!cancelled && ocr) {
-          sourceTextRef.current = ocr
+          setSourceText(ocr)
           setSourceTick((n) => n + 1)
         }
       } catch {
@@ -247,7 +265,7 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
             <Suspense fallback={<PlainQuestionCard q={current} />}>
               <OfficialPyqPreviewMath
                 q={current}
-                sourceText={sourceTextRef.current}
+                sourceText={sourceText}
                 sourceTick={sourceTick}
               />
             </Suspense>

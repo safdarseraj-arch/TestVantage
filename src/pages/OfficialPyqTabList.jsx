@@ -53,16 +53,33 @@ function rowKey(paper) {
   return String(paper?.id || paper?.paperId || paper?.paperLabel || '').trim()
 }
 
-/** Show Paper 1 / Paper 2 even when paperLabel is only "JEE Advanced 2024". */
-function paperListTitle(paper) {
-  const label = String(paper?.paperLabel || '').trim() || 'Paper'
-  const session = String(paper?.session || '').trim()
+/** JEE Main has one sitting per date/shift — never show Advanced-style Paper 1 / Paper 2. */
+function isJeeMainPaperNumberSession(session) {
+  return /^paper\s*[- ]?\d+$/i.test(String(session || '').trim())
+}
+
+/** Session text for list badges / titles (skip Paper N on JEE Main). */
+export function officialPyqDisplaySession(paper) {
+  const session = String(paper?.session || '').trim().replace(/\s+/g, ' ')
+  if (!session) return ''
+  if (String(paper?.exam || '').toLowerCase() === 'jee-main' && isJeeMainPaperNumberSession(session)) {
+    return ''
+  }
+  return session
+}
+
+/** Show Paper 1 / Paper 2 for Advanced even when paperLabel is only "JEE Advanced 2024". */
+export function paperListTitle(paper) {
+  let label = String(paper?.paperLabel || '').trim() || 'Paper'
+  if (String(paper?.exam || '').toLowerCase() === 'jee-main') {
+    label = label.replace(/\s*[·•|\-–—]?\s*Paper\s*[- ]?\d+\b/gi, '').replace(/\s{2,}/g, ' ').trim() || label
+  }
+  const session = officialPyqDisplaySession(paper)
   if (!session) return label
-  const sessionNorm = session.replace(/\s+/g, ' ')
-  if (new RegExp(sessionNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'), 'i').test(label)) {
+  if (new RegExp(session.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'), 'i').test(label)) {
     return label
   }
-  return `${label} · ${sessionNorm}`
+  return `${label} · ${session}`
 }
 
 function OfficialPyqTabList({
@@ -155,6 +172,7 @@ function OfficialPyqTabList({
           {papers.map((p) => {
             const paperKey = rowKey(p)
             const isRowSelected = selectedId != null && paperKey === String(selectedId)
+            const sessionShown = officialPyqDisplaySession(p)
             return (
               <li
                 key={paperKey}
@@ -183,7 +201,7 @@ function OfficialPyqTabList({
                     <span className="bank-review-badge">
                       {statusLabel(p.status)} · {officialPyqPaperQuestionCount(p)} Q ·{' '}
                       {getOfficialPyqExamLabel(p.exam)} {p.year}
-                      {p.session ? ` · ${p.session}` : ''}
+                      {sessionShown ? ` · ${sessionShown}` : ''}
                     </span>
                     <span className="cc-sub official-pyq-paper-source">{p.sourceLabel}</span>
                     {localQualityListMark(p.localQuality) ? (

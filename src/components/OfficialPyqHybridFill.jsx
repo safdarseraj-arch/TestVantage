@@ -18,6 +18,14 @@ function notSavedNote(result) {
     : ''
 }
 
+function stillBlankNote(result) {
+  const nums = Array.isArray(result.stillBlank) ? result.stillBlank : []
+  if (!nums.length) return ''
+  const shown = nums.slice(0, 40).join(', ')
+  const more = nums.length > 40 ? ` (+${nums.length - 40} more)` : ''
+  return ` Still blank tags (chapter / topic / unit / toughness): question(s) ${shown}${more}. Press Fill again for those, or type them by hand.`
+}
+
 export default function OfficialPyqHybridFill({ paperId, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [redoAll, setRedoAll] = useState(false)
@@ -50,6 +58,17 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
     setError('')
     setNote('Starting…')
     try {
+      // Clear unreadable institute / draft sols first — Hybrid only fills true gaps (~5–10%).
+      try {
+        const { clearPoorInstituteSolutionsForHybrid } = await import('../utils/officialPyqInstituteSolutions.js')
+        const cleared = clearPoorInstituteSolutionsForHybrid(paperId)
+        if (cleared?.ok && cleared.cleared) {
+          setNote(`Cleared ${cleared.cleared} unreadable institute solution(s). Filling remaining gaps…`)
+          onChanged?.()
+        }
+      } catch {
+        /* nonfatal — fill still runs */
+      }
       const result = await fillOfficialPyqApprovedPaperPartByPart(paperId, {
         redoAll,
         signal: ctl.signal,
@@ -70,11 +89,12 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
         ? ` Question(s) ${result.incomplete.join(', ')}: ${HYBRID_FILL_INCOMPLETE_NOTE}. They were not asked again, so nothing was paid twice.`
         : ''
       const cost = hybridFillUsageNote(result.usage)
+      const blank = stillBlankNote(result)
       if (result.paused) {
         setError(
-          `Hybrid AI stopped answering at question ${result.paused.at}: ${result.paused.reason} Saved ${result.filled} question(s) before that. When the helper is running again, press the button — it carries on from question ${result.paused.at}; finished questions are not asked (or paid for) again.`,
+          `Hybrid AI stopped answering at question ${result.paused.at} after several failed pairs: ${result.paused.reason} Saved ${result.filled} question(s) before that. When the helper is running again, press the button — finished questions are skipped; blanks are tried again.`,
         )
-        setNote(`${cost.trim()}${look}${incomplete}${failed}${notSavedNote(result)}`)
+        setNote(`${cost.trim()}${look}${incomplete}${failed}${notSavedNote(result)}${blank}`)
         return
       }
       const notSaved = notSavedNote(result)
@@ -84,11 +104,11 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
         : ''
       if (!result.asked) {
         setNote(
-          `${printedAll ? 'Every question already has its chapter.' : 'Every question already has its chapter, answer, and solution.'} Tick "Redo all" to fill again.${noKey}`,
+          `${printedAll ? 'Every question already has its chapter.' : 'Every question already has its chapter, answer, and solution.'} Tick "Redo all" to fill again.${noKey}${blank}`,
         )
       } else {
         setNote(
-          `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} question(s). The paper is still Approved — press Publish when it looks right.${tagsOnly}${look}${incomplete}${failed}${notSaved}${noKey}${cost}`,
+          `${result.stopped ? 'Stopped. ' : ''}Hybrid AI filled and saved ${result.filled} of ${result.asked} question(s). The paper is still Approved — press Publish when it looks right.${tagsOnly}${look}${incomplete}${failed}${notSaved}${noKey}${blank}${cost}`,
         )
       }
     } catch (err) {
@@ -107,10 +127,12 @@ export default function OfficialPyqHybridFill({ paperId, onChanged }) {
   return (
     <div className="official-pyq-pending-fill" data-testid="official-pyq-hybrid-fill">
       <p className="form-hint">
-        Optional: Hybrid AI fills the tags, answer, and solution, two questions at a time. Source is the
+        Optional: Hybrid AI fills the tags, answer, and solution, two questions at a time, for the whole
+        paper. A short helper outage skips that pair and continues; only a long outage pauses. Source is the
         paper's own name. Answers printed on the paper and your own edits stay, and the solution must reach
         the printed answer; with no printed answer, the answer is the one the solution reaches. Question
         wording does not change. When a question has its answer and solution printed, only its tags are filled.
+        After Fill, any questions still missing chapter / topic / unit / toughness are listed by number.
       </p>
       <label className="form-hint" data-testid="official-pyq-printed-solutions-toggle">
         <input

@@ -133,14 +133,21 @@ export function hybridFillRequestForQuestion(question, paperExam = '', opts = {}
   const official =
     officialPyqCardAnswerIsKept(question) && question?.bonusMarksToAll !== true && question?.zeroMarksToAll !== true
   const ask = grid ? gridQuestionText(question) : String(question?.text ?? question?.stem ?? '')
+  // Placeholder "General" / empty tags must not be sent — Gemini echoes them and the card stays unfilled.
+  const unit = String(question?.section || question?.unit || '').trim()
+  const chapter = String(question?.chapter || '').trim()
+  const topic = String(question?.topic || '').trim()
+  const realUnit = unit && !/^general$/i.test(unit) ? unit : ''
+  const realChapter = chapter && !/^general$/i.test(chapter) ? chapter : ''
+  const realTopic = topic && !/^general$/i.test(topic) ? topic : ''
   return {
     question_text: questionTextWithPassage(ask, question?.passageText),
     options: grid ? [] : (Array.isArray(question?.options) ? question.options : []).map((opt) => String(opt ?? '')),
-    subject: question?.subject ? mapSubjectSlugToHybridLabel(question.subject, question.chapter || question.section) : '',
-    unit: String(question?.section || question?.unit || ''),
-    section: String(question?.section || question?.unit || ''),
-    chapter: String(question?.chapter || ''),
-    topic: question?.topic ? String(question.topic) : '',
+    subject: question?.subject ? mapSubjectSlugToHybridLabel(question.subject, realChapter || realUnit) : '',
+    unit: realUnit,
+    section: realUnit,
+    chapter: realChapter,
+    topic: realTopic,
     question_type: grid ? 'matrix_match_grid' : question?.questionType ? String(question.questionType) : '',
     exam: examId ? mapExamSlugToHybridLabel(examId) : '',
     toughness_level: question?.toughnessLevel != null ? String(question.toughnessLevel) : '',
@@ -315,6 +322,31 @@ export function officialPyqCardIsFilled(q, paper) {
   return true
 }
 
+/** True when subject tags (unit/chapter/topic/toughness) are still missing. */
+export function officialPyqCardTagsAreBlank(q) {
+  if (!q || isOfficialPyqPlaceholder(q) || !String(q?.text ?? q?.stem ?? '').trim()) return false
+  const chapter = String(q?.chapter || '').trim()
+  if (!chapter || /^general$/i.test(chapter)) return true
+  if (!String(q?.section || q?.unit || '').trim() || !String(q?.topic || '').trim()) return true
+  if (q?.toughnessLevel == null || q.toughnessLevel === '') return true
+  return false
+}
+
+/**
+ * 1-based question numbers that still need Hybrid tags after a fill run.
+ * @param {any} paper
+ * @returns {number[]}
+ */
+export function officialPyqBlankTagQuestionNumbers(paper) {
+  const questions = Array.isArray(paper?.questions) ? paper.questions : []
+  /** @type {number[]} */
+  const nums = []
+  questions.forEach((q, i) => {
+    if (officialPyqCardTagsAreBlank(q)) nums.push(i + 1)
+  })
+  return nums
+}
+
 /**
  * Cards whose source is not the paper's own name get it ("JEE Advanced 2025 Paper 1").
  * @param {any} paper @returns {any[] | null} the corrected cards, or null when every card already has it
@@ -372,6 +404,7 @@ export function applyHybridPatchToCard(card, patch) {
       next.matrixAnswerKey = patch.matrixAnswerKey
       delete next.matrixAnswerAlternates
       next.answerSource = 'hybrid_ai'
+      delete next.answerKeyReleased
     }
   }
   const answer = isMatrixGridCard(card) ? '' : currentAnswerText(patch)
@@ -385,6 +418,7 @@ export function applyHybridPatchToCard(card, patch) {
     delete next.numericalAlternatives
     delete next.correctIndicesAlternatives
     next.answerSource = 'hybrid_ai'
+    delete next.answerKeyReleased
   }
   if (answer && !printedBonus && answer !== currentAnswerText(card) && (answerHandSet || KEPT_SOURCES.has(card.answerSource))) {
     // The kept answer stays; the quality check asks for a look.
@@ -392,8 +426,11 @@ export function applyHybridPatchToCard(card, patch) {
   } else if (answer) {
     delete next.hybridAnswerDisagrees
   }
+  // Hand-edited cards keep a real solution the admin typed; an empty/missing solution
+  // must still accept Hybrid AI (many cards were flagged adminEdited only for stem/answer fixes).
   const solutionKept = KEPT_SOURCES.has(card.solutionSource) && officialPyqCardSolutionIsKept(card)
-  if (!handEdited && !solutionKept && has(patch.solution) && patch.solution !== card.solution) {
+  const solutionHandLocked = handEdited && solutionIsUsable(card)
+  if (!solutionHandLocked && !solutionKept && has(patch.solution) && patch.solution !== card.solution) {
     next.solution = patch.solution
     next.solutionSource = 'hybrid_ai'
   }
@@ -453,6 +490,13 @@ function tagsOnlyPatch(patch, card) {
 export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {}) {
   const before = getOfficialPyqPendingPaper(paperId)
   if (!before || before.status !== 'approved') throw new Error(HYBRID_FILL_NEEDS_APPROVAL)
+  // Unreadable institute sols must not block Hybrid — clear them so only real gaps are asked.
+  try {
+    const { clearPoorInstituteSolutionsForHybrid } = await import('./officialPyqInstituteSolutions.js')
+    clearPoorInstituteSolutionsForHybrid(paperId)
+  } catch {
+    /* nonfatal */
+  }
   saveOfficialPyqPaperSource(paperId)
   const paper = getOfficialPyqPendingPaper(paperId) || before
   const source = officialPyqPaperSourceName(paper)
@@ -496,11 +540,8 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
       },
       onApplied: (row) => {
         if (row.skipped) return
-        if (row.incomplete) {
-          incomplete.push(row.index + 1)
-          return
-        }
-        if (row.needsLook) needsLook.push(row.index + 1)
+        if (row.incomplete) incomplete.push(row.index + 1)
+        if (row.needsLook && !row.incomplete) needsLook.push(row.index + 1)
         if (!row.patch) return
         const latest = getOfficialPyqPendingPaper(paperId)
         if (latest?.status !== 'approved') throw new Error(HYBRID_FILL_NEEDS_APPROVAL)
@@ -511,7 +552,8 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
         }
         // A solution that reads like a hint, has no answer line, or misses the official answer is not
         // saved, and neither is the answer that came with it; the tags still are.
-        const patch = row.tagsOnly || row.problem ? tagsOnlyPatch(row.patch, card) : row.patch
+        // Incomplete cards (missing figure) still save usable tags when Gemini returned them.
+        const patch = row.tagsOnly || row.problem || row.incomplete ? tagsOnlyPatch(row.patch, card) : row.patch
         const result = applyOfficialPyqPublishedMeta(paperId, row.index, {
           ...publishedPatchFromCard(applyHybridPatchToCard(card, patch)),
           source: source || card.source,
@@ -524,15 +566,20 @@ export async function fillOfficialPyqApprovedPaperPartByPart(paperId, opts = {})
       },
     },
   )
-  const paused = rows.find((row) => row.outage)
+  const paused = rows.find((row) => row.pausedRun && row.outage)
+  const after = getOfficialPyqPendingPaper(paperId) || paper
+  const stillBlank = officialPyqBlankTagQuestionNumbers(after)
   return {
     total,
-    asked: rows.filter((row) => !row.skipped && !row.outage).length,
+    asked: rows.filter((row) => !row.skipped).length,
     filled,
     needsLook: needsLook.filter((n) => !rows.some((row) => row.index + 1 === n && row.error && !row.patch)),
-    failed: rows.filter((row) => !row.skipped && !row.outage && !row.patch && row.error).map((row) => row.index + 1),
+    failed: rows
+      .filter((row) => !row.skipped && !row.patch && (row.error || row.outage) && !row.pausedRun)
+      .map((row) => row.index + 1),
     incomplete,
     notSaved,
+    stillBlank,
     tagsOnly: rows.filter((row) => row.tagsOnly).length,
     noPrintedAnswer,
     paused: paused ? { at: paused.index + 1, reason: paused.outage } : null,

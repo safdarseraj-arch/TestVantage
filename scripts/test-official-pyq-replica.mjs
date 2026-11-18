@@ -406,11 +406,33 @@ const downRows = await fillPaperQuestionByQuestion(
     if (question.text !== 'Down stem 1.' && question.text !== 'Down stem 2.') throw new Error(HELPER_DOWN)
     return { correct_answer: 'A', step_by_step_solution: 'Step 1. Expand. The value is 2.' }
   },
-  { concurrency: 2, outageWaitsMs: [1, 1], onApplied: (row) => appliedDown.push(row.index) },
+  {
+    concurrency: 2,
+    outageWaitsMs: [1, 1],
+    maxOutageStreak: 1,
+    onApplied: (row) => appliedDown.push(row.index),
+  },
 )
-assert.deepEqual(appliedDown, [0, 1, 2, 3], 'the run pauses after the part where Hybrid AI stopped answering')
+assert.deepEqual(appliedDown, [0, 1, 2, 3], 'with streak 1 the run pauses after the first failed pair')
 assert.equal(downCalls, 2 + 2 * 3, 'questions 3 and 4 are each asked 3 times (two waits), questions 5 and 6 are not asked')
-assert.ok(downRows[2].outage && !downRows[2].needsLook && !downRows[2].patch)
+assert.ok(downRows[2].outage && downRows[2].pausedRun && !downRows[2].needsLook && !downRows[2].patch)
+let continueCalls = 0
+const continueRows = await fillPaperQuestionByQuestion(
+  [1, 2, 3, 4, 5, 6].map((n) => ({ text: `Continue stem ${n}.` })),
+  async (question) => {
+    continueCalls += 1
+    if (question.text === 'Continue stem 1.' || question.text === 'Continue stem 2.') {
+      return { correct_answer: 'A', step_by_step_solution: 'Step 1. Expand. The value is 2.' }
+    }
+    throw new Error(HELPER_DOWN)
+  },
+  { concurrency: 2, outageWaitsMs: [1, 1], maxOutageStreak: 3 },
+)
+assert.equal(continueRows.length, 6, 'a short failed pair does not stop the rest of the paper')
+assert.ok(continueRows[0].patch && continueRows[1].patch)
+assert.ok(continueRows[2].outage && !continueRows[2].pausedRun)
+assert.ok(continueRows[4].outage && !continueRows[4].pausedRun)
+assert.equal(continueCalls, 2 + 4 * 3, 'pairs 2 and 3 are still attempted after the first outage pair')
 let fatalCalls = 0
 await assert.rejects(
   fillPaperQuestionByQuestion(
@@ -455,6 +477,7 @@ const {
 } = await import(
   '../src/utils/officialPyqPendingFill.js'
 )
+const { officialPyqAnswerKeyIsReleased } = await import('../src/utils/officialPyqPendingStore.js')
 const GOOD_SOLUTION = 'Use $\\det(kA)=k^3\\det A$.\n$\\det(2A)=8\\times 2=16$.\nAnswer: (B)'
 assert.equal(HYBRID_FILL_PART_SIZE, 2)
 assert.equal(officialPyqSolutionProblem(GOOD_SOLUTION), '')
@@ -537,6 +560,12 @@ const handCard = applyHybridPatchToCard(
 assert.equal(handCard.solution, 'Mine.')
 assert.equal(handCard.correctIndex, 0)
 assert.equal(handCard.chapter, 'Optics')
+const handEmptySol = applyHybridPatchToCard(
+  { text: 'Q', adminEdited: true, correctIndex: 0, answerSource: 'from_paper' },
+  { chapter: 'Optics', solution: GOOD_SOLUTION },
+)
+assert.equal(handEmptySol.solution, GOOD_SOLUTION, 'adminEdited with no solution still takes Hybrid AI')
+assert.equal(handEmptySol.solutionSource, 'hybrid_ai')
 const sameAnswerCard = applyHybridPatchToCard(
   { text: 'Q', correctIndex: 1, answerSource: 'unknown' },
   { correctIndex: 1, correctIndices: [], correctInteger: '', correctNumerical: '' },
@@ -741,9 +770,24 @@ assert.equal(officialPyqCardIsFilled({ ...releasedCards[1], chapter: 'C', sectio
 const releasedRequest = hybridFillRequestForQuestion(releasedCards[0], 'jee-advanced')
 assert.equal(releasedRequest.answer_is_official, false, 'a hand-edited card with a released key is still solved by Hybrid AI')
 assert.equal(releasedRequest.answer, '')
-const releasedPatched = applyHybridPatchToCard(releasedCards[0], { correctIndex: 2, solution: GOOD_SOLUTION })
-assert.equal(releasedPatched.correctIndex, 2)
+const releasedPatched = applyHybridPatchToCard(releasedCards[1], { correctIndex: 1, solution: GOOD_SOLUTION })
+assert.equal(releasedPatched.correctIndex, 1)
 assert.equal(releasedPatched.answerSource, 'hybrid_ai')
+assert.equal(releasedPatched.answerKeyReleased, undefined, 'Hybrid AI clears the fake-key release flag')
+assert.equal(officialPyqAnswerKeyIsReleased(releasedPatched), false)
+assert.equal(
+  officialPyqCardIsFilled({
+    ...releasedPatched,
+    chapter: 'C',
+    section: 'S',
+    topic: 'T',
+    toughnessLevel: 3,
+    solution: GOOD_SOLUTION,
+    solutionSource: 'hybrid_ai',
+  }),
+  true,
+  'Hybrid-filled card after a released key counts as filled',
+)
 
 const draftCard = { ...officialB, text: 'S', solution: '**Answer.** (B) Quick eliminations', solutionSource: 'draft' }
 assert.equal(hybridFillRequestForQuestion(draftCard, 'jee-advanced', { source: 'X' }).solution, '', 'a draft is not sent as a solution')
@@ -815,7 +859,8 @@ assert.ok(tagsOnlyParagraph.question_text.startsWith(`Paragraph:\n${PASSAGE}`), 
 
 // A question that cannot be solved as it stands is not asked again (no second paid reply): Gemini names what is
 // missing, tags it incomplete, or sends no answer and no solution. A card already missing its paragraph or
-// named figure is not asked at all. These are listed on their own, not with "needs a look", and nothing is saved.
+// named figure is not asked at all. These are listed on their own, not with "needs a look". Usable tags from
+// an incomplete reply are still saved; a bogus "Incomplete Question" topic is not.
 assert.equal(officialPyqCardMissingText({ text: 'The value of $n$ is ____.', passageRole: 'comprehension_child' }), 'its paragraph is missing')
 assert.equal(officialPyqCardMissingText({ text: 'The current in the circuit shown in the figure is', options: ['1', '2', '3', '4'] }), 'it names a figure but the card has no picture')
 assert.equal(officialPyqCardMissingText({ text: 'The circuit shown in the figure \\includegraphics{https://cdn.mathpix.com/cropped/a.jpg}' }), '')
@@ -848,7 +893,7 @@ globalThis.fetch = async (_url, init) => {
   const body = JSON.parse(init.body)
   incompleteBodies.push(body)
   const reply = body.question_text.startsWith('Gemini says')
-    ? { chapter: 'Matrices & Determinants', topic: 'Determinants', correct_answer: '', step_by_step_solution: '', missing_info: 'the table of values is missing' }
+    ? { chapter: 'Matrices & Determinants', topic: 'Determinants', unit: 'Algebra', toughness_level: '4', correct_answer: '', step_by_step_solution: '', missing_info: 'the table of values is missing' }
     : body.question_text.startsWith('Gemini tags')
       ? { chapter: 'Sequences & Series', topic: 'Incomplete Question', correct_answer: '', step_by_step_solution: '' }
       : body.retry_reason
@@ -873,15 +918,19 @@ assert.match(asksFor('A plain stem')[1].retry_reason, /reads like a hint/)
 assert.deepEqual(incompleteRun.incomplete, [1, 2, 3])
 assert.deepEqual(incompleteRun.needsLook, [])
 assert.deepEqual(incompleteRun.failed, [])
-assert.equal(incompleteRun.filled, 1)
+assert.equal(incompleteRun.filled, 2, 'usable tags from a missing-figure reply are saved, plus the fixed hint question')
+assert.deepEqual(incompleteRun.stillBlank, [2, 3], 'blank-tag list names cards that still need chapter/topic')
 const incompleteSaved = getOfficialPyqPendingPaper(incompletePaper.id).questions
-assert.equal(incompleteSaved[0].chapter, 'General', 'nothing from an incomplete reply is saved')
+assert.equal(incompleteSaved[0].chapter, 'Matrices & Determinants', 'usable tags from an incomplete reply are kept')
+assert.equal(incompleteSaved[0].topic, 'Determinants')
 assert.equal(incompleteSaved[1].topic, undefined, '"Incomplete Question" is never saved as a topic')
+assert.equal(incompleteSaved[1].chapter, 'General')
 assert.equal(incompleteSaved[3].correctInteger, 7)
 assert.match(incompleteSaved[3].solution, /Answer: 7$/)
 
 const fillUi = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/components/OfficialPyqHybridFill.jsx'), 'utf8')
 assert.ok(fillUi.includes('result.incomplete') && fillUi.includes('HYBRID_FILL_INCOMPLETE_NOTE'))
+assert.ok(fillUi.includes('stillBlankNote') && fillUi.includes('Still blank tags'))
 const bankUi = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../src/components/BankHybridFill.jsx'), 'utf8')
 assert.ok(bankUi.includes('result.incomplete') && bankUi.includes('HYBRID_FILL_INCOMPLETE_NOTE'))
 // The per-card buttons ("Ask Hybrid AI for Solution", "Ask Hybrid AI to fill") send the paragraph too.

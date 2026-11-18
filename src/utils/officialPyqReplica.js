@@ -189,6 +189,36 @@ export function answerFieldsFromHybrid(correctAnswer) {
 }
 
 /**
+ * Tags-only patch when Gemini returned chapter/topic but the card cannot be solved yet
+ * (missing figure / missing_info). Returns null when the reply has no usable tags.
+ * @param {object} question
+ * @param {object} filled
+ */
+export function usableHybridTagsOnlyPatch(question, filled) {
+  const f = filled && typeof filled === 'object' ? filled : {}
+  const incompleteTag = /\b(?:incomplete|missing|unreadable|insufficient)\b/i
+  if (incompleteTag.test(`${f.topic ?? ''} ${f.chapter ?? ''}`)) return null
+  const chapter = String(f.chapter ?? '').trim()
+  const topic = String(f.topic ?? '').trim()
+  const unit = String(f.unit || f.section || '').trim()
+  const toughness = String(f.toughness_level ?? '').trim()
+  if (!chapter && !topic && !unit && !toughness) return null
+  if (chapter && /^general$/i.test(chapter) && !topic && !unit) return null
+  const patch = publishedMetaPatchFromHybridFill(question, { ...f, correct_answer: '', step_by_step_solution: '' })
+  if (!patch) return null
+  const q = question && typeof question === 'object' ? question : {}
+  return {
+    ...patch,
+    solution: q.solution,
+    correctIndex: q.correctIndex ?? '',
+    correctIndices: Array.isArray(q.correctIndices) ? q.correctIndices : [],
+    correctInteger: q.correctInteger ?? '',
+    correctNumerical: q.correctNumerical ?? '',
+    matrixAnswerKey: undefined,
+  }
+}
+
+/**
  * Tags, answer, and solution only. Stem, options, and figures are not in this patch.
  * A blank Hybrid field keeps the stored value. A new solution replaces a hint or story.
  * @param {object} question
@@ -346,8 +376,14 @@ export const HYBRID_FILL_PART_SIZE = 2
 /** Paid Gemini replies per question when the reply is weak (hint, essay, off the official answer). */
 export const HYBRID_FILL_TRIES = 2
 
-/** Waits before asking again while Hybrid AI or Gemini is not answering; after the last one the run pauses. */
+/** Waits before asking again while Hybrid AI or Gemini is not answering; after the last one that question is marked failed and the next pair still runs. */
 export const HYBRID_FILL_OUTAGE_WAITS_MS = [5_000, 20_000]
+
+/**
+ * Stop the whole paper only after this many consecutive pairs where Hybrid AI
+ * still did not answer (helper down / quota). One failed pair no longer skips the rest.
+ */
+export const HYBRID_FILL_MAX_OUTAGE_STREAK = 3
 
 const OUTAGE_RE =
   /not running|did not answer in time|failed to fetch|fetch failed|network ?error|resource.?exhausted|quota|rate.?limit|too many requests|\bunavailable\b|overloaded|deadline.?exceeded|try again later|\b(?:429|502|504)\b/i
@@ -422,8 +458,9 @@ export function hybridFillUsageNote(usage) {
  * one request per question, so no request carries a whole paper and times out.
  * A weak reply is asked again once (HYBRID_FILL_TRIES paid replies), then marked for a look.
  * When Hybrid AI or Gemini stops answering, the question waits and is asked again
- * (HYBRID_FILL_OUTAGE_WAITS_MS); if it still does not answer, the run pauses at that question
- * (`row.outage`) instead of running through the rest of the paper with nothing filled.
+ * (HYBRID_FILL_OUTAGE_WAITS_MS); if it still does not answer, that row is `outage` and the
+ * next pair still runs. Only after HYBRID_FILL_MAX_OUTAGE_STREAK consecutive failed pairs
+ * does the run pause (`row.pausedRun`) so a dead helper does not burn the whole paper.
  * Each finished part is handed to `onApplied` before the next part starts.
  * A `tagsOnly` question asks for metatags only, so its solution is never judged or retried.
  * `answerProblem` judges the reply's answer (e.g. it misses the official one); a problem is retried like a weak solution,
@@ -472,7 +509,21 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
         if (next?.usage) usage.push({ ...next.usage, model: next.usage.model || next.model })
         outage = ''
         const cannotSolve = tagsOnly ? '' : incompleteFor(question, next)
-        if (cannotSolve) return { index, skipped: false, needsLook: true, incomplete: cannotSolve, question, patch: null, tagsOnly, usage }
+        if (cannotSolve) {
+          // Still keep usable tags (chapter/topic/…) even when the card cannot be solved yet.
+          const tagsPatch = usableHybridTagsOnlyPatch(question, next)
+          return {
+            index,
+            skipped: false,
+            needsLook: true,
+            incomplete: cannotSolve,
+            question,
+            filled: next,
+            patch: tagsPatch,
+            tagsOnly: true,
+            usage,
+          }
+        }
         const nextProblem = tagsOnly
           ? ''
           : officialPyqSolutionProblem(next?.step_by_step_solution) || answerProblem(question, next)
@@ -503,6 +554,11 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
     return { index, skipped: false, needsLook: Boolean(problem), problem, question, filled, patch, tagsOnly, usage }
   }
 
+  const maxOutageStreak = Math.max(
+    1,
+    Number(hooks.maxOutageStreak) || HYBRID_FILL_MAX_OUTAGE_STREAK,
+  )
+  let outageStreak = 0
   for (let start = 0; start < list.length; start += size) {
     if (hooks.signal?.aborted) break
     const part = []
@@ -512,7 +568,17 @@ export async function fillPaperQuestionByQuestion(questions, fillOne, hooks = {}
       rows.push(row)
       if (onApplied) onApplied(row, rows.slice())
     }
-    if (done.some((row) => row.outage)) break
+    if (done.some((row) => row.outage)) {
+      outageStreak += 1
+      if (outageStreak >= maxOutageStreak) {
+        for (const row of done) {
+          if (row.outage) row.pausedRun = true
+        }
+        break
+      }
+    } else {
+      outageStreak = 0
+    }
   }
   return rows
 }

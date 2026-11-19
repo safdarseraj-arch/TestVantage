@@ -1,6 +1,8 @@
 """Compare Official PYQ cards with the original paper page (Gemini vision).
 
 Original files live in data/official_pyq_originals/ (not served publicly).
+On attach, hatch watermarks are washed and the cleaned pages are what See original
+and crops use; the raw upload is kept as ``{id}.raw.*`` for PDF text-layer locate.
 Admin crops of original pages live in data/official_pyq_crops/ and are served as question pictures.
 Nothing here rewrites a question. Gemini only reports differences and may
 suggest a correction copied from the page; the admin decides. Drawings in a
@@ -217,6 +219,7 @@ def _write_meta(paper_id: str, meta: dict[str, Any]) -> None:
 
 
 def _original_file(paper_id: str) -> Path | None:
+    """Washed original used for See original / crops (hatch stamps already removed when saved)."""
     safe = _safe_id(paper_id)
     for suffix in (".pdf", *_IMAGE_SUFFIXES.keys()):
         path = ORIGINALS_DIR / f"{safe}{suffix}"
@@ -225,7 +228,67 @@ def _original_file(paper_id: str) -> Path | None:
     return None
 
 
+def _raw_original_file(paper_id: str) -> Path | None:
+    """Unwashed upload kept for PDF text-layer page find. Falls back to the washed file."""
+    safe = _safe_id(paper_id)
+    for suffix in (".pdf", *_IMAGE_SUFFIXES.keys()):
+        path = ORIGINALS_DIR / f"{safe}.raw{suffix}"
+        if path.exists():
+            return path
+    return _original_file(paper_id)
+
+
+def _clear_paper_files(paper_id: str, *, institute: bool = False) -> None:
+    safe = _safe_id(paper_id)
+    folder = _institute_dir() if institute else ORIGINALS_DIR
+    folder.mkdir(parents=True, exist_ok=True)
+    for suffix in (".pdf", *_IMAGE_SUFFIXES.keys()):
+        (folder / f"{safe}{suffix}").unlink(missing_ok=True)
+        (folder / f"{safe}.raw{suffix}").unlink(missing_ok=True)
+
+
+def _washed_document_bytes(data: bytes, *, is_pdf: bool) -> tuple[bytes, int, str]:
+    """Wash hatch watermarks from every page, then return (bytes, page_count, kind).
+
+    PDFs stay PDFs (image pages at crop DPI, same point size). Single images stay PNG.
+    Future crops cut from this file so hatch stamps never reappear.
+    """
+    open_kw = {"stream": data, "filetype": "pdf"} if is_pdf else {"stream": data}
+    with fitz.open(**open_kw) as src:
+        pages = int(src.page_count or 0)
+        if pages < 1:
+            raise ValueError("That file has no pages.")
+        if not is_pdf and pages == 1:
+            pix = src[0].get_pixmap(alpha=False)
+            if pix.n > 3:
+                pix = fitz.Pixmap(fitz.csRGB, pix)
+            return _pixmap_png_washed(pix), 1, "image"
+        out = fitz.open()
+        try:
+            scale = _CROP_DPI / 72.0
+            for index in range(pages):
+                page = src[index]
+                rect = page.rect
+                pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+                if pix.n > 3:
+                    pix = fitz.Pixmap(fitz.csRGB, pix)
+                try:
+                    _lighten_crop_watermark(pix)
+                except Exception:
+                    logger.debug("Page watermark wash skipped", exc_info=True)
+                new_page = out.new_page(width=rect.width, height=rect.height)
+                new_page.insert_image(new_page.rect, stream=pix.tobytes("png"))
+            return out.tobytes(deflate=True, garbage=3), pages, "pdf"
+        finally:
+            out.close()
+
+
 def save_original(paper_id: str, filename: str, data: bytes) -> dict[str, Any]:
+    """Store the original paper for See original / crops, washed of hatch watermarks when possible.
+
+    The raw upload is kept as ``{id}.raw.*`` so PDF text-layer page find still works; the file
+    used for viewing and cropping is the washed copy so future crops stay clean.
+    """
     suffix = Path(filename or "").suffix.lower()
     is_pdf = suffix == ".pdf" or data[:5] == b"%PDF-"
     if is_pdf:
@@ -242,12 +305,31 @@ def save_original(paper_id: str, filename: str, data: bytes) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001 - surface a plain message
             raise ValueError("That PDF could not be opened.") from exc
     ORIGINALS_DIR.mkdir(parents=True, exist_ok=True)
-    old = _original_file(paper_id)
-    if old is not None:
-        old.unlink(missing_ok=True)
-    dest = ORIGINALS_DIR / f"{_safe_id(paper_id)}{suffix}"
-    dest.write_bytes(data)
-    _write_meta(paper_id, {"file_name": filename, "kind": "pdf" if is_pdf else "image", "pages": pages})
+    safe = _safe_id(paper_id)
+    _clear_paper_files(paper_id)
+    raw_dest = ORIGINALS_DIR / f"{safe}.raw{suffix}"
+    raw_dest.write_bytes(data)
+    washed = False
+    kind = "pdf" if is_pdf else "image"
+    dest_suffix = suffix
+    try:
+        washed_bytes, pages, kind = _washed_document_bytes(data, is_pdf=is_pdf)
+        dest_suffix = ".pdf" if kind == "pdf" else ".png"
+        (ORIGINALS_DIR / f"{safe}{dest_suffix}").write_bytes(washed_bytes)
+        washed = True
+    except Exception:
+        logger.exception("Original watermark wash failed; storing the upload as-is for %s", safe)
+        (ORIGINALS_DIR / f"{safe}{suffix}").write_bytes(data)
+        dest_suffix = suffix
+    _write_meta(
+        paper_id,
+        {
+            "file_name": filename,
+            "kind": kind,
+            "pages": pages,
+            "watermark_washed": washed,
+        },
+    )
     return original_status(paper_id)
 
 
@@ -262,6 +344,7 @@ def original_status(paper_id: str) -> dict[str, Any]:
         "pages": int(meta.get("pages") or 1),
         "file_name": meta.get("file_name") or path.name,
         "original_count": meta.get("page_map", {}).get("total_questions"),
+        "watermark_washed": bool(meta.get("watermark_washed")),
         "gemini_key": gemini_key_present(),
     }
 
@@ -274,8 +357,17 @@ def _institute_dir() -> Path:
 
 
 def _institute_file(paper_id: str) -> Path | None:
+    """Washed institute PDF used for figure crops."""
     path = _institute_dir() / f"{_safe_id(paper_id)}.pdf"
     return path if path.exists() else None
+
+
+def _raw_institute_file(paper_id: str) -> Path | None:
+    """Unwashed institute upload for text extract. Falls back to the washed file."""
+    path = _institute_dir() / f"{_safe_id(paper_id)}.raw.pdf"
+    if path.exists():
+        return path
+    return _institute_file(paper_id)
 
 
 def _institute_meta_path(paper_id: str) -> Path:
@@ -296,7 +388,11 @@ def _write_institute_meta(paper_id: str, meta: dict[str, Any]) -> None:
 
 
 def save_institute(paper_id: str, filename: str, institute: str, data: bytes) -> dict[str, Any]:
-    """A coaching institute's solutions PDF, kept beside the original as a second reference."""
+    """A coaching institute's solutions PDF, kept beside the original as a second reference.
+
+    Hatch watermarks are washed on save so solution figure crops stay clean; the raw PDF is
+    kept as ``{id}.raw.pdf`` for text extract / answer matching.
+    """
     name = re.sub(r"\s+", " ", str(institute or "")).strip()[:80]
     if not name:
         raise ValueError("Type the institute name (for example Allen or Resonance).")
@@ -310,8 +406,21 @@ def save_institute(paper_id: str, filename: str, institute: str, data: bytes) ->
     except Exception as exc:  # noqa: BLE001 - surface a plain message
         raise ValueError("That PDF could not be opened.") from exc
     _institute_dir().mkdir(parents=True, exist_ok=True)
-    (_institute_dir() / f"{_safe_id(paper_id)}.pdf").write_bytes(data)
-    _write_institute_meta(paper_id, {"file_name": filename, "institute": name, "pages": pages})
+    safe = _safe_id(paper_id)
+    _clear_paper_files(paper_id, institute=True)
+    (_institute_dir() / f"{safe}.raw.pdf").write_bytes(data)
+    washed = False
+    try:
+        washed_bytes, pages, _kind = _washed_document_bytes(data, is_pdf=True)
+        (_institute_dir() / f"{safe}.pdf").write_bytes(washed_bytes)
+        washed = True
+    except Exception:
+        logger.exception("Institute watermark wash failed; storing the upload as-is for %s", safe)
+        (_institute_dir() / f"{safe}.pdf").write_bytes(data)
+    _write_institute_meta(
+        paper_id,
+        {"file_name": filename, "institute": name, "pages": pages, "watermark_washed": washed},
+    )
     return institute_status(paper_id)
 
 
@@ -324,12 +433,13 @@ def institute_status(paper_id: str) -> dict[str, Any]:
         "institute": meta.get("institute") or "",
         "file_name": meta.get("file_name") or "",
         "pages": int(meta.get("pages") or 1),
+        "watermark_washed": bool(meta.get("watermark_washed")),
     }
 
 
 def institute_pdf_text(paper_id: str, *, max_pages: int = 120) -> dict[str, Any]:
     """Plain text of the stored institute solutions PDF (PyMuPDF). Browser PDF.js often misses FIITJEE pages."""
-    path = _institute_file(paper_id)
+    path = _raw_institute_file(paper_id)
     if path is None:
         raise OriginalMissingError(INSTITUTE_MISSING_MESSAGE)
     try:
@@ -487,12 +597,19 @@ async def page_map(paper_id: str) -> dict[str, Any]:
 
 
 def _render_pages(path: Path, pages: list[int]) -> list[tuple[bytes, str]]:
+    """Page pictures for See original / Compare. Wash hatch again so older unwashed uploads stay clean."""
     out: list[tuple[bytes, str]] = []
     with fitz.open(str(path)) as doc:
         scale = _RENDER_DPI / 72.0
         for page_no in pages:
             if 1 <= page_no <= doc.page_count:
-                pix = doc[page_no - 1].get_pixmap(matrix=fitz.Matrix(scale, scale))
+                pix = doc[page_no - 1].get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+                if pix.n > 3:
+                    pix = fitz.Pixmap(fitz.csRGB, pix)
+                try:
+                    _lighten_crop_watermark(pix)
+                except Exception:
+                    logger.debug("Page render watermark wash skipped", exc_info=True)
                 out.append((pix.tobytes("jpeg", jpg_quality=88), "image/jpeg"))
     return out
 
@@ -518,9 +635,10 @@ def locate_question_local(
     paper_id: str, number: int, card_text: str, occurrence: int = 0, same_number_count: int = 1
 ) -> dict[str, Any]:
     """Pages for "Show original page": PDF text layer, else a page map already saved. No Gemini."""
-    path = _original_file(paper_id)
-    if path is None:
+    view = _original_file(paper_id)
+    if view is None:
         return {"available": False, "message": ORIGINAL_MISSING_MESSAGE, "pages": [], "page_count": 0}
+    path = _raw_original_file(paper_id) or view
     if path.suffix != ".pdf":
         return {"available": True, "kind": "image", "pages": [1], "page_count": 1, "found_by": "image"}
     with fitz.open(str(path)) as doc:
@@ -547,7 +665,11 @@ def render_original_page(paper_id: str, page: int) -> tuple[bytes, str]:
     if path is None:
         raise OriginalMissingError(ORIGINAL_MISSING_MESSAGE)
     if path.suffix != ".pdf":
-        return path.read_bytes(), _IMAGE_SUFFIXES[path.suffix]
+        raw = path.read_bytes()
+        try:
+            return _picture_png(raw), "image/png"
+        except Exception:
+            return raw, _IMAGE_SUFFIXES[path.suffix]
     with fitz.open(str(path)) as doc:
         if not 1 <= page <= doc.page_count:
             raise ValueError(f"Page {page} is not in the original paper (1-{doc.page_count}).")
@@ -602,7 +724,7 @@ def _labels_layout(labels: list[tuple[int, float, float]]) -> str:
 def option_layouts(paper_id: str) -> dict[str, Any]:
     """How the original paper lays out each question's options (A)-(D). Local PDF text layer only; no Gemini.
     Questions are keyed by printed number and its n-th appearance (numbering restarts per subject)."""
-    path = _original_file(paper_id)
+    path = _raw_original_file(paper_id)
     if path is None or path.suffix != ".pdf":
         return {"available": False, "questions": [], "counts": {}}
     meta = _read_meta(paper_id)
@@ -1525,8 +1647,10 @@ async def compare_question(body: dict[str, Any]) -> dict[str, Any]:
     number = int(body.get("printed_number") or body.get("go_to") or 0)
     if path.suffix == ".pdf":
         find_text = f"{body.get('passage_text') or ''}\n{body.get('card_text') or ''}"
+        # Text-layer locate uses the raw upload; page pictures use the washed file.
+        locate_path = _raw_original_file(paper_id) or path
         pages = await _pages_for_question(
-            path,
+            locate_path,
             paper_id,
             number,
             find_text,

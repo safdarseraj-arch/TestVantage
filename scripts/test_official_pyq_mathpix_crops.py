@@ -112,4 +112,26 @@ with tempfile.TemporaryDirectory() as tmp:
         washed.pixel(0, 0)[:3] == (255, 255, 255) and washed.pixel(3, 3)[:3] == (20, 20, 20),
     )
 
+    # Attach original: wash on save so See original / future crops never reintroduce hatch.
+    stamped = fitz.open()
+    stamped_page = stamped.new_page(width=200, height=200)
+    stamped_page.draw_rect(fitz.Rect(0, 0, 200, 200), color=(0.6, 0.6, 0.6), fill=(0.6, 0.6, 0.6))
+    stamped_page.insert_text((40, 100), "Q.1", fontsize=24, color=(0, 0, 0))
+    stamped_bytes = stamped.tobytes()
+    stamped.close()
+    status = opc.save_original("opyq-wash-save", "hatch.pdf", stamped_bytes)
+    check("save_original reports watermark_washed", status.get("watermark_washed") is True)
+    raw_path = opc._raw_original_file("opyq-wash-save")
+    view_path = opc._original_file("opyq-wash-save")
+    check("raw upload kept beside washed view file", raw_path is not None and view_path is not None and raw_path != view_path)
+    check("raw file still has the upload bytes", raw_path.read_bytes() == stamped_bytes)
+    crop = opc.crop_original_page("opyq-wash-save", 1, {"x0": 0.1, "y0": 0.1, "x1": 0.9, "y1": 0.9})
+    crop_pix = fitz.Pixmap(opc.read_crop(crop["name"]))
+    # Mid-gray fill should be gone on the washed source (and crop wash).
+    corner = crop_pix.pixel(2, 2)[:3]
+    check(
+        "crop from saved original no longer shows mid-gray hatch",
+        corner[0] >= 250 and corner[1] >= 250 and corner[2] >= 250,
+    )
+
 print("\nAll Mathpix crop tests passed")

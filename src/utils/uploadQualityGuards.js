@@ -196,6 +196,8 @@ export function storedCardMissesOcrFix(q, source) {
 }
 
 export function healUploadQuestionCard(q, rawSource, map) {
+  // Keep admin page-crops / rebuilt match tables; OCR heal was wiping them with SMILES.
+  if (q?.adminEdited === true) return q
   const source = scanOf(rawSource)
   return applyStoredOcrCardFixes(
     enrichMatchListsFromOcr(healBaseCard(q, source, map), source),

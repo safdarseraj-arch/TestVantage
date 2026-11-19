@@ -93,10 +93,29 @@ function cdnFiguresByMarker(source) {
 }
 
 /**
+ * Four OCR option bodies are useful only when at least two differ.
+ * FIITJEE bond-line MCQs (Q75) often OCR every option as the same SMILES while the
+ * page crops are the real distinct drawings — swapping then makes "two options the same".
+ * @param {Map<string, string>} bodies
+ * @param {number} count
+ */
+function ocrOptionBodiesAreDistinct(bodies, count = 4) {
+  const vals = []
+  for (let i = 0; i < count; i += 1) {
+    const v = bodies.get(String(i + 1)) || bodies.get(String.fromCharCode(65 + i))
+    if (v) vals.push(String(v).replace(/\s+/g, ''))
+  }
+  // Every option body must differ. Size >= 2 still lets Q63's paired rings
+  // (iodo / hydroxy twice each) wipe four good page crops with duplicate SMILES.
+  return vals.length >= count && new Set(vals).size === vals.length
+}
+
+/**
  * Replace clubbed / tall original option crops with SMILES (or Mathpix CDN crops) from OCR.
- * When every option is an original crop and OCR still has four numbered SMILES (Q63/Q71/Q79)
- * or four numbered CDN figures (Q39 circuits), prefer those — loose Gemini boxes often glue
- * stem text / hatch into the crop.
+ * When every option is an original crop and OCR still has four *distinct* numbered SMILES
+ * (Q63/Q71/Q79) or four numbered CDN figures (Q39 circuits), prefer those — loose Gemini
+ * boxes often glue stem text / hatch into the crop. Identical OCR SMILES never win over
+ * page crops (washed FIITJEE structure options).
  * @template {Record<string, any>} T
  * @param {T} q
  * @param {unknown} source
@@ -116,7 +135,9 @@ export function preferOcrSmilesOverBadOptionCrops(q, source) {
   const fourNumbered =
     allOriginalCrops &&
     opts.length >= 4 &&
-    [1, 2, 3, 4].every((n) => bodies.has(String(n)))
+    [1, 2, 3, 4].every((n) => bodies.has(String(n))) &&
+    ocrOptionBodiesAreDistinct(bodies, opts.length)
+  const distinctOcr = ocrOptionBodiesAreDistinct(bodies, opts.length)
   let changed = false
   const next = opts.map((opt, i) => {
     const url = optionCropUrl(opt)
@@ -124,6 +145,9 @@ export function preferOcrSmilesOverBadOptionCrops(q, source) {
     const fromLetter = bodies.get(String.fromCharCode(65 + i))
     const body = fromNum || fromLetter
     if (!body) return opt
+    // Identical OCR SMILES/CDN bodies never beat a page crop — even a slightly wide
+    // option box — or every FIITJEE structure option collapses to one drawing.
+    if (!distinctOcr && isOriginalCropUrl(url)) return opt
     if (fourNumbered || looksLikeBadOptionCrop(url)) {
       changed = true
       return body

@@ -35,10 +35,17 @@ export function officialPyqCardAsShown(q, rawSourceText = '') {
   try {
     if (q?.adminEdited === true) {
       healed = peelOfficialPyqCardForDisplay(q, '')
-      const printed = Number(q?.printedNumber ?? q?.questionNumber)
-      const nextText = restoreMissingFiguresFromSource(healed?.text ?? q?.text, sourceText, printed)
-      if (nextText !== String(healed?.text ?? '')) {
-        healed = { ...healed, text: nextText }
+      const optionFigs = (Array.isArray(healed?.options) ? healed.options : []).filter((o) =>
+        /\\includegraphics|!\[[^\]]*\]\(|<smiles>/i.test(String(o ?? '')),
+      ).length
+      // When options already hold the drawings (Q75 bond-line crops), do not pull a neighbouring
+      // OCR figure into the stem — that pasted the wrong reaction scheme above the options.
+      if (optionFigs < 2) {
+        const printed = Number(q?.printedNumber ?? q?.questionNumber)
+        const nextText = restoreMissingFiguresFromSource(healed?.text ?? q?.text, sourceText, printed)
+        if (nextText !== String(healed?.text ?? '')) {
+          healed = { ...healed, text: nextText }
+        }
       }
       // Figure restore can copy option drawings into the stem; peel when options already hold them.
       healed = restoreLabelledFigureOptions(healed, sourceText)

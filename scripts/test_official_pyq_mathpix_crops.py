@@ -102,20 +102,38 @@ with tempfile.TemporaryDirectory() as tmp:
     again = opc.keep_mathpix_pictures([bank], fetch=fake_fetch)
     check("a link with a local copy is not downloaded again", again["kept"] == [bank] and not asked)
 
-    # Mid-gray hatch (FIITJEE-style) must wash toward white before split / review.
-    hatch = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 8, 8), False)
-    hatch.set_rect(hatch.irect, (150, 150, 150))
-    hatch.set_rect(fitz.IRect(2, 2, 6, 6), (20, 20, 20))  # real ink stays
+    # Pale hatch / stipple washes away; connected mid-gray bond strokes stay.
+    hatch = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 32, 32), False)
+    hatch.set_rect(hatch.irect, (230, 230, 230))
+    hatch.set_rect(fitz.IRect(8, 8, 24, 24), (20, 20, 20))  # solid ink block
+    hatch.set_rect(fitz.IRect(0, 28, 32, 30), (170, 170, 170))  # long pale bond stroke
+    # Stipple hatch dots (FIITJEE stamp) — tiny components must vanish.
+    for x, y in ((1, 1), (3, 2), (5, 1), (28, 3), (30, 5), (2, 14), (29, 14)):
+        hatch.set_rect(fitz.IRect(x, y, x + 1, y + 1), (150, 150, 150))
+    hatch.set_rect(fitz.IRect(26, 0, 28, 2), (208, 208, 208))
     washed = fitz.Pixmap(opc._picture_png(hatch.tobytes("png")))
     check(
-        "watermark wash clears mid-gray hatch before split",
-        washed.pixel(0, 0)[:3] == (255, 255, 255) and washed.pixel(3, 3)[:3] == (20, 20, 20),
+        "watermark wash clears pale hatch before split",
+        washed.pixel(0, 0)[:3] == (255, 255, 255) and washed.pixel(12, 12)[:3] == (20, 20, 20),
+    )
+    check(
+        "watermark wash keeps pale bond / structure strokes",
+        washed.pixel(10, 29)[:3] == (170, 170, 170),
+    )
+    check(
+        "watermark wash clears mid-pale hatch away from ink",
+        washed.pixel(27, 0)[:3] == (255, 255, 255),
+    )
+    check(
+        "watermark wash clears stipple hatch dots",
+        washed.pixel(1, 1)[:3] == (255, 255, 255) and washed.pixel(30, 5)[:3] == (255, 255, 255),
     )
 
     # Attach original: wash on save so See original / future crops never reintroduce hatch.
     stamped = fitz.open()
     stamped_page = stamped.new_page(width=200, height=200)
-    stamped_page.draw_rect(fitz.Rect(0, 0, 200, 200), color=(0.6, 0.6, 0.6), fill=(0.6, 0.6, 0.6))
+    # ~0.90 ≈ RGB 230 — pale hatch only; mid-gray fills are treated as ink and kept.
+    stamped_page.draw_rect(fitz.Rect(0, 0, 200, 200), color=(0.90, 0.90, 0.90), fill=(0.90, 0.90, 0.90))
     stamped_page.insert_text((40, 100), "Q.1", fontsize=24, color=(0, 0, 0))
     stamped_bytes = stamped.tobytes()
     stamped.close()
@@ -127,10 +145,10 @@ with tempfile.TemporaryDirectory() as tmp:
     check("raw file still has the upload bytes", raw_path.read_bytes() == stamped_bytes)
     crop = opc.crop_original_page("opyq-wash-save", 1, {"x0": 0.1, "y0": 0.1, "x1": 0.9, "y1": 0.9})
     crop_pix = fitz.Pixmap(opc.read_crop(crop["name"]))
-    # Mid-gray fill should be gone on the washed source (and crop wash).
+    # Light hatch fill should be gone on the washed source (and crop wash).
     corner = crop_pix.pixel(2, 2)[:3]
     check(
-        "crop from saved original no longer shows mid-gray hatch",
+        "crop from saved original no longer shows light hatch",
         corner[0] >= 250 and corner[1] >= 250 and corner[2] >= 250,
     )
 

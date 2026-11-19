@@ -332,6 +332,56 @@ assert.equal(
   'Q39 swaps clubbed paper crops for Mathpix CDN option figures',
 )
 
+// Q75: OCR prints the same SMILES four times; keep distinct page crops (do not collapse options).
+const { preferOcrSmilesOverBadOptionCrops } = await import('../src/utils/restorePyqOptionFiguresFromOcr.js')
+const q75Ocr = [
+  'Bond line formula of $\\mathrm{HOCH}(\\mathrm{CN})_{2}$ is',
+  '(1)',
+  '<smiles>N#CC(O)C#N</smiles>',
+  '(2)',
+  '<smiles>N#CC(O)C#N</smiles>',
+  '(3)',
+  '<smiles>N#CC(O)C#N</smiles>',
+  '(4)',
+  '<smiles>N#CC(O)C#N</smiles>',
+  'Ans. (3)',
+].join('\n')
+const q75Crops = [
+  '\\includegraphics{/api/official-pyq/original/crops/q75-a.png?page=32&x0=0.2090&y0=0.7093&x1=0.3232&y1=0.7798}',
+  '\\includegraphics{/api/official-pyq/original/crops/q75-b.png?page=32&x0=0.5690&y0=0.7147&x1=0.7086&y1=0.7753}',
+  '\\includegraphics{/api/official-pyq/original/crops/q75-c.png?page=32&x0=0.2065&y0=0.7847&x1=0.3098&y1=0.8544}',
+  '\\includegraphics{/api/official-pyq/original/crops/q75-d.png?page=32&x0=0.5690&y0=0.7890&x1=0.7086&y1=0.8544}',
+]
+const q75Kept = preferOcrSmilesOverBadOptionCrops(
+  {
+    text: 'Bond line formula of $\\mathrm{HOCH}(\\mathrm{CN})_{2}$ is',
+    options: q75Crops,
+    printedNumber: 75,
+  },
+  q75Ocr,
+)
+assert.deepEqual(q75Kept.options, q75Crops, 'Q75 keeps page crops when OCR SMILES are identical')
+const q75Shown = officialPyqCardAsShown(
+  {
+    text: 'Bond line formula of $\\mathrm{HOCH}(\\mathrm{CN})_{2}$ is',
+    options: q75Crops,
+    questionType: 'single_correct',
+    printedNumber: 75,
+    adminEdited: true,
+  },
+  q75Ocr,
+)
+assert.equal(
+  q75Shown.options.filter((o) => /original\/crops\/q75-/.test(String(o))).length,
+  4,
+  'Q75 asShown still shows the four page crops',
+)
+assert.equal(
+  /cdn\.mathpix|includegraphics/i.test(String(q75Shown.text)),
+  false,
+  'Q75 stem stays prose-only when options already hold the drawings',
+)
+
 // Q78: bare stem crop → cyclohexene SMILES, not an earlier enol SMILES from a wide OCR window.
 const q78Ocr = [
   'Highest enol content will be shown by:',

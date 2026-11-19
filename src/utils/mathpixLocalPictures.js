@@ -14,7 +14,7 @@ const MATHPIX_CROP_LINK = /^https?:\/\/cdn\.mathpix\.com\/cropped\/[A-Za-z0-9._~
 const MATHPIX_CROP_LINKS_RE = /https?:\/\/cdn\.mathpix\.com\/cropped\/[^\s)}"'<>\]]+/gi
 const LINKS_PER_REQUEST = 200
 /** Bump when crop wash / serve headers change so browsers drop old immutable hatch caches. */
-const ORIGINAL_CROP_WASH_QUERY = 'wash=2'
+const ORIGINAL_CROP_WASH_QUERY = 'wash=5'
 /** Links the helper already answered for in this session (kept, saved, or gone). */
 const keptThisSession = new Set()
 let storedSweepDone = false

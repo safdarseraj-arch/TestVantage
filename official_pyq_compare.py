@@ -54,6 +54,14 @@ _LAYOUT_REVISION = 2
 _LAYOUT_Y_TOLERANCE = 4.0
 _LAYOUT_X_TOLERANCE = 6.0
 _QUESTION_MARKER_RE = re.compile(r"^Q\.?(\d{1,3})$")
+# FIITJEE solutions booklets print "*87." / "87." (and official papers print "Q.87").
+_FIITJEE_QUESTION_START_RE = re.compile(
+    r"(?m)^\s*(?P<star>\*{1,2}\s*)?(?:Q\.?\s*(?P<qnum>\d{1,3})\b|(?P<num>\d{1,3})\s*[.)])(?=\s|$)"
+)
+_INSTRUCTION_QUESTIONISH_RE = re.compile(
+    r"(?i)^\s*\*?\d+\.\s+(?:The test|This test paper|Please read|Important Instructions|"
+    r"Each subject|Maximum Marks|You are allotted|The question paper|This section contains)"
+)
 _OPTION_WORD_RE = re.compile(r"^\(([A-D])\)")
 
 ORIGINAL_MISSING_MESSAGE = "Original paper not available for this paper"
@@ -218,6 +226,40 @@ def _write_meta(paper_id: str, meta: dict[str, Any]) -> None:
     _meta_path(paper_id).write_text(json.dumps(meta), encoding="utf-8")
 
 
+def _ensure_washed_original_from_raw(paper_id: str) -> Path | None:
+    """If the washed view file is missing but ``.raw`` exists, rebuild it with soft wash."""
+    safe = _safe_id(paper_id)
+    raw = None
+    for suffix in (".pdf", *_IMAGE_SUFFIXES.keys()):
+        candidate = ORIGINALS_DIR / f"{safe}.raw{suffix}"
+        if candidate.exists():
+            raw = candidate
+            break
+    if raw is None:
+        return None
+    try:
+        data = raw.read_bytes()
+        is_pdf = raw.suffix.lower() == ".pdf" or data[:5] == b"%PDF-"
+        washed_bytes, pages, kind = _washed_document_bytes(data, is_pdf=is_pdf)
+        dest_suffix = ".pdf" if kind == "pdf" else ".png"
+        dest = ORIGINALS_DIR / f"{safe}{dest_suffix}"
+        dest.write_bytes(washed_bytes)
+        meta = _read_meta(paper_id)
+        meta.update(
+            {
+                "kind": kind,
+                "pages": pages,
+                "watermark_washed": True,
+                "file_name": meta.get("file_name") or raw.name.replace(".raw", ""),
+            }
+        )
+        _write_meta(paper_id, meta)
+        return dest
+    except Exception:
+        logger.exception("Could not rebuild washed original from raw for %s", safe)
+        return None
+
+
 def _original_file(paper_id: str) -> Path | None:
     """Washed original used for See original / crops (hatch stamps already removed when saved)."""
     safe = _safe_id(paper_id)
@@ -225,7 +267,7 @@ def _original_file(paper_id: str) -> Path | None:
         path = ORIGINALS_DIR / f"{safe}{suffix}"
         if path.exists():
             return path
-    return None
+    return _ensure_washed_original_from_raw(paper_id)
 
 
 def _raw_original_file(paper_id: str) -> Path | None:
@@ -437,6 +479,29 @@ def institute_status(paper_id: str) -> dict[str, Any]:
     }
 
 
+def original_pdf_text(paper_id: str, *, max_pages: int = 120) -> dict[str, Any]:
+    """Plain text of the stored original PDF (prefer raw upload). Used to heal missed FIITJEE questions."""
+    path = _raw_original_file(paper_id)
+    if path is None:
+        raise OriginalMissingError(ORIGINAL_MISSING_MESSAGE)
+    try:
+        with fitz.open(path) as doc:
+            limit = min(int(doc.page_count or 0), max(1, int(max_pages or 120)))
+            parts = [(doc[i].get_text("text") or "").strip() for i in range(limit)]
+            pages = int(doc.page_count or 0)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError("That original PDF could not be read.") from exc
+    text = "\n\n".join(p for p in parts if p).strip()
+    meta = _read_meta(paper_id)
+    return {
+        "text": text,
+        "pages": pages,
+        "chars": len(text),
+        "file_name": meta.get("file_name") or path.name,
+        "watermark_washed": bool(meta.get("watermark_washed")),
+    }
+
+
 def institute_pdf_text(paper_id: str, *, max_pages: int = 120) -> dict[str, Any]:
     """Plain text of the stored institute solutions PDF (PyMuPDF). Browser PDF.js often misses FIITJEE pages."""
     path = _raw_institute_file(paper_id)
@@ -492,9 +557,42 @@ def _with_next_page(page: int, page_count: int) -> list[int]:
 def _nth_start_page(starts: list[int], occurrence: int, same_number_count: int) -> int:
     """Page of the n-th question with this printed number (restart numbering: one per subject).
     0 when the paper does not show exactly as many starts as there are cards with this number."""
-    if same_number_count < 1 or len(starts) != same_number_count or occurrence >= len(starts):
+    if same_number_count < 1 or occurrence >= len(starts):
+        return 0
+    # Continuous papers (one card per number): take the occurrence-th real start even when
+    # a false header match left an extra page in the list.
+    if same_number_count == 1:
+        return starts[occurrence] if occurrence < len(starts) else 0
+    if len(starts) != same_number_count:
         return 0
     return starts[occurrence]
+
+
+def _marker_pages_for_number(doc: fitz.Document, number: int) -> list[int]:
+    """Pages where printed question ``number`` starts. Prefers FIITJEE ``*N.`` / ``Q.N`` over bare ``N.``;
+    skips instruction lines like ``1. The test is of 3 hours``.
+    """
+    strong: list[int] = []
+    weak: list[int] = []
+    for index in range(doc.page_count):
+        text = doc[index].get_text("text") or ""
+        if len(text.strip()) < 40:
+            continue
+        for match in _FIITJEE_QUESTION_START_RE.finditer(text):
+            n = int(match.group("qnum") or match.group("num") or 0)
+            if n != number:
+                continue
+            line_end = text.find("\n", match.start())
+            line = text[match.start() : line_end if line_end >= 0 else match.start() + 120]
+            if _INSTRUCTION_QUESTIONISH_RE.match(line):
+                continue
+            page = index + 1
+            if match.group("star") or match.group("qnum"):
+                if page not in strong:
+                    strong.append(page)
+            elif page not in weak and page not in strong:
+                weak.append(page)
+    return strong or weak
 
 
 def _text_layer_pages(
@@ -510,16 +608,14 @@ def _text_layer_pages(
     only counts with enough words; otherwise the n-th printed number is used."""
     words = set(_prose_words(card_text)[:40])
     enough_words = len(words) >= _MIN_MATCH_WORDS
-    marker = re.compile(rf"(?m)^\s*(?:Q\.?\s*{number}\b|{number}\s*[.)]\s)")
-    marker_pages: list[int] = []
+    marker_pages = _marker_pages_for_number(doc, number)
+    marker_set = set(marker_pages)
     best_page, best_score = 0, 0.0
     for index in range(doc.page_count):
         text = doc[index].get_text("text") or ""
         if len(text.strip()) < 40:
             continue
-        has_marker = bool(marker.search(text))
-        if has_marker:
-            marker_pages.append(index + 1)
+        has_marker = (index + 1) in marker_set
         if not enough_words:
             continue
         page_words = set(_prose_words(text))
@@ -596,8 +692,12 @@ async def page_map(paper_id: str) -> dict[str, Any]:
     return mapped
 
 
-def _render_pages(path: Path, pages: list[int]) -> list[tuple[bytes, str]]:
-    """Page pictures for See original / Compare. Wash hatch again so older unwashed uploads stay clean."""
+def _render_pages(path: Path, pages: list[int], *, wash: bool = True) -> list[tuple[bytes, str]]:
+    """Page pictures for See original / Compare.
+
+    Optional hatch wash for older unwashed uploads. Prefer ``wash=False`` when the stored
+    file was already washed on save — a second pass used to bleach chemistry option drawings.
+    """
     out: list[tuple[bytes, str]] = []
     with fitz.open(str(path)) as doc:
         scale = _RENDER_DPI / 72.0
@@ -606,10 +706,11 @@ def _render_pages(path: Path, pages: list[int]) -> list[tuple[bytes, str]]:
                 pix = doc[page_no - 1].get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
                 if pix.n > 3:
                     pix = fitz.Pixmap(fitz.csRGB, pix)
-                try:
-                    _lighten_crop_watermark(pix)
-                except Exception:
-                    logger.debug("Page render watermark wash skipped", exc_info=True)
+                if wash:
+                    try:
+                        _lighten_crop_watermark(pix)
+                    except Exception:
+                        logger.debug("Page render watermark wash skipped", exc_info=True)
                 out.append((pix.tobytes("jpeg", jpg_quality=88), "image/jpeg"))
     return out
 
@@ -697,9 +798,14 @@ def _reading_order_words(doc: fitz.Document) -> list[tuple[int, float, float, st
 
 
 def _is_question_marker(word: tuple[int, float, float, str], page_width: float) -> int:
-    match = _QUESTION_MARKER_RE.match(word[3])
+    text = str(word[3] or "")
+    match = _QUESTION_MARKER_RE.match(text)
     if not match:
-        return 0
+        # FIITJEE: "*87." / "87." as a single PDF word.
+        alt = re.match(r"^\*{0,2}(\d{1,3})\.?$", text)
+        if not alt:
+            return 0
+        match = alt
     x = word[1] / (page_width or 1.0)
     return int(match.group(1)) if x < 0.3 or 0.5 <= x < 0.8 else 0
 
@@ -777,8 +883,12 @@ def _crop_box(box: dict[str, Any]) -> tuple[float, float, float, float]:
 
 
 def crop_original_page(paper_id: str, page: int, box: dict[str, Any]) -> dict[str, Any]:
-    """Cut one box (page fractions) out of the original page as a PNG. Copies pixels only; nothing is redrawn."""
-    path = _original_file(paper_id)
+    """Cut one box (page fractions) out of the original page as a PNG. Copies pixels only; nothing is redrawn.
+
+    Prefer the unwashed ``.raw`` upload when present so crop wash sees true hatch stipple
+    (already-washed view files can leave stamp residue that looks like ink).
+    """
+    path = _raw_original_file(paper_id) or _original_file(paper_id)
     if path is None:
         raise OriginalMissingError(ORIGINAL_MISSING_MESSAGE)
     x0, y0, x1, y1 = _crop_box(box)
@@ -798,32 +908,96 @@ def crop_original_page(paper_id: str, page: int, box: dict[str, Any]) -> dict[st
 
 
 def _lighten_crop_watermark(pix: fitz.Pixmap) -> None:
-    """Wash light/mid gray hatch watermarks (FIITJEE diagonal grid) toward white; keep dark ink.
+    """Wash FIITJEE hatch stamps; keep chemistry / circuit strokes.
 
-    Runs on every figure crop *before* it is saved, and again when crops are served, so Mathpix
-    CDN watermarks and original-PDF stamps never show in review / option pictures.
+    The stamp is a stipple of tiny disconnected gray dots (often ~120–180), while bonds and
+    gate lines form large connected strokes. Gray-only thresholds either erase bonds or leave
+    hatch (Q75). Drop small gray connected components, then bleach leftover pale gray.
     """
     if pix.n < 3:
         return
+    w, h, n = pix.width, pix.height, pix.n
     mv = pix.samples_mv
-    step = pix.n
-    for i in range(0, len(mv) - 2, step):
-        r, g, b = mv[i], mv[i + 1], mv[i + 2]
-        mx, mn = max(r, g, b), min(r, g, b)
-        # Keep real ink and coloured pixels; wash gray hatch / stamp toward white.
-        # Allow a little color cast on hatch (scanner / JPEG) — still wash near-gray.
-        if mx - mn > 40 or mn < 58 or mx > 252:
-            continue
-        if mn >= 88:
-            mv[i] = 255
-            mv[i + 1] = 255
-            mv[i + 2] = 255
-        elif mn >= 58:
-            # Lift mid-gray hatch without erasing soft pencil / light print.
-            lift = int((255 - mn) * 0.95)
-            mv[i] = min(255, r + lift)
-            mv[i + 1] = min(255, g + lift)
-            mv[i + 2] = min(255, b + lift)
+    # Gray-ish mid/dark candidates (hatch stipple + strokes). Keep coloured ink always.
+    cand = bytearray(w * h)
+    for y in range(h):
+        row = y * w
+        for x in range(w):
+            i = (row + x) * n
+            r, g, b = mv[i], mv[i + 1], mv[i + 2]
+            mx, mn = max(r, g, b), min(r, g, b)
+            if mx - mn > 36:
+                continue  # colour — leave alone
+            if mn < 200:
+                cand[row + x] = 1
+    # Connected components of candidate gray; keep only sizable strokes.
+    seen = bytearray(w * h)
+    keep = bytearray(w * h)
+    _min_stroke = 18
+    for y0 in range(h):
+        base = y0 * w
+        for x0 in range(w):
+            start = base + x0
+            if not cand[start] or seen[start]:
+                continue
+            stack = [start]
+            seen[start] = 1
+            comp = [start]
+            while stack:
+                cur = stack.pop()
+                cy, cx = divmod(cur, w)
+                for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                    ny, nx = cy + dy, cx + dx
+                    if ny < 0 or ny >= h or nx < 0 or nx >= w:
+                        continue
+                    nxt = ny * w + nx
+                    if cand[nxt] and not seen[nxt]:
+                        seen[nxt] = 1
+                        stack.append(nxt)
+                        comp.append(nxt)
+            if len(comp) >= _min_stroke:
+                for p in comp:
+                    keep[p] = 1
+    # Dilate kept strokes 1px so anti-aliased edges survive the pale bleach.
+    keep2 = bytearray(keep)
+    for y in range(h):
+        for x in range(w):
+            if not keep[y * w + x]:
+                continue
+            for dy in (-1, 0, 1):
+                yy = y + dy
+                if yy < 0 or yy >= h:
+                    continue
+                for dx in (-1, 0, 1):
+                    xx = x + dx
+                    if 0 <= xx < w:
+                        keep2[yy * w + xx] = 1
+    for y in range(h):
+        row = y * w
+        for x in range(w):
+            i = (row + x) * n
+            r, g, b = mv[i], mv[i + 1], mv[i + 2]
+            mx, mn = max(r, g, b), min(r, g, b)
+            if mx - mn > 36:
+                continue
+            idx = row + x
+            # Tiny gray stipple (hatch) — wipe even when fairly dark.
+            if cand[idx] and not keep[idx]:
+                mv[i] = 255
+                mv[i + 1] = 255
+                mv[i + 2] = 255
+                continue
+            if keep2[idx] or mn < 195 or mx > 252:
+                continue
+            if mn >= 205:
+                mv[i] = 255
+                mv[i + 1] = 255
+                mv[i + 2] = 255
+            elif mn >= 195:
+                lift = int((255 - mn) * 0.7)
+                mv[i] = min(255, r + lift)
+                mv[i + 1] = min(255, g + lift)
+                mv[i + 2] = min(255, b + lift)
 
 
 def _pixmap_png_washed(pix: fitz.Pixmap) -> bytes:
@@ -1225,12 +1399,10 @@ def read_crop(name: str) -> bytes:
     path = CROPS_DIR / name
     if not path.is_file():
         raise OriginalMissingError("That cropped picture is not on this computer.")
-    raw = path.read_bytes()
-    # Older crops may still hold hatch stamps; wash on serve so review never shows them.
-    try:
-        return _picture_png(raw)
-    except Exception:
-        return raw
+    # Serve the stored PNG as-is. Crops are washed once when cut from the already-washed
+    # original (or when a Mathpix CDN picture is kept). A second wash on serve bleached
+    # FIITJEE mid-gray bond lines (Q75 option structures) even after soft thresholds.
+    return path.read_bytes()
 
 
 _MAX_FIGURE_BOXES = 12

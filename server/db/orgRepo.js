@@ -1,8 +1,8 @@
 import { getPool, usePostgres } from './pg.js'
 
-const ORG_KEYS = ['schools', 'classes', 'assignments', 'users']
+const ORG_KEYS = ['schools', 'classes', 'assignments', 'users', 'batches', 'invites']
 
-/** @returns {Promise<{ schools: object[], classes: object[], assignments: object[], users: object[], updatedAt: number }>} */
+/** @returns {Promise<{ schools: object[], classes: object[], assignments: object[], users: object[], batches: object[], invites: object[], updatedAt: number }>} */
 export async function loadOrgPg() {
   const p = getPool()
   if (!p) throw new Error('Postgres not configured')
@@ -17,6 +17,8 @@ export async function loadOrgPg() {
     classes: [],
     assignments: [],
     users: [],
+    batches: [],
+    invites: [],
     updatedAt: 0,
   }
 
@@ -27,6 +29,8 @@ export async function loadOrgPg() {
     if (key === 'classes' && Array.isArray(data)) out.classes = data
     if (key === 'assignments' && Array.isArray(data)) out.assignments = data
     if (key === 'users' && Array.isArray(data)) out.users = data
+    if (key === 'batches' && Array.isArray(data)) out.batches = data
+    if (key === 'invites' && Array.isArray(data)) out.invites = data
     out.updatedAt = Math.max(out.updatedAt, Number(row.updated_at) || 0)
   }
 
@@ -34,7 +38,7 @@ export async function loadOrgPg() {
 }
 
 /**
- * @param {{ schools?: object[], classes?: object[], assignments?: object[], users?: object[] }} payload
+ * @param {{ schools?: object[], classes?: object[], assignments?: object[], users?: object[], batches?: object[], invites?: object[] }} payload
  */
 export async function saveOrgPg(payload) {
   const p = getPool()
@@ -47,6 +51,8 @@ export async function saveOrgPg(payload) {
     classes: payload.classes ?? current.classes,
     assignments: payload.assignments ?? current.assignments,
     users: payload.users ?? current.users,
+    batches: payload.batches ?? current.batches,
+    invites: payload.invites ?? current.invites,
     updatedAt: now,
   }
 
@@ -55,6 +61,8 @@ export async function saveOrgPg(payload) {
     ['classes', next.classes],
     ['assignments', next.assignments],
     ['users', next.users],
+    ['batches', next.batches],
+    ['invites', next.invites],
   ]
 
   for (const [key, data] of entries) {

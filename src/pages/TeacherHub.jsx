@@ -7,12 +7,12 @@ import { canAccessMainQuestionBank } from '../utils/teacherQuestionBank.js'
 import { getUserById } from '../utils/users.js'
 import { TEACHER_STANDARDS, TEACHER_SUBJECTS } from '../utils/userProfiles.js'
 import {
-  ENTITLEMENT_LABELS,
   FACULTY_EXAM_SPECIALIZATIONS,
   FACULTY_MODE_LABELS,
   FACULTY_ONBOARDING_MODES,
   facultyModeFromProfile,
   personalVaultBlurb,
+  summarizeEntitlements,
 } from '../utils/facultyWorkbench.js'
 
 const UPLOAD = teacherUploadLinks({ from: 'teacher' })
@@ -22,9 +22,9 @@ const PRIMARY_CARDS = [
     id: 'bank',
     to: '/question-bank?hub=view&view=draft&owner=teacher',
     icon: '📚',
-    title: 'Question bank',
-    desc: 'Filter, organise, and manage questions in your private bank.',
-    cta: 'Open bank',
+    title: 'Personal Vault',
+    desc: 'Your private teacher-owned question bank — portable IP.',
+    cta: 'Open vault',
     perms: [PERMS.UPLOAD_QUESTIONS],
     accent: '#1d4ed8',
   },
@@ -32,7 +32,7 @@ const PRIMARY_CARDS = [
     id: 'upload',
     to: UPLOAD.root,
     icon: '⬆️',
-    title: 'Upload',
+    title: 'Upload to vault',
     desc: 'Add questions from text, image, PDF, Word, CSV, or JSON.',
     cta: 'Upload questions',
     perms: [PERMS.UPLOAD_QUESTIONS],
@@ -115,9 +115,11 @@ export default function TeacherHub() {
   const facultyMode =
     facultyModeFromProfile(profile) || FACULTY_ONBOARDING_MODES.INDEPENDENT
   const entitlements = profile?.entitlements || null
+  const entitlementSummary = summarizeEntitlements(entitlements)
 
   const accessMain = isAdmin || canAccessMainQuestionBank(session)
   const cards = PRIMARY_CARDS.filter((card) => card.perms.some((p) => hasPermission(p)))
+  const showFirstRun = Boolean(profile?.personalVaultOwned) && hasPermission(PERMS.UPLOAD_QUESTIONS)
 
   return (
     <PortalPage
@@ -131,10 +133,7 @@ export default function TeacherHub() {
             Refer &amp; earn
           </Link>
           <Link to="/profile" className="btn btn-ghost btn-sm">
-            Edit profile
-          </Link>
-          <Link to="/profile" className="btn btn-ghost btn-sm">
-            Invite friends
+            Profile &amp; branding
           </Link>
         </>
       }
@@ -172,6 +171,25 @@ export default function TeacherHub() {
         </Link>
       </section>
 
+      {showFirstRun ? (
+        <section className="card teacher-first-run" aria-label="Get started">
+          <h2>Get started in 3 steps</h2>
+          <ol className="teacher-first-run-list">
+            <li>
+              <Link to="/question-bank?hub=view&view=draft&owner=teacher">Open your Personal Vault</Link>
+            </li>
+            <li>
+              <Link to={questionBankUploadUrl({ owner: 'teacher', from: 'teacher' })}>
+                Upload a few questions
+              </Link>
+            </li>
+            <li>
+              <Link to="/create-test?pool=mine">Make a paper from your vault</Link>
+            </li>
+          </ol>
+        </section>
+      ) : null}
+
       <section className="card teacher-workbench-strip" aria-label="Faculty workbench">
         <div className="teacher-workbench-strip-head">
           <h2>Faculty workbench</h2>
@@ -185,6 +203,13 @@ export default function TeacherHub() {
             Campus: <strong>{profile.campusName}</strong>
             {profile.department ? ` · ${profile.department}` : ''}
             {profile.schoolInviteCode ? ` · invite ${profile.schoolInviteCode}` : ''}
+          </p>
+        ) : null}
+        {facultyMode === FACULTY_ONBOARDING_MODES.INDEPENDENT ? (
+          <p className="form-hint">
+            Joining a partner school later? Open{' '}
+            <Link to="/profile">Profile</Link> and switch to <strong>School-invited</strong> with your
+            principal’s code (demo: SCHOOL-DEMO).
           </p>
         ) : null}
         {exams.length ? (
@@ -203,24 +228,29 @@ export default function TeacherHub() {
           </p>
         ) : null}
         {entitlements ? (
-          <ul className="teacher-entitlement-list">
-            {ENTITLEMENT_LABELS.map((row) => (
-              <li key={row.key} className={entitlements[row.key] ? 'is-on' : 'is-off'}>
-                {entitlements[row.key] ? 'On' : 'Off'} — {row.label}
-              </li>
-            ))}
-            <li className="is-on">OCR quota — {entitlements.monthly_ocr_quota ?? 0} pages / month</li>
-          </ul>
+          <>
+            <p className="form-hint">
+              <strong>{entitlementSummary.onLabels.length}</strong> content rights on
+              {entitlementSummary.offCount
+                ? ` · ${entitlementSummary.offCount} locked by plan`
+                : ''}
+              {' · '}
+              OCR quota {entitlementSummary.ocrQuota} pages / month
+            </p>
+            <ul className="teacher-entitlement-list">
+              {entitlementSummary.onLabels.map((label) => (
+                <li key={label} className="is-on">
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </>
         ) : (
           <p className="form-hint">
             Finish <Link to="/onboarding/teacher">faculty onboarding</Link> or update Profile to set
             pathway entitlements.
           </p>
         )}
-        <p className="form-hint">
-          Personal Vault = your private question bank below. School Shared Bank and System QB PDF
-          export unlock with school plan / admin flags.
-        </p>
       </section>
 
       {!accessMain && hasPermission(PERMS.UPLOAD_QUESTIONS) ? (

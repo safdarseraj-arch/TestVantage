@@ -12,8 +12,13 @@ import FeesPanel from '../components/school/FeesPanel'
 import TimetablePanel from '../components/school/TimetablePanel'
 import StaffPanel from '../components/school/StaffPanel'
 import SchoolReportsPanel from '../components/school/SchoolReportsPanel'
+import BatchesPanel from '../components/school/BatchesPanel'
 import { useOrgData } from '../hooks/useOrgData'
+import { useAuth } from '../context/AuthContext'
+import { PERMS } from '../utils/permissions'
 import { getSchoolById } from '../utils/schoolsStore'
+import { getBatchesBySchool } from '../utils/schoolBatchesStore'
+import { schoolPhase1Readiness } from '../utils/schoolPhase1'
 import { statsForSchool } from '../utils/schoolUi'
 import { ensureSchoolErpDemo, schoolDashboardSnapshot } from '../utils/schoolErp'
 import { getAllTests } from '../data/tests'
@@ -21,6 +26,7 @@ import { getAllTests } from '../data/tests'
 const TABS = [
   { id: 'overview', label: 'Dashboard', group: 'home' },
   { id: 'classes', label: 'Classes', group: 'people' },
+  { id: 'batches', label: 'Batches', group: 'people' },
   { id: 'students', label: 'Students', group: 'people' },
   { id: 'staff', label: 'Staff', group: 'people' },
   { id: 'attendance', label: 'Attendance', group: 'ops' },
@@ -38,6 +44,8 @@ export default function SchoolDetail() {
   const rawTab = searchParams.get('tab') || 'overview'
   const tab = rawTab === 'assign' ? 'exams' : TAB_IDS.has(rawTab) ? rawTab : 'overview'
   const classParam = searchParams.get('class') || ''
+  const { hasPermission } = useAuth()
+  const canManageSchools = hasPermission(PERMS.MANAGE_SCHOOLS)
 
   const { schools, classes, visibleClasses, assignments, students, teachers, isAdmin, session, refresh } =
     useOrgData()
@@ -45,6 +53,7 @@ export default function SchoolDetail() {
   const [selectedClassId, setSelectedClassId] = useState(classParam)
   const [editingSchool, setEditingSchool] = useState(false)
   const [erpTick, setErpTick] = useState(0)
+  const [batchTick, setBatchTick] = useState(0)
 
   const school = useMemo(
     () => schools.find((s) => s.id === schoolId) ?? getSchoolById(schoolId),
@@ -55,6 +64,21 @@ export default function SchoolDetail() {
     () => visibleClasses.filter((c) => c.schoolId === schoolId),
     [visibleClasses, schoolId],
   )
+
+  const schoolBatches = useMemo(() => {
+    if (!schoolId) return []
+    return getBatchesBySchool(schoolId)
+  }, [schoolId, batchTick])
+
+  const readiness = useMemo(() => {
+    if (!school) return null
+    return schoolPhase1Readiness({
+      school,
+      schoolClasses,
+      students,
+      batches: schoolBatches,
+    })
+  }, [school, schoolClasses, students, schoolBatches, erpTick])
 
   const stats = useMemo(
     () => (school ? statsForSchool(school.id, classes, students) : null),
@@ -110,6 +134,10 @@ export default function SchoolDetail() {
   }
 
   const bumpErp = () => setErpTick((n) => n + 1)
+  const bumpBatches = () => {
+    setBatchTick((n) => n + 1)
+    bumpErp()
+  }
 
   if (!school) {
     return (
@@ -122,7 +150,7 @@ export default function SchoolDetail() {
     )
   }
 
-  if (!isAdmin && schoolClasses.length === 0) {
+  if (!isAdmin && !canManageSchools && schoolClasses.length === 0) {
     return (
       <PortalPage role="school" title="Access restricted" className="page school-portal-page">
         <p className="form-hint">You do not have any classes in this school.</p>
@@ -139,10 +167,14 @@ export default function SchoolDetail() {
       className="page school-portal-page school-detail-page"
       eyebrow="School Management"
       title={school.name}
-      subtitle={
-        [school.code, school.address].filter(Boolean).join(' · ') ||
-        'Complete school workspace — people, attendance, fees, timetable, and exams.'
-      }
+      subtitle={[
+        school.academicYear,
+        school.boardType ? String(school.boardType).toUpperCase() : '',
+        school.code,
+        school.address,
+      ]
+        .filter(Boolean)
+        .join(' · ') || 'Classes + competitive batches, roster import, teacher invites.'}
       actions={
         <>
           <Link to="/admin/schools" className="btn btn-ghost btn-sm">
@@ -204,13 +236,16 @@ export default function SchoolDetail() {
             snapshot={snapshot}
             schoolName={school.name}
             onGoTab={setTab}
+            readiness={readiness}
           />
 
           <div className="school-profile-block">
             <div className="school-panel-head">
               <div>
                 <h3>School profile</h3>
-                <p className="form-hint">Name, code, and address for this institution.</p>
+                <p className="form-hint">
+                  Name, academic year, board, and address for this campus.
+                </p>
               </div>
               {!editingSchool && (
                 <button
@@ -244,6 +279,18 @@ export default function SchoolDetail() {
                   <dd>{school.code ? <code>{school.code}</code> : '—'}</dd>
                 </div>
                 <div>
+                  <dt>Academic year</dt>
+                  <dd>{school.academicYear || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Board</dt>
+                  <dd>{school.boardType ? String(school.boardType).toUpperCase() : '—'}</dd>
+                </div>
+                <div>
+                  <dt>Affiliation</dt>
+                  <dd>{school.affiliationNo || '—'}</dd>
+                </div>
+                <div>
                   <dt>Address</dt>
                   <dd>{school.address || '—'}</dd>
                 </div>
@@ -268,6 +315,24 @@ export default function SchoolDetail() {
         </section>
       )}
 
+      {tab === 'batches' && (
+        <section className="card">
+          <BatchesPanel
+            schoolId={school.id}
+            batches={schoolBatches}
+            schoolClasses={schoolClasses}
+            students={students}
+            teachers={teachers}
+            onMessage={(type, text) => setMsg({ type, text })}
+            onRefresh={() => {
+              bumpBatches()
+              refresh()
+            }}
+            onGoTab={setTab}
+          />
+        </section>
+      )}
+
       {tab === 'students' && (
         <section className="card">
           <StudentManagementPanel
@@ -278,13 +343,26 @@ export default function SchoolDetail() {
             session={session}
             onMessage={(type, text) => setMsg({ type, text })}
             onRefresh={refresh}
+            onGoTab={setTab}
           />
         </section>
       )}
 
       {tab === 'staff' && (
         <section className="card">
-          <StaffPanel schoolClasses={schoolClasses} teachers={teachers} isAdmin={isAdmin} />
+          <StaffPanel
+            school={school}
+            schoolClasses={schoolClasses}
+            teachers={teachers}
+            isAdmin={isAdmin}
+            session={session}
+            onMessage={(type, text) => setMsg({ type, text })}
+            onRefresh={() => {
+              bumpErp()
+              refresh()
+            }}
+            onGoTab={setTab}
+          />
         </section>
       )}
 
@@ -292,6 +370,7 @@ export default function SchoolDetail() {
         <section className="card">
           <AttendancePanel
             schoolId={school.id}
+            schoolName={school.name}
             schoolClasses={schoolClasses}
             students={students}
             selectedClassId={selectedClassId}
@@ -308,6 +387,7 @@ export default function SchoolDetail() {
         <section className="card">
           <FeesPanel
             schoolId={school.id}
+            schoolName={school.name}
             schoolClasses={schoolClasses}
             students={students}
             onMessage={(type, text) => setMsg({ type, text })}
@@ -334,6 +414,7 @@ export default function SchoolDetail() {
         <section className="card">
           <AssignTestsPanel
             schoolClasses={schoolClasses}
+            schoolBatches={schoolBatches}
             assignments={assignments}
             session={session}
             onMessage={(type, text) => setMsg({ type, text })}

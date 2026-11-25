@@ -11,6 +11,8 @@ const DEFAULT_ORG = {
   classes: [],
   assignments: [],
   users: [],
+  batches: [],
+  invites: [],
   updatedAt: 0,
 }
 
@@ -18,7 +20,7 @@ function ensureDataDir() {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
 }
 
-/** @returns {{ schools: object[], classes: object[], assignments: object[], users: object[], updatedAt: number }} */
+/** @returns {{ schools: object[], classes: object[], assignments: object[], users: object[], batches: object[], invites: object[], updatedAt: number }} */
 export function loadOrgFile() {
   ensureDataDir()
   if (!existsSync(ORG_FILE)) return { ...DEFAULT_ORG }
@@ -29,6 +31,8 @@ export function loadOrgFile() {
       classes: Array.isArray(parsed?.classes) ? parsed.classes : [],
       assignments: Array.isArray(parsed?.assignments) ? parsed.assignments : [],
       users: Array.isArray(parsed?.users) ? parsed.users : [],
+      batches: Array.isArray(parsed?.batches) ? parsed.batches : [],
+      invites: Array.isArray(parsed?.invites) ? parsed.invites : [],
       updatedAt: Number(parsed?.updatedAt) || 0,
     }
   } catch {
@@ -37,7 +41,7 @@ export function loadOrgFile() {
 }
 
 /**
- * @param {{ schools?: object[], classes?: object[], assignments?: object[], users?: object[] }} payload
+ * @param {{ schools?: object[], classes?: object[], assignments?: object[], users?: object[], batches?: object[], invites?: object[] }} payload
  */
 export function saveOrgFile(payload) {
   ensureDataDir()
@@ -47,6 +51,8 @@ export function saveOrgFile(payload) {
     classes: payload.classes ?? current.classes,
     assignments: payload.assignments ?? current.assignments,
     users: payload.users ?? current.users,
+    batches: payload.batches ?? current.batches,
+    invites: payload.invites ?? current.invites,
     updatedAt: Date.now(),
   }
   writeFileSync(ORG_FILE, JSON.stringify(next))

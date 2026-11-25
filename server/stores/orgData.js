@@ -13,14 +13,14 @@ export function setOrgDataBackend(mode) {
   backend = mode
 }
 
-/** @returns {Promise<{ schools: object[], classes: object[], assignments: object[], users: object[], updatedAt: number }>} */
+/** @returns {Promise<{ schools: object[], classes: object[], assignments: object[], users: object[], batches: object[], invites: object[], updatedAt: number }>} */
 export async function loadOrgData() {
   if (backend === 'postgres') return loadOrgPg()
   return loadOrgFile()
 }
 
 /**
- * @param {{ schools?: object[], classes?: object[], assignments?: object[], users?: object[] }} payload
+ * @param {{ schools?: object[], classes?: object[], assignments?: object[], users?: object[], batches?: object[], invites?: object[] }} payload
  */
 export async function saveOrgData(payload) {
   if (backend === 'postgres') return saveOrgPg(payload)

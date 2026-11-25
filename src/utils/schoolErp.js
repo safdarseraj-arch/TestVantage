@@ -2,6 +2,7 @@ import {
   ensureDemoAttendance,
   todayAttendanceSummary,
 } from '../utils/schoolAttendanceStore'
+import { getBatchesBySchool } from '../utils/schoolBatchesStore'
 import { ensureDemoFees, feesSummary } from '../utils/schoolFeesStore'
 import { ensureDemoTimetable, todaySchedule } from '../utils/schoolTimetableStore'
 
@@ -36,9 +37,15 @@ export function schoolDashboardSnapshot({
   const schedule = todaySchedule(schoolId, schoolClasses)
 
   const classIds = new Set(schoolClasses.map((c) => c.id))
+  const batches = getBatchesBySchool(schoolId)
+  const batchIds = new Set(batches.map((b) => b.id))
   const now = Date.now()
   const upcomingExams = (assignments || [])
-    .filter((a) => a.active !== false && classIds.has(a.classId))
+    .filter(
+      (a) =>
+        a.active !== false &&
+        ((a.classId && classIds.has(a.classId)) || (a.batchId && batchIds.has(a.batchId))),
+    )
     .map((a) => {
       const due = a.dueAt ? new Date(a.dueAt).getTime() : null
       const from = a.availableFrom ? new Date(a.availableFrom).getTime() : null
@@ -54,14 +61,19 @@ export function schoolDashboardSnapshot({
       id: a.id,
       testId: a.testId,
       testTitle: testsById[a.testId]?.title || a.testId,
-      classId: a.classId,
-      className: schoolClasses.find((c) => c.id === a.classId)?.name || 'Class',
+      classId: a.classId || null,
+      batchId: a.batchId || null,
+      className: a.batchId
+        ? batches.find((b) => b.id === a.batchId)?.name || 'Batch'
+        : schoolClasses.find((c) => c.id === a.classId)?.name || 'Class',
       dueAt: a.dueAt,
       availableFrom: a.availableFrom,
     }))
 
   const teacherIds = new Set(schoolClasses.flatMap((c) => c.teacherIds ?? []))
-  const staffCount = teachers.filter((t) => teacherIds.has(t.id)).length || teacherIds.size
+  const staffCount =
+    teachers.filter((t) => teacherIds.has(t.id) || t.schoolId === schoolId).length ||
+    teacherIds.size
 
   return {
     attendance,
@@ -72,8 +84,11 @@ export function schoolDashboardSnapshot({
       classes: schoolClasses.length,
       students: new Set(schoolClasses.flatMap((c) => c.studentIds ?? [])).size,
       staff: staffCount,
+      batches: batches.length,
       activeAssignments: (assignments || []).filter(
-        (a) => a.active !== false && classIds.has(a.classId),
+        (a) =>
+          a.active !== false &&
+          ((a.classId && classIds.has(a.classId)) || (a.batchId && batchIds.has(a.batchId))),
       ).length,
     },
   }

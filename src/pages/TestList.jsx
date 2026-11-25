@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { PERMS } from '../utils/permissions'
-import { getAssignedTestIdsForClasses } from '../utils/assignmentsStore'
+import { getAssignedTestIdsForStudent } from '../utils/assignmentsStore'
 import { getClassesForStudent } from '../utils/classesStore'
 import { getUserById } from '../utils/users'
 import PatternBlueprint from '../components/PatternBlueprint'
@@ -40,8 +40,8 @@ export default function TestList() {
   }, [isUser, session?.userId])
 
   const assignedTestIds = useMemo(
-    () => getAssignedTestIdsForClasses(studentClassIds),
-    [studentClassIds],
+    () => getAssignedTestIdsForStudent(session?.userId, studentClassIds),
+    [session?.userId, studentClassIds],
   )
 
   const canCreate = session?.role === 'admin' || hasPermission(PERMS.CREATE_PAPER)

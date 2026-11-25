@@ -60,7 +60,7 @@ import { dedupeQuestionsForExam } from '../utils/testQuestionClone.js'
 import { validatePaperForPublish, isTestPublished, isCustomTestPaper } from '../utils/paperPublish.js'
 import { getExamAccess, examAccessBlockMessage } from '../utils/examAccess.js'
 import { PERMS } from '../utils/permissions'
-import { getAssignedTestIdsForClasses } from '../utils/assignmentsStore.js'
+import { getAssignedTestIdsForStudent } from '../utils/assignmentsStore.js'
 import { getClassesForStudent } from '../utils/classesStore.js'
 import { getUserById } from '../utils/users.js'
 import { buildInitialAnswers } from '../utils/answers'
@@ -207,8 +207,8 @@ export default function Exam() {
   const examQuestions = healResult.questions
 
   const assignedTestIds = useMemo(
-    () => getAssignedTestIdsForClasses(studentClassIds),
-    [studentClassIds],
+    () => getAssignedTestIdsForStudent(session?.userId, studentClassIds),
+    [session?.userId, studentClassIds],
   )
 
   const paperReadiness = useMemo(

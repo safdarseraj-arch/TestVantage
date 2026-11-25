@@ -4,11 +4,15 @@ import { SELF_REGISTER_TEACHER_PERMS } from './permissions.js'
 import {
   FACULTY_EXAM_SPECIALIZATIONS,
   FACULTY_ONBOARDING_MODES,
+  clearRememberedSchoolInvite,
   defaultEntitlementsForMode,
+  defaultWatermarkForName,
   lookupSchoolInvite,
   normalizeEntitlements,
   normalizeSchoolInviteCode,
+  permissionsFromEntitlements,
 } from './facultyWorkbench.js'
+import { attachTeacherFromSchoolInvite } from './schoolTeacherAttach.js'
 
 export const STUDENT_ONBOARDING_PATH = '/onboarding/student'
 export const TEACHER_ONBOARDING_PATH = '/onboarding/teacher'
@@ -289,7 +293,10 @@ export function validateTeacherProfile(raw) {
     }
   }
 
-  const watermarkText = trim(raw?.watermarkText).slice(0, 120)
+  let watermarkText = trim(raw?.watermarkText).slice(0, 120)
+  if (!watermarkText && trim(raw?.suggestName)) {
+    watermarkText = defaultWatermarkForName(raw.suggestName).slice(0, 120)
+  }
   const paperHeaderText = trim(raw?.paperHeaderText).slice(0, 200)
   const signatureDataUrl = trim(raw?.signatureDataUrl)
   if (signatureDataUrl && !signatureDataUrl.startsWith('data:image/')) {
@@ -349,18 +356,35 @@ export function completeStudentProfile(userId, raw) {
 }
 
 export function completeTeacherProfile(userId, raw) {
-  const checked = validateTeacherProfile(raw)
-  if (!checked.ok) return checked
   const user = getUserById(userId)
   if (!user || user.role !== 'teacher') return { ok: false, error: 'Teacher account not found.' }
 
+  const checked = validateTeacherProfile({
+    ...raw,
+    suggestName: raw?.suggestName || user.name,
+  })
+  if (!checked.ok) return checked
+
   const existing = Array.isArray(user.permissions) ? user.permissions : []
+  const fromEntitlements = permissionsFromEntitlements(checked.profile.entitlements)
   const saved = saveUserProfile(userId, {
     profile: checked.profile,
     profileComplete: true,
-    permissions: [...new Set([...existing, ...SELF_REGISTER_TEACHER_PERMS])],
+    permissions: [
+      ...new Set([...existing, ...SELF_REGISTER_TEACHER_PERMS, ...fromEntitlements]),
+    ],
   })
   if (!saved.ok) return saved
+
+  let attach = null
+  if (checked.profile.onboardingMode === FACULTY_ONBOARDING_MODES.SCHOOL) {
+    const invite = lookupSchoolInvite(checked.profile.schoolInviteCode)
+    if (invite) {
+      attach = attachTeacherFromSchoolInvite(userId, invite)
+    }
+  }
+
+  clearRememberedSchoolInvite()
   refreshSessionFromUser(userId)
-  return { ok: true, user: saved.user }
+  return { ok: true, user: saved.user, attach }
 }

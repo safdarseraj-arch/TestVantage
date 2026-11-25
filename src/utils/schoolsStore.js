@@ -1,3 +1,6 @@
+import { deleteBatchesForSchool } from './schoolBatchesStore.js'
+import { deleteInvitesForSchool } from './schoolInvitesStore.js'
+
 const STORAGE_KEY = 'testvantage-schools'
 
 /**
@@ -6,6 +9,9 @@ const STORAGE_KEY = 'testvantage-schools'
  *   name: string
  *   code?: string
  *   address?: string
+ *   academicYear?: string
+ *   boardType?: string
+ *   affiliationNo?: string
  *   createdAt: number
  * }} School
  */
@@ -36,9 +42,16 @@ export function getSchoolById(id) {
 }
 
 /**
- * @param {{ name: string, code?: string, address?: string }} data
+ * @param {{
+ *   name: string
+ *   code?: string
+ *   address?: string
+ *   academicYear?: string
+ *   boardType?: string
+ *   affiliationNo?: string
+ * }} data
  */
-export function addSchool({ name, code, address }) {
+export function addSchool({ name, code, address, academicYear, boardType, affiliationNo }) {
   const trimmed = String(name ?? '').trim()
   if (!trimmed) return { ok: false, error: 'School name is required.' }
 
@@ -53,6 +66,9 @@ export function addSchool({ name, code, address }) {
     name: trimmed,
     code: code?.trim() || undefined,
     address: address?.trim() || undefined,
+    academicYear: academicYear?.trim() || undefined,
+    boardType: boardType?.trim() || undefined,
+    affiliationNo: affiliationNo?.trim() || undefined,
     createdAt: Date.now(),
   }
   schools.push(school)
@@ -62,7 +78,14 @@ export function addSchool({ name, code, address }) {
 
 /**
  * @param {string} id
- * @param {{ name?: string, code?: string, address?: string }} updates
+ * @param {{
+ *   name?: string
+ *   code?: string
+ *   address?: string
+ *   academicYear?: string
+ *   boardType?: string
+ *   affiliationNo?: string
+ * }} updates
  */
 export function updateSchool(id, updates) {
   const schools = loadSchools()
@@ -83,6 +106,24 @@ export function updateSchool(id, updates) {
   if (updates.address != null) {
     schools[idx] = { ...schools[idx], address: updates.address.trim() || undefined }
   }
+  if (updates.academicYear != null) {
+    schools[idx] = {
+      ...schools[idx],
+      academicYear: updates.academicYear.trim() || undefined,
+    }
+  }
+  if (updates.boardType != null) {
+    schools[idx] = {
+      ...schools[idx],
+      boardType: updates.boardType.trim() || undefined,
+    }
+  }
+  if (updates.affiliationNo != null) {
+    schools[idx] = {
+      ...schools[idx],
+      affiliationNo: updates.affiliationNo.trim() || undefined,
+    }
+  }
   saveSchools(schools)
   return { ok: true, school: schools[idx] }
 }
@@ -93,5 +134,8 @@ export function deleteSchool(id) {
   const next = schools.filter((s) => s.id !== id)
   if (next.length === schools.length) return { ok: false, error: 'School not found.' }
   saveSchools(next)
+  // Drop orphan Phase-1 batches / invites; class delete still blocks when classes remain.
+  deleteBatchesForSchool(id)
+  deleteInvitesForSchool(id)
   return { ok: true }
 }

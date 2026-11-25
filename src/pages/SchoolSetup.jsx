@@ -9,11 +9,17 @@ import { PERMS } from '../utils/permissions'
 import { schoolOrgStats, statsForSchool } from '../utils/schoolUi'
 import { feesSummary } from '../utils/schoolFeesStore'
 import { todayAttendanceSummary } from '../utils/schoolAttendanceStore'
+import { getBatchesBySchool } from '../utils/schoolBatchesStore'
+import { schoolPhase1Readiness } from '../utils/schoolPhase1'
 
 const MODULES = [
   {
     title: 'People',
-    items: ['Classes & batches', 'Students & logins', 'Staff / teachers'],
+    items: [
+      'Classes & competitive batches',
+      'CSV roster import',
+      'Teacher invite codes',
+    ],
   },
   {
     title: 'Daily ops',
@@ -33,10 +39,11 @@ export default function SchoolSetup() {
   const [showAddForm, setShowAddForm] = useState(false)
 
   const visibleSchools = useMemo(() => {
-    if (isAdmin) return schools
+    // Full school managers see every campus; other teachers only see schools they teach in.
+    if (isAdmin || canManageSchools) return schools
     const ids = new Set(visibleClasses.map((c) => c.schoolId))
     return schools.filter((s) => ids.has(s.id))
-  }, [schools, visibleClasses, isAdmin])
+  }, [schools, visibleClasses, isAdmin, canManageSchools])
 
   const totals = schoolOrgStats(visibleSchools, classes, students)
 
@@ -46,7 +53,7 @@ export default function SchoolSetup() {
       className="page school-portal-page"
       eyebrow="Complete school solution"
       title="School Management"
-      subtitle="One place for schools, classes, students, attendance, fees, timetable, exams, and reports."
+      subtitle="Phase-1 academic foundation: campus setup, dual class/batch mapping, roster import, teacher invites — plus attendance, fees, exams."
       actions={
         <Link to="/teacher/results" className="btn btn-ghost btn-sm">
           Student results
@@ -128,10 +135,10 @@ export default function SchoolSetup() {
             Click <strong>New school</strong> above to add your first institution.
           </p>
           <ol className="school-workflow-list" style={{ textAlign: 'left', display: 'inline-block' }}>
-            <li>Add the school</li>
-            <li>Create classes and enroll students</li>
-            <li>Mark attendance, set fees, build timetable</li>
-            <li>Assign mock exams from TestVantages</li>
+            <li>Add the school (year + board)</li>
+            <li>Create classes, import roster, invite teachers</li>
+            <li>Map competitive batches (JEE / NEET)</li>
+            <li>Mark attendance, set fees, assign mock exams</li>
           </ol>
         </section>
       ) : (
@@ -141,8 +148,19 @@ export default function SchoolSetup() {
             const schoolCls = classes.filter((c) => c.schoolId === s.id)
             const att = todayAttendanceSummary(s.id, schoolCls, students)
             const fees = feesSummary(s.id, schoolCls, students)
+            const readiness = schoolPhase1Readiness({
+              school: s,
+              schoolClasses: schoolCls,
+              students,
+              batches: getBatchesBySchool(s.id),
+            })
+            const nextTab = readiness.nextItem?.tab || 'overview'
             return (
-              <Link key={s.id} to={`/admin/schools/${s.id}`} className="school-hub-card">
+              <Link
+                key={s.id}
+                to={`/admin/schools/${s.id}?tab=${encodeURIComponent(nextTab)}`}
+                className="school-hub-card"
+              >
                 <div className="school-hub-card-glow" aria-hidden />
                 <div className="school-hub-card-top">
                   <span className="school-hub-mark" aria-hidden>
@@ -154,12 +172,26 @@ export default function SchoolSetup() {
                   <div>
                     <h3>{s.name}</h3>
                     {s.code && <code className="school-hub-code">{s.code}</code>}
+                    {(s.academicYear || s.boardType) && (
+                      <p className="school-hub-year">
+                        {[s.academicYear, s.boardType ? String(s.boardType).toUpperCase() : '']
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    )}
                   </div>
+                  <span
+                    className={`school-hub-ready ${readiness.percent === 100 ? 'done' : ''}`}
+                    title={readiness.nextHint}
+                  >
+                    {readiness.percent}%
+                  </span>
                 </div>
                 {s.address && <p className="school-hub-address">{s.address}</p>}
                 <div className="school-hub-card-stats">
                   <span>{stats.classCount} classes</span>
                   <span>{stats.studentCount} students</span>
+                  <span>{readiness.batchCount} batches</span>
                 </div>
                 <div className="school-hub-card-meta">
                   <span>
@@ -173,7 +205,11 @@ export default function SchoolSetup() {
                         : 'Fees ready'}
                   </span>
                 </div>
-                <span className="school-hub-card-cta">Open school →</span>
+                <span className="school-hub-card-cta">
+                  {readiness.percent === 100
+                    ? 'Open school →'
+                    : `${readiness.nextItem?.cta || 'Continue setup'} →`}
+                </span>
               </Link>
             )
           })}

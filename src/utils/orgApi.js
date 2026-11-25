@@ -18,6 +18,8 @@ export async function pingOrgApi() {
  *   classes: object[],
  *   assignments: object[],
  *   users: object[],
+ *   batches: object[],
+ *   invites: object[],
  *   updatedAt: number,
  * }>}
  */
@@ -33,6 +35,8 @@ export async function fetchOrgData() {
     classes: Array.isArray(data?.classes) ? data.classes : [],
     assignments: Array.isArray(data?.assignments) ? data.assignments : [],
     users: Array.isArray(data?.users) ? data.users : [],
+    batches: Array.isArray(data?.batches) ? data.batches : [],
+    invites: Array.isArray(data?.invites) ? data.invites : [],
     updatedAt: Number(data?.updatedAt) || 0,
   }
 }
@@ -43,6 +47,8 @@ export async function fetchOrgData() {
  *   classes: object[],
  *   assignments: object[],
  *   users: object[],
+ *   batches?: object[],
+ *   invites?: object[],
  * }} payload
  * @param {{ email?: string }} [opts]
  */

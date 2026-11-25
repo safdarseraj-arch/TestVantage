@@ -178,7 +178,7 @@ export function createStudentAccount({ name, loginId, password, createdBy }) {
     return { ok: false, error: 'This user ID is already in use.' }
   }
   const user = {
-    id: `user-${Date.now()}`,
+    id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: name.trim() || id,
     email: id,
     password,

@@ -26,8 +26,8 @@ export function normalizeInviteCode(code) {
   return String(code ?? '')
     .trim()
     .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '')
-    .slice(0, 8)
+    .replace(/[^A-Z0-9_]/g, '')
+    .slice(0, 24)
 }
 
 /** Stable invite code for a saved account. */

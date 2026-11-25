@@ -209,6 +209,31 @@ export const SITE_MAP_STUDENT_FLOW = [
         desc: 'Post a doubt from a result question — text, file, or voice. Peers can reply. Does not copy the question stem.',
         where: 'Top nav → Compete → Ask Your Doubt · path /doubts',
       },
+      {
+        to: '/earn',
+        label: 'Earn & Refer',
+        desc: 'Share referral / vanity codes, free-mock locks, wallet credits, video submissions, and the 3-bucket earnings ledger.',
+        where: 'Top nav → Compete → Earn & Refer · path /earn',
+        next: 'Campus Earn',
+      },
+      {
+        to: '/campus-earn',
+        label: 'Campus Earn',
+        desc: 'University mentor onboarding, side-income calculator, and promoter profile for 18+ campus students.',
+        where: 'Top nav → More → Campus Earn · path /campus-earn',
+      },
+      {
+        to: '/m/your-slug',
+        label: 'Mentor microsite',
+        desc: 'Public mentor landing (free mocks + vanity code). Replace your-slug with the promoter microsite slug from Earn.',
+        where: 'Shared link · path /m/:slug · outside main chrome',
+      },
+      {
+        to: '/v/video-slug',
+        label: 'Promo video page',
+        desc: 'Approved creator reel with 15% tracked attribution. Open from Earn after admin approval.',
+        where: 'Shared link · path /v/:slug · outside main chrome',
+      },
     ],
   },
   {

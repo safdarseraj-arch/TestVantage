@@ -25,12 +25,17 @@ const NAV_COMPETE = [
   { to: '/merit-stride', label: 'Merit Stride', icon: '✨', title: 'Points, badges, focus' },
   { to: '/study-circle', label: 'Study Circle', icon: '👥', title: 'Cohort Code rooms' },
   { to: '/doubts', label: 'Ask Your Doubt', icon: '💬', title: 'Doubt on a question' },
+  { to: '/earn', label: 'Earn & Refer', icon: '💸', title: 'Referral & campus side-income' },
 ]
 
-const NAV_MORE = [{ to: '/tour', label: 'TestVantages Tour', icon: '🗺️' }]
+const NAV_MORE = [
+  { to: '/tour', label: 'TestVantages Tour', icon: '🗺️' },
+  { to: '/campus-earn', label: 'Campus Earn', icon: '🎓', title: 'University mentor side-income' },
+]
 const NAV_MORE_ADMIN = [
   ...NAV_MORE,
   { to: '/go-live-guide', label: 'Go live guide', icon: '🚀' },
+  { to: '/admin/referrals', label: 'Referral admin', icon: '📈' },
 ]
 
 const ADMIN_NAV = [
@@ -46,6 +51,7 @@ const ADMIN_NAV = [
   { to: '/admin/schools', label: 'School Management', icon: '🏫' },
   { to: '/teacher/results', label: 'Student Results', icon: '👥' },
   { to: '/admin', label: 'OCR settings', icon: '⚙️' },
+  { to: '/admin/referrals', label: 'Referral admin', icon: '📈' },
 ]
 
 const PAGE_TITLES = {
@@ -101,6 +107,9 @@ const PAGE_TITLES = {
   '/admin/paper-patterns': 'Paper Patterns',
   '/login': 'Sign In',
   '/profile': 'Profile',
+  '/earn': 'Earn & Refer',
+  '/campus-earn': 'Campus Earn',
+  '/admin/referrals': 'Referral Admin',
 }
 
 const BREADCRUMB = {
@@ -147,6 +156,9 @@ const BREADCRUMB = {
   '/teacher/results': 'Teacher',
   '/login': 'Account',
   '/profile': 'Account',
+  '/earn': 'Compete',
+  '/campus-earn': 'Help',
+  '/admin/referrals': 'Admin',
 }
 
 function getPageTitle(pathname) {

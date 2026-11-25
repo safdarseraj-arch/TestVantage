@@ -52,7 +52,44 @@ export default function StudentMockTest() {
   useEffect(() => {
     const type = searchParams.get('type')
     if (type && STUDENT_MOCK_TYPE_IDS.includes(type)) setTestTypeId(type)
+    const exam = String(searchParams.get('exam') || '').toLowerCase()
+    if (exam === 'neet') setExamPatternId('neet')
+    else if (exam === 'jee' || exam === 'jee_main' || exam === 'main') setExamPatternId('jee-main')
+    else if (exam === 'jee_adv' || exam === 'advanced') setExamPatternId('jee-advanced')
   }, [searchParams])
+
+  // Free-mock-first 45-day lead lock when arriving via mentor ?ref=
+  useEffect(() => {
+    const ref = searchParams.get('ref') || searchParams.get('coupon')
+    if (!ref || !session?.userId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { getPartnerByCode } = await import('../utils/referralStore.js')
+        const { createFreeMockLeadLock, applyReferralCapture } = await import(
+          '../utils/referralEngine.js'
+        )
+        const { ATTRIBUTION_SOURCES } = await import('../utils/referralConstants.js')
+        if (cancelled) return
+        applyReferralCapture({ code: ref, source: ATTRIBUTION_SOURCES.FREE_MOCK })
+        const partner = getPartnerByCode(ref)
+        if (!partner) return
+        createFreeMockLeadLock({
+          partnerId: partner.id,
+          aspirantUserId: session.userId,
+          examTrack:
+            String(searchParams.get('exam') || '').toLowerCase().includes('neet')
+              ? 'neet'
+              : 'jee_main',
+        })
+      } catch {
+        /* referral lock is best-effort */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, session?.userId])
 
   const [bank, setBank] = useState(/** @type {import('../data/tests').Question[]} */ ([]))
   const [bankReady, setBankReady] = useState(false)

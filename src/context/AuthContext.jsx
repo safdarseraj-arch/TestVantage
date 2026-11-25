@@ -7,6 +7,10 @@ import {
 } from '../utils/auth'
 import { registerTeacher, registerUser } from '../utils/users'
 import { findUserByInviteCode, normalizeInviteCode } from '../utils/invites.js'
+import { attributeSignup } from '../utils/referralEngine.js'
+import { getPartnerByCode, upsertPartner } from '../utils/referralStore.js'
+import { PARTNER_TYPES } from '../utils/referralConstants.js'
+import { syncReferralStore } from '../utils/referralApi.js'
 import { sessionHasPermission } from '../utils/permissions'
 import { isPlatformScaleEnabled } from '../config/platform.js'
 import { pullOrgFromServer, pushOrgToServer } from '../utils/orgServerSync.js'
@@ -44,50 +48,96 @@ export function AuthProvider({ children }) {
     return result
   }, [])
 
-  const register = useCallback(async ({ name, email, password, role = 'user', inviteCode }) => {
-    try {
-      const cleanInvite = normalizeInviteCode(inviteCode)
-      let referral = {}
-      if (cleanInvite) {
-        const inviter = findUserByInviteCode(cleanInvite)
-        if (!inviter) {
-          return {
-            ok: false,
-            error: 'Invite code not found. Leave it blank, or ask the person who invited you.',
+  const register = useCallback(
+    async ({ name, email, password, role = 'user', inviteCode, becomeAmbassador = false }) => {
+      try {
+        const cleanInvite = normalizeInviteCode(inviteCode)
+        let referral = {}
+        if (cleanInvite) {
+          const inviter = findUserByInviteCode(cleanInvite)
+          const partner = getPartnerByCode(cleanInvite)
+          if (!inviter && !partner) {
+            return {
+              ok: false,
+              error: 'Invite code not found. Leave it blank, or ask the person who invited you.',
+            }
+          }
+          if (inviter) {
+            referral = {
+              referredBy: inviter.id,
+              referredByEmail: inviter.email,
+              referredByName: inviter.name,
+            }
+          } else if (partner) {
+            referral = {
+              referredBy: partner.userId,
+              referredByEmail: partner.email,
+              referredByName: partner.displayName || partner.name,
+            }
           }
         }
-        referral = {
-          referredBy: inviter.id,
-          referredByEmail: inviter.email,
-          referredByName: inviter.name,
+        const result =
+          role === 'teacher'
+            ? registerTeacher({ name, email, password, ...referral })
+            : registerUser({ name, email, password, ...referral })
+        if (!result.ok) return result
+        const newUserId = result.user?.id
+        if (newUserId) {
+          try {
+            attributeSignup({
+              referredUserId: newUserId,
+              inviteCode: cleanInvite || undefined,
+              referredEmail: email,
+            })
+          } catch {
+            /* attribution is best-effort */
+          }
         }
-      }
-      const result =
-        role === 'teacher'
-          ? registerTeacher({ name, email, password, ...referral })
-          : registerUser({ name, email, password, ...referral })
-      if (!result.ok) return result
-      if (isPlatformScaleEnabled()) {
-        await pushOrgToServer().catch(() => {})
-      }
-      const loginResult = await loginUserAsync(email, password)
-      if (loginResult.ok) setSession(loginResult.session)
-      else {
+        if (isPlatformScaleEnabled()) {
+          await pushOrgToServer().catch(() => {})
+        }
+        const loginResult = await loginUserAsync(email, password)
+        if (loginResult.ok) setSession(loginResult.session)
+        else {
+          return {
+            ok: false,
+            error:
+              loginResult.error ??
+              'Account created, but sign-in failed. Go back to Sign in and use the same email and password.',
+          }
+        }
+
+        let ambassador = false
+        if (becomeAmbassador && loginResult.session?.userId) {
+          try {
+            const partnerType =
+              role === 'teacher' ? PARTNER_TYPES.FACULTY : PARTNER_TYPES.STUDENT
+            const partnerResult = upsertPartner({
+              userId: loginResult.session.userId,
+              name: loginResult.session.name || name,
+              email: loginResult.session.email || email,
+              partnerType,
+              parentPartnerCode: cleanInvite || undefined,
+            })
+            if (partnerResult.ok) {
+              ambassador = true
+              syncReferralStore().catch(() => {})
+            }
+          } catch {
+            /* promoter create is best-effort; account still works */
+          }
+        }
+
+        return { ...loginResult, ambassador }
+      } catch (err) {
         return {
           ok: false,
-          error:
-            loginResult.error ??
-            'Account created, but sign-in failed. Go back to Sign in and use the same email and password.',
+          error: err instanceof Error ? err.message : 'Registration failed. Press F5 and try again.',
         }
       }
-      return loginResult
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : 'Registration failed. Press F5 and try again.',
-      }
-    }
-  }, [])
+    },
+    [],
+  )
 
   const logout = useCallback(() => {
     logoutSession()

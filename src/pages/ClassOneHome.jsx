@@ -12,6 +12,7 @@ import { getUserById } from '../utils/users'
 import { getAttemptsByOwner, getOwnerKey } from '../utils/attemptHistory'
 import { buildMasteryGraph } from '../utils/aiMastery.js'
 import StudentNotificationsBanner from '../components/StudentNotificationsBanner.jsx'
+import CreatorVideoSpotlight from '../components/CreatorVideoSpotlight.jsx'
 import { isDemoStudentIdentity, DEMO_SAMPLE_TEST_IDS, STAFF_WORKING_TEST_ID } from '../utils/demoStudentAccess.js'
 
 const FEATURED_ACTIONS = [
@@ -70,6 +71,7 @@ const STUDENT_PILLARS = [
       { to: '/leaderboard', icon: '🏆', label: 'Leaderboard', desc: 'Real attempt standings' },
       { to: '/exam-pulse', icon: '📡', label: 'Exam Pulse', desc: 'Exams · admissions · focus' },
       { to: '/profile', icon: '👤', label: 'Profile & invites', desc: 'Your details · share invite code' },
+      { to: '/earn', icon: '💸', label: 'Earn & Refer', desc: 'Wallet · campus side-income' },
     ],
   },
   {
@@ -81,6 +83,8 @@ const STUDENT_PILLARS = [
       { to: '/merit-stride', icon: '✨', label: 'Merit Stride', desc: 'Points · badges · focus' },
       { to: '/study-circle', icon: '👥', label: 'Study Circle', desc: 'Cohort Code rooms' },
       { to: '/doubts', icon: '💬', label: 'Ask Your Doubt', desc: 'Doubt on a question' },
+      { to: '/earn', icon: '💸', label: 'Earn & Refer', desc: 'Share link · vanity code' },
+      { to: '/campus-earn', icon: '🎓', label: 'Campus Earn', desc: 'University mentor program' },
     ],
   },
 ]
@@ -268,6 +272,9 @@ function StudentDashboard({ session }) {
                 Profile &amp; invite
               </Link>
             ) : null}
+            <Link to="/earn" className="sp-btn sp-btn-glass">
+              Earn &amp; Refer
+            </Link>
           </div>
         </div>
 
@@ -291,6 +298,23 @@ function StudentDashboard({ session }) {
       </section>
 
       <StudentNotificationsBanner userId={session?.userId} />
+
+      <CreatorVideoSpotlight limit={4} />
+
+      {session?.userId ? (
+        <section className="tv-refer-strip" aria-label="Refer and earn">
+          <div>
+            <h2>Refer &amp; earn</h2>
+            <p>
+              Share promo templates or approved reels with classmates. Earn when friends join —
+              WhatsApp, Instagram, and more.
+            </p>
+          </div>
+          <Link to="/earn#promo-gallery" className="btn btn-primary btn-sm">
+            Open promo gallery
+          </Link>
+        </section>
+      ) : null}
 
       <section className="sp-featured-strip" aria-label="Prepare centre">
         <Link

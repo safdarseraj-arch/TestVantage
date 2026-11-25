@@ -7,7 +7,7 @@ import { saveAttempt, getAllStudentAttempts } from './attemptHistory.js'
 import { scoreToPercentile } from './percentile.js'
 import { allowAutoDemoSeed } from './prodSafety.js'
 
-export const DEMO_BATCH_SEED_KEY = 'testvantage-demo-batch-results-v2'
+export const DEMO_BATCH_SEED_KEY = 'testvantage-demo-batch-results-v3'
 export const DEMO_BATCH_TEST_ID = 'jee-main-full-demo'
 export const DEMO_BATCH_TEST_TITLE = 'Sample classroom — JEE Main (practice only)'
 
@@ -34,6 +34,39 @@ const DEMO_BATCH_STUDENTS = [
 ]
 
 const MAX_SCORE = DEMO_SUBJECTS.length * DEMO_Q_PER_SUBJECT * DEMO_MARKS_CORRECT
+
+/** Demo chapters per subject for classroom heatmap */
+const DEMO_CHAPTERS = {
+  Physics: ['Kinematics', 'Laws of Motion', 'Current Electricity', 'Optics'],
+  Chemistry: ['Atomic Structure', 'Chemical Bonding', 'Equilibrium', 'Organic Chemistry'],
+  Maths: ['Complex Numbers', 'Matrices', 'Integrals', 'Probability'],
+}
+
+/**
+ * Build chapter failure mix for heatmap demos.
+ * @param {number} strength
+ * @param {string} subject
+ * @param {number} seed
+ */
+function buildChapterStats(strength, subject, seed) {
+  const chapters = DEMO_CHAPTERS[subject] || ['General']
+  /** @type {Record<string, { correct: number, wrong: number, unattempted: number }>} */
+  const byChapter = {}
+  chapters.forEach((ch, i) => {
+    const bias = ((seed + i * 3) % 7) * 0.04 - 0.12
+    const p = Math.max(0.15, Math.min(0.95, strength + bias))
+    const total = 6
+    const attempted = Math.round(total * (0.6 + p * 0.35))
+    const correct = Math.round(attempted * p)
+    const wrong = Math.max(0, attempted - correct)
+    byChapter[ch] = {
+      correct,
+      wrong,
+      unattempted: Math.max(0, total - attempted),
+    }
+  })
+  return byChapter
+}
 
 /**
  * Build one subject row with attempted / correct / negative / total marks.
@@ -150,8 +183,38 @@ export function seedDemoBatchResults(opts = {}) {
   const attempts = DEMO_BATCH_STUDENTS.map((s, i) => {
     const biases = [0.05 - (i % 3) * 0.03, -0.02 + (i % 2) * 0.04, 0.01 - (i % 4) * 0.02]
     const bySubject = {}
+    /** @type {Record<string, { correct: number, wrong: number, unattempted: number }>} */
+    const byChapter = {}
+    /** @type {object[]} */
+    const perQuestion = []
     for (let si = 0; si < DEMO_SUBJECTS.length; si += 1) {
-      bySubject[DEMO_SUBJECTS[si]] = buildSubjectStats(s.scorePct, biases[si])
+      const subName = DEMO_SUBJECTS[si]
+      bySubject[subName] = buildSubjectStats(s.scorePct, biases[si])
+      const chapterStats = buildChapterStats(s.scorePct, subName, i + si)
+      Object.assign(byChapter, chapterStats)
+      const subjectId = subName === 'Maths' ? 'mathematics' : subName.toLowerCase()
+      for (const [chapter, st] of Object.entries(chapterStats)) {
+        for (let qi = 0; qi < st.correct; qi++) {
+          perQuestion.push({
+            questionId: `demo-${i}-${subjectId}-${chapter}-c${qi}`,
+            subject: subjectId,
+            chapter,
+            grade: 'correct',
+            marks: 4,
+            maxMarks: 4,
+          })
+        }
+        for (let qi = 0; qi < st.wrong; qi++) {
+          perQuestion.push({
+            questionId: `demo-${i}-${subjectId}-${chapter}-w${qi}`,
+            subject: subjectId,
+            chapter,
+            grade: 'wrong',
+            marks: -1,
+            maxMarks: 4,
+          })
+        }
+      }
     }
 
     const subjects = DEMO_SUBJECTS.map((name) => normalizeSubjectStats(name, bySubject[name]))
@@ -164,6 +227,8 @@ export function seedDemoBatchResults(opts = {}) {
     const accuracy = attempted > 0 ? Math.round((correct / attempted) * 100) : 0
     const durationSeconds = s.minutes * 60 + (i % 7) * 13
     const submittedAt = now - i * 47 * 60_000 - (i % 3) * 120_000
+    // Spread demo submits across day slots for bio-clock demos when opened as student history
+    const startedAt = submittedAt - durationSeconds * 1000 - ((i % 4) * 5 + 8) * 3600_000
     const percentile = scoreToPercentile(score, MAX_SCORE)
     const ownerKey = `demo-batch-student-${i + 1}`
     const id = `demo-batch-att-${i + 1}`
@@ -177,6 +242,8 @@ export function seedDemoBatchResults(opts = {}) {
       submitReason: 'submit',
       questionTimes: {},
       visitedIds: [],
+      startedAt,
+      submittedAt,
       result: {
         score,
         maxScore: MAX_SCORE,
@@ -189,9 +256,9 @@ export function seedDemoBatchResults(opts = {}) {
         negativeMarks,
         attempted,
         bySubject,
-        byChapter: {},
+        byChapter,
         byQuestionType: {},
-        perQuestion: [],
+        perQuestion,
       },
     }
 
@@ -215,12 +282,13 @@ export function seedDemoBatchResults(opts = {}) {
       negativeMarks,
       durationSeconds,
       submittedAt,
+      startedAt,
       percentile,
       estimatedAIR: resultSnapshot.estimatedAIR,
       tabViolations: resultSnapshot.tabViolations,
       submitReason: 'submit',
       bySubject,
-      byChapter: {},
+      byChapter,
       byQuestionType: {},
       markedCount: 0,
       isDemoBatch: true,

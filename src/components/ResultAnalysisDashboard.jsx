@@ -1,5 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Area,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from 'recharts'
 import PercentileBar from './PercentileBar'
 import VerticalCompareChart from './VerticalCompareChart'
 import QuestionLevelAnalysis from './QuestionLevelAnalysis'
@@ -24,8 +35,18 @@ import {
   buildTimeSinks,
   buildWeakTopics,
   buildChapterSubjectMap,
+  buildQuestionLevelCohortStats,
   getAnalysisSubjectTabs,
 } from '../utils/testAnalysis.js'
+import {
+  buildClockStaminaCurve,
+  buildErrorDnaTypes,
+  enrichDifficultyWithSitterConversion,
+} from '../utils/resultAdvancedAnalytics.js'
+import {
+  getAttemptWrongReasons,
+  updateAttemptWrongReason,
+} from '../utils/attemptHistory.js'
 import { COMPARE_SERIES_LABELS, chartSeries } from '../utils/chartColors.js'
 import { formatTime } from '../utils/formatTime.js'
 
@@ -67,6 +88,7 @@ function InsightCallout({ title, children }) {
  *   studentGrades?: Map<string, string>
  *   comparison?: ReturnType<import('../utils/resultInsights.js').compareWithPreviousAttempt> | null
  *   attempts?: import('../utils/attemptHistory.js').Attempt[]
+ *   attemptId?: string | null
  * }} props
  */
 export default function ResultAnalysisDashboard({
@@ -76,6 +98,7 @@ export default function ResultAnalysisDashboard({
   studentGrades,
   comparison,
   attempts = [],
+  attemptId = null,
 }) {
   const navigate = useNavigate()
   const [mainTab, setMainTab] = useState('summary')
@@ -87,8 +110,65 @@ export default function ResultAnalysisDashboard({
   const [subjectTab, setSubjectTab] = useState('overall')
   const showSubjectTabs = SUBJECT_TAB_IDS.has(mainTab)
 
-  const { result } = data
+  const [wrongReasons, setWrongReasons] = useState(() => {
+    if (attemptId) return getAttemptWrongReasons(attemptId)
+    return { ...(data?.wrongReasons || {}) }
+  })
+
+  useEffect(() => {
+    if (attemptId) setWrongReasons(getAttemptWrongReasons(attemptId))
+  }, [attemptId])
+
+  const handleWrongReasonChange = useCallback(
+    (questionId, tagId) => {
+      setWrongReasons((prev) => {
+        const next = { ...prev }
+        if (tagId) next[questionId] = tagId
+        else delete next[questionId]
+        return next
+      })
+      if (attemptId) updateAttemptWrongReason(attemptId, questionId, tagId)
+    },
+    [attemptId],
+  )
+
+  const { result: rawResult } = data
+  const result = useMemo(() => {
+    if (!rawResult) return rawResult
+    const perQuestion = (rawResult.perQuestion || []).map((pq) => {
+      const tag = wrongReasons[pq.questionId]
+      return tag ? { ...pq, wrongReason: tag } : { ...pq, wrongReason: undefined }
+    })
+    return { ...rawResult, perQuestion }
+  }, [rawResult, wrongReasons])
+
   const questionTimes = data.questionTimes ?? {}
+  const sessionTelemetry = data.sessionTelemetry ?? null
+  const paperDurationSec =
+    Number(data.durationSeconds) > 0
+      ? Number(data.durationSeconds)
+      : Number(test.durationMinutes || 0) * 60
+
+  const autoErrorTypes = useMemo(() => {
+    const dna = buildErrorDnaTypes({
+      result: rawResult,
+      questionTimes,
+      paperDurationSec,
+      questions: test.questions,
+      wrongReasons: {},
+    })
+    /** @type {Record<string, string>} */
+    const map = {}
+    for (const item of dna.items || []) {
+      if (item.questionId && item.autoType) map[item.questionId] = item.autoType
+    }
+    return map
+  }, [rawResult, questionTimes, paperDurationSec, test.questions])
+
+  const chartData = useMemo(
+    () => ({ ...data, result, wrongReasons }),
+    [data, result, wrongReasons],
+  )
 
   const scoreComparison = useMemo(
     () => buildCohortScoreComparison(testId, result, test.examPatternId, subjectTab),
@@ -105,10 +185,36 @@ export default function ResultAnalysisDashboard({
     [result, subjectTab],
   )
 
-  const difficulty = useMemo(
+  const clockStamina = useMemo(
+    () =>
+      buildClockStaminaCurve({
+        result,
+        questionTimes,
+        sessionTelemetry,
+        paperDurationSec,
+        subjectFilter: subjectTab,
+      }),
+    [result, questionTimes, sessionTelemetry, paperDurationSec, subjectTab],
+  )
+
+  const difficultyRaw = useMemo(
     () => buildDifficultyAnalysis(result, testId, test.questions, subjectTab),
     [result, testId, test.questions, subjectTab],
   )
+
+  const difficultyEnrich = useMemo(() => {
+    const cohort = buildQuestionLevelCohortStats(testId, test.questions)
+    const cohortDiffMap = new Map(cohort.map((r) => [r.questionId, r.difficulty]))
+    return enrichDifficultyWithSitterConversion(difficultyRaw, {
+      result,
+      questionTimes,
+      questions: test.questions,
+      subjectFilter: subjectTab,
+      cohortDiffMap,
+    })
+  }, [difficultyRaw, result, questionTimes, test.questions, subjectTab, testId])
+
+  const difficulty = difficultyEnrich.rows
 
   const chapters = useMemo(
     () => buildChapterLevelAnalysis(result, testId, subjectTab),
@@ -176,8 +282,17 @@ export default function ResultAnalysisDashboard({
     [data, test, attempts],
   )
 
-  const staminaInsight = useMemo(() => buildStaminaInsight(stamina), [stamina])
-  const difficultyInsight = useMemo(() => buildDifficultyInsight(difficulty), [difficulty])
+  const staminaInsight = useMemo(
+    () => clockStamina.insight || buildStaminaInsight(stamina),
+    [clockStamina.insight, stamina],
+  )
+  const difficultyInsight = useMemo(() => {
+    const base = buildDifficultyInsight(difficulty)
+    if (difficultyEnrich.insightExtra) {
+      return base ? `${base} ${difficultyEnrich.insightExtra}` : difficultyEnrich.insightExtra
+    }
+    return base
+  }, [difficulty, difficultyEnrich.insightExtra])
 
   const staminaChart = useMemo(() => {
     if (!stamina.length) return null
@@ -353,7 +468,7 @@ export default function ResultAnalysisDashboard({
         <div className="rad-panel">
           <CohortDataNote studentCount={scoreComparison.studentCount} />
           <ResultChartsPanel
-            data={data}
+            data={chartData}
             test={test}
             attempts={attempts}
             scoreComparison={scoreComparison}
@@ -507,6 +622,9 @@ export default function ResultAnalysisDashboard({
             subjectFilter={subjectTab}
             perQuestion={result.perQuestion}
             initialQuestionId={focusQuestionId}
+            wrongReasons={wrongReasons}
+            autoErrorTypes={autoErrorTypes}
+            onWrongReasonChange={handleWrongReasonChange}
           />
         </div>
       )}
@@ -523,6 +641,26 @@ export default function ResultAnalysisDashboard({
             showMaxInLabel
           />
 
+          {difficultyEnrich.sitter?.conversion != null && (
+            <div className="rad-sitter-banner card">
+              <div>
+                <p className="rad-sitter-eyebrow">Sitter conversion</p>
+                <strong className="rad-sitter-pct">{difficultyEnrich.sitter.conversion}%</strong>
+                <p className="form-hint">
+                  {difficultyEnrich.sitter.correct}/{difficultyEnrich.sitter.total} easy items
+                  banked
+                  {difficultyEnrich.sitter.avgSitterSec != null
+                    ? ` · avg ${difficultyEnrich.sitter.avgSitterSec}s each`
+                    : ''}
+                </p>
+              </div>
+              <p className="rad-sitter-note">
+                Sitters are easy questions. Aim for 85%+ conversion — leftover easy marks are the
+                fastest way to climb.
+              </p>
+            </div>
+          )}
+
           <div className="rad-diff-grid">
             {difficulty.map((d) => (
               <div key={d.id} className={`rad-diff-card rad-diff-${d.id}`}>
@@ -536,6 +674,9 @@ export default function ResultAnalysisDashboard({
                   skipped
                 </p>
                 <p className="rad-diff-acc">{d.accuracy}% accuracy on attempted</p>
+                {d.id === 'easy' && d.sitterConversion != null && (
+                  <p className="rad-diff-sitter">Sitter conversion {d.sitterConversion}%</p>
+                )}
               </div>
             ))}
           </div>
@@ -626,9 +767,121 @@ export default function ResultAnalysisDashboard({
       {mainTab === 'stamina' && (
         <div className="rad-panel">
           <InsightCallout title="Stamina read">{staminaInsight}</InsightCallout>
+
+          {clockStamina.chart.length > 0 && (
+            <div className="card rad-clock-stamina">
+              <div className="rad-clock-stamina-head">
+                <div>
+                  <h3>Fatigue curve (clock)</h3>
+                  <p className="form-hint">
+                    {clockStamina.mode === 'clock'
+                      ? `Live exam clock · ${clockStamina.bucketMinutes}-min buckets`
+                      : clockStamina.mode === 'estimated'
+                        ? `Estimated from time spent · ${clockStamina.bucketMinutes}-min buckets (take a new mock for exact clock)`
+                        : `Sparse timing · ${clockStamina.bucketMinutes}-min buckets`}
+                  </p>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <ComposedChart data={clockStamina.chart} margin={{ top: 12, right: 12, left: -8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="radStaminaAccFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0d9488" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#0d9488" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12 }} />
+                  <YAxis
+                    yAxisId="acc"
+                    domain={[0, 100]}
+                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                    tickFormatter={(v) => `${v}%`}
+                  />
+                  <YAxis
+                    yAxisId="count"
+                    orientation="right"
+                    allowDecimals={false}
+                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const row = payload[0]?.payload
+                      if (!row) return null
+                      return (
+                        <div className="rcx-tooltip">
+                          <strong>{row.range}</strong>
+                          <p>Accuracy {row.accuracy}%</p>
+                          <p>
+                            {row.correct} correct · {row.incorrect} wrong · {row.unattempted} skipped
+                          </p>
+                        </div>
+                      )
+                    }}
+                  />
+                  <Legend />
+                  <Area
+                    yAxisId="acc"
+                    type="monotone"
+                    dataKey="accuracy"
+                    name="Accuracy %"
+                    stroke="#0d9488"
+                    fill="url(#radStaminaAccFill)"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: '#0d9488', strokeWidth: 0 }}
+                  />
+                  <Line
+                    yAxisId="count"
+                    type="monotone"
+                    dataKey="correct"
+                    name="Correct"
+                    stroke="#16a34a"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                  <Line
+                    yAxisId="count"
+                    type="monotone"
+                    dataKey="incorrect"
+                    name="Wrong"
+                    stroke="#dc2626"
+                    strokeWidth={2}
+                    strokeDasharray="4 3"
+                    dot={{ r: 3 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+
+              <div className="rad-stamina-grid rad-stamina-grid-clock">
+                {clockStamina.buckets.map((b) => (
+                  <div key={b.id} className="rad-stamina-card card">
+                    <h4>{b.range}</h4>
+                    <p className="rad-stamina-range">{b.total} questions in window</p>
+                    <div className="rad-stamina-stats">
+                      <div>
+                        <strong className="text-correct">{b.correct}</strong>
+                        <span>Correct</span>
+                      </div>
+                      <div>
+                        <strong className="text-wrong">{b.incorrect}</strong>
+                        <span>Incorrect</span>
+                      </div>
+                      <div>
+                        <strong>{b.unattempted}</strong>
+                        <span>Skipped</span>
+                      </div>
+                    </div>
+                    <p className="rad-stamina-pct">{b.accuracy}% accuracy this window</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <VerticalCompareChart
-            title="Stamina — performance across the paper"
-            subtitle="Correct vs incorrect vs unattempted in each quarter of the test"
+            title="Question-order quarters"
+            subtitle="Fallback view by question index (Q1…Qn split into four)"
             categories={
               staminaChart?.categories.map((c) => ({
                 id: c.id,
@@ -637,54 +890,6 @@ export default function ResultAnalysisDashboard({
             }
             series={staminaChart?.series ?? []}
           />
-
-          <div className="rad-stamina-grid">
-            {stamina.map((q) => (
-              <div key={q.id} className="rad-stamina-card card">
-                <h4>{q.label}</h4>
-                <p className="rad-stamina-range">{q.range}</p>
-                <div className="rad-stamina-stats">
-                  <div>
-                    <strong className="text-correct">{q.correct}</strong>
-                    <span>Correct</span>
-                  </div>
-                  <div>
-                    <strong className="text-wrong">{q.incorrect}</strong>
-                    <span>Incorrect</span>
-                  </div>
-                  <div>
-                    <strong>{q.unattempted}</strong>
-                    <span>Skipped</span>
-                  </div>
-                  <div>
-                    <strong>{q.attempted}</strong>
-                    <span>Attempted</span>
-                  </div>
-                </div>
-                <div className="rad-stamina-bar">
-                  {q.total > 0 && (
-                    <>
-                      <span
-                        className="seg correct"
-                        style={{ width: `${(q.correct / q.total) * 100}%` }}
-                      />
-                      <span
-                        className="seg wrong"
-                        style={{ width: `${(q.incorrect / q.total) * 100}%` }}
-                      />
-                      <span
-                        className="seg skipped"
-                        style={{ width: `${(q.unattempted / q.total) * 100}%` }}
-                      />
-                    </>
-                  )}
-                </div>
-                <p className="rad-stamina-pct">
-                  {q.total > 0 ? Math.round((q.correct / q.total) * 100) : 0}% accuracy this quarter
-                </p>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>

@@ -1,6 +1,14 @@
 import { getUserById, saveUserProfile } from './users.js'
 import { refreshSessionFromUser } from './auth.js'
 import { SELF_REGISTER_TEACHER_PERMS } from './permissions.js'
+import {
+  FACULTY_EXAM_SPECIALIZATIONS,
+  FACULTY_ONBOARDING_MODES,
+  defaultEntitlementsForMode,
+  lookupSchoolInvite,
+  normalizeEntitlements,
+  normalizeSchoolInviteCode,
+} from './facultyWorkbench.js'
 
 export const STUDENT_ONBOARDING_PATH = '/onboarding/student'
 export const TEACHER_ONBOARDING_PATH = '/onboarding/teacher'
@@ -226,6 +234,11 @@ export function validateTeacherProfile(raw) {
   const subjects = Array.isArray(raw?.subjects) ? raw.subjects.map(trim).filter(Boolean) : []
   const standards = Array.isArray(raw?.standards) ? raw.standards.map(trim).filter(Boolean) : []
   const experience = trim(raw?.experience)
+  const modeRaw = trim(raw?.onboardingMode)
+  const onboardingMode =
+    modeRaw === FACULTY_ONBOARDING_MODES.SCHOOL
+      ? FACULTY_ONBOARDING_MODES.SCHOOL
+      : FACULTY_ONBOARDING_MODES.INDEPENDENT
 
   if (!validDob(dob)) return { ok: false, error: 'Enter a valid date of birth.' }
   if (!subjects.length || !subjects.every((id) => TEACHER_SUBJECTS.some((s) => s.id === id))) {
@@ -238,6 +251,67 @@ export function validateTeacherProfile(raw) {
     return { ok: false, error: 'Keep academic / past experience under 2000 characters, or leave it blank.' }
   }
 
+  const examSpecializations = Array.isArray(raw?.examSpecializations)
+    ? raw.examSpecializations.map(trim).filter(Boolean)
+    : []
+  if (
+    examSpecializations.length &&
+    !examSpecializations.every((id) => FACULTY_EXAM_SPECIALIZATIONS.some((e) => e.id === id))
+  ) {
+    return { ok: false, error: 'Pick valid exam specializations.' }
+  }
+
+  let schoolInviteCode = ''
+  let campusName = trim(raw?.campusName)
+  let department = trim(raw?.department)
+  let schoolClasses = Array.isArray(raw?.schoolClasses)
+    ? raw.schoolClasses.map(trim).filter(Boolean)
+    : []
+  let systemQbTier = trim(raw?.systemQbTier) || ''
+
+  if (onboardingMode === FACULTY_ONBOARDING_MODES.SCHOOL) {
+    const invite = lookupSchoolInvite(raw?.schoolInviteCode)
+    if (!invite) {
+      return {
+        ok: false,
+        error: 'Enter a valid school invite code (try SCHOOL-DEMO or CAMPUS-TV).',
+      }
+    }
+    schoolInviteCode = invite.code
+    if (!campusName) campusName = invite.campusName
+    if (!department) department = invite.department
+    if (!schoolClasses.length) schoolClasses = [...invite.classes]
+    systemQbTier = invite.systemQbTier
+  } else if (examSpecializations.length < 1) {
+    return {
+      ok: false,
+      error: 'Pick at least one exam specialization (CBSE, JEE, NEET, …).',
+    }
+  }
+
+  const watermarkText = trim(raw?.watermarkText).slice(0, 120)
+  const paperHeaderText = trim(raw?.paperHeaderText).slice(0, 200)
+  const signatureDataUrl = trim(raw?.signatureDataUrl)
+  if (signatureDataUrl && !signatureDataUrl.startsWith('data:image/')) {
+    return { ok: false, error: 'Signature must be an image file.' }
+  }
+  if (signatureDataUrl.length > 450_000) {
+    return { ok: false, error: 'Signature image is too large. Use a smaller PNG or JPG.' }
+  }
+
+  const entitlements = normalizeEntitlements(
+    raw?.entitlements,
+    onboardingMode === FACULTY_ONBOARDING_MODES.SCHOOL
+      ? FACULTY_ONBOARDING_MODES.SCHOOL
+      : FACULTY_ONBOARDING_MODES.INDEPENDENT,
+  )
+  if (!raw?.entitlements) {
+    Object.assign(
+      entitlements,
+      defaultEntitlementsForMode(onboardingMode, { systemQbTier }),
+    )
+  }
+
   return {
     ok: true,
     profile: {
@@ -246,6 +320,18 @@ export function validateTeacherProfile(raw) {
       subjects,
       standards,
       experience,
+      onboardingMode,
+      examSpecializations,
+      schoolInviteCode: schoolInviteCode || normalizeSchoolInviteCode(raw?.schoolInviteCode) || '',
+      campusName,
+      department,
+      schoolClasses,
+      systemQbTier,
+      watermarkText,
+      paperHeaderText,
+      signatureDataUrl: signatureDataUrl || '',
+      entitlements,
+      personalVaultOwned: true,
     },
   }
 }

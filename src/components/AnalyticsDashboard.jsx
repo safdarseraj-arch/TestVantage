@@ -1,6 +1,21 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import StatBar from './StatBar'
+import {
+  ResponsiveContainer,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ComposedChart,
+  Line,
+} from 'recharts'
 import { ALL_SUBJECTS } from '../data/subjects'
 import { formatTime } from '../utils/formatTime'
 import AiStudyPlanPanel from './AiStudyPlanPanel'
@@ -11,6 +26,8 @@ import { savePracticePrefill } from '../utils/aiMastery.js'
 import { buildExamFit } from '../utils/examFit.js'
 import { buildFormForecast } from '../utils/formForecast.js'
 import { buildPrecisionMap } from '../utils/precisionMap.js'
+import { buildErrorDnaTypes } from '../utils/resultAdvancedAnalytics.js'
+import { attemptToResultData } from '../utils/attemptHistory.js'
 
 const ANALYTICS_TABS = [
   { id: 'overview', label: 'Overview', short: 'Overview', icon: '📊' },
@@ -28,8 +45,6 @@ const ANALYTICS_TABS = [
 export default function AnalyticsDashboard({ stats, attempts = [] }) {
   const navigate = useNavigate()
   const [tab, setTab] = useState('overview')
-  const maxTrend = Math.max(...stats.trend.map((t) => t.percentile), 1)
-  const maxActivity = Math.max(...stats.activityByDay.map((d) => d.count), 1)
   const attemptList = attempts.length ? attempts : []
   const forecastBundle = buildFormForecast(attemptList)
   const fit = buildExamFit(attemptList)
@@ -37,6 +52,84 @@ export default function AnalyticsDashboard({ stats, attempts = [] }) {
   const primary = forecastBundle.byExam[forecastBundle.primaryExamId]
   const latest = attemptList[0]
   const activeTab = ANALYTICS_TABS.find((t) => t.id === tab)
+
+  const trendChart = useMemo(
+    () =>
+      (stats.trend || []).map((t, i) => ({
+        i: i + 1,
+        label: new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        percentile: Math.round(t.percentile),
+        scorePct: t.maxScore > 0 ? Math.round((t.score / t.maxScore) * 100) : 0,
+      })),
+    [stats.trend],
+  )
+
+  const activityChart = useMemo(
+    () => (stats.activityByDay || []).map((d) => ({ day: d.day, count: d.count })),
+    [stats.activityByDay],
+  )
+
+  const subjectChart = useMemo(() => {
+    return ALL_SUBJECTS.filter((s) => stats.bySubject?.[s.id]).map((s) => {
+      const d = stats.bySubject[s.id]
+      const pct = d.max > 0 ? Math.round((d.score / d.max) * 100) : 0
+      return { id: s.id, label: s.label, pct, color: s.color }
+    })
+  }, [stats.bySubject])
+
+  const errorDna = useMemo(() => {
+    const recent = (attemptList || []).slice(0, 8)
+    /** @type {Record<string, number>} */
+    const totals = {}
+    let tagged = 0
+    for (const att of recent) {
+      const data = attemptToResultData(att)
+      if (!data?.result?.perQuestion?.length) continue
+      const dna = buildErrorDnaTypes({
+        result: data.result,
+        questionTimes: data.questionTimes ?? {},
+        paperDurationSec: data.durationSeconds ?? 0,
+        wrongReasons: data.wrongReasons ?? att.wrongReasons ?? {},
+      })
+      for (const [key, n] of Object.entries(dna.counts || {})) {
+        if (!n) continue
+        totals[key] = (totals[key] ?? 0) + n
+        tagged += n
+      }
+    }
+    if (tagged >= 3) {
+      const meta = {
+        question_misread: { name: 'Question Misread', color: '#e11d48' },
+        question_misunderstanding: { name: 'Question Misunderstanding', color: '#d97706' },
+        conceptual_error: { name: 'Conceptual Error', color: '#7c3aed' },
+        calculation_error: { name: 'Calculation error', color: '#2563eb' },
+        formula_error: { name: 'Formula error', color: '#0d9488' },
+        guess: { name: 'Guess', color: '#64748b' },
+        silly: { name: 'Silly / avoidable', color: '#e11d48' },
+        overtime: { name: 'Overtime wrong', color: '#c2410c' },
+        concept: { name: 'Concept gap', color: '#6d28d9' },
+        calc: { name: 'Calc / numerical', color: '#1d4ed8' },
+        other: { name: 'Other', color: '#94a3b8' },
+      }
+      return Object.keys(totals)
+        .map((key) => ({
+          name: meta[key]?.name ?? key,
+          value: totals[key],
+          color: meta[key]?.color ?? '#64748b',
+        }))
+        .filter((d) => d.value > 0)
+        .sort((a, b) => b.value - a.value)
+    }
+    // Fallback: weak-chapter donut when type tags are thin
+    const weak = (stats.weakChapters || []).slice(0, 6)
+    if (!weak.length) return []
+    const colors = ['#e11d48', '#d97706', '#0d9488', '#2563eb', '#7c3aed', '#64748b']
+    return weak.map((w, i) => ({
+      name: w.chapter || w.topic || w.label || `Topic ${i + 1}`,
+      value: Math.max(1, Math.round(100 - (w.accuracy ?? w.pct ?? 50))),
+      color: colors[i % colors.length],
+    }))
+  }, [attemptList, stats.weakChapters])
 
   return (
     <div className="si-analytics">
@@ -188,69 +281,139 @@ export default function AnalyticsDashboard({ stats, attempts = [] }) {
 
       {tab === 'trends' && (
         <div className="si-analytics-two-col">
-          <section className="card si-chart-card">
-            <h2>Percentile trend</h2>
-            <p className="form-hint">Last {stats.trend.length} attempts — higher is better</p>
-            <div className="si-trend-chart">
-              {stats.trend.map((t, i) => (
-                <div
-                  key={`${t.label}-${i}`}
-                  className="si-trend-col"
-                  title={`${t.percentile.toFixed(0)} percentile · ${new Date(t.date).toLocaleDateString()}`}
-                >
-                  <div
-                    className="si-trend-bar"
-                    style={{ height: `${Math.max(12, (t.percentile / maxTrend) * 100)}%` }}
+          <section className="card si-chart-card si-rechart-card">
+            <h2>Percentile & score trend</h2>
+            <p className="form-hint">Last {trendChart.length} attempts — dual-axis view</p>
+            {trendChart.length < 2 ? (
+              <p className="form-hint">Need at least two attempts for a trend line.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={trendChart} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="siPctFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0d9488" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#0d9488" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e8ecf2" />
+                  <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} />
+                  <YAxis
+                    yAxisId="left"
+                    domain={[0, 100]}
+                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                    tickFormatter={(v) => `${v}`}
                   />
-                  <span className="si-trend-pct">{Math.round(t.percentile)}</span>
-                  <span className="si-trend-label">
-                    {new Date(t.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                  </span>
-                </div>
-              ))}
-            </div>
+                  <Tooltip />
+                  <Legend />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="percentile"
+                    name="Percentile"
+                    stroke="#0d9488"
+                    fill="url(#siPctFill)"
+                    strokeWidth={2.5}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="scorePct"
+                    name="Score %"
+                    stroke="#2563eb"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+            <p className="aqm-takeaway">
+              {stats.scoreTrendDelta > 0
+                ? `Up ${stats.scoreTrendDelta} pts vs last test — protect this streak with one timed mock this week.`
+                : stats.scoreTrendDelta < 0
+                  ? `Down ${Math.abs(stats.scoreTrendDelta)} pts vs last — open weak chapters and drill the top two.`
+                  : 'Take another mock to unlock a clearer trajectory.'}
+            </p>
           </section>
 
-          <section className="card si-chart-card">
+          <section className="card si-chart-card si-rechart-card">
             <h2>Activity</h2>
             <p className="form-hint">Tests per day (recent)</p>
-            <div className="si-activity-chart">
-              {stats.activityByDay.map((d) => (
-                <div key={d.day} className="si-activity-col" title={`${d.count} test(s)`}>
-                  <div
-                    className="si-activity-bar"
-                    style={{ height: `${Math.max(8, (d.count / maxActivity) * 100)}%` }}
-                  />
-                  <span className="si-activity-label">{d.day}</span>
-                </div>
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={activityChart} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e8ecf2" vertical={false} />
+                <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="count" name="Tests" fill="#2563eb" radius={[6, 6, 0, 0]} maxBarSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
           </section>
+
+          {errorDna.length > 0 && (
+            <section className="card si-chart-card si-rechart-card si-error-dna">
+              <h2>Personal error DNA</h2>
+              <p className="form-hint">
+                Your “Why I got it wrong” tags when set; otherwise auto silly / overtime / concept /
+                calc. Falls back to weak chapters when tags are thin.
+              </p>
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={errorDna}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={48}
+                    outerRadius={78}
+                    paddingAngle={2}
+                    stroke="none"
+                  >
+                    {errorDna.map((d) => (
+                      <Cell key={d.name} fill={d.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v, n) => [`gap weight ${v}`, n]} />
+                  <Legend verticalAlign="bottom" height={48} iconType="circle" />
+                </PieChart>
+              </ResponsiveContainer>
+            </section>
+          )}
         </div>
       )}
 
-      {tab === 'subjects' && Object.keys(stats.bySubject).length > 0 && (
-        <section className="card si-subject-mastery">
+      {tab === 'subjects' && subjectChart.length > 0 && (
+        <section className="card si-subject-mastery si-rechart-card">
           <h2>Subject performance</h2>
           <p className="form-hint">Average score % across all your attempts</p>
-          <div className="si-subject-bars">
-            {ALL_SUBJECTS.filter((s) => stats.bySubject[s.id]).map((s) => {
-              const d = stats.bySubject[s.id]
-              const pct = d.max > 0 ? Math.round((d.score / d.max) * 100) : 0
-              const isStrong = stats.strongSubjects.some((x) => x.id === s.id)
-              const isWeak = stats.weakSubjects.some((x) => x.id === s.id)
-              return (
-                <div key={s.id} className="si-subject-row">
-                  <div className="si-subject-row-head">
-                    <span style={{ color: s.color }}>{s.label}</span>
-                    <strong>{pct}%</strong>
-                    {isStrong && <span className="si-tag si-tag-good">Strong</span>}
-                    {isWeak && <span className="si-tag si-tag-weak">Needs work</span>}
-                  </div>
-                  <StatBar label="" value={pct} max={100} color={s.color} />
-                </div>
-              )
-            })}
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart
+              data={subjectChart}
+              layout="vertical"
+              margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e8ecf2" horizontal={false} />
+              <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
+              <YAxis type="category" dataKey="label" width={100} tick={{ fill: '#334155', fontSize: 12 }} />
+              <Tooltip formatter={(v) => [`${v}%`, 'Avg score']} />
+              <Bar dataKey="pct" name="Avg score %" radius={[0, 8, 8, 0]} maxBarSize={22}>
+                {subjectChart.map((d) => (
+                  <Cell key={d.id} fill={d.color || '#2563eb'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="si-subject-tags">
+            {stats.strongSubjects?.slice(0, 3).map((s) => (
+              <span key={s.id} className="si-tag si-tag-good">
+                Strong · {ALL_SUBJECTS.find((x) => x.id === s.id)?.label || s.id}
+              </span>
+            ))}
+            {stats.weakSubjects?.slice(0, 3).map((s) => (
+              <span key={s.id} className="si-tag si-tag-weak">
+                Needs work · {ALL_SUBJECTS.find((x) => x.id === s.id)?.label || s.id}
+              </span>
+            ))}
           </div>
         </section>
       )}

@@ -667,6 +667,103 @@
   font-size: 0.78rem;
 }
 
+/* —— Why I got it wrong —— */
+.rqw-why {
+  margin: 0 0 1rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid #fde68a;
+  background: linear-gradient(180deg, #fffbeb 0%, #fff 85%);
+}
+
+.rqw-why-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.rqw-why-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #92400e;
+  letter-spacing: -0.01em;
+}
+
+.rqw-why-hint {
+  font-size: 0.78rem;
+  color: #a16207;
+  line-height: 1.35;
+}
+
+.rqw-why-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.rqw-why-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #334155;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    box-shadow 0.12s ease,
+    color 0.12s ease;
+}
+
+.rqw-why-chip:hover {
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.rqw-why-chip.suggested {
+  border-style: dashed;
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.rqw-why-chip.active {
+  border-color: #d97706;
+  border-style: solid;
+  background: #fef3c7;
+  color: #78350f;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+}
+
+.rqw-why-soft {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #b45309;
+  opacity: 0.9;
+}
+
+.rqw-q-pill.tagged::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d97706;
+}
+
 @media (max-width: 900px) {
   .rqw-split {
     grid-template-columns: 1fr;

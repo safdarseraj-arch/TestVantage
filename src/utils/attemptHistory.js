@@ -44,6 +44,61 @@ export function saveAttempt(attempt) {
   return entry
 }
 
+/**
+ * Persist a student’s “Why I got it wrong” tag on one question of an attempt.
+ * @param {string} attemptId
+ * @param {string} questionId
+ * @param {string | null} tagId  pass null to clear
+ * @returns {object | null} updated attempt
+ */
+export function updateAttemptWrongReason(attemptId, questionId, tagId) {
+  if (!attemptId || !questionId) return null
+  const data = loadAll()
+  const idx = data.attempts.findIndex((a) => a.id === attemptId)
+  if (idx < 0) return null
+  const att = { ...data.attempts[idx] }
+  const nextMap = { ...(att.wrongReasons || {}) }
+  if (tagId) nextMap[questionId] = tagId
+  else delete nextMap[questionId]
+  att.wrongReasons = nextMap
+  att.savedAt = Date.now()
+
+  if (att.resultSnapshot?.result?.perQuestion) {
+    const snap = { ...att.resultSnapshot, result: { ...att.resultSnapshot.result } }
+    snap.result.perQuestion = (snap.result.perQuestion || []).map((pq) =>
+      pq.questionId === questionId
+        ? { ...pq, wrongReason: tagId || undefined }
+        : pq,
+    )
+    snap.wrongReasons = nextMap
+    att.resultSnapshot = snap
+  }
+  if (Array.isArray(att.perQuestion)) {
+    att.perQuestion = att.perQuestion.map((pq) =>
+      pq.questionId === questionId
+        ? { ...pq, wrongReason: tagId || undefined }
+        : pq,
+    )
+  }
+
+  data.attempts[idx] = att
+  saveAll(data)
+  return att
+}
+
+/** @param {string} attemptId */
+export function getAttemptWrongReasons(attemptId) {
+  const att = getAttemptById(attemptId)
+  if (!att) return {}
+  if (att.wrongReasons && typeof att.wrongReasons === 'object') return { ...att.wrongReasons }
+  if (att.resultSnapshot?.wrongReasons) return { ...att.resultSnapshot.wrongReasons }
+  const fromPq = {}
+  for (const pq of att.resultSnapshot?.result?.perQuestion ?? att.perQuestion ?? []) {
+    if (pq?.wrongReason && pq.questionId) fromPq[pq.questionId] = pq.wrongReason
+  }
+  return fromPq
+}
+
 /** @param {string} ownerKey */
 export function getAttemptsByOwner(ownerKey) {
   return loadAll().attempts.filter((a) => a.ownerKey === ownerKey)
@@ -94,8 +149,27 @@ export async function getAllStudentAttemptsAsync(opts = {}) {
  */
 export function attemptToResultData(attempt) {
   if (!attempt) return null
+  const wrongReasons =
+    (attempt.wrongReasons && typeof attempt.wrongReasons === 'object'
+      ? attempt.wrongReasons
+      : null) ||
+    (attempt.resultSnapshot?.wrongReasons && typeof attempt.resultSnapshot.wrongReasons === 'object'
+      ? attempt.resultSnapshot.wrongReasons
+      : {}) ||
+    {}
+
+  /** @param {object[]} list */
+  const attachWrongReasons = (list) =>
+    (list || []).map((pq) => {
+      const tag = wrongReasons[pq.questionId] ?? pq.wrongReason
+      return tag ? { ...pq, wrongReason: tag } : { ...pq }
+    })
+
   const snap = attempt.resultSnapshot
   if (snap) {
+    const result = snap.result
+      ? { ...snap.result, perQuestion: attachWrongReasons(snap.result.perQuestion) }
+      : snap.result
     return {
       testId: attempt.testId,
       title: attempt.title ?? snap.title,
@@ -103,17 +177,21 @@ export function attemptToResultData(attempt) {
       testTypeId: attempt.testTypeId,
       userName: attempt.userName,
       userEmail: attempt.userEmail,
-      submittedAt: attempt.submittedAt,
+      submittedAt: attempt.submittedAt ?? snap.submittedAt ?? null,
       durationSeconds: attempt.durationSeconds ?? snap.durationSeconds,
       percentile: attempt.percentile ?? snap.percentile,
       estimatedAIR: attempt.estimatedAIR ?? snap.estimatedAIR,
       tabViolations: attempt.tabViolations ?? snap.tabViolations ?? 0,
       submitReason: attempt.submitReason ?? snap.submitReason,
       questionTimes: snap.questionTimes ?? {},
+      sessionTelemetry: snap.sessionTelemetry ?? null,
       visitedIds: snap.visitedIds ?? [],
-      result: snap.result,
+      result,
+      wrongReasons: { ...wrongReasons },
       calibratedStanding: snap.calibratedStanding,
       calibratedSectionResults: snap.calibratedSectionResults,
+      startedAt: attempt.startedAt ?? snap.startedAt ?? null,
+      examPlan: attempt.examPlan ?? snap.examPlan ?? null,
     }
   }
   return {
@@ -125,6 +203,10 @@ export function attemptToResultData(attempt) {
     percentile: attempt.percentile,
     estimatedAIR: attempt.estimatedAIR,
     tabViolations: attempt.tabViolations ?? 0,
+    startedAt: attempt.startedAt ?? null,
+    submittedAt: attempt.submittedAt ?? null,
+    examPlan: attempt.examPlan ?? null,
+    wrongReasons: { ...wrongReasons },
     result: {
       score: attempt.score,
       maxScore: attempt.maxScore,
@@ -136,10 +218,11 @@ export function attemptToResultData(attempt) {
       bySubject: attempt.bySubject ?? {},
       byChapter: attempt.byChapter ?? {},
       byQuestionType: attempt.byQuestionType ?? {},
-      perQuestion: attempt.perQuestion ?? [],
+      perQuestion: attachWrongReasons(attempt.perQuestion ?? []),
       markedCount: attempt.markedCount ?? 0,
     },
     questionTimes: attempt.questionTimes ?? {},
+    sessionTelemetry: attempt.sessionTelemetry ?? null,
     visitedIds: attempt.visitedIds ?? [],
   }
 }

@@ -545,6 +545,25 @@
   font-size: 1.05rem;
 }
 
+.si-rechart-card {
+  min-height: 0;
+}
+
+.si-rechart-card .aqm-takeaway {
+  margin-top: 0.75rem;
+}
+
+.si-error-dna {
+  grid-column: 1 / -1;
+}
+
+.si-subject-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+}
+
 /* Trend chart */
 .si-trend-chart {
   display: flex;

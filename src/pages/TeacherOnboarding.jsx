@@ -2,20 +2,32 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import TeacherProfileFields from '../components/TeacherProfileFields'
+import { FACULTY_ONBOARDING_MODES } from '../utils/facultyWorkbench'
 import {
   TEACHER_HOME_PATH,
   completeTeacherProfile,
   needsTeacherOnboarding,
 } from '../utils/userProfiles'
 
+const EMPTY = {
+  dob: '',
+  subjects: [],
+  standards: [],
+  experience: '',
+  onboardingMode: FACULTY_ONBOARDING_MODES.INDEPENDENT,
+  examSpecializations: [],
+  schoolInviteCode: '',
+  campusName: '',
+  department: '',
+  schoolClasses: [],
+  watermarkText: '',
+  paperHeaderText: '',
+  signatureDataUrl: '',
+}
+
 export default function TeacherOnboarding() {
   const { session, isTeacher, isAdmin, refresh } = useAuth()
-  const [values, setValues] = useState({
-    dob: '',
-    subjects: [],
-    standards: [],
-    experience: '',
-  })
+  const [values, setValues] = useState(EMPTY)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
@@ -45,7 +57,7 @@ export default function TeacherOnboarding() {
         <div className="auth-shell auth-shell--continue">
           <div className="auth-form-panel">
             <div className="auth-form-header">
-              <h1>Teacher tools ready</h1>
+              <h1>Faculty workbench ready</h1>
               <p>Opening Teacher home. If this stays here, tap Continue.</p>
             </div>
             <Link to={TEACHER_HOME_PATH} className="btn btn-primary auth-submit-btn">
@@ -77,24 +89,24 @@ export default function TeacherOnboarding() {
         <div className="auth-brand-panel">
           <div className="auth-brand-glow" aria-hidden="true" />
           <span className="auth-brand-mark">TV</span>
-          <h2>Finish your teacher profile</h2>
+          <h2>Faculty onboarding</h2>
           <p className="auth-brand-lead">
-            After this page, your own question bank, lecture plan, and paper tools turn on. Official
-            PYQ approve stays with the founder admin.
+            School-invited or independent — finish this once to open your Personal Vault, lecture
+            plan, and paper tools. Official PYQ approve stays with the founder admin.
           </p>
           <ul className="auth-feature-list">
-            <li>Create and upload to your bank</li>
-            <li>Lecture planner and bank management</li>
-            <li>Make papers, generate, and PDF</li>
+            <li>Path A: school invite → campus + school bank</li>
+            <li>Path B: independent → personal batches &amp; vault</li>
+            <li>Your Personal Vault IP stays portable</li>
           </ul>
         </div>
 
         <div className="auth-form-panel onboarding-form-panel">
           <div className="auth-form-header">
-            <h1>Teaching details</h1>
+            <h1>Set up your workbench</h1>
             <p>
-              Welcome{session.name ? `, ${session.name.split(' ')[0]}` : ''}. Date of birth, subjects,
-              and class are required. Experience is optional.
+              Welcome{session.name ? `, ${session.name.split(' ')[0]}` : ''}. Choose school-invited
+              or independent, then subjects and class.
             </p>
           </div>
 

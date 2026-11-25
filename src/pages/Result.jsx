@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ResultAnalysisDashboard from '../components/ResultAnalysisDashboard'
 import ResultScoreRing from '../components/ResultScoreRing'
 import { attemptToResultData, getAttemptById, getAttemptsByOwner } from '../utils/attemptHistory'
@@ -21,10 +21,16 @@ import { getSubjectsForPattern } from '../data/subjects'
 import { getTestById } from '../data/tests'
 import WeakChaptersPanel from '../components/WeakChaptersPanel'
 import ResultNextSteps from '../components/ResultNextSteps'
+import ResultShareReport from '../components/ResultShareReport'
+import PlanAdherencePanel from '../components/PlanAdherencePanel'
+import RoughSheetPanel from '../components/RoughSheetPanel'
 import { buildChapterSubjectMap, buildWeakTopics } from '../utils/testAnalysis'
+import { loadExamStrategyPlan } from '../utils/examStrategyPlan'
+import { createMistakeOnlyRetest, listWrongQuestionIds } from '../utils/mistakeOnlyRetest'
 
 export default function Result() {
   const { testId } = useParams()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { session } = useAuth()
   const ownerKey = getOwnerKey(session?.userId)
@@ -81,6 +87,28 @@ export default function Result() {
     const top = weakTopics[0]?.chapter
     return top ? (chapterSubjects[top] ?? []) : []
   }, [weakTopics, chapterSubjects])
+
+  const examPlan = useMemo(() => {
+    if (data?.examPlan) return data.examPlan
+    if (storedAttempt?.examPlan) return storedAttempt.examPlan
+    if (storedAttempt?.resultSnapshot?.examPlan) return storedAttempt.resultSnapshot.examPlan
+    return loadExamStrategyPlan(testId, ownerKey)
+  }, [data, storedAttempt, testId, ownerKey])
+
+  const wrongCount = useMemo(
+    () => (data?.result ? listWrongQuestionIds(data.result).length : 0),
+    [data],
+  )
+
+  const onMistakeRetest = () => {
+    if (!test || !data?.result) return
+    const created = createMistakeOnlyRetest({ test, result: data.result })
+    if (!created.ok) {
+      window.alert(created.error)
+      return
+    }
+    navigate(`/exam/${created.test.id}`)
+  }
 
   if (!data) {
     return (
@@ -291,9 +319,46 @@ export default function Result() {
           examPatternId={examPatternId}
           chapterSubjects={chapterSubjects}
           title="Focus areas from this test"
-          subtitle="Sorted weakest first — one tap starts a practice session for that chapter."
+          subtitle="Sorted weakest first — Practice or open NCERT when a chapter link exists."
           maxRows={6}
         />
+      )}
+
+      <ResultShareReport data={data} test={test} studentName={data.userName} />
+
+      <PlanAdherencePanel
+        plan={examPlan}
+        result={result}
+        questionTimes={data.questionTimes}
+        sessionTelemetry={data.sessionTelemetry}
+        examPatternId={examPatternId}
+      />
+
+      <RoughSheetPanel
+        attemptId={
+          attemptId ||
+          storedAttempt?.id ||
+          (data.submittedAt ? `session-${testId}-${data.submittedAt}` : null)
+        }
+      />
+
+      {wrongCount > 0 && (
+        <div className="card si-mistake-retest">
+          <div className="si-mistake-retest-body">
+            <div>
+              <p className="si-weak-eyebrow">Spaced / mistake-only</p>
+              <h2>Practice only wrong questions</h2>
+              <p className="form-hint">
+                Timed mini-paper of the {wrongCount}{' '}
+                {wrongCount === 1 ? 'question' : 'questions'} you missed — same stems from this
+                attempt.
+              </p>
+            </div>
+            <button type="button" className="btn btn-primary" onClick={onMistakeRetest}>
+              Start mistake retest
+            </button>
+          </div>
+        </div>
       )}
 
       <p className="si-ff-hint form-hint">
@@ -308,6 +373,7 @@ export default function Result() {
         studentGrades={studentGradeMap}
         comparison={comparison}
         attempts={attempts}
+        attemptId={attemptId || storedAttempt?.id || null}
       />
 
       <ResultNextSteps
@@ -316,6 +382,8 @@ export default function Result() {
         topWeakChapter={weakTopics[0]?.chapter}
         topWeakSubjects={topWeakSubjects}
         testTypeId={data.testTypeId}
+        wrongCount={wrongCount}
+        onMistakeRetest={wrongCount > 0 ? onMistakeRetest : undefined}
       />
 
       <div className="result-actions si-result-actions si-result-actions-secondary">

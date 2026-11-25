@@ -135,6 +135,7 @@ assert.ok(teacher.permissions.includes(PERMS.CREATE_PAPER))
 assert.ok(teacher.permissions.includes(PERMS.UPLOAD_QUESTIONS))
 assert.ok(!teacher.permissions.includes(PERMS.PUBLISH_QUESTIONS))
 assert.ok(!teacher.permissions.includes(PERMS.ACCESS_MAIN_QUESTION_BANK))
+assert.equal(teacher.profile.watermarkText, 'Ms Rao · confidential')
 assert.deepEqual([...teacher.permissions].sort(), [...SELF_REGISTER_TEACHER_PERMS].sort())
 
 const existingStudent = {
@@ -174,6 +175,8 @@ assert.equal(legacyTeacherDone.ok, true)
 assert.equal(getUserById(existingTeacher.id).profile.onboardingMode, 'school')
 assert.equal(getUserById(existingTeacher.id).profile.entitlements.can_contribute_school_qb, true)
 assert.ok(getUserById(existingTeacher.id).permissions.includes(PERMS.UPLOAD_QUESTIONS))
+assert.ok(getUserById(existingTeacher.id).permissions.includes(PERMS.ACCESS_MAIN_QUESTION_BANK))
+assert.ok(getUserById(existingTeacher.id).permissions.includes(PERMS.ASSIGN_TESTS))
 assert.ok(!getUserById(existingTeacher.id).permissions.includes(PERMS.PUBLISH_QUESTIONS))
 
 assert.equal(signedInHomePath(null), '/home')

@@ -1,36 +1,72 @@
-import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import TeacherProfileFields from '../components/TeacherProfileFields'
-import { FACULTY_ONBOARDING_MODES } from '../utils/facultyWorkbench'
+import {
+  FACULTY_ONBOARDING_MODES,
+  lookupSchoolInvite,
+  readRememberedSchoolInvite,
+  rememberSchoolInvite,
+} from '../utils/facultyWorkbench'
 import {
   TEACHER_HOME_PATH,
   completeTeacherProfile,
   needsTeacherOnboarding,
 } from '../utils/userProfiles'
 
-const EMPTY = {
-  dob: '',
-  subjects: [],
-  standards: [],
-  experience: '',
-  onboardingMode: FACULTY_ONBOARDING_MODES.INDEPENDENT,
-  examSpecializations: [],
-  schoolInviteCode: '',
-  campusName: '',
-  department: '',
-  schoolClasses: [],
-  watermarkText: '',
-  paperHeaderText: '',
-  signatureDataUrl: '',
+function initialValuesFromInvite(rawCode) {
+  const invite = lookupSchoolInvite(rawCode)
+  if (!invite) {
+    return {
+      dob: '',
+      subjects: [],
+      standards: [],
+      experience: '',
+      onboardingMode: FACULTY_ONBOARDING_MODES.INDEPENDENT,
+      examSpecializations: [],
+      schoolInviteCode: '',
+      campusName: '',
+      department: '',
+      schoolClasses: [],
+      watermarkText: '',
+      paperHeaderText: '',
+      signatureDataUrl: '',
+    }
+  }
+  rememberSchoolInvite(invite.code)
+  return {
+    dob: '',
+    subjects: [],
+    standards: [],
+    experience: '',
+    onboardingMode: FACULTY_ONBOARDING_MODES.SCHOOL,
+    examSpecializations: [],
+    schoolInviteCode: invite.code,
+    campusName: invite.campusName,
+    department: invite.department,
+    schoolClasses: [...(invite.classes || [])],
+    watermarkText: '',
+    paperHeaderText: '',
+    signatureDataUrl: '',
+  }
 }
 
 export default function TeacherOnboarding() {
   const { session, isTeacher, isAdmin, refresh } = useAuth()
-  const [values, setValues] = useState(EMPTY)
+  const [searchParams] = useSearchParams()
+  const inviteFromUrl =
+    searchParams.get('schoolInvite') || searchParams.get('invite') || readRememberedSchoolInvite()
+  const [values, setValues] = useState(() => initialValuesFromInvite(inviteFromUrl))
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [done, setDone] = useState(false)
+
+  const pathHint = useMemo(() => {
+    if (values.onboardingMode === FACULTY_ONBOARDING_MODES.SCHOOL) {
+      return 'School path — campus rights and school bank submit after you save.'
+    }
+    return 'Independent path — Personal Vault and branded papers for your own batches.'
+  }, [values.onboardingMode])
 
   if (!session || !isTeacher || isAdmin) {
     return (
@@ -73,7 +109,10 @@ export default function TeacherOnboarding() {
     e.preventDefault()
     setError('')
     setSaving(true)
-    const result = completeTeacherProfile(session.userId, values)
+    const result = completeTeacherProfile(session.userId, {
+      ...values,
+      suggestName: session.name,
+    })
     setSaving(false)
     if (!result.ok) {
       setError(result.error ?? 'Could not save. Check the fields and try again.')
@@ -105,15 +144,49 @@ export default function TeacherOnboarding() {
           <div className="auth-form-header">
             <h1>Set up your workbench</h1>
             <p>
-              Welcome{session.name ? `, ${session.name.split(' ')[0]}` : ''}. Choose school-invited
-              or independent, then subjects and class.
+              Welcome{session.name ? `, ${session.name.split(' ')[0]}` : ''}. {pathHint}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="onboarding-form">
             <TeacherProfileFields
               values={values}
-              onChange={(field, value) => setValues((prev) => ({ ...prev, [field]: value }))}
+              onChange={(field, value) => {
+                setValues((prev) => {
+                  const next = { ...prev, [field]: value }
+                  if (field === 'schoolInviteCode') {
+                    const hit = lookupSchoolInvite(value)
+                    if (hit) {
+                      rememberSchoolInvite(hit.code)
+                      return {
+                        ...next,
+                        onboardingMode: FACULTY_ONBOARDING_MODES.SCHOOL,
+                        schoolInviteCode: hit.code,
+                        campusName: prev.campusName || hit.campusName,
+                        department: prev.department || hit.department,
+                        schoolClasses:
+                          prev.schoolClasses?.length > 0 ? prev.schoolClasses : [...hit.classes],
+                      }
+                    }
+                  }
+                  if (field === 'onboardingMode' && value === FACULTY_ONBOARDING_MODES.SCHOOL) {
+                    const remembered = readRememberedSchoolInvite()
+                    if (remembered && !next.schoolInviteCode) {
+                      const hit = lookupSchoolInvite(remembered)
+                      if (hit) {
+                        return {
+                          ...next,
+                          schoolInviteCode: hit.code,
+                          campusName: hit.campusName,
+                          department: hit.department,
+                          schoolClasses: [...hit.classes],
+                        }
+                      }
+                    }
+                  }
+                  return next
+                })
+              }}
             />
 
             {error ? <p className="upload-error">{error}</p> : null}

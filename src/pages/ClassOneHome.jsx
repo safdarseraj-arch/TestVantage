@@ -6,7 +6,7 @@ import { getExamPattern, getPatternMarkingLabel } from '../data/examPatterns'
 import { getTestType } from '../data/testTypes'
 import { filterTests } from '../data/tests'
 import { PERMS } from '../utils/permissions'
-import { getAssignedTestIdsForClasses } from '../utils/assignmentsStore'
+import { getAssignedTestIdsForStudent } from '../utils/assignmentsStore'
 import { getClassesForStudent } from '../utils/classesStore'
 import { getUserById } from '../utils/users'
 import { getAttemptsByOwner, getOwnerKey } from '../utils/attemptHistory'
@@ -196,9 +196,9 @@ function StudentDashboard({ session }) {
   }, [session?.userId])
 
   const assignedTests = useMemo(() => {
-    const ids = getAssignedTestIdsForClasses(studentClassIds)
+    const ids = getAssignedTestIdsForStudent(session?.userId, studentClassIds)
     return filterTests().filter((t) => ids.includes(t.id))
-  }, [studentClassIds])
+  }, [session?.userId, studentClassIds])
 
   const stats = useMemo(() => {
     if (!attempts.length) {

@@ -8,6 +8,7 @@ import { loadUsers, saveUsersDirect } from './users.js'
 import { loadAdminAccount } from './auth.js'
 import { persistInviteCode } from './invites.js'
 import { DEMO_STUDENT_EMAIL, DEMO_STUDENT_ID } from './demoStudentAccess.js'
+import { ensurePilotDemoCampus } from './pilotDemoCampus.js'
 
 export {
   DEMO_SAMPLE_TEST_IDS,
@@ -63,8 +64,9 @@ export const DEMO_ACCOUNTS = [
       PERMS.VIEW_STUDENT_RESULTS,
       PERMS.CREATE_PAPER,
       PERMS.UPLOAD_QUESTIONS,
+      PERMS.ACCESS_MAIN_QUESTION_BANK,
     ],
-    hint: 'School staff — schools, assign tests, results',
+    hint: 'School-invited staff — campus bank, assign tests, results',
   },
 ]
 
@@ -83,10 +85,61 @@ const STUDENT_PROFILE = {
 }
 
 const TEACHER_PROFILE = {
+  kind: 'teacher',
   dob: '1988-06-15',
   subjects: ['physics', 'mathematics'],
   standards: ['class_11', 'class_12'],
-  experience: 'Demo teacher account',
+  experience: 'Demo independent faculty account',
+  onboardingMode: 'independent',
+  examSpecializations: ['jee-main', 'jee-advanced'],
+  schoolInviteCode: '',
+  campusName: '',
+  department: '',
+  schoolClasses: [],
+  systemQbTier: '',
+  watermarkText: 'Demo · confidential',
+  paperHeaderText: 'Demo Teacher — Personal Vault',
+  signatureDataUrl: '',
+  personalVaultOwned: true,
+  entitlements: {
+    can_upload_personal_qb: true,
+    can_contribute_school_qb: false,
+    can_approve_school_qb: false,
+    can_view_system_qb: false,
+    can_use_system_qb_in_cbt: false,
+    can_use_system_qb_in_lecture_plan: false,
+    can_export_system_qb_pdf: false,
+    monthly_ocr_quota: 40,
+  },
+}
+
+const STAFF_PROFILE = {
+  kind: 'teacher',
+  dob: '1985-03-20',
+  subjects: ['physics', 'chemistry', 'mathematics'],
+  standards: ['class_11', 'class_12'],
+  experience: 'Demo school-invited staff',
+  onboardingMode: 'school',
+  examSpecializations: ['cbse', 'jee-main'],
+  schoolInviteCode: 'TV-PILOT-DEMO',
+  campusName: 'Pilot Demo Campus',
+  department: 'Science',
+  schoolClasses: ['11-A Science', '12-A Science'],
+  systemQbTier: 'school_standard',
+  watermarkText: 'Staff · Pilot Demo Campus',
+  paperHeaderText: 'Pilot Demo Campus',
+  signatureDataUrl: '',
+  personalVaultOwned: true,
+  entitlements: {
+    can_upload_personal_qb: true,
+    can_contribute_school_qb: true,
+    can_approve_school_qb: false,
+    can_view_system_qb: true,
+    can_use_system_qb_in_cbt: true,
+    can_use_system_qb_in_lecture_plan: true,
+    can_export_system_qb_pdf: false,
+    monthly_ocr_quota: 200,
+  },
 }
 
 function reservedDemoEmail(email) {
@@ -107,7 +160,11 @@ function demoUserRow(demo) {
     isDemo: true,
     allowAllMocks: isStudent,
     createdBy: 'demo-seed',
-    profile: isStudent ? { ...STUDENT_PROFILE } : { ...TEACHER_PROFILE },
+    profile: isStudent
+      ? { ...STUDENT_PROFILE }
+      : demo.key === 'staff'
+        ? { ...STAFF_PROFILE }
+        : { ...TEACHER_PROFILE },
   }
 }
 
@@ -152,6 +209,12 @@ export function ensureDemoAccounts() {
   for (const demo of DEMO_ACCOUNTS) {
     if (demo.role === 'admin') continue
     persistInviteCode(demo.id)
+  }
+  // Seed Pilot Demo Campus after demo users exist so staff can link into classes.
+  try {
+    ensurePilotDemoCampus()
+  } catch {
+    /* localStorage may be unavailable in some test hosts */
   }
   return DEMO_ACCOUNTS
 }

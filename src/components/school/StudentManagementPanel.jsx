@@ -9,6 +9,13 @@ import {
   updateStudentAccount,
 } from '../../utils/users'
 import { studentInitials } from '../../utils/schoolUi'
+import {
+  ROSTER_CSV_TEMPLATE,
+  formatRosterErrors,
+  importRosterToClass,
+  parseRosterCsv,
+  previewRosterRows,
+} from '../../utils/schoolRosterImport'
 
 /**
  * @param {{
@@ -19,6 +26,7 @@ import { studentInitials } from '../../utils/schoolUi'
  *   session: object
  *   onMessage: (type: string, text: string) => void
  *   onRefresh: () => void
+ *   onGoTab?: (tab: string) => void
  * }} props
  */
 export default function StudentManagementPanel({
@@ -29,6 +37,7 @@ export default function StudentManagementPanel({
   session,
   onMessage,
   onRefresh,
+  onGoTab,
 }) {
   const [search, setSearch] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
@@ -39,6 +48,9 @@ export default function StudentManagementPanel({
   const [resettingStudentId, setResettingStudentId] = useState(null)
   const [resetPassword, setResetPassword] = useState('')
   const [studentToAdd, setStudentToAdd] = useState('')
+  const [showBulk, setShowBulk] = useState(false)
+  const [bulkText, setBulkText] = useState(ROSTER_CSV_TEMPLATE)
+  const [bulkResult, setBulkResult] = useState(null)
 
   const activeClass = schoolClasses.find((c) => c.id === selectedClassId) ?? schoolClasses[0] ?? null
 
@@ -63,6 +75,14 @@ export default function StudentManagementPanel({
     () => students.filter((s) => !activeClass?.studentIds?.includes(s.id)),
     [students, activeClass],
   )
+
+  const bulkPreview = useMemo(() => {
+    if (!showBulk || !bulkText.trim()) return null
+    const parsed = parseRosterCsv(bulkText)
+    if (!parsed.ok) return { ok: false, error: parsed.error, count: 0, errors: [] }
+    const preview = previewRosterRows(parsed.rows)
+    return { ...preview, error: preview.ok ? '' : formatRosterErrors(preview.errors) }
+  }, [showBulk, bulkText])
 
   const copyText = async (text, label) => {
     try {
@@ -155,11 +175,80 @@ export default function StudentManagementPanel({
     }
   }
 
+  const handleBulkImport = () => {
+    if (!activeClass) {
+      onMessage('error', 'Select a class first.')
+      return
+    }
+    onMessage('', '')
+    setBulkResult(null)
+    const parsed = parseRosterCsv(bulkText)
+    if (!parsed.ok) {
+      onMessage('error', parsed.error)
+      return
+    }
+    const preview = previewRosterRows(parsed.rows)
+    if (!preview.ok) {
+      onMessage('error', formatRosterErrors(preview.errors))
+      return
+    }
+    const result = importRosterToClass({
+      classId: activeClass.id,
+      className: activeClass.name,
+      rows: parsed.rows,
+      createdBy: session?.id ?? session?.email ?? 'roster-import',
+    })
+    setBulkResult(result)
+    if (!result.ok) {
+      onMessage('error', result.error || 'Import failed.')
+      return
+    }
+    const failNote = result.failed?.length
+      ? ` ${result.failed.length} row(s) failed — see details below.`
+      : ''
+    onMessage(
+      'success',
+      `Imported ${result.created.length} student(s) into ${activeClass.name}.${failNote}`,
+    )
+    onRefresh()
+  }
+
+  const downloadTemplate = () => {
+    const blob = new Blob([ROSTER_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'testvantage-roster-template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleCsvFile = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = String(reader.result || '')
+      setBulkText(text)
+      setBulkResult(null)
+      onMessage('success', `Loaded ${file.name}. Check the preview, then import.`)
+    }
+    reader.onerror = () => onMessage('error', 'Could not read that file.')
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
   if (schoolClasses.length === 0) {
     return (
       <div className="school-empty-state">
         <span className="school-empty-icon" aria-hidden>👥</span>
-        <p>Add a class first, then you can enroll students here.</p>
+        <h4>Add a class first</h4>
+        <p className="form-hint">Create a class/section, then enroll students here (or import a CSV).</p>
+        {typeof onGoTab === 'function' && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => onGoTab('classes')}>
+            Go to Classes
+          </button>
+        )}
       </div>
     )
   }
@@ -171,15 +260,113 @@ export default function StudentManagementPanel({
           <h3>Students</h3>
           <p className="form-hint">Create accounts, share login details, and manage class rosters.</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          disabled={!activeClass}
-          onClick={() => setShowAddForm((v) => !v)}
-        >
-          {showAddForm ? 'Close form' : '+ Add student'}
-        </button>
+        <div className="school-panel-head-actions">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={!activeClass}
+            onClick={() => {
+              setShowBulk((v) => !v)
+              setBulkResult(null)
+            }}
+          >
+            {showBulk ? 'Close CSV' : 'Bulk CSV import'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={!activeClass}
+            onClick={() => setShowAddForm((v) => !v)}
+          >
+            {showAddForm ? 'Close form' : '+ Add student'}
+          </button>
+        </div>
       </div>
+
+      {showBulk && activeClass && (
+        <div className="school-bulk-import">
+          <h4>Bulk CSV import — {activeClass.name}</h4>
+          <p className="form-hint">
+            Columns: <code>name</code>, optional <code>loginId</code>, <code>password</code>,{' '}
+            <code>rollNo</code>. Blank login/password are auto-generated.
+          </p>
+          <div className="school-form-actions" style={{ marginBottom: '0.75rem' }}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={downloadTemplate}>
+              Download template
+            </button>
+            <label className="btn btn-ghost btn-sm school-file-label">
+              Upload CSV
+              <input
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                onChange={handleCsvFile}
+                className="sr-only"
+              />
+            </label>
+          </div>
+          <textarea
+            className="school-bulk-textarea"
+            value={bulkText}
+            onChange={(e) => {
+              setBulkText(e.target.value)
+              setBulkResult(null)
+            }}
+            rows={8}
+            spellCheck={false}
+            aria-label="Roster CSV"
+          />
+          {bulkPreview && (
+            <p
+              className={
+                bulkPreview.ok ? 'form-hint school-bulk-preview' : 'upload-error school-bulk-preview'
+              }
+            >
+              {bulkPreview.ok
+                ? bulkPreview.summary
+                : bulkPreview.error || 'Fix CSV errors before importing.'}
+            </p>
+          )}
+          <div className="school-form-actions">
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleBulkImport}
+              disabled={!bulkPreview?.ok}
+            >
+              Import {bulkPreview?.ok ? `${bulkPreview.count} student(s)` : 'into class'}
+            </button>
+          </div>
+          {bulkResult?.created?.length > 0 && (
+            <div className="school-credentials-card">
+              <strong>Created logins ({bulkResult.created.length})</strong>
+              <ul className="school-bulk-result-list">
+                {bulkResult.created.slice(0, 20).map((r) => (
+                  <li key={r.id}>
+                    {r.name} · <code>{r.loginId}</code> / <code>{r.password}</code>
+                  </li>
+                ))}
+              </ul>
+              {bulkResult.created.length > 20 && (
+                <p className="form-hint">Showing first 20 — copy from list as needed.</p>
+              )}
+              {bulkResult.failed?.length > 0 && (
+                <div className="school-bulk-failed">
+                  <p className="upload-error">
+                    {bulkResult.failed.length} row(s) failed (duplicate IDs or bad data):
+                  </p>
+                  <ul className="school-bulk-result-list">
+                    {bulkResult.failed.slice(0, 10).map((f) => (
+                      <li key={`${f.line}-${f.name}`}>
+                        Line {f.line}: {f.name} — {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="school-student-toolbar">
         <label className="school-field school-field--grow">
@@ -348,6 +535,27 @@ export default function StudentManagementPanel({
               ? 'No students match your search.'
               : `No students in ${activeClass?.name ?? 'this class'} yet.`}
           </p>
+          {!search && (
+            <div className="school-form-actions" style={{ justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setShowAddForm(true)}
+              >
+                Add student
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setShowBulk(true)
+                  setBulkResult(null)
+                }}
+              >
+                Bulk CSV import
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <ul className="school-student-list">

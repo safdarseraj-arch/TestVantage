@@ -74,21 +74,38 @@ export function markAllNotificationsRead(userId) {
  * @param {{
  *   assignment: { id: string, testId: string, availableFrom?: number | null, dueAt?: number | null, notes?: string }
  *   test: { id: string, title: string, durationMinutes?: number, totalQuestions?: number }
- *   classId: string
+ *   classId?: string
+ *   batchId?: string
+ *   targetName?: string
+ *   studentIds?: string[]
  * }} payload
  */
-export function notifyStudentsOnAssignment({ assignment, test, classId }) {
-  const schoolClass = getClassById(classId)
-  if (!schoolClass?.studentIds?.length) {
+export function notifyStudentsOnAssignment({
+  assignment,
+  test,
+  classId,
+  batchId,
+  targetName,
+  studentIds,
+}) {
+  const schoolClass = classId ? getClassById(classId) : null
+  const ids =
+    Array.isArray(studentIds) && studentIds.length
+      ? studentIds
+      : schoolClass?.studentIds || []
+  if (!ids.length) {
     return { studentCount: 0, emails: [], notifications: 0 }
   }
+
+  const groupName = targetName || schoolClass?.name || 'your group'
+  const groupId = classId || batchId || schoolClass?.id || ''
 
   const list = loadAll()
   const now = Date.now()
   let added = 0
   const emails = []
 
-  for (const studentId of schoolClass.studentIds) {
+  for (const studentId of ids) {
     const student = getUserById(studentId)
     if (!student) continue
     emails.push(student.email)
@@ -98,8 +115,8 @@ export function notifyStudentsOnAssignment({ assignment, test, classId }) {
       type: 'test_assigned',
       testId: test.id,
       testTitle: test.title,
-      classId: schoolClass.id,
-      className: schoolClass.name,
+      classId: groupId,
+      className: groupName,
       assignmentId: assignment.id,
       availableFrom: assignment.availableFrom ?? null,
       dueAt: assignment.dueAt ?? null,

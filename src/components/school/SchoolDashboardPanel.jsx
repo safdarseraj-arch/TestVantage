@@ -7,6 +7,7 @@ export default function SchoolDashboardPanel({
   snapshot,
   onGoTab,
   schoolName,
+  readiness,
 }) {
   const { attendance, fees, schedule, upcomingExams, counts } = snapshot
 
@@ -14,6 +15,8 @@ export default function SchoolDashboardPanel({
     attendance.enrolled > 0 && attendance.marked > 0
       ? Math.round((attendance.present / Math.max(attendance.marked, 1)) * 100)
       : null
+
+  const nextItem = readiness?.nextItem || readiness?.items?.find((i) => !i.done) || null
 
   return (
     <div className="school-dash">
@@ -29,8 +32,68 @@ export default function SchoolDashboardPanel({
           <span className="school-dash-pill">{counts.students} students</span>
           <span className="school-dash-pill">{counts.staff} staff</span>
           <span className="school-dash-pill">{counts.activeAssignments} live exams</span>
+          {typeof counts.batches === 'number' && (
+            <span className="school-dash-pill">{counts.batches} batches</span>
+          )}
         </div>
       </div>
+
+      {readiness && (
+        <section className="school-phase1-card" aria-label="Phase 1 readiness">
+          <div className="school-phase1-head">
+            <div>
+              <span className="school-dash-kicker">Phase 1 · Academic foundation</span>
+              <h4>School setup checklist</h4>
+              <p className="form-hint">{readiness.nextHint}</p>
+            </div>
+            <div className="school-phase1-pct-wrap">
+              <strong className="school-phase1-pct">{readiness.percent}%</strong>
+              <span className="form-hint" style={{ margin: 0 }}>
+                {readiness.readyCount}/{readiness.total} done
+              </span>
+            </div>
+          </div>
+          <div
+            className="school-phase1-bar"
+            role="progressbar"
+            aria-valuenow={readiness.percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Phase 1 setup progress"
+          >
+            <span style={{ width: `${Math.max(0, Math.min(100, readiness.percent))}%` }} />
+          </div>
+          {nextItem && (
+            <div className="school-phase1-next">
+              <p className="form-hint" style={{ margin: 0 }}>
+                {nextItem.hint || nextItem.label}
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => onGoTab(nextItem.tab)}
+              >
+                {nextItem.cta || 'Continue setup'}
+              </button>
+            </div>
+          )}
+          <ul className="school-phase1-list">
+            {readiness.items.map((item) => (
+              <li key={item.id} className={item.done ? 'done' : ''}>
+                <button type="button" onClick={() => onGoTab(item.tab)}>
+                  <span aria-hidden>{item.done ? '✓' : '○'}</span>
+                  <span className="school-phase1-item-text">
+                    <span>{item.label}</span>
+                    {!item.done && item.cta ? (
+                      <span className="school-phase1-item-cta">{item.cta} →</span>
+                    ) : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="school-dash-grid">
         <article className="school-dash-tile school-dash-tile--attend">
@@ -204,7 +267,21 @@ export default function SchoolDashboardPanel({
           <span aria-hidden>📚</span>
           <div>
             <strong>Classes</strong>
-            <span>Batches & teachers</span>
+            <span>Board sections</span>
+          </div>
+        </button>
+        <button type="button" className="school-quick-link" onClick={() => onGoTab('batches')}>
+          <span aria-hidden>🎯</span>
+          <div>
+            <strong>Competitive batches</strong>
+            <span>JEE / NEET dual track</span>
+          </div>
+        </button>
+        <button type="button" className="school-quick-link" onClick={() => onGoTab('staff')}>
+          <span aria-hidden>✉️</span>
+          <div>
+            <strong>Invite teachers</strong>
+            <span>School Path A codes</span>
           </div>
         </button>
       </div>

@@ -16,7 +16,7 @@ export default function OrgServerSyncPanel({ onRefresh, onMessage }) {
       <div className="card org-server-sync-panel">
         <h3>Live school sync</h3>
         <p className="form-hint">
-          Schools, classes, and assignments sync to the server when{' '}
+          Schools, classes, batches, invites, assignments, and users sync to the server when{' '}
           <strong>VITE_PLATFORM_SCALE=1</strong> is set in your production build and the API is
           running.
         </p>
@@ -32,7 +32,7 @@ export default function OrgServerSyncPanel({ onRefresh, onMessage }) {
         onRefresh?.()
         onMessage?.(
           'success',
-          `Pulled live data — ${result.counts?.schools ?? 0} schools, ${result.counts?.classes ?? 0} classes.`,
+          `Pulled live data — ${result.counts?.schools ?? 0} schools, ${result.counts?.classes ?? 0} classes, ${result.counts?.batches ?? 0} batches, ${result.counts?.invites ?? 0} invites.`,
         )
       } else {
         onMessage?.('error', result.error ?? 'Pull failed')
@@ -70,8 +70,9 @@ export default function OrgServerSyncPanel({ onRefresh, onMessage }) {
         </div>
       </div>
       <p className="form-hint">
-        Changes auto-push after you save. Use <strong>Pull</strong> when opening on a new device, or{' '}
-        <strong>Push</strong> to upload this browser&apos;s schools and classes to the live server.
+        Changes auto-push after you save (including batches and invites). Use{' '}
+        <strong>Pull</strong> when opening on a new device, or <strong>Push</strong> to upload this
+        browser&apos;s school data to the live server.
       </p>
     </div>
   )

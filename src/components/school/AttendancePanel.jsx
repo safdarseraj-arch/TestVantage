@@ -5,6 +5,12 @@ import {
   upsertAttendance,
 } from '../../utils/schoolAttendanceStore'
 import { studentInitials } from '../../utils/schoolUi'
+import {
+  WHATSAPP_CONSENT_NOTE,
+  absenceReminderMessage,
+  buildWhatsAppHref,
+  copyWhatsAppText,
+} from '../../utils/schoolWhatsApp'
 
 const STATUSES = [
   { id: 'present', label: 'Present' },
@@ -16,6 +22,7 @@ export default function AttendancePanel({
   schoolId,
   schoolClasses,
   students,
+  schoolName,
   selectedClassId,
   onSelectClass,
   onMessage,
@@ -59,6 +66,8 @@ export default function AttendancePanel({
     setMarks(next)
   }
 
+  const absentees = roster.filter((s) => marks[s.id] === 'absent')
+
   const save = () => {
     if (!classId) {
       onMessage?.('error', 'Pick a class first.')
@@ -71,6 +80,19 @@ export default function AttendancePanel({
     const rec = upsertAttendance({ schoolId, classId, date, marks })
     setSavedAt(rec.updatedAt)
     onMessage?.('success', `Attendance saved for ${date}.`)
+  }
+
+  const remindAbsence = async (student) => {
+    const text = absenceReminderMessage({
+      studentName: student.name || student.email || 'your ward',
+      className: cls?.name || 'class',
+      date,
+      schoolName: schoolName || 'our school',
+    })
+    const copied = await copyWhatsAppText(text)
+    if (copied.ok) onMessage?.('success', 'Absence note copied. Opening WhatsApp…')
+    else onMessage?.('error', copied.error)
+    window.open(buildWhatsAppHref(text), '_blank', 'noopener,noreferrer')
   }
 
   if (schoolClasses.length === 0) {
@@ -132,33 +154,61 @@ export default function AttendancePanel({
           <p className="form-hint">Open the Students tab to enroll accounts.</p>
         </div>
       ) : (
-        <ul className="school-student-list">
-          {roster.map((s) => (
-            <li key={s.id} className="school-student-card school-att-row">
-              <span className="school-student-avatar" aria-hidden>
-                {studentInitials(s.name)}
-              </span>
-              <div className="school-student-info">
-                <strong>{s.name || 'Student'}</strong>
-                <code>{s.email || s.id}</code>
-              </div>
-              <div className="school-att-toggle" role="group" aria-label={`Attendance for ${s.name}`}>
-                {STATUSES.map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    className={`school-att-btn school-att-btn--${st.id} ${
-                      marks[s.id] === st.id ? 'active' : ''
-                    }`}
-                    onClick={() => setStatus(s.id, st.id)}
-                  >
-                    {st.label}
-                  </button>
+        <>
+          <ul className="school-student-list">
+            {roster.map((s) => (
+              <li key={s.id} className="school-student-card school-att-row">
+                <span className="school-student-avatar" aria-hidden>
+                  {studentInitials(s.name)}
+                </span>
+                <div className="school-student-info">
+                  <strong>{s.name || 'Student'}</strong>
+                  <code>{s.email || s.id}</code>
+                </div>
+                <div className="school-att-toggle" role="group" aria-label={`Attendance for ${s.name}`}>
+                  {STATUSES.map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      className={`school-att-btn school-att-btn--${st.id} ${
+                        marks[s.id] === st.id ? 'active' : ''
+                      }`}
+                      onClick={() => setStatus(s.id, st.id)}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {absentees.length > 0 && (
+            <div className="school-att-whatsapp">
+              <h4 className="school-module-subhead">WhatsApp absence notes</h4>
+              <p className="form-hint">{WHATSAPP_CONSENT_NOTE}</p>
+              <ul className="school-assign-cards">
+                {absentees.map((s) => (
+                  <li key={`wa-${s.id}`} className="school-assign-card">
+                    <div>
+                      <strong>{s.name || 'Student'}</strong>
+                      <p className="form-hint" style={{ margin: '0.2rem 0 0' }}>
+                        Marked absent for {date}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => remindAbsence(s)}
+                    >
+                      Open WhatsApp
+                    </button>
+                  </li>
                 ))}
-              </div>
-            </li>
-          ))}
-        </ul>
+              </ul>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

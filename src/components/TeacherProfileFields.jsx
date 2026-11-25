@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   TEACHER_STANDARDS,
   TEACHER_SUBJECTS,
@@ -14,23 +15,30 @@ function toggleId(list, id) {
   return list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
 }
 
-function readSignatureFile(file, onChange) {
+function readSignatureFile(file, onChange, setSigError) {
+  setSigError('')
   if (!file) {
     onChange('signatureDataUrl', '')
     return
   }
   if (!String(file.type || '').startsWith('image/')) {
     onChange('signatureDataUrl', '')
+    setSigError('Use a PNG or JPG image for your signature.')
     return
   }
   if (file.size > 320_000) {
     onChange('signatureDataUrl', '')
+    setSigError('Signature image is too large. Keep it under about 300 KB.')
     return
   }
   const reader = new FileReader()
   reader.onload = () => {
     const result = typeof reader.result === 'string' ? reader.result : ''
     onChange('signatureDataUrl', result)
+  }
+  reader.onerror = () => {
+    onChange('signatureDataUrl', '')
+    setSigError('Could not read that image. Try another file.')
   }
   reader.readAsDataURL(file)
 }
@@ -47,6 +55,7 @@ export default function TeacherProfileFields({
 }) {
   const mode = values.onboardingMode || FACULTY_ONBOARDING_MODES.INDEPENDENT
   const inviteHint = lookupSchoolInvite(values.schoolInviteCode)
+  const [sigError, setSigError] = useState('')
 
   return (
     <>
@@ -168,26 +177,31 @@ export default function TeacherProfileFields({
             </label>
           </div>
         </>
-      ) : (
-        <fieldset className="onboarding-fieldset">
-          <legend>Exam specializations</legend>
-          <div className="onboarding-chips">
-            {FACULTY_EXAM_SPECIALIZATIONS.map((e) => (
-              <button
-                key={e.id}
-                type="button"
-                className={`onboarding-chip${(values.examSpecializations || []).includes(e.id) ? ' is-on' : ''}`}
-                onClick={() =>
-                  onChange('examSpecializations', toggleId(values.examSpecializations || [], e.id))
-                }
-                disabled={disabled}
-              >
-                {e.label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      )}
+      ) : null}
+
+      <fieldset className="onboarding-fieldset">
+        <legend>
+          Exam specializations
+          {mode === FACULTY_ONBOARDING_MODES.SCHOOL ? (
+            <span className="onboarding-optional"> (optional)</span>
+          ) : null}
+        </legend>
+        <div className="onboarding-chips">
+          {FACULTY_EXAM_SPECIALIZATIONS.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              className={`onboarding-chip${(values.examSpecializations || []).includes(e.id) ? ' is-on' : ''}`}
+              onClick={() =>
+                onChange('examSpecializations', toggleId(values.examSpecializations || [], e.id))
+              }
+              disabled={disabled}
+            >
+              {e.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
       <div className="onboarding-grid">
         <label>
@@ -219,10 +233,11 @@ export default function TeacherProfileFields({
         <input
           type="file"
           accept="image/png,image/jpeg,image/webp"
-          onChange={(e) => readSignatureFile(e.target.files?.[0], onChange)}
+          onChange={(e) => readSignatureFile(e.target.files?.[0], onChange, setSigError)}
           disabled={disabled}
         />
       </label>
+      {sigError ? <p className="upload-error">{sigError}</p> : null}
       {values.signatureDataUrl ? (
         <p className="form-hint onboarding-signature-preview-wrap">
           <img
@@ -233,7 +248,10 @@ export default function TeacherProfileFields({
           <button
             type="button"
             className="btn btn-ghost btn-sm"
-            onClick={() => onChange('signatureDataUrl', '')}
+            onClick={() => {
+              setSigError('')
+              onChange('signatureDataUrl', '')
+            }}
             disabled={disabled}
           >
             Remove signature

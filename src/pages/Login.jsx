@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { loadAdminAccount } from '../utils/auth'
@@ -11,6 +11,7 @@ import {
 } from '../utils/userProfiles'
 import { DEMO_ACCOUNTS, ensureDemoAccounts, getDemoAdminHint } from '../utils/demoAccounts.js'
 import { findUserByInviteCode, normalizeInviteCode } from '../utils/invites.js'
+import { lookupSchoolInvite, rememberSchoolInvite } from '../utils/facultyWorkbench.js'
 import { readCapturedReferral } from '../utils/referralEngine.js'
 import { getPartnerByCode, getPartnerById } from '../utils/referralStore.js'
 
@@ -71,6 +72,10 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  const schoolInviteHit = lookupSchoolInvite(
+    searchParams.get('schoolInvite') || searchParams.get('invite'),
+  )
+
   const inviteFromUrl = normalizeInviteCode(
     searchParams.get('invite') ||
       searchParams.get('ref') ||
@@ -79,13 +84,14 @@ export default function Login() {
   )
   const capturedReferral = !inviteFromUrl ? readCapturedReferral() : null
   const inviteFromCapture = normalizeInviteCode(capturedReferral?.code || '')
-  const invitePrefill = inviteFromUrl || inviteFromCapture
+  // School campus codes are not student friend-invite codes.
+  const invitePrefill = schoolInviteHit ? '' : inviteFromUrl || inviteFromCapture
   const rawFrom = typeof location.state?.from === 'string' ? location.state.from : ''
   const fromQuestionBank = rawFrom.startsWith('/question-bank')
 
   const initialMode = location.state?.admin || rawFrom.startsWith('/admin') || fromQuestionBank
     ? 'admin'
-    : rawFrom.startsWith('/teacher') || location.state?.staff
+    : schoolInviteHit || rawFrom.startsWith('/teacher') || location.state?.staff
       ? 'teacher'
       : rawFrom === '/earn' ||
           rawFrom.startsWith('/earn/') ||
@@ -95,7 +101,7 @@ export default function Login() {
         : 'student'
   const [mode, setMode] = useState(initialMode)
   const [isRegister, setIsRegister] = useState(
-    Boolean(invitePrefill) || initialMode === 'ambassador',
+    Boolean(invitePrefill) || Boolean(schoolInviteHit) || initialMode === 'ambassador',
   )
   const [inviteCode, setInviteCode] = useState(invitePrefill)
   const [postRegisterPath, setPostRegisterPath] = useState(null)
@@ -106,6 +112,10 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [demoBusy, setDemoBusy] = useState('')
+
+  useEffect(() => {
+    if (schoolInviteHit?.code) rememberSchoolInvite(schoolInviteHit.code)
+  }, [schoolInviteHit?.code])
 
   if (isAdmin) {
     const dest = fromQuestionBank ? rawFrom : '/question-bank'
@@ -195,7 +205,12 @@ export default function Login() {
             mode === 'teacher'
               ? afterAuthPath(result.session, TEACHER_ONBOARDING_PATH)
               : afterAuthPath(result.session, STUDENT_ONBOARDING_PATH)
-          navigate(dest, { replace: true })
+          const schoolCode = schoolInviteHit?.code
+          const teacherDest =
+            mode === 'teacher' && schoolCode && dest === TEACHER_ONBOARDING_PATH
+              ? `${TEACHER_ONBOARDING_PATH}?schoolInvite=${encodeURIComponent(schoolCode)}`
+              : dest
+          navigate(teacherDest, { replace: true })
         } else {
           postRegisterPathRef.current = null
           setPostRegisterPath(null)
@@ -216,12 +231,17 @@ export default function Login() {
           navigate('/earn', { replace: true })
           return
         }
+        const schoolCode = schoolInviteHit?.code
+        const teacherFallback =
+          schoolCode && result.session?.role === 'teacher'
+            ? `${TEACHER_ONBOARDING_PATH}?schoolInvite=${encodeURIComponent(schoolCode)}`
+            : fromQuestionBank
+              ? rawFrom
+              : teacherHomePath(result.session.permissions)
         const dest = afterAuthPath(
           result.session,
           result.session?.role === 'teacher'
-            ? fromQuestionBank
-              ? rawFrom
-              : teacherHomePath(result.session.permissions)
+            ? teacherFallback
             : loginReturnPath(location.state, 'student'),
         )
         navigate(isAuthPath(dest) ? STUDENT_HOME : dest, { replace: true })
@@ -312,11 +332,15 @@ export default function Login() {
       ? 'This login is for promoting TestVantage and earning when friends join. Register free, then get your share link.'
       : 'Sign in with your ambassador email and password to open Earn and your share kit.'
     : isTeacherMode
-      ? isRegister
-        ? 'Register free, then finish a short profile. Your bank, lecture plan, and papers turn on. Official PYQ approve stays with admin.'
-        : fromQuestionBank
-          ? 'Use your teacher email and password. After sign-in you open Question Bank.'
-          : 'Use your teacher email and password, or register free. After sign-in you land on Teacher home.'
+      ? schoolInviteHit
+        ? isRegister
+          ? `School invite for ${schoolInviteHit.campusName}. Register free, then finish Path A onboarding for this campus.`
+          : `School invite for ${schoolInviteHit.campusName}. Sign in to continue Path A onboarding, or register free if you are new.`
+        : isRegister
+          ? 'Register free, then finish a short profile. Your bank, lecture plan, and papers turn on. Official PYQ approve stays with admin.'
+          : fromQuestionBank
+            ? 'Use your teacher email and password. After sign-in you open Question Bank.'
+            : 'Use your teacher email and password, or register free. After sign-in you land on Teacher home.'
       : 'Use the user ID and password from your school admin, or register with your email.'
 
   const submitLabel = isRegister

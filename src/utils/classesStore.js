@@ -193,11 +193,14 @@ export function syncUserClassLinks() {
     }
     if (u.role === 'teacher') {
       const teaches = classes.filter((c) => idList(c.teacherIds).includes(u.id)).map((c) => c.id)
+      const schoolId = teaches.length
+        ? classes.find((c) => c.id === teaches[0])?.schoolId
+        : u.schoolId
       const prevIds = [...(u.classIds ?? [])].sort().join(',')
       const nextIds = [...teaches].sort().join(',')
-      if (prevIds !== nextIds) {
+      if (prevIds !== nextIds || (schoolId && u.schoolId !== schoolId)) {
         changed = true
-        return { ...u, classIds: teaches }
+        return { ...u, classIds: teaches, schoolId: schoolId || u.schoolId }
       }
     }
     return u

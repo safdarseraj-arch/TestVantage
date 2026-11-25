@@ -3,6 +3,10 @@
  * Dual pathways: school-invited vs independent B2T, Personal Vault IP, entitlement flags.
  */
 
+import { PERMS, SELF_REGISTER_TEACHER_PERMS } from './permissions.js'
+
+export const SCHOOL_INVITE_STORAGE_KEY = 'tv_school_invite'
+
 export const FACULTY_ONBOARDING_MODES = Object.freeze({
   SCHOOL: 'school',
   INDEPENDENT: 'independent',
@@ -25,20 +29,20 @@ export const FACULTY_EXAM_SPECIALIZATIONS = Object.freeze([
 ])
 
 /**
- * Demo school invite codes (Path A). Principal/admin bulk invite comes later;
- * these codes unlock campus + default school entitlement tier.
+ * Demo school invite codes (Path A). Live schools also mint codes from Staff tab
+ * (see schoolInvitesStore) — lookupSchoolInvite checks both.
  */
 export const DEMO_SCHOOL_INVITES = Object.freeze({
   'SCHOOL-DEMO': {
-    campusName: 'TestVantage Demo School',
+    campusName: 'Pilot Demo Campus',
     department: 'Science',
-    classes: ['Class 11', 'Class 12'],
+    classes: ['11-A Science', '12-A Science'],
     systemQbTier: 'school_standard',
   },
   'CAMPUS-TV': {
-    campusName: 'TestVantage Partner Campus',
-    department: 'STEM',
-    classes: ['Class 11', 'Class 12', 'Dropper'],
+    campusName: 'Pilot Demo Campus',
+    department: 'Science',
+    classes: ['11-A Science', '12-A Science'],
     systemQbTier: 'school_standard',
   },
 })
@@ -54,8 +58,35 @@ export function lookupSchoolInvite(raw) {
   const code = normalizeSchoolInviteCode(raw)
   if (!code) return null
   const row = DEMO_SCHOOL_INVITES[code]
-  if (!row) return null
-  return { code, ...row }
+  if (row) return { code, ...row, source: 'demo' }
+  // School-minted invites (Staff tab → localStorage). Safe no-op outside the browser.
+  return lookupLiveSchoolInvite(code)
+}
+
+/** @param {string} code */
+function lookupLiveSchoolInvite(code) {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem('testvantage-school-invites')
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    const invites = Array.isArray(data?.invites) ? data.invites : []
+    const hit = invites.find(
+      (i) => normalizeSchoolInviteCode(i?.code) === code && !i?.revokedAt,
+    )
+    if (!hit) return null
+    return {
+      code,
+      campusName: String(hit.campusName || '').trim() || 'School campus',
+      department: String(hit.department || '').trim() || 'General',
+      classes: Array.isArray(hit.classes) ? hit.classes.map(String) : [],
+      systemQbTier: hit.systemQbTier === 'pro_add_on' ? 'pro_add_on' : 'school_standard',
+      schoolId: hit.schoolId ? String(hit.schoolId) : undefined,
+      source: 'school',
+    }
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -126,3 +157,70 @@ export const ENTITLEMENT_LABELS = Object.freeze([
   { key: 'can_use_system_qb_in_lecture_plan', label: 'System QB in lectures' },
   { key: 'can_export_system_qb_pdf', label: 'Export System QB PDF' },
 ])
+
+/** Map PDF entitlement flags onto app permission strings (additive). */
+export function permissionsFromEntitlements(entitlements) {
+  const e = normalizeEntitlements(entitlements, FACULTY_ONBOARDING_MODES.INDEPENDENT)
+  const out = [...SELF_REGISTER_TEACHER_PERMS]
+  if (e.can_upload_personal_qb && !out.includes(PERMS.UPLOAD_QUESTIONS)) {
+    out.push(PERMS.UPLOAD_QUESTIONS)
+  }
+  if (e.can_view_system_qb || e.can_use_system_qb_in_cbt || e.can_use_system_qb_in_lecture_plan) {
+    out.push(PERMS.ACCESS_MAIN_QUESTION_BANK)
+  }
+  if (e.can_contribute_school_qb || e.can_approve_school_qb) {
+    out.push(PERMS.ASSIGN_TESTS)
+  }
+  return [...new Set(out)]
+}
+
+export function defaultWatermarkForName(name) {
+  const first = String(name ?? '')
+    .trim()
+    .split(/\s+/)[0]
+  if (!first) return 'TestVantage · confidential'
+  return `${first} · confidential`
+}
+
+export function rememberSchoolInvite(raw) {
+  const code = normalizeSchoolInviteCode(raw)
+  if (typeof sessionStorage === 'undefined') return code
+  try {
+    if (code && lookupSchoolInvite(code)) sessionStorage.setItem(SCHOOL_INVITE_STORAGE_KEY, code)
+    else sessionStorage.removeItem(SCHOOL_INVITE_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+  return code
+}
+
+export function readRememberedSchoolInvite() {
+  if (typeof sessionStorage === 'undefined') return ''
+  try {
+    const code = normalizeSchoolInviteCode(sessionStorage.getItem(SCHOOL_INVITE_STORAGE_KEY))
+    return lookupSchoolInvite(code) ? code : ''
+  } catch {
+    return ''
+  }
+}
+
+export function clearRememberedSchoolInvite() {
+  if (typeof sessionStorage === 'undefined') return
+  try {
+    sessionStorage.removeItem(SCHOOL_INVITE_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Compact entitlement summary for Teacher home. */
+export function summarizeEntitlements(entitlements) {
+  const e = entitlements && typeof entitlements === 'object' ? entitlements : null
+  if (!e) return { onLabels: [], offCount: ENTITLEMENT_LABELS.length, ocrQuota: 0 }
+  const onLabels = ENTITLEMENT_LABELS.filter((row) => e[row.key]).map((row) => row.label)
+  return {
+    onLabels,
+    offCount: Math.max(0, ENTITLEMENT_LABELS.length - onLabels.length),
+    ocrQuota: Math.max(0, Number(e.monthly_ocr_quota) || 0),
+  }
+}

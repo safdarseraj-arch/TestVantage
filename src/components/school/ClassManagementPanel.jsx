@@ -89,7 +89,9 @@ export default function ClassManagementPanel({
       <div className="school-panel-head">
         <div>
           <h3>Classes</h3>
-          <p className="form-hint">Each class groups students for assignments and results.</p>
+          <p className="form-hint">
+            Board class / section (e.g. 11-A). Add competitive batches under the Batches tab.
+          </p>
         </div>
         <button
           type="button"
@@ -156,7 +158,7 @@ export default function ClassManagementPanel({
       {schoolClasses.length === 0 ? (
         <div className="school-empty-state">
           <span className="school-empty-icon" aria-hidden>📚</span>
-          <p>No classes yet. Click <strong>Add class</strong> to create your first batch.</p>
+          <p>No classes yet. Click <strong>Add class</strong> to create your first class/section.</p>
         </div>
       ) : (
         <div className="school-class-grid">

@@ -3,6 +3,8 @@ import { getSession } from './auth.js'
 import { loadAssignments } from './assignmentsStore.js'
 import { loadClasses } from './classesStore.js'
 import { fetchOrgData, pingOrgApi, pushOrgData } from './orgApi.js'
+import { loadBatches } from './schoolBatchesStore.js'
+import { loadSchoolInvites } from './schoolInvitesStore.js'
 import { loadSchools } from './schoolsStore.js'
 import { loadUsers, saveUsersDirect } from './users.js'
 
@@ -28,13 +30,24 @@ function saveSyncMeta(meta) {
   localStorage.setItem(ORG_SYNC_META_KEY, JSON.stringify(meta))
 }
 
-/** @returns {{ schools: object[], classes: object[], assignments: object[], users: object[] }} */
+/**
+ * @returns {{
+ *   schools: object[],
+ *   classes: object[],
+ *   assignments: object[],
+ *   users: object[],
+ *   batches: object[],
+ *   invites: object[],
+ * }}
+ */
 export function collectOrgPayload() {
   return {
     schools: loadSchools(),
     classes: loadClasses(),
     assignments: loadAssignments(),
     users: loadUsers(),
+    batches: loadBatches(),
+    invites: loadSchoolInvites(),
   }
 }
 
@@ -44,6 +57,8 @@ export function collectOrgPayload() {
  *   classes: object[],
  *   assignments: object[],
  *   users: object[],
+ *   batches?: object[],
+ *   invites?: object[],
  *   updatedAt?: number,
  * }} payload
  */
@@ -53,6 +68,14 @@ export function applyOrgPayload(payload) {
   localStorage.setItem(
     'testvantage-assignments',
     JSON.stringify({ assignments: payload.assignments ?? [] }),
+  )
+  localStorage.setItem(
+    'testvantage-school-batches',
+    JSON.stringify({ batches: payload.batches ?? [] }),
+  )
+  localStorage.setItem(
+    'testvantage-school-invites',
+    JSON.stringify({ invites: payload.invites ?? [] }),
   )
   saveUsersDirect(payload.users ?? [])
   saveSyncMeta({
@@ -102,7 +125,7 @@ export async function pushOrgToServer() {
 }
 
 /**
- * Pull schools/classes/assignments/users from server (server wins on conflicts).
+ * Pull schools/classes/assignments/users/batches/invites from server (server wins on conflicts).
  * @returns {Promise<{ ok: boolean, counts?: object, error?: string }>}
  */
 export async function pullOrgFromServer() {
@@ -128,6 +151,8 @@ export async function pullOrgFromServer() {
         classes: merged.classes.length,
         assignments: merged.assignments.length,
         users: merged.users.length,
+        batches: merged.batches.length,
+        invites: merged.invites.length,
       },
     }
   } catch (err) {
@@ -143,18 +168,29 @@ export async function pullOrgFromServer() {
  * @param {number} remoteUpdatedAt
  */
 function mergeOrgData(local, remote, localUpdatedAt, remoteUpdatedAt) {
-  if (remoteUpdatedAt >= localUpdatedAt) return remote
+  if (remoteUpdatedAt >= localUpdatedAt) {
+    return {
+      schools: remote.schools ?? [],
+      classes: remote.classes ?? [],
+      assignments: remote.assignments ?? [],
+      users: remote.users ?? [],
+      batches: remote.batches ?? [],
+      invites: remote.invites ?? [],
+    }
+  }
 
-  const mergeById = (localRows, remoteRows) => {
-    const map = new Map(remoteRows.map((r) => [r.id, r]))
-    for (const row of localRows) map.set(row.id, row)
+  const mergeByKey = (localRows, remoteRows, keyFn) => {
+    const map = new Map((remoteRows || []).map((r) => [keyFn(r), r]))
+    for (const row of localRows || []) map.set(keyFn(row), row)
     return [...map.values()]
   }
 
   return {
-    schools: mergeById(local.schools, remote.schools),
-    classes: mergeById(local.classes, remote.classes),
-    assignments: mergeById(local.assignments, remote.assignments),
-    users: mergeById(local.users, remote.users),
+    schools: mergeByKey(local.schools, remote.schools, (r) => r.id),
+    classes: mergeByKey(local.classes, remote.classes, (r) => r.id),
+    assignments: mergeByKey(local.assignments, remote.assignments, (r) => r.id),
+    users: mergeByKey(local.users, remote.users, (r) => r.id),
+    batches: mergeByKey(local.batches, remote.batches, (r) => r.id),
+    invites: mergeByKey(local.invites, remote.invites, (r) => r.code),
   }
 }

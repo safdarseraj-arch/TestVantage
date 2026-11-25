@@ -614,6 +614,8 @@ export async function handleApiRequest(req, res) {
         classes: Array.isArray(body?.classes) ? body.classes : undefined,
         assignments: Array.isArray(body?.assignments) ? body.assignments : undefined,
         users: Array.isArray(body?.users) ? body.users : undefined,
+        batches: Array.isArray(body?.batches) ? body.batches : undefined,
+        invites: Array.isArray(body?.invites) ? body.invites : undefined,
       })
       sendJson(res, 200, { ok: true, ...saved, teacher: teacherEmail(req) })
       return

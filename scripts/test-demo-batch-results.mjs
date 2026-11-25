@@ -20,6 +20,8 @@ const {
 
 localStorage.removeItem('testvantage-demo-batch-results-v1')
 localStorage.removeItem('testvantage-demo-batch-results-v2')
+localStorage.removeItem('testvantage-demo-batch-results-v3')
+localStorage.removeItem('testvantage-demo-batch-results-v4')
 localStorage.removeItem('testvantage-attempt-history')
 
 const first = seedDemoBatchResults({ force: true })

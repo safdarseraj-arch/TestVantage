@@ -472,6 +472,8 @@ export default function ResultAnalysisDashboard({
             test={test}
             attempts={attempts}
             scoreComparison={scoreComparison}
+            attemptId={attemptId}
+            onOpenQuestion={openQuestion}
           />
           <VerticalCompareChart
             title="You vs device cohort"

@@ -412,6 +412,7 @@ export default function ResultQuestionWisePanel({
                     <QuestionPeerStatsBlock
                       peer={selectedPeer}
                       yourTimeSeconds={selected.timeSpentSeconds}
+                      yourGrade={selected.grade}
                     />
                   </div>
                 )}

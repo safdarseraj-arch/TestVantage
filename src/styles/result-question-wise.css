@@ -592,6 +592,57 @@
 
 /* Peer response + time tables (Your vs correct tab) */
 
+.rqw-crowd-hint {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.rqw-crowd-hint strong {
+  display: block;
+  font-size: 0.86rem;
+  margin-bottom: 0.2rem;
+}
+
+.rqw-crowd-hint p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.rqw-crowd-hint--urgent {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.rqw-crowd-hint--urgent strong {
+  color: #991b1b;
+}
+
+.rqw-crowd-hint--warn {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.rqw-crowd-hint--warn strong {
+  color: #9a3412;
+}
+
+.rqw-crowd-hint--ok {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.rqw-crowd-hint--ok strong {
+  color: #166534;
+}
+
+.rqw-crowd-hint--neutral {
+  background: #f8fafc;
+}
+
 .rqw-peer-stats {
   display: flex;
   flex-direction: column;

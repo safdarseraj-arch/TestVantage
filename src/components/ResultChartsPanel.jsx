@@ -37,6 +37,12 @@ import {
   buildBioClockInsight,
   buildScoreFloorCeilingBand,
 } from '../utils/resultAdvancedAnalytics.js'
+import {
+  buildDiagnosticAnalyticsPack,
+  buildPersonalFixQueue,
+  buildRetestDelta,
+} from '../utils/diagnosticQuestionAnalytics.js'
+import { getAllStudentAttempts } from '../utils/attemptHistory.js'
 import AttemptQualityMatrix from './AttemptQualityMatrix.jsx'
 import WhatIfScoreSimulator from './WhatIfScoreSimulator.jsx'
 
@@ -71,9 +77,18 @@ function tipLabel(tip, i) {
  *   test: import('../data/tests').Test
  *   attempts?: import('../utils/attemptHistory.js').Attempt[]
  *   scoreComparison?: object | null
+ *   onOpenQuestion?: (questionId: string) => void
+ *   attemptId?: string | null
  * }} props
  */
-export default function ResultChartsPanel({ data, test, attempts = [], scoreComparison = null }) {
+export default function ResultChartsPanel({
+  data,
+  test,
+  attempts = [],
+  scoreComparison = null,
+  onOpenQuestion,
+  attemptId = null,
+}) {
   const result = data?.result
   const examPatternId = test?.examPatternId ?? data?.examPatternId
   const questionTimes = data?.questionTimes ?? {}
@@ -181,6 +196,77 @@ export default function ResultChartsPanel({ data, test, attempts = [], scoreComp
     [result, questionTimes, paperDurationSec, questions],
   )
 
+  const diagnosticStudentPack = useMemo(() => {
+    const testId = test?.id ?? data?.testId
+    if (!result?.perQuestion?.length || !testId) {
+      return { trap: null, fixQueue: null, retest: null, tabs: null }
+    }
+    // Cohort is device-wide for this paper (same source as peer / question-level stats).
+    let samePaper = getAllStudentAttempts().filter((a) => a.testId === testId)
+    if (samePaper.length < 2) {
+      samePaper = (attempts || []).filter((a) => a.testId === testId)
+    }
+    const pack =
+      samePaper.length >= 2
+        ? buildDiagnosticAnalyticsPack(samePaper, {
+            testId,
+            studentPerQuestion: result.perQuestion,
+            studentQuestionTimes: questionTimes,
+          })
+        : null
+    const trap =
+      pack?.student ||
+      {
+        ready: false,
+        takeaway:
+          'When more classmates finish this same paper, Trap fall and Time-sink rates appear here.',
+        trapFallRate: null,
+        timeSinkRate: null,
+        tabASeen: 0,
+        tabBSeen: 0,
+      }
+    const fixQueue = pack?.tabs
+      ? buildPersonalFixQueue({
+          perQuestion: result.perQuestion,
+          tabs: pack.tabs,
+          limit: 8,
+        })
+      : {
+          ready: false,
+          items: [],
+          takeaway:
+            'When more classmates finish this paper, your personal Fix Queue appears here.',
+        }
+
+    const priorSamePaper = (attempts || []).filter((a) => {
+      if (a.testId !== testId) return false
+      if (attemptId && a.id === attemptId) return false
+      // Prefer older attempts than the current one when timestamps exist
+      const curAt = Number(data?.submittedAt) || 0
+      const aAt = Number(a.submittedAt) || 0
+      if (curAt && aAt) return aAt < curAt
+      return true
+    })
+    const retest = buildRetestDelta({
+      currentPerQuestion: result.perQuestion,
+      priorAttempts: priorSamePaper,
+    })
+
+    return { trap, fixQueue, retest, tabs: pack?.tabs || null }
+  }, [
+    attempts,
+    test?.id,
+    data?.testId,
+    data?.submittedAt,
+    result,
+    questionTimes,
+    attemptId,
+  ])
+
+  const trapMetrics = diagnosticStudentPack.trap
+  const fixQueue = diagnosticStudentPack.fixQueue
+  const retestDelta = diagnosticStudentPack.retest
+
   const totalOutcome = donut.reduce((s, d) => s + d.value, 0)
   const trendIsWithinTest = trend.length > 0 && trend.every((p) => p.withinTest)
   const hasMarketAvg = subjectBars.some((b) => b.marketAvgPct != null)
@@ -243,6 +329,157 @@ export default function ResultChartsPanel({ data, test, attempts = [], scoreComp
             paperDurationSec={paperDurationSec}
             questions={questions}
           />
+        </ChartCard>
+
+        <ChartCard
+          title="Trap fall & time sinks"
+          subtitle="How you handled questions most classmates get wrong or skip"
+          className="rcx-span-2"
+        >
+          {!trapMetrics?.ready ? (
+            <ChartEmpty message={trapMetrics?.takeaway || 'Need cohort flags for this paper.'} />
+          ) : (
+            <>
+              <div className="rcx-band-kpis">
+                <div>
+                  <strong>
+                    {trapMetrics.trapFallRate != null ? `${trapMetrics.trapFallRate}%` : '—'}
+                  </strong>
+                  <span className="form-hint" style={{ display: 'block' }}>
+                    Trap fall ({trapMetrics.tabAWrongAttempt}/{trapMetrics.tabASeen} high-mistake)
+                  </span>
+                </div>
+                <div>
+                  <strong>
+                    {trapMetrics.timeSinkRate != null ? `${trapMetrics.timeSinkRate}%` : '—'}
+                  </strong>
+                  <span className="form-hint" style={{ display: 'block' }}>
+                    Time-sink skip ({trapMetrics.tabBTimeSinkSkip}/{trapMetrics.tabBSeen} high-skip)
+                  </span>
+                </div>
+              </div>
+              <p className="form-hint" style={{ marginBottom: 0 }}>
+                {trapMetrics.takeaway}
+              </p>
+            </>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title="Personal Fix Queue"
+          subtitle="High-mistake traps and combined-struggle items you missed — fix these first"
+          className="rcx-span-2"
+        >
+          {!fixQueue?.ready || !fixQueue.items?.length ? (
+            <ChartEmpty message={fixQueue?.takeaway || 'No Fix Queue items yet.'} />
+          ) : (
+            <>
+              <ul className="rcx-fix-queue">
+                {fixQueue.items.map((item) => (
+                  <li key={item.questionId} className="rcx-fix-queue-item">
+                    <div>
+                      <strong>
+                        {item.index != null ? `Q${item.index}` : 'Question'} · {item.reasonLabel}
+                      </strong>
+                      <span className="form-hint" style={{ display: 'block' }}>
+                        {(item.subject || '—').toString()}
+                        {item.chapter ? ` · ${item.chapter}` : ''} · peer struggle{' '}
+                        {item.peerStrugglePct}% · you {item.grade}
+                      </span>
+                    </div>
+                    <div className="rcx-fix-queue-actions">
+                      {typeof onOpenQuestion === 'function' ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => onOpenQuestion(item.questionId)}
+                        >
+                          Open in Question-wise
+                        </button>
+                      ) : null}
+                      <Link to="/practice" className="btn btn-ghost btn-sm">
+                        Practice
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="form-hint" style={{ marginBottom: 0 }}>
+                {fixQueue.takeaway}
+              </p>
+            </>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title="Re-test delta"
+          subtitle="Improvement on the same question IDs vs your earlier attempt(s)"
+          className="rcx-span-2"
+        >
+          {!retestDelta?.ready ? (
+            <ChartEmpty message={retestDelta?.takeaway || 'No overlapping re-test questions yet.'} />
+          ) : (
+            <>
+              <div className="rcx-band-kpis">
+                <div>
+                  <strong>
+                    {retestDelta.improvementPct != null ? `${retestDelta.improvementPct}%` : '—'}
+                  </strong>
+                  <span className="form-hint" style={{ display: 'block' }}>
+                    Improved ({retestDelta.improved}/{retestDelta.comparable})
+                  </span>
+                </div>
+                <div>
+                  <strong>{retestDelta.regressed}</strong>
+                  <span className="form-hint" style={{ display: 'block' }}>
+                    Regressed
+                  </span>
+                </div>
+                <div>
+                  <strong>{retestDelta.held}</strong>
+                  <span className="form-hint" style={{ display: 'block' }}>
+                    Unchanged / still miss
+                  </span>
+                </div>
+              </div>
+              {retestDelta.items?.length ? (
+                <ul className="rcx-retest-list">
+                  {retestDelta.items.slice(0, 6).map((it) => (
+                    <li key={it.questionId}>
+                      <strong>{it.index != null ? `Q${it.index}` : 'Q?'}</strong>{' '}
+                      <span
+                        className={`rcx-retest-chip rcx-retest-chip--${it.change}`}
+                      >
+                        {it.change === 'improved'
+                          ? 'Improved'
+                          : it.change === 'regressed'
+                            ? 'Regressed'
+                            : it.change}
+                      </span>{' '}
+                      <span className="form-hint">
+                        {it.previousGrade} → {it.currentGrade}
+                      </span>
+                      {typeof onOpenQuestion === 'function' ? (
+                        <>
+                          {' '}
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => onOpenQuestion(it.questionId)}
+                          >
+                            View
+                          </button>
+                        </>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="form-hint" style={{ marginBottom: 0 }}>
+                {retestDelta.takeaway}
+              </p>
+            </>
+          )}
         </ChartCard>
 
         <ChartCard

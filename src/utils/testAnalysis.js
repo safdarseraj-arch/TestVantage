@@ -605,7 +605,7 @@ export function buildPerQuestionPeerStats(testId, questions = []) {
   const timeMap = new Map()
 
   for (const q of questions) {
-    responseMap.set(q.id, { correct: 0, wrong: 0, unattempted: 0, total: 0 })
+    responseMap.set(q.id, { correct: 0, wrong: 0, unattempted: 0, total: 0, optionWrong: {} })
     timeMap.set(q.id, [])
   }
 
@@ -620,7 +620,14 @@ export function buildPerQuestionPeerStats(testId, questions = []) {
         row.total++
         if (pq.grade === 'correct') row.correct++
         else if (pq.grade === 'unattempted') row.unattempted++
-        else row.wrong++
+        else {
+          row.wrong++
+          const opt = pq.userAnswerLabel || pq.selectedOption || pq.userAnswer
+          if (opt != null && String(opt).trim()) {
+            const key = String(opt).trim()
+            row.optionWrong[key] = (row.optionWrong[key] || 0) + 1
+          }
+        }
       }
       const sec = Number(qTimes[id] ?? pq.timeSpentSeconds ?? 0)
       if (sec > 0 && timeMap.has(id)) timeMap.get(id).push(sec)
@@ -631,7 +638,13 @@ export function buildPerQuestionPeerStats(testId, questions = []) {
   const out = new Map()
 
   for (const q of questions) {
-    const row = responseMap.get(q.id) ?? { correct: 0, wrong: 0, unattempted: 0, total: 0 }
+    const row = responseMap.get(q.id) ?? {
+      correct: 0,
+      wrong: 0,
+      unattempted: 0,
+      total: 0,
+      optionWrong: {},
+    }
     const times = timeMap.get(q.id) ?? []
     const denom = row.total > 0 ? row.total : studentCount || 1
     const correctPct = Math.round((row.correct / denom) * 100)
@@ -650,6 +663,7 @@ export function buildPerQuestionPeerStats(testId, questions = []) {
       wrongPct,
       skippedPct,
       studentCount,
+      optionWrong: { ...(row.optionWrong || {}) },
       avgTimeSeconds: averagePositiveTime(times),
       top10TimeSeconds: avgFastestFraction(times, 10),
       top25TimeSeconds: avgFastestFraction(times, 25),

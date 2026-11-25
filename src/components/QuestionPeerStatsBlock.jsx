@@ -1,3 +1,8 @@
+import {
+  buildCrowdBenchmarkHint,
+  buildDistractorBreakdown,
+} from '../utils/diagnosticQuestionAnalytics.js'
+
 /**
  * Per-question peer response and time comparison tables.
  * @param {{
@@ -10,6 +15,7 @@
  *     wrongPct: number
  *     skippedPct: number
  *     studentCount: number
+ *     optionWrong?: Record<string, number>
  *     avgTimeSeconds: number | null
  *     top10TimeSeconds: number | null
  *     top25TimeSeconds: number | null
@@ -17,9 +23,10 @@
  *     timeSampleSize: number
  *   } | null | undefined
  *   yourTimeSeconds?: number | null
+ *   yourGrade?: string | null
  * }} props
  */
-export default function QuestionPeerStatsBlock({ peer, yourTimeSeconds }) {
+export default function QuestionPeerStatsBlock({ peer, yourTimeSeconds, yourGrade }) {
   const yourSec = Number(yourTimeSeconds ?? 0)
   const hasYourTime = yourSec > 0
 
@@ -39,9 +46,24 @@ export default function QuestionPeerStatsBlock({ peer, yourTimeSeconds }) {
         : null
 
   const appeared = peer?.appearedTo ?? 0
+  const strugglePct = peer ? (peer.wrongPct || 0) + (peer.skippedPct || 0) : 0
+  const crowd = buildCrowdBenchmarkHint({
+    grade: yourGrade || undefined,
+    peerCorrectPct: peer?.correctPct,
+    peerStrugglePct: strugglePct,
+    peerStudentCount: peer?.studentCount,
+  })
+  const distractors = buildDistractorBreakdown(peer?.optionWrong, peer?.wrong)
 
   return (
     <div className="rqw-peer-stats">
+      {yourGrade && peer && peer.studentCount >= 2 ? (
+        <div className={`rqw-crowd-hint rqw-crowd-hint--${crowd.tone}`} role="status">
+          <strong>{crowd.title}</strong>
+          <p>{crowd.message}</p>
+        </div>
+      ) : null}
+
       <section className="rqw-peer-section">
         <h4>How students on this device responded</h4>
         <div className="rqw-peer-table-wrap">
@@ -80,6 +102,41 @@ export default function QuestionPeerStatsBlock({ peer, yourTimeSeconds }) {
           </table>
         </div>
       </section>
+
+      {distractors.ready ? (
+        <section className="rqw-peer-section">
+          <h4>Wrong-option breakdown</h4>
+          <p className="form-hint" style={{ marginTop: 0 }}>
+            Where classmates landed when wrong
+            {distractors.dominant
+              ? ` — top trap option ${distractors.dominant} (${distractors.dominantPct}%)`
+              : ''}
+            .
+          </p>
+          <div className="rqw-peer-table-wrap">
+            <table className="rqw-peer-table">
+              <thead>
+                <tr>
+                  <th>Option</th>
+                  <th className="rqw-peer-num">Count</th>
+                  <th className="rqw-peer-num">Of wrong</th>
+                </tr>
+              </thead>
+              <tbody>
+                {distractors.rows.slice(0, 6).map((r) => (
+                  <tr key={r.label}>
+                    <td>
+                      <strong>{r.label}</strong>
+                    </td>
+                    <td className="rqw-peer-num">{r.count}</td>
+                    <td className="rqw-peer-num">{r.pct}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="rqw-peer-section">
         <h4>Time comparison</h4>

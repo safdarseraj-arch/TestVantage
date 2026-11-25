@@ -25,6 +25,7 @@ import './styles/compete-habit.css'
 import './styles/form-forecast.css'
 import './styles/landing-pages.css'
 import './styles/onboarding-profile.css'
+import './styles/referral.css'
 
 const rootEl = document.getElementById('root')
 

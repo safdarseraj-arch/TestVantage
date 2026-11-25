@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { loadAdminAccount } from '../utils/auth'
@@ -11,6 +11,8 @@ import {
 } from '../utils/userProfiles'
 import { DEMO_ACCOUNTS, ensureDemoAccounts, getDemoAdminHint } from '../utils/demoAccounts.js'
 import { findUserByInviteCode, normalizeInviteCode } from '../utils/invites.js'
+import { readCapturedReferral } from '../utils/referralEngine.js'
+import { getPartnerByCode, getPartnerById } from '../utils/referralStore.js'
 
 const STUDENT_HOME = STUDENT_HOME_PATH
 
@@ -69,7 +71,15 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const inviteFromUrl = normalizeInviteCode(searchParams.get('invite'))
+  const inviteFromUrl = normalizeInviteCode(
+    searchParams.get('invite') ||
+      searchParams.get('ref') ||
+      searchParams.get('coupon') ||
+      searchParams.get('code'),
+  )
+  const capturedReferral = !inviteFromUrl ? readCapturedReferral() : null
+  const inviteFromCapture = normalizeInviteCode(capturedReferral?.code || '')
+  const invitePrefill = inviteFromUrl || inviteFromCapture
   const rawFrom = typeof location.state?.from === 'string' ? location.state.from : ''
   const fromQuestionBank = rawFrom.startsWith('/question-bank')
 
@@ -77,10 +87,19 @@ export default function Login() {
     ? 'admin'
     : rawFrom.startsWith('/teacher') || location.state?.staff
       ? 'teacher'
-      : 'student'
+      : rawFrom === '/earn' ||
+          rawFrom.startsWith('/earn/') ||
+          rawFrom === '/campus-earn' ||
+          rawFrom.startsWith('/campus-earn/')
+        ? 'ambassador'
+        : 'student'
   const [mode, setMode] = useState(initialMode)
-  const [isRegister, setIsRegister] = useState(Boolean(inviteFromUrl))
-  const [inviteCode, setInviteCode] = useState(inviteFromUrl)
+  const [isRegister, setIsRegister] = useState(
+    Boolean(invitePrefill) || initialMode === 'ambassador',
+  )
+  const [inviteCode, setInviteCode] = useState(invitePrefill)
+  const [postRegisterPath, setPostRegisterPath] = useState(null)
+  const postRegisterPathRef = useRef(null)
   const defaultAdmin = loadAdminAccount()
   const [name, setName] = useState('')
   const [email, setEmail] = useState(() => (initialMode === 'admin' ? defaultAdmin.email : ''))
@@ -99,29 +118,41 @@ export default function Login() {
     )
   }
   if (isTeacher && !location.state?.admin) {
-    const dest = afterAuthPath(session, fromQuestionBank ? rawFrom : teacherHomePath(session?.permissions))
+    const dest =
+      postRegisterPathRef.current ||
+      postRegisterPath ||
+      afterAuthPath(session, fromQuestionBank ? rawFrom : teacherHomePath(session?.permissions))
+    const toEarn = dest === '/earn'
     return (
       <AuthContinuing
         to={isAuthPath(dest) ? '/teacher' : dest}
-        title="Teacher signed in"
+        title={toEarn ? 'Ambassador ready' : 'Teacher signed in'}
         detail={
-          dest === TEACHER_ONBOARDING_PATH
-            ? 'Opening your teacher profile. If this stays blank, tap Continue.'
-            : 'Opening Teacher home. If this stays blank, tap Continue.'
+          toEarn
+            ? 'Opening your Earn dashboard with your share code. If this stays blank, tap Continue.'
+            : dest === TEACHER_ONBOARDING_PATH
+              ? 'Opening your teacher profile. If this stays blank, tap Continue.'
+              : 'Opening Teacher home. If this stays blank, tap Continue.'
         }
       />
     )
   }
   if (isUser && !isTeacher && !location.state?.admin) {
-    const dest = afterAuthPath(session, loginReturnPath(location.state, 'student'))
+    const dest =
+      postRegisterPathRef.current ||
+      postRegisterPath ||
+      afterAuthPath(session, loginReturnPath(location.state, 'student'))
+    const toEarn = dest === '/earn'
     return (
       <AuthContinuing
         to={dest}
-        title="You are signed in"
+        title={toEarn ? 'Ambassador ready' : 'You are signed in'}
         detail={
-          dest === STUDENT_ONBOARDING_PATH
-            ? 'Opening your student profile. If this page stays here, tap Continue.'
-            : 'Opening your student home. If this page stays here, tap Continue.'
+          toEarn
+            ? 'Opening your Earn dashboard with your share code. If this page stays here, tap Continue.'
+            : dest === STUDENT_ONBOARDING_PATH
+              ? 'Opening your student profile. If this page stays here, tap Continue.'
+              : 'Opening your student home. If this page stays here, tap Continue.'
         }
         extra={
           <button type="button" className="link-btn auth-continue-logout" onClick={logout}>
@@ -136,21 +167,38 @@ export default function Login() {
     e.preventDefault()
     setError('')
     try {
-      if (isRegister && (mode === 'student' || mode === 'teacher')) {
+      if (isRegister && (mode === 'student' || mode === 'teacher' || mode === 'ambassador')) {
+        const asAmbassador = mode === 'ambassador'
+        // Ref + state before await so the signed-in redirect cannot steal /earn after setSession.
+        if (asAmbassador) {
+          postRegisterPathRef.current = '/earn'
+          setPostRegisterPath('/earn')
+        }
         const result = await register({
           name,
           email,
           password,
           role: mode === 'teacher' ? 'teacher' : 'user',
           inviteCode,
+          becomeAmbassador: asAmbassador,
         })
         if (result.ok) {
+          if (asAmbassador || result.ambassador) {
+            postRegisterPathRef.current = '/earn'
+            setPostRegisterPath('/earn')
+            navigate('/earn', { replace: true })
+            return
+          }
+          postRegisterPathRef.current = null
+          setPostRegisterPath(null)
           const dest =
             mode === 'teacher'
               ? afterAuthPath(result.session, TEACHER_ONBOARDING_PATH)
               : afterAuthPath(result.session, STUDENT_ONBOARDING_PATH)
           navigate(dest, { replace: true })
         } else {
+          postRegisterPathRef.current = null
+          setPostRegisterPath(null)
           setError(result.error ?? 'Registration failed. Try a different email, or press F5 and sign in.')
         }
         return
@@ -160,6 +208,12 @@ export default function Login() {
         if (mode === 'teacher' && result.session?.role !== 'teacher') {
           logout()
           setError('This account is not a teacher. Use the Student tab, or ask an admin for a teacher login.')
+          return
+        }
+        if (mode === 'ambassador') {
+          postRegisterPathRef.current = '/earn'
+          setPostRegisterPath('/earn')
+          navigate('/earn', { replace: true })
           return
         }
         const dest = afterAuthPath(
@@ -229,7 +283,53 @@ export default function Login() {
 
   const isTeacherMode = mode === 'teacher'
   const isStudentMode = mode === 'student'
-  const inviteHost = inviteFromUrl ? findUserByInviteCode(inviteFromUrl) : null
+  const isAmbassadorMode = mode === 'ambassador'
+  const isUserFormMode = isStudentMode || isTeacherMode || isAmbassadorMode
+  const inviteLookupCode = inviteCode || invitePrefill
+  const inviteHost = inviteLookupCode ? findUserByInviteCode(inviteLookupCode) : null
+  const invitePartner =
+    !inviteHost && inviteLookupCode
+      ? getPartnerByCode(inviteLookupCode) ||
+        (capturedReferral?.partnerId ? getPartnerById(capturedReferral.partnerId) : null)
+      : null
+  const inviteByName =
+    inviteHost?.name || invitePartner?.displayName || invitePartner?.name || null
+
+  const formTitle = isRegister
+    ? isAmbassadorMode
+      ? 'Create ambassador account'
+      : isTeacherMode
+        ? 'Create teacher account'
+        : 'Create account'
+    : isAmbassadorMode
+      ? 'Ambassador sign in'
+      : isTeacherMode
+        ? 'Teacher sign in'
+        : 'Welcome back'
+
+  const formLead = isAmbassadorMode
+    ? isRegister
+      ? 'This login is for promoting TestVantage and earning when friends join. Register free, then get your share link.'
+      : 'Sign in with your ambassador email and password to open Earn and your share kit.'
+    : isTeacherMode
+      ? isRegister
+        ? 'Register free, then finish a short profile. Your bank, lecture plan, and papers turn on. Official PYQ approve stays with admin.'
+        : fromQuestionBank
+          ? 'Use your teacher email and password. After sign-in you open Question Bank.'
+          : 'Use your teacher email and password, or register free. After sign-in you land on Teacher home.'
+      : 'Use the user ID and password from your school admin, or register with your email.'
+
+  const submitLabel = isRegister
+    ? isAmbassadorMode
+      ? 'Register & open Earn'
+      : isTeacherMode
+        ? 'Register teacher'
+        : 'Register & continue'
+    : isAmbassadorMode
+      ? 'Ambassador sign in'
+      : isTeacherMode
+        ? 'Teacher sign in'
+        : 'Sign in'
 
   return (
     <div className="page login-page auth-page">
@@ -255,7 +355,7 @@ export default function Login() {
         </div>
 
         <div className="auth-form-panel">
-          <div className="auth-mode-tabs">
+          <div className="auth-mode-tabs" role="tablist" aria-label="Account type">
             <button
               type="button"
               className={mode === 'student' ? 'active' : ''}
@@ -290,6 +390,18 @@ export default function Login() {
             >
               Admin
             </button>
+            <button
+              type="button"
+              className={mode === 'ambassador' ? 'active' : ''}
+              onClick={() => {
+                setMode('ambassador')
+                setEmail('')
+                setIsRegister(true)
+                setError('')
+              }}
+            >
+              Ambassador
+            </button>
           </div>
 
           {fromQuestionBank ? (
@@ -299,30 +411,14 @@ export default function Login() {
             </p>
           ) : null}
 
-          {isStudentMode || isTeacherMode ? (
+          {isUserFormMode ? (
             <>
               <div className="auth-form-header">
-                <h1>
-                  {isRegister
-                    ? isTeacherMode
-                      ? 'Create teacher account'
-                      : 'Create account'
-                    : isTeacherMode
-                      ? 'Teacher sign in'
-                      : 'Welcome back'}
-                </h1>
-                <p>
-                  {isTeacherMode
-                    ? isRegister
-                      ? 'Register free, then finish a short profile. Your bank, lecture plan, and papers turn on. Official PYQ approve stays with admin.'
-                      : fromQuestionBank
-                        ? 'Use your teacher email and password. After sign-in you open Question Bank.'
-                        : 'Use your teacher email and password, or register free. After sign-in you land on Teacher home.'
-                    : 'Use the user ID and password from your school admin, or register with your email.'}
-                </p>
+                <h1>{formTitle}</h1>
+                <p>{formLead}</p>
               </div>
               <form onSubmit={handleUserLogin}>
-                {isRegister && (isStudentMode || isTeacherMode) && (
+                {isRegister ? (
                   <label>
                     Full name
                     <input
@@ -332,7 +428,7 @@ export default function Login() {
                       required
                     />
                   </label>
-                )}
+                ) : null}
                 <label>
                   User ID or email
                   <input
@@ -354,7 +450,7 @@ export default function Login() {
                     autoComplete={isRegister ? 'new-password' : 'current-password'}
                   />
                 </label>
-                {isRegister && (isStudentMode || isTeacherMode) ? (
+                {isRegister ? (
                   <label>
                     Invite code (optional)
                     <input
@@ -362,25 +458,36 @@ export default function Login() {
                       value={inviteCode}
                       onChange={(e) => setInviteCode(normalizeInviteCode(e.target.value))}
                       autoComplete="off"
-                      placeholder="From a teacher or friend"
+                      placeholder={
+                        isAmbassadorMode ? 'If someone referred you' : 'From a teacher or friend'
+                      }
                     />
                   </label>
                 ) : null}
-                {inviteHost ? (
-                  <p className="form-hint">
-                    Invited by <strong>{inviteHost.name || 'a TestVantages account'}</strong>. Register
-                    to join.
+                {inviteByName || invitePrefill ? (
+                  <p className="form-hint" data-testid="invite-prefill-hint">
+                    {inviteByName ? (
+                      <>
+                        Invited by <strong>{inviteByName}</strong>
+                        {invitePrefill ? (
+                          <>
+                            {' '}
+                            · code <strong>{invitePrefill}</strong>
+                          </>
+                        ) : null}
+                        . Register to join — free diagnostic mocks stay linked for 45 days.
+                      </>
+                    ) : (
+                      <>
+                        Referral code <strong>{invitePrefill}</strong> is ready. Register to apply it
+                        (or clear the field to skip).
+                      </>
+                    )}
                   </p>
                 ) : null}
                 {error && <p className="upload-error">{error}</p>}
                 <button type="submit" className="btn btn-primary auth-submit-btn">
-                  {isRegister
-                    ? isTeacherMode
-                      ? 'Register teacher'
-                      : 'Register & continue'
-                    : isTeacherMode
-                      ? 'Teacher sign in'
-                      : 'Sign in'}
+                  {submitLabel}
                 </button>
               </form>
               <p className="auth-toggle">

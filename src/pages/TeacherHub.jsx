@@ -6,6 +6,14 @@ import { teacherUploadLinks, questionBankUploadUrl } from '../utils/questionBank
 import { canAccessMainQuestionBank } from '../utils/teacherQuestionBank.js'
 import { getUserById } from '../utils/users.js'
 import { TEACHER_STANDARDS, TEACHER_SUBJECTS } from '../utils/userProfiles.js'
+import {
+  ENTITLEMENT_LABELS,
+  FACULTY_EXAM_SPECIALIZATIONS,
+  FACULTY_MODE_LABELS,
+  FACULTY_ONBOARDING_MODES,
+  facultyModeFromProfile,
+  personalVaultBlurb,
+} from '../utils/facultyWorkbench.js'
 
 const UPLOAD = teacherUploadLinks({ from: 'teacher' })
 
@@ -99,9 +107,14 @@ export default function TeacherHub() {
   }
 
   const stored = session?.userId ? getUserById(session.userId) : null
-  const subjects = labelList(stored?.profile?.subjects, TEACHER_SUBJECTS)
-  const standards = labelList(stored?.profile?.standards, TEACHER_STANDARDS)
+  const profile = stored?.profile
+  const subjects = labelList(profile?.subjects, TEACHER_SUBJECTS)
+  const standards = labelList(profile?.standards, TEACHER_STANDARDS)
+  const exams = labelList(profile?.examSpecializations, FACULTY_EXAM_SPECIALIZATIONS)
   const fullName = session?.name?.trim() || 'Teacher'
+  const facultyMode =
+    facultyModeFromProfile(profile) || FACULTY_ONBOARDING_MODES.INDEPENDENT
+  const entitlements = profile?.entitlements || null
 
   const accessMain = isAdmin || canAccessMainQuestionBank(session)
   const cards = PRIMARY_CARDS.filter((card) => card.perms.some((p) => hasPermission(p)))
@@ -114,6 +127,9 @@ export default function TeacherHub() {
       subtitle={`${fullName} — question bank, lecture plan, papers, and PDF in one calm place.`}
       actions={
         <>
+          <Link to="/earn#promo-gallery" className="btn btn-primary btn-sm">
+            Refer &amp; earn
+          </Link>
           <Link to="/profile" className="btn btn-ghost btn-sm">
             Edit profile
           </Link>
@@ -130,6 +146,11 @@ export default function TeacherHub() {
           <h2 className="teacher-hub-hero-name">{fullName}</h2>
           <p className="teacher-hub-hero-lead">
             Start with your bank, plan a lecture, or make a paper. Student mocks stay under Prepare.
+          </p>
+          <p className="form-hint" style={{ marginTop: '0.65rem' }}>
+            Want to promote TestVantage? Open{' '}
+            <Link to="/earn#promo-gallery">Refer &amp; earn</Link> for share templates, approved
+            reels, and WhatsApp / social share.
           </p>
           {subjects.length || standards.length ? (
             <div className="teacher-hub-welcome-chips">
@@ -151,9 +172,61 @@ export default function TeacherHub() {
         </Link>
       </section>
 
+      <section className="card teacher-workbench-strip" aria-label="Faculty workbench">
+        <div className="teacher-workbench-strip-head">
+          <h2>Faculty workbench</h2>
+          <span className="teacher-hub-welcome-chip">
+            {FACULTY_MODE_LABELS[facultyMode] || 'Teacher'}
+          </span>
+        </div>
+        <p className="form-hint">{personalVaultBlurb(facultyMode)}</p>
+        {facultyMode === FACULTY_ONBOARDING_MODES.SCHOOL && profile?.campusName ? (
+          <p className="form-hint">
+            Campus: <strong>{profile.campusName}</strong>
+            {profile.department ? ` · ${profile.department}` : ''}
+            {profile.schoolInviteCode ? ` · invite ${profile.schoolInviteCode}` : ''}
+          </p>
+        ) : null}
+        {exams.length ? (
+          <div className="teacher-hub-welcome-chips">
+            {exams.map((label) => (
+              <span key={label} className="teacher-hub-welcome-chip teacher-hub-welcome-chip--muted">
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {profile?.watermarkText || profile?.paperHeaderText ? (
+          <p className="form-hint">
+            {profile.paperHeaderText ? <>Header: {profile.paperHeaderText}. </> : null}
+            {profile.watermarkText ? <>Watermark: {profile.watermarkText}.</> : null}
+          </p>
+        ) : null}
+        {entitlements ? (
+          <ul className="teacher-entitlement-list">
+            {ENTITLEMENT_LABELS.map((row) => (
+              <li key={row.key} className={entitlements[row.key] ? 'is-on' : 'is-off'}>
+                {entitlements[row.key] ? 'On' : 'Off'} — {row.label}
+              </li>
+            ))}
+            <li className="is-on">OCR quota — {entitlements.monthly_ocr_quota ?? 0} pages / month</li>
+          </ul>
+        ) : (
+          <p className="form-hint">
+            Finish <Link to="/onboarding/teacher">faculty onboarding</Link> or update Profile to set
+            pathway entitlements.
+          </p>
+        )}
+        <p className="form-hint">
+          Personal Vault = your private question bank below. School Shared Bank and System QB PDF
+          export unlock with school plan / admin flags.
+        </p>
+      </section>
+
       {!accessMain && hasPermission(PERMS.UPLOAD_QUESTIONS) ? (
         <p className="form-hint teacher-hub-scope-note">
-          You are in <strong>your question bank</strong>. Uploads also reach the admin Review queue.
+          You are in <strong>your Personal Vault</strong> (teacher-owned IP). Uploads also reach the
+          admin Review queue.
         </p>
       ) : null}
 

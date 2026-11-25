@@ -11,6 +11,8 @@ import {
   inviteSignupPath,
   persistInviteCode,
 } from '../utils/invites.js'
+import { getPartnerByUserId } from '../utils/referralStore.js'
+import { getPromoterDashboard } from '../utils/referralEngine.js'
 import {
   STUDENT_HOME_PATH,
   TEACHER_HOME_PATH,
@@ -34,7 +36,21 @@ function emptyStudent(nowY) {
 }
 
 function emptyTeacher() {
-  return { dob: '', subjects: [], standards: [], experience: '' }
+  return {
+    dob: '',
+    subjects: [],
+    standards: [],
+    experience: '',
+    onboardingMode: 'independent',
+    examSpecializations: [],
+    schoolInviteCode: '',
+    campusName: '',
+    department: '',
+    schoolClasses: [],
+    watermarkText: '',
+    paperHeaderText: '',
+    signatureDataUrl: '',
+  }
 }
 
 function studentFromStored(profile, nowY) {
@@ -57,10 +73,24 @@ function teacherFromStored(profile) {
   const base = emptyTeacher()
   if (!profile) return base
   return {
+    ...base,
     dob: profile.dob ?? '',
     subjects: Array.isArray(profile.subjects) ? [...profile.subjects] : [],
     standards: Array.isArray(profile.standards) ? [...profile.standards] : [],
     experience: profile.experience ?? '',
+    onboardingMode: profile.onboardingMode === 'school' ? 'school' : 'independent',
+    examSpecializations: Array.isArray(profile.examSpecializations)
+      ? [...profile.examSpecializations]
+      : profile.onboardingMode === 'school'
+        ? []
+        : ['jee-main'],
+    schoolInviteCode: profile.schoolInviteCode ?? '',
+    campusName: profile.campusName ?? '',
+    department: profile.department ?? '',
+    schoolClasses: Array.isArray(profile.schoolClasses) ? [...profile.schoolClasses] : [],
+    watermarkText: profile.watermarkText ?? '',
+    paperHeaderText: profile.paperHeaderText ?? '',
+    signatureDataUrl: profile.signatureDataUrl ?? '',
   }
 }
 
@@ -76,11 +106,16 @@ export default function Profile() {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [inviteCopied, setInviteCopied] = useState(false)
+  const [earnCopied, setEarnCopied] = useState(false)
   const inviteCode = session?.userId ? inviteCodeForUser(session.userId) : ''
   const inviteLink = inviteCode
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}${inviteSignupPath(inviteCode)}`
     : ''
   const referralCount = session?.userId ? countReferralsForUser(session.userId) : 0
+  const earnPartner = session?.userId ? getPartnerByUserId(session.userId) : null
+  const earnDash = earnPartner ? getPromoterDashboard(earnPartner.id) : null
+  const earnCode = earnDash?.share?.vanityCode || ''
+  const earnLink = earnDash?.share?.referralLink || ''
 
   useEffect(() => {
     if (session?.userId) persistInviteCode(session.userId)
@@ -198,37 +233,84 @@ export default function Profile() {
         </form>
       </section>
 
-      {inviteCode ? (
+      {inviteCode || earnCode ? (
         <section className="card profile-card" data-testid="profile-invite-card">
-          <h2 className="profile-invite-title">Invite friends</h2>
-          <p className="form-hint">
-            Share your code. When they register at login with this code, they are marked as invited
-            by you. This does not change their password or your question bank.
-          </p>
-          <p>
-            Your code: <strong>{inviteCode}</strong>
-          </p>
-          <p className="form-hint">Link: {inviteLink}</p>
-          <p className="form-hint">
-            People who joined with your code: <strong>{referralCount}</strong>
-          </p>
+          <h2 className="profile-invite-title">Invite &amp; earn</h2>
+          {earnCode ? (
+            <>
+              <p className="form-hint">
+                <strong>Earn share code</strong> (commissions / wallet when friends upgrade after free
+                mocks): <strong className="tv-code-display">{earnCode}</strong>
+              </p>
+              {earnLink ? <p className="form-hint">Earn link: {earnLink}</p> : null}
+              <div className="tv-inline-form" style={{ marginBottom: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(earnLink || earnCode)
+                      setEarnCopied(true)
+                    } catch {
+                      setEarnCopied(false)
+                    }
+                  }}
+                >
+                  {earnCopied ? 'Earn link copied' : 'Copy earn link'}
+                </button>
+                <Link to="/earn#promo-gallery" className="btn btn-ghost btn-sm">
+                  Promo gallery
+                </Link>
+              </div>
+            </>
+          ) : (
+            <p className="form-hint">
+              Open <Link to="/earn">Earn &amp; Refer</Link> once to create your commission share kit
+              (students, teachers, and ambassadors).
+            </p>
+          )}
+          {inviteCode ? (
+            <>
+              <p className="form-hint">
+                Friend invite code (marks who invited them at signup): <strong>{inviteCode}</strong>
+              </p>
+              <p className="form-hint">Invite link: {inviteLink}</p>
+              <p className="form-hint">
+                People who joined with your invite code: <strong>{referralCount}</strong>
+              </p>
+            </>
+          ) : null}
           {stored?.referredByName ? (
             <p className="form-hint">You joined from {stored.referredByName}.</p>
           ) : null}
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(inviteLink || inviteCode)
-                setInviteCopied(true)
-              } catch {
-                setInviteCopied(false)
-              }
-            }}
-          >
-            {inviteCopied ? 'Copied' : 'Copy invite link'}
-          </button>
+          <div className="tv-inline-form">
+            {inviteCode ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(inviteLink || inviteCode)
+                    setInviteCopied(true)
+                  } catch {
+                    setInviteCopied(false)
+                  }
+                }}
+              >
+                {inviteCopied ? 'Invite copied' : 'Copy invite link'}
+              </button>
+            ) : null}
+            <Link to="/earn" className="btn btn-ghost btn-sm">
+              Open Earn dashboard
+            </Link>
+            <Link to="/campus-earn" className="btn btn-ghost btn-sm">
+              Campus Earn
+            </Link>
+          </div>
+          <p className="form-hint" style={{ marginTop: '0.75rem' }}>
+            Prefer one link for money: use your Earn share code / promo gallery. The friend invite
+            code is only for “who invited me” on the account.
+          </p>
         </section>
       ) : null}
     </PortalPage>

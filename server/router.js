@@ -52,6 +52,14 @@ import {
   setPulseLinkFile,
   upsertPulseProfileFile,
 } from './pulseFileStore.js'
+import {
+  getPartnerByCodeFile,
+  getPartnerBySlugFile,
+  getVideoBySlugFile,
+  listFeaturedVideosFile,
+  loadReferralFile,
+  saveReferralFile,
+} from './referralFileStore.js'
 import { authenticateLogin, requireAdmin, ADMIN_USING_DEFAULT_PASSWORD } from './auth.js'
 import {
   getCounsellingUpdateStatus,
@@ -933,6 +941,53 @@ export async function handleApiRequest(req, res) {
       }
       const state = saveMeritFile(ownerKey, body.state)
       sendJson(res, 200, { ok: true, state })
+      return
+    }
+
+    // Referral / campus-earn / creator hub (Phase 1–2 MVP file store)
+    if (req.method === 'GET' && path === '/api/referral/store') {
+      sendJson(res, 200, { store: loadReferralFile() })
+      return
+    }
+
+    if (req.method === 'PUT' && path === '/api/referral/store') {
+      const body = await readJsonBody(req, 2 * 1024 * 1024)
+      try {
+        const store = saveReferralFile(body?.store ?? body)
+        sendJson(res, 200, { ok: true, store })
+      } catch (err) {
+        sendJson(res, 400, { error: err instanceof Error ? err.message : 'Invalid store' })
+      }
+      return
+    }
+
+    if (req.method === 'GET' && path === '/api/referral/partner') {
+      const code = url.searchParams.get('code')?.trim()
+      const slug = url.searchParams.get('slug')?.trim()
+      if (code) {
+        sendJson(res, 200, { partner: getPartnerByCodeFile(code) })
+        return
+      }
+      if (slug) {
+        sendJson(res, 200, { partner: getPartnerBySlugFile(slug) })
+        return
+      }
+      sendJson(res, 400, { error: 'code or slug query param required' })
+      return
+    }
+
+    if (req.method === 'GET' && path === '/api/referral/video') {
+      const slug = url.searchParams.get('slug')?.trim()
+      if (!slug) {
+        sendJson(res, 400, { error: 'slug query param required' })
+        return
+      }
+      sendJson(res, 200, { video: getVideoBySlugFile(slug) })
+      return
+    }
+
+    if (req.method === 'GET' && path === '/api/referral/featured-videos') {
+      sendJson(res, 200, { videos: listFeaturedVideosFile() })
       return
     }
 

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import ErrorBoundary from './components/ErrorBoundary'
 import RequirePermission from './components/RequirePermission'
 import Layout from './components/Layout'
+import ReferralCapture from './components/ReferralCapture'
 import Login from './pages/Login'
 import StudentOnboarding from './pages/StudentOnboarding'
 import TeacherOnboarding from './pages/TeacherOnboarding'
@@ -136,6 +137,11 @@ const GeneratorDashboard = lazyPage(
   'Hybrid AI',
 )
 const UploadPortal = lazyPage(() => import('./pages/UploadPortal.jsx'), 'Upload a PDF')
+const CampusEarn = lazyPage(() => import('./pages/CampusEarn.jsx'), 'Campus Earn')
+const ReferralDashboard = lazyPage(() => import('./pages/ReferralDashboard.jsx'), 'Earn & Refer')
+const MentorMicrosite = lazyPage(() => import('./pages/MentorMicrosite.jsx'), 'Mentor page')
+const PromoVideoPage = lazyPage(() => import('./pages/PromoVideoPage.jsx'), 'Promo video')
+const ReferralAdmin = lazyPage(() => import('./pages/ReferralAdmin.jsx'), 'Referral admin')
 
 function RouteLoading({ label = 'Loading…' }) {
   const [stuck, setStuck] = useState(false)
@@ -169,6 +175,8 @@ function withSuspense(node, label) {
 /** OCR-first: Question Bank is the main workflow. */
 export default function App() {
   return (
+    <>
+    <ReferralCapture />
     <Routes>
       <Route
         path="/login"
@@ -194,9 +202,38 @@ export default function App() {
           </ErrorBoundary>
         }
       />
+      <Route
+        path="/m/:slug"
+        element={
+          <ErrorBoundary>
+            {withSuspense(<MentorMicrosite />, 'Loading mentor page…')}
+          </ErrorBoundary>
+        }
+      />
+      <Route
+        path="/v/:slug"
+        element={
+          <ErrorBoundary>
+            {withSuspense(<PromoVideoPage />, 'Loading video…')}
+          </ErrorBoundary>
+        }
+      />
       <Route element={<Layout />}>
         <Route index element={<Navigate to="/home" replace />} />
         <Route path="home" element={withSuspense(<Home />, 'Loading home…')} />
+        <Route path="earn" element={withSuspense(<ReferralDashboard />, 'Loading Earn & Refer…')} />
+        <Route
+          path="campus-earn"
+          element={withSuspense(<CampusEarn />, 'Loading Campus Earn…')}
+        />
+        <Route
+          path="admin/referrals"
+          element={
+            <RequirePermission adminOnly>
+              {withSuspense(<ReferralAdmin />, 'Loading referral admin…')}
+            </RequirePermission>
+          }
+        />
         <Route path="prepare" element={withSuspense(<PrepareHub />, 'Loading prepare centre…')} />
         {/* Bookmark: old Prep Hub URL → single Prepare centre */}
         <Route path="prep-hub" element={<Navigate to="/prepare" replace />} />
@@ -408,5 +445,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Route>
     </Routes>
+    </>
   )
 }

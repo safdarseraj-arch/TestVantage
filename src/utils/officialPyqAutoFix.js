@@ -92,12 +92,21 @@ export function officialPyqAutoFixRejectReason(card, draft, ctx = {}) {
   if (figure) return figure
   const next = applyOfficialPyqCardDraft(card, draft)
   if (!String(next.text ?? '').trim()) return 'the corrected question text is empty'
+  // Never save a "fix" that still draws structures from scan codes (Q81 / 2012 P2).
+  const draftBlob = [draft?.text, draft?.passageText, ...(Array.isArray(draft?.options) ? draft.options : [])].join('\n')
+  if (/<smiles\b/i.test(draftBlob)) {
+    return 'the correction still uses a structure code (SMILES) instead of a page drawing'
+  }
   const shown = drawnProblems(next)
   if (shown.length) return shown[0]
   const n = Number(ctx.printedNumber)
   const printed = String(next.text).match(/^\s*Q\s*\.?\s*(\d{1,3})\b/)
   if (printed && Number.isFinite(n) && Number(printed[1]) !== n) return `the correction is for Q${printed[1]}, not Q${n}`
   const opts = (Array.isArray(next.options) ? next.options : []).map((o) => String(o ?? '').trim()).filter(Boolean)
+  // "(A), (B) and (C) only" stripped to ", (B) and (C) only" must never auto-save (Q33).
+  if (opts.some((o) => /^,\s*\(\s*[A-Da-d]\s*\)/.test(o) || /^,\s*[A-Da-d]\b/.test(o))) {
+    return 'an option lost its leading (A)/(B) label and starts with a comma'
+  }
   const type = String(next.questionType ?? '')
   if (MCQ_TYPES.test(type)) {
     if (opts.length < 2) return 'the correction leaves an option box empty'

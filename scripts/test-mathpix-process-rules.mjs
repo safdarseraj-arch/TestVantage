@@ -1514,9 +1514,10 @@ const swallowed = [
 const restoredList = restoreScanMathBreaks(swallowed, stephenListOcr)
 assert.match(restoredList, /Nitrobenzene/, 'the scan List-II rows come back')
 assert.match(restoredList, /Benzoic acid/, 'a reagent table is not replaced by the answer table')
+assert.match(restoredList, /List-I[\s\S]*Stephen reaction/, 'List-I is kept when List-II is restored')
 assert.equal(
   validateMathpixQuestion({ text: restoredList, options: longerList.options }).issues.some(
-    (issue) => issue.code === 'missing_column',
+    (issue) => issue.code === 'missing_column' && /List-II/i.test(String(issue.note ?? '')),
   ),
   false,
   'restored List-II is not a missing list',
@@ -1594,9 +1595,27 @@ assert.equal(latexExtractionIncomplete(tolueneLeft), false, 'a drawn reaction ar
 assert.deepEqual(visibleLatexSourceHits(tolueneLeft), [], 'a drawn reaction arrow is not raw code')
 const approvalSrc = readFileSync(new URL('../src/utils/officialPyqApproval.js', import.meta.url), 'utf8')
 const listSrc = readFileSync(new URL('../src/pages/OfficialPyqTabList.jsx', import.meta.url), 'utf8')
+const pendingSrc = readFileSync(new URL('../src/pages/OfficialPyqPending.jsx', import.meta.url), 'utf8')
 assert.match(approvalSrc, /persistOfficialPyqQualityRun/, 'a new upload runs the local quality check')
 assert.match(listSrc, /Run quality check and fix/, 'each pending row can run the check again')
 assert.match(listSrc, /official-pyq-quality-rerun/)
+assert.match(pendingSrc, /persistOfficialPyqQualityRun/, 'quality button runs the local quality check')
+assert.match(
+  pendingSrc,
+  /Local quality only|never await Mathpix here/,
+  'quality button stays local (Mathpix re-read must not hang Checking…)',
+)
+assert.match(
+  pendingSrc,
+  /official-pyq-institute-mathpix-reread|Re-read institute with Mathpix/,
+  'Mathpix institute re-read is a separate button, not the quality check',
+)
+const qualityHandlerChunk = pendingSrc.match(/onQualityFix=\{\(summary\) => \{[\s\S]*?\}\s*\}/)?.[0] || ''
+assert.equal(
+  /rereadStoredInstituteSolutions/.test(qualityHandlerChunk),
+  false,
+  'quality button must not await a full Mathpix institute re-read (that hung Checking…)',
+)
 
 const healedSalt = healUploadQuestionCard(
   { text: 'List-I (R) <smiles>[Cl+3-][N-]c1ccccc1</smiles>' },

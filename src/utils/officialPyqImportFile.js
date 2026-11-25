@@ -8,6 +8,7 @@ import { parsePyqJson, parsePyqCsv } from './pyqImport.js'
 import { enrichParsedWithAnswerProvenance } from './answerProvenance.js'
 import { importQuestionsToOfficialPyqPending } from './officialPyqApproval.js'
 import {
+  combinePyqPreparedOcrText,
   extractPyqFileWithGemini,
   formatOfficialPyqExtractSummary,
   formatOfficialPyqStoredNotes,
@@ -18,6 +19,9 @@ import {
   repairGeminiPyqBankItem,
 } from './pyqGeminiExtract.js'
 import { ocrIsHindiOnly } from './stripHindiOcr.js'
+
+/** Max PDFs for one paper or one 3-part subject-wise solutions set. */
+export const OFFICIAL_PYQ_MULTI_UPLOAD_MAX = 3
 
 function isSupportedOfficialPyqUpload(file) {
   const name = String(file?.name || '').toLowerCase()
@@ -58,27 +62,132 @@ function isSupportedOfficialPyqUpload(file) {
  * }} [io]
  */
 export async function importFileToPending(file, meta, io = {}) {
-  const name = file.name.toLowerCase()
-  const { other, label } = pendingPaperLabel(meta)
+  return importFilesToPending([file], meta, io)
+}
 
-  if (name.endsWith('.json') || name.endsWith('.csv')) {
-    const text = await file.text()
-    const questions = (name.endsWith('.json') ? parsePyqJson(text) : parsePyqCsv(text)).map(repairGeminiPyqBankItem)
-    const paper = savePendingPaper(meta, { questions, preparedText: '', notes: formatOfficialPyqStoredNotes({ fileName: file.name }) })
-    return { paper, summary: null, preparedText: '', cloudNote: '' }
+/**
+ * Upload one paper PDF, or up to 3 subject-wise parts (Physics / Chemistry / Maths).
+ * Parts are OCR’d separately then merged before the usual split + solutions-booklet rebuild.
+ * @param {File[] | FileList} files
+ * @param {Parameters<typeof importFileToPending>[1]} meta
+ * @param {Parameters<typeof importFileToPending>[2]} [io]
+ */
+export async function importFilesToPending(files, meta, io = {}) {
+  const list = [...(files || [])].filter(Boolean).slice(0, OFFICIAL_PYQ_MULTI_UPLOAD_MAX)
+  if (!list.length) throw new Error('Choose a PDF, Word, JSON, or CSV file.')
+  if (list.length === 1) {
+    const file = list[0]
+    const name = file.name.toLowerCase()
+    const { other, label } = pendingPaperLabel(meta)
+
+    if (name.endsWith('.json') || name.endsWith('.csv')) {
+      const text = await file.text()
+      const questions = (name.endsWith('.json') ? parsePyqJson(text) : parsePyqCsv(text)).map(repairGeminiPyqBankItem)
+      const paper = savePendingPaper(meta, {
+        questions,
+        preparedText: '',
+        notes: formatOfficialPyqStoredNotes({ fileName: file.name }),
+      })
+      return finalizePendingImport({ paper, summary: null, preparedText: '', cloudNote: '' }, meta)
+    }
+    if (!isSupportedOfficialPyqUpload(file)) {
+      throw new Error('Use an official PDF, Word, JSON, or CSV file.')
+    }
+    const extracted = await extractPyqFileWithGemini(file, io.onProgress, {
+      signal: io.signal,
+      timeoutMs: io.timeoutMs ?? 400_000,
+      exam: meta.exam,
+      year: meta.year,
+      session: meta.session,
+      paperLabel: other ? label : meta.paperLabel,
+    })
+    return finalizePendingImport(pendingPaperFromExtract(extracted, meta, file.name), meta)
   }
-  if (!isSupportedOfficialPyqUpload(file)) {
-    throw new Error('Use an official PDF, Word, JSON, or CSV file.')
+
+  const { other, label } = pendingPaperLabel(meta)
+  /** @type {any[]} */
+  const extracts = []
+  for (let i = 0; i < list.length; i += 1) {
+    const file = list[i]
+    if (!isSupportedOfficialPyqUpload(file)) {
+      throw new Error(`Part ${i + 1} (“${file.name}”) must be a PDF, Word, or image.`)
+    }
+    if (io.signal?.aborted) {
+      const err = new Error('Upload cancelled.')
+      err.name = 'AbortError'
+      throw err
+    }
+    const base = io.onProgress
+    const extracted = await extractPyqFileWithGemini(
+      file,
+      (pct, lbl) => {
+        if (!base) return
+        const slice = 100 / list.length
+        base(Math.round(i * slice + (Number(pct) || 0) * (slice / 100)), lbl || `Reading part ${i + 1} of ${list.length}…`)
+      },
+      {
+        signal: io.signal,
+        timeoutMs: io.timeoutMs ?? 400_000,
+        exam: meta.exam,
+        year: meta.year,
+        session: meta.session,
+        paperLabel: other ? label : meta.paperLabel,
+      },
+    )
+    extracts.push(extracted)
   }
-  const extracted = await extractPyqFileWithGemini(file, io.onProgress, {
-    signal: io.signal,
-    timeoutMs: io.timeoutMs ?? 400_000,
-    exam: meta.exam,
-    year: meta.year,
-    session: meta.session,
-    paperLabel: other ? label : meta.paperLabel,
-  })
-  return pendingPaperFromExtract(extracted, meta, file.name)
+  const combined = {
+    ...extracts[0],
+    visionText: combinePyqPreparedOcrText(...extracts.map((e) => e?.visionText)),
+    pdfText: combinePyqPreparedOcrText(...extracts.map((e) => e?.pdfText || e?.localOcrText)),
+    localOcrText: combinePyqPreparedOcrText(...extracts.map((e) => e?.localOcrText || e?.pdfText)),
+    text: combinePyqPreparedOcrText(...extracts.map((e) => e?.text || e?.visionText || e?.pdfText)),
+    cloudNote: extracts
+      .map((e) => String(e?.cloudNote || '').trim())
+      .filter(Boolean)
+      .join(' '),
+  }
+  const names = list.map((f) => f.name).join(' + ')
+  return finalizePendingImport(pendingPaperFromExtract(combined, meta, names), meta)
+}
+
+/**
+ * After a normal split, if OCR is really an institute solutions booklet and card count is low,
+ * rebuild from Ans./Sol. so JEE Main / Advanced booklet uploads do not stay broken.
+ * @param {{ paper: any, summary: any, preparedText: string, cloudNote: string }} result
+ * @param {Parameters<typeof importFileToPending>[1]} meta
+ */
+async function finalizePendingImport(result, meta) {
+  const paper = result?.paper
+  if (!paper?.id) return result
+  try {
+    const { maybeRebuildPendingFromSolutionsOcr } = await import('./officialPyqInstituteSolutions.js')
+    const rebuilt = maybeRebuildPendingFromSolutionsOcr(paper.id, {
+      institute: meta?.sourceLabel || paper.instituteSolutions?.institute || 'Institute',
+    })
+    if (rebuilt.ok && rebuilt.rebuilt && rebuilt.paper) {
+      const { keepBookletSolutionPicturesLocal } = await import('./officialPyqInstituteSolutions.js')
+      const { getOfficialPyqPendingPaper } = await import('./officialPyqPendingStore.js')
+      const pictures = await keepBookletSolutionPicturesLocal(paper.id).catch(() => null)
+      const picNote =
+        pictures?.ok && pictures.saved
+          ? ` Kept ${pictures.saved} solution picture(s) from the booklet PDF.`
+          : ''
+      return {
+        ...result,
+        paper: getOfficialPyqPendingPaper(paper.id) || rebuilt.paper,
+        cloudNote: [
+          String(result.cloudNote || '').trim(),
+          `Detected institute solutions booklet — rebuilt ${rebuilt.built} question(s) with ${rebuilt.withAns} answers and ${rebuilt.withSol} solutions.${picNote}`,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      }
+    }
+  } catch {
+    /* keep the normal split */
+  }
+  return result
 }
 
 /** @param {Parameters<typeof importFileToPending>[1]} meta */

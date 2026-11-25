@@ -45,6 +45,8 @@ function sectionType(window) {
   if (/matching\s+list|match\s+list|list[-\s]match|match\s+the\s+following/i.test(t)) return 'matrix_match'
   if (/one\s+or\s+more/i.test(t)) return 'multiple_correct'
   if (/only\s+one/i.test(t)) return 'single_correct'
+  // FIITJEE JEE Main: "20 multiple choice questions… four choices (1),(2),(3),(4)" = single correct.
+  if (/multiple\s+choice/i.test(t)) return 'single_correct'
   if (/numerical/i.test(t)) return 'numerical'
   if (/non[-\s]?negative\s+integer|\binteger\b/i.test(t)) return 'integer'
   return ''
@@ -66,8 +68,9 @@ export function buildPaperFacts(raw) {
   // 2026: "This section contains TWO (02) questions corresponding to each question stem" is the
   // per-stem count of the section above, not a new section.
   // 2014: "This section contains 10 multiple choice type questions".
+  // FIITJEE JEE Main booklets print "10 Numerical based questions" (not "numerical value type").
   const re =
-    /This section contains\s+([A-Za-z]+|\d+)\s*(?:\(\s*0*(\d+)\s*\)\s*)?(?:(?:multiple\s+choice|integer(?:\s+answer)?|numerical(?:\s+value)?|single\s+correct)\s+(?:type\s+)?)?(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)\b(?!\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)/gi
+    /This section contains\s+([A-Za-z]+|\d+)\s*(?:\(\s*0*(\d+)\s*\)\s*)?(?:(?:multiple\s+choice|integer(?:\s+answer)?|numerical(?:\s+(?:value|based))?|single\s+correct)\s+(?:type\s+)?)?(question stems?|paragraphs?|matching list(?:\s+sets)?|list[-\s]match\s+sets?|questions?)\b(?!\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)/gi
   let m
   let subject = ''
   let sawHeading = false
@@ -98,7 +101,7 @@ export function buildPaperFacts(raw) {
     const stop = ahead
       .slice(20)
       .search(
-        /This section contains\s+(?:[A-Za-z]+|\d+)\s*(?:\(\s*0*\d+\s*\)\s*)?(?:(?:multiple\s+choice|integer(?:\s+answer)?|numerical(?:\s+value)?|single\s+correct)\s+(?:type\s+)?)?(?:question(?!s?\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)|paragraph|matching list|list[-\s]match)|\bSECTION\s*[-–]?\s*\d/i,
+        /This section contains\s+(?:[A-Za-z]+|\d+)\s*(?:\(\s*0*\d+\s*\)\s*)?(?:(?:multiple\s+choice|integer(?:\s+answer)?|numerical(?:\s+(?:value|based))?|single\s+correct)\s+(?:type\s+)?)?(?:question(?!s?\s+(?:corresponding\s+to|based\s+on|on|for)\s+each\b)|paragraph|matching list|list[-\s]match)|\bSECTION\s*[-–]?\s*\d/i,
       )
     const window = stop >= 0 ? ahead.slice(0, stop + 20) : ahead
     let count = 0

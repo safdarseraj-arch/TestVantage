@@ -1405,7 +1405,7 @@ test('a long split after Mathpix is not reported as "stalled": the upload watchd
   assert.match(watchdog[1], /progressPct/)
   assert.match(watchdog[1], /progressLabel/)
   assert.match(watchdog[0], /uploadAbortRef\.current\?\.abort\(\)/, 'a real stall stops the upload instead of leaving it running unseen')
-  assert.match(page, /importFileToPending\([\s\S]{0,400}signal: uploadCtl\.signal/, 'the upload listens to the stop')
+  assert.match(page, /importFiles?ToPending\([\s\S]{0,400}signal: uploadCtl\.signal/, 'the upload listens to the stop')
   assert.match(page, /\} else \{\s*setError\(''\)\s*setMessage\(\s*`Imported/, 'a finished upload clears an old red banner')
   assert.match(page, /UPLOAD_STALLED_MESSAGE =[\s\S]{0,200}no second OCR bill/)
   const mathpixSrc = fs.readFileSync(path.join(process.cwd(), 'server/mathpix.js'), 'utf8')

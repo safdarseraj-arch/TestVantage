@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
     status = opc.save_institute("opyq-inst", "allen-2024-p1.pdf", "  Allen   Kota ", institute_pdf)
     check("institute PDF stored with its name and pages",
-          status == {"available": True, "institute": "Allen Kota", "file_name": "allen-2024-p1.pdf", "pages": 3})
+          status == {"available": True, "institute": "Allen Kota", "file_name": "allen-2024-p1.pdf", "pages": 3, "watermark_washed": True})
     check("stored in its own slot, not as the original", opc._original_file("opyq-inst") is None
           and (opc.ORIGINALS_DIR / "institute" / "opyq-inst.pdf").is_file())
 
@@ -114,5 +114,34 @@ with tempfile.TemporaryDirectory() as tmp:
     res = client.post("/api/official-pyq/original/opyq-nothing/institute/mathpix-crops", json={"urls": [other]})
     check("crop route without an institute PDF says so",
           res.status_code == 404 and res.json()["detail"]["code"] == "institute_missing")
+
+    # Vector solution figure: short labels + drawings in a Sol. block (Mathpix often omits includegraphics).
+    fig_doc = fitz.open()
+    fig_page = fig_doc.new_page(width=595, height=842)
+    fig_page.insert_text((72, 80), "Mathematics")
+    fig_page.insert_text((72, 120), "*Q.4")
+    fig_page.insert_text((72, 160), "Ans. A")
+    fig_page.insert_text((72, 200), "Sol.")
+    fig_page.insert_text((72, 240), "Let T be (3cos, 2sin)")
+    # Pack labels tightly so the detector’s 28pt cluster gap joins them (real FIITJEE figs are compact).
+    fig_page.draw_oval(fitz.Rect(380, 320, 500, 400), color=(0, 0, 0), width=1.5)
+    fig_page.draw_line((380, 360), (520, 360), color=(0, 0, 0), width=1)
+    fig_page.draw_line((430, 360), (500, 400), color=(0, 0, 0), width=1)
+    fig_page.insert_text((385, 325), "(0,2)")
+    fig_page.insert_text((400, 355), "O")
+    fig_page.insert_text((460, 345), "R")
+    fig_page.insert_text((500, 325), "(p,q)")
+    fig_page.insert_text((455, 370), "(3,0)")
+    fig_page.insert_text((445, 395), "T(3cos, 2sin)")
+    fig_pdf = fig_doc.tobytes()
+    fig_doc.close()
+    opc.save_institute("opyq-fig", "fiitjee-q4.pdf", "FIITJEE", fig_pdf)
+    figs = opc.crop_institute_solution_figures("opyq-fig")
+    check("vector Sol. figure is cut from the institute PDF", figs["count"] >= 1 and figs["figures"][0]["number"] == 4)
+    res = client.post("/api/official-pyq/original/opyq-fig/institute/solution-figures")
+    check(
+        "solution-figures route returns the crop",
+        res.status_code == 200 and res.json().get("count", 0) >= 1 and res.json()["figures"][0]["number"] == 4,
+    )
 
 print("\nAll institute PDF store tests passed")

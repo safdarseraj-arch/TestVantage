@@ -338,10 +338,17 @@ export function missingBracketedGivenLine(stem, ocrWindow) {
   const at = window.toLowerCase().indexOf(head.toLowerCase())
   if (at < 0) return ''
   let region = window.slice(at)
-  const cut = region.search(/\n\s*(?:\\item\s*\[\s*Q\.?\s*\]\s*\$?\s*\d|Q\.\s*\d+)/)
+  // FIITJEE Mathpix uses \item[66.] / \item[] *66. — not only \item[Q.] / Q.66
+  const cut = region.search(
+    /\n\s*(?:\\item\s*\[\s*(?:\*?Q\.?|\*?)?\s*\]?\s*\*?\s*\d{1,3}\b|Q\.\s*\d+)/i,
+  )
   if (cut > 40) region = region.slice(0, cut)
   const match = region.match(/\[\s*Given\s*:[\s\S]*?\]/)
   if (!match) return ''
+  // Never attach a Given line that sits after this stem's own answers (next Q).
+  const givenAt = region.indexOf(match[0])
+  const ansBeforeGiven = region.slice(0, givenAt).search(/\n\s*Ans\.\s*\(/i)
+  if (ansBeforeGiven >= 0) return ''
   return match[0].replace(/\s*\n\s*/g, ' ').trim()
 }
 
@@ -414,7 +421,8 @@ function restoreCutOffOptionTable(stem, ocrWindow) {
   if (!found) return text
   const full = found[0]
   if (text.includes(full)) return text
-  const listAt = text.search(/List-II\b/i)
+  // Standalone List-II heading only — not "Match … with List-II" in the intro.
+  const listAt = text.search(/(?:^|\n)[ \t]*List-II\b/i)
   if (listAt < 0) return text
   let from = listAt
   while (from < text.length) {
@@ -453,15 +461,17 @@ function restoreListTwoSwallowedByOptionTable(stem, ocrWindow) {
   if (ocrList.length > 8000) return text
   const ocrMarks = new Set(numberedListMarks(ocrList).map((mark) => mark.replace(/\s+/g, '')))
   if (ocrMarks.size < 2) return text
-  const cardListAt = text.search(/List-II\b/i)
+  // Standalone List-II heading only — not "Match … with List-II" in the intro.
+  const cardListAt = text.search(/(?:^|\n)[ \t]*List-II\b/i)
   if (cardListAt < 0) return text
-  const cardTail = text.slice(cardListAt)
+  const headingStart = text[cardListAt] === '\n' ? cardListAt + 1 : cardListAt
+  const cardTail = text.slice(headingStart)
   const cardOpt = optionTableAt(cardTail)
   if (cardOpt < 0) return text
   const cardMarks = new Set(numberedListMarks(cardTail.slice(0, cardOpt)).map((mark) => mark.replace(/\s+/g, '')))
   const missing = [...ocrMarks].some((mark) => !cardMarks.has(mark))
   if (!missing) return text
-  return `${text.slice(0, cardListAt)}${ocrList}\n\n${cardTail.slice(cardOpt)}`
+  return `${text.slice(0, headingStart)}${ocrList}\n\n${cardTail.slice(cardOpt)}`
 }
 
 /**
@@ -732,12 +742,20 @@ export function validateMathpixQuestion(q) {
     const parsed = parseMatchingListForDisplay(text, q.options)
     // A picture cut from the original page holds the lists the text does not.
     const listsInPicture = hasOriginalPageCrop(text)
-    if (!listsInPicture && (parsed?.listI?.length ?? 0) < 2) {
+    // FIITJEE 4-column match tables already print both lists; display-parse often
+    // misses them (and a trailing CDN crop of the same table makes it worse).
+    const tabularBothLists =
+      /\\begin\{tabular\}/i.test(text) &&
+      /LIST\s*I\b/i.test(text) &&
+      /LIST\s*II\b/i.test(text) &&
+      (text.match(/\b[A-D]\.\s*&/g) || []).length >= 3 &&
+      (text.match(/\b(?:I{1,3}|IV)\.\s*&/g) || []).length >= 2
+    if (!listsInPicture && !tabularBothLists && (parsed?.listI?.length ?? 0) < 2) {
       issues.push({
         code: 'missing_column',
         note: 'Match-the-column is missing List-I. Not inventing rows.',
       })
-    } else if (!listsInPicture && (parsed?.listII?.length ?? 0) < 2) {
+    } else if (!listsInPicture && !tabularBothLists && (parsed?.listII?.length ?? 0) < 2) {
       issues.push({
         code: 'missing_column',
         note: 'Match-the-column is missing List-II. Not inventing rows.',

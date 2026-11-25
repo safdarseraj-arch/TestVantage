@@ -990,7 +990,16 @@ function cardDamageReason(q, fresh, passageLostFigure, solutionRules = true, ite
   if (printed) return printed
   const instituteSol = instituteSolutionDirtyReason(q?.solution)
   if (instituteSol) return instituteSol
-  if (visibleLatexSourceHits(q?.solution).length > 0) {
+  // Code-only P–S options beat a junk printed-key solution on the same card (2014 P2 Q40
+  // before-persist). Auto-fix still heals the solution; matchListReason reports the codes.
+  if (
+    visibleLatexSourceHits(q?.solution).length > 0 &&
+    !codeOptionsAsPairs(q?.options, q?.text) &&
+    !(
+      /\*?\(?From printed key/i.test(String(q?.solution ?? '')) &&
+      /\*\*Correct:\*\*/i.test(String(q?.solution ?? ''))
+    )
+  ) {
     return 'The solution still shows raw maths code on screen; it is cleaned for display'
   }
   if (isMatrixGridCard(q)) return drawnReason(q)
@@ -1031,15 +1040,36 @@ function withInstituteSolutionRepaired(q) {
     return next
   }
   let cleaned = raw
-  if (instituteSolutionChromeFixable(raw) || visibleLatexSourceHits(raw).length > 0) {
-    cleaned = cleanInstituteSolutionBody(raw) || raw
+  const preCleaned = cleanInstituteSolutionBody(raw) || raw
+  if (
+    instituteSolutionChromeFixable(raw) ||
+    visibleLatexSourceHits(raw).length > 0 ||
+    preCleaned !== raw.trim() ||
+    /\$\$/.test(raw)
+  ) {
+    cleaned = preCleaned
     try {
-      cleaned = wrapBareLatexRuns(healInstituteSolutionMath(cleaned))
+      // Heal again after wrapBareLatexRuns — wrap can re-open `$2 $V…$$` dollars.
+      cleaned = healInstituteSolutionMath(wrapBareLatexRuns(healInstituteSolutionMath(cleaned)))
     } catch {
       cleaned = healInstituteSolutionMath(cleaned)
     }
   }
   if (!cleaned.trim()) return q
+  // Truncated printed-key scraps that still show raw `$…$$` after heal — keep only the
+  // Correct line so Quality does not flag dangling dollars (2014 P1 Q1/Q12/Q23).
+  if (
+    visibleLatexSourceHits(cleaned).length > 0 &&
+    /\*?\(?From printed key/i.test(cleaned)
+  ) {
+    const correct = cleaned.match(/\*\*Correct:\*\*[^\n]*/i)?.[0]
+    cleaned = correct ? correct.trim() : ''
+  }
+  if (!cleaned.trim()) {
+    const next = { ...q, solution: '' }
+    delete next.solutionSource
+    return next
+  }
   if (cleaned === raw.trim() || cleaned === raw) return q
   // Prefer a version that no longer shows raw commands.
   if (
@@ -1123,7 +1153,9 @@ function withDamageRepaired(q, fresh, siblingPassage, items = [], ocr = '') {
   if (isMatrixGridCard(next)) return next
   // Cards rebuilt from an institute solutions OCR already have Ans./Sol./options from that
   // booklet. Re-splitting the same OCR as a "paper scan" wipes good options (JEE Main FIITJEE).
+  // Still strip booklet-cover bleed and clear options wrongly glued onto numericals.
   if (isInstituteOcrCard(next)) {
+    next = withInstituteBookletStemTidy(next)
     if (siblingPassage && !FIGURE_IN_TEXT_RE.test(String(next.passageText ?? ''))) {
       next = { ...next, passageText: siblingPassage }
     }
@@ -1443,8 +1475,23 @@ function isInstituteOcrCard(q) {
   )
 }
 
+/** Strip FIITJEE cover/instructions glued under a stem; drop options on number-answer cards. */
+function withInstituteBookletStemTidy(q) {
+  if (!q || typeof q !== 'object') return q
+  let next = q
+  const text = stripTrailingPyqSectionHeader(String(next.text ?? ''))
+  if (text && text !== String(next.text ?? '')) next = { ...next, text }
+  const type = String(next.questionType ?? '').toLowerCase()
+  if (/^(?:numerical|integer|passage_integer)$/.test(type) && Array.isArray(next.options) && next.options.length) {
+    next = { ...next, options: [] }
+  }
+  return next
+}
+
 function repairFailingCard(q, ocr) {
-  if (q?.adminEdited === true || isMatrixGridCard(q) || isInstituteOcrCard(q)) return q
+  if (q?.adminEdited === true || isMatrixGridCard(q)) return q
+  // Institute OCR cards: only tidy booklet bleed / numerical options — never re-split from scan OCR.
+  if (isInstituteOcrCard(q)) return withInstituteBookletStemTidy(q)
   let next = { ...applyStoredOcrCardFixes(q, ocr) }
   next = withInstituteSolutionRepaired(next)
   const peeled = peelPrintedAnswerFromStem(stripCheckerSentences(String(q?.text ?? '')))

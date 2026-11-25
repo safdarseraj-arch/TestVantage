@@ -104,9 +104,9 @@ function cardHasFigure(q) {
   }
 }
 
-/** Where one question's scan text ends: the next Q number, a section heading, the next stem/paragraph, or the printed "Answer: [0.7 to 0.8]" key. */
+/** Where one question's scan text ends: the next Q number, a section heading, the next stem/paragraph, the printed "Answer: [0.7 to 0.8]" / "Ans. +1" key, Sol., or a starred next item (*86.). */
 const QUESTION_END =
-  /\b[Qq]\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*[Qq]|\\section\*?\{|\bQuestion Stem\b|\b(?:Paragraph|PARAGRAPH)\b|\b(?:Answer|Ans)\s*[:.]\s*(?:\[|\(|\$|-?\d|[A-D]\b)/
+  /\b[Qq]\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*[Qq]|\\section\*?\{|\bQuestion Stem\b|\b(?:Paragraph|PARAGRAPH)\b|\b(?:Answer|Ans)\.?\s*[:.]?\s*(?:\[|\(|\$|[+\u2212\uFF0B-]?\s*\d|[A-D]\b)|\bSol\.\s|\*\s*\d{1,2}\./i
 
 /**
  * Two questions can open with the same words ("One mole of a monatomic ideal gas undergoes…"),
@@ -148,8 +148,12 @@ function nothingLost(q, ocr) {
     missing.push(`${optionLetters.size} options in the scan`)
   }
   const labels = span.match(/\(\s*[PQRS]\s*\)|\(\s*[1-5]\s*\)/g) || []
+  const optionSlots = Array.isArray(q?.options) ? q.options.length : 0
+  const optionCount = filled(q?.options).length
   for (const label of labels) {
     const compact = label.replace(/\s+/g, '')
+    // JEE Main cards store option text without "(1)"…"(4)" wrappers (empty slots OK when Mathpix skipped one).
+    if (/^\([1-4]\)$/.test(compact) && (optionCount >= 3 || optionSlots >= 4)) continue
     if (!card.includes(compact.toLowerCase()) && !card.includes(compact.toLowerCase().replace(/[()]/g, ''))) {
       missing.push(compact)
     }

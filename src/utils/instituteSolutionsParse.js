@@ -14,7 +14,7 @@ const SKIP_HEAD_RE =
   /^(?:SECTION\b|Section\s*[-\u2013\u2014:^]?\s*(?:[IVX]+|[A-D1-4])\b|PARAGRAPH\b|Paragraph\s+(?:for|\d|[IVX]+\b)|PASSAGE\b|Passage\s+(?:for|\d|[IVX]+\b)|COMPREHENSION\b|.*\bMaximum\s+Marks\b)/i
 /** Marking-scheme / next-section chrome that Mathpix sometimes leaves after Sol. */
 const SOLUTION_TAIL_CHROME_RE =
-  /(?:^|\n)\s*(?:\\(?:sub)*section\*?\{)?\s*SECTION[\s^]*\d|\\(?:sub)*section\*?\{[^}\n]*SECTION[\s^]*\d|\\(?:sub)*section\*?\{(?:PHYSICS|CHEMISTRY|MATHEMATICS|MATHS?|BIOLOGY)\}|(?:^|\n)\s*\([A-D]\)(?:\s*,\s*\([A-D]\))*(?:\s+and\s+\([A-D]\))?\.?\s*(?:ONE OR MORE|ONLY three options|ONLY ONE)|(?:^|\n)\s*ONE OR MORE THAN ONE of these four|(?:^|\n)\s*ONLY ONE of these four|(?:^|\n)\s*Answer to each question will be evaluated|(?:^|\n)\s*For each question,\s*choose the option|(?:^|\n)\s*\\item\[-\]\s*(?:This section|Answer to each|For each question)|(?:^|\n)\s*(?:Full Marks|Maximum\s+Marks)\s*:|(?:^|\n)\s*[^\n]{0,40}marking scheme/i
+  /(?:^|\n)\s*(?:\\(?:sub)*section\*?\{)?\s*SECTION[\s^]*\d|\\(?:sub)*section\*?\{[^}\n]*SECTION[\s^]*\d|\\(?:sub)*section\*?\{(?:PHYSICS|CHEMISTRY|MATHEMATICS|MATHS?|BIOLOGY)\}|(?:^|\n)\s*(?:\\(?:sub)*section\*?\{\s*)?PART\s*[-–—]?\s*[A-D]\b|(?:^|\n)\s*\([A-D]\)(?:\s*,\s*\([A-D]\))*(?:\s+and\s+\([A-D]\))?\.?\s*(?:ONE OR MORE|ONLY three options|ONLY ONE)|(?:^|\n)\s*ONE OR MORE THAN ONE of these four|(?:^|\n)\s*ONLY ONE of these four|(?:^|\n)\s*Answer to each question will be evaluated|(?:^|\n)\s*For each question,\s*choose the option|(?:^|\n)\s*\\item\[-\]\s*(?:This section|Answer to each|For each question)|(?:^|\n)\s*(?:Full Marks|Maximum\s+Marks)\s*:|(?:^|\n)\s*[^\n]{0,40}marking scheme/i
 /** A later question marker left inside a solution ("*Q.3", "\item[] *Q. 4", "*Q^7."). */
 const MERGED_Q_IN_SOL_RE =
   /(?:^|\n)\s*(?:\\item\s*\[[^\]]*\]\s*)?\*{0,2}\s*Q\s*(?:\^\s*\{?\s*|\.?\s*)?\d{1,3}\s*\}?\s*[.):]?(?=\s|$|[A-Z\\$])/im
@@ -153,6 +153,10 @@ function cleanLines(raw, institute = '') {
   return lines.filter(({ raw: line, probe }) => {
     if (!probe) return true
     if (LATEX_SHELL_RE.test(line.trim()) || FURNITURE_RE.test(probe)) return false
+    // Chemistry MCQs often repeat the same <smiles>…</smiles> / figure for (1)–(4).
+    // That is not page furniture — dropping them empties every option (Q75 Shift 2).
+    if (/<smiles>|\\includegraphics|!\[[^\]]*\]\(/i.test(line)) return true
+    if (OPTION_LINE_RE.test(probe) || OPTION_BLOCK_RE.test(line)) return true
     if (structural(probe) || !plainText(probe)) return true
     if ((probe.match(/\|/g) || []).length >= 2) return false
     if (
@@ -311,6 +315,119 @@ export function instituteAnswerCount(read) {
  * OCR so students never see "SECTION 1 (Maximum Marks…)" or the word "Delta" in a solution.
  * @param {unknown} text
  */
+/** Running heads / footers FIITJEE prints on every page. */
+const INSTITUTE_PAGE_FURNITURE_RE =
+  /(?:^|\n)\s*(?:JEE\s*\(\s*ADVANCED\s*\)\s*-?\s*20\d{2}[^\n]*|FIITJEE\s+Ltd\.[^\n]*|website:\s*www\.fiitjee[^\n]*|www\.fiitjee\.com[^\n]*)/gi
+
+/** Private-use “math font” letters from a PDF text layer — they show as junk/code on screen. */
+const PDF_PUA_RE = /[\uE000-\uF8FF]/g
+
+/**
+ * How drawable a solution is (higher is better). PDF font glyphs score very low vs Mathpix LaTeX.
+ * @param {unknown} text
+ */
+export function instituteSolutionDisplayScore(text) {
+  const s = String(text ?? '')
+  if (!s.trim()) return -1
+  let score = Math.min(s.length, 1200) / 80
+  const pua = (s.match(PDF_PUA_RE) || []).length
+  score -= pua * 2.5
+  if (/\\begin\{aligned\}|\\frac\s*\{|\$\$/.test(s)) score += 25
+  if (/\$[^$\n]{2,}\$/.test(s)) score += 12
+  if (/\\(?:mathrm|mathbf|Rightarrow|triangle|omega|cdot|times)\b/.test(s)) score += 8
+  if (INSTITUTE_PAGE_FURNITURE_RE.test(s)) score -= 6
+  INSTITUTE_PAGE_FURNITURE_RE.lastIndex = 0
+  return score
+}
+
+/** True when the solution is mostly PDF private-use letters (looks like code to students). */
+export function instituteSolutionLooksLikeRawPdf(text) {
+  const s = String(text ?? '')
+  if (!s.trim()) return false
+  const pua = (s.match(PDF_PUA_RE) || []).length
+  if (pua >= 8) return true
+  if (pua >= 3 && pua / s.length > 0.03) return true
+  // Stacked fraction lines with almost no words and no LaTeX — FIITJEE text layer.
+  const lines = s.split(/\n/).filter((l) => l.trim())
+  const short = lines.filter((l) => /^\s*[\d.+\-/=()]+\s*$/.test(l)).length
+  if (lines.length >= 6 && short / lines.length >= 0.45 && !/\$|\\frac|\\begin\{/.test(s)) return true
+  return false
+}
+
+/**
+ * Prefer Mathpix LaTeX stems over longer PDF font-junk / stacked-digit soup.
+ * @param {unknown} qA Mathpix (or first) question body
+ * @param {unknown} qB PDF (or second) question body
+ */
+export function preferredInstituteQuestion(qA, qB) {
+  const a = String(qA ?? '')
+  const b = String(qB ?? '')
+  if (!a.trim()) return b
+  if (!b.trim()) return a
+  const junkA = instituteSolutionLooksLikeRawPdf(a)
+  const junkB = instituteSolutionLooksLikeRawPdf(b)
+  if (junkA && !junkB) return b
+  if (junkB && !junkA) return a
+  const score = (s) => {
+    let n = Math.min(s.length, 900) / 120
+    if (/\$[^$\n]{2,}\$/.test(s)) n += 18
+    if (/\\frac\s*\{|\\begin\{/.test(s)) n += 14
+    if (/\\mathrm|\\sqrt|\\times|\\cdot/.test(s)) n += 6
+    if (instituteSolutionLooksLikeRawPdf(s)) n -= 40
+    return n
+  }
+  return score(a) >= score(b) ? a : b
+}
+
+/**
+ * Strip PDF private-use font junk and chrome; keep the solution when enough readable
+ * words / maths remain. Used so an institute upload keeps the maximum usable solutions.
+ * @param {unknown} text
+ * @returns {string}
+ */
+export function salvageInstituteSolutionBody(text) {
+  let s = String(text ?? '')
+  if (!s.trim()) return ''
+  const hadPua = PDF_PUA_RE.test(s)
+  PDF_PUA_RE.lastIndex = 0
+  s = s.replace(PDF_PUA_RE, '')
+  s = cleanInstituteSolutionBody(s)
+  if (!s.trim() || instituteSolutionLooksLikeRawPdf(s)) return ''
+  // After stripping FIITJEE math-font letters, leftover digit/letter scraps are not a solution.
+  const words = (s.match(/[A-Za-z]{3,}/g) || []).length
+  if (hadPua && words < 4) return ''
+  return s
+}
+
+/** True when students can read this as an institute solution (drawn maths or plain words). */
+export function instituteSolutionIsUsable(text) {
+  if (salvageInstituteSolutionBody(text)) return true
+  const cleaned = cleanInstituteSolutionBody(text)
+  return Boolean(cleaned.trim()) && !instituteSolutionLooksLikeRawPdf(cleaned)
+}
+
+/**
+ * True when a stored institute solution still looks broken to students (font junk, missing
+ * glyphs, or bare scraps). Hybrid AI may replace these after they are cleared.
+ * @param {unknown} text
+ */
+export function instituteSolutionLooksPoorForStudents(text) {
+  const s = String(text ?? '').trim()
+  if (!s) return true
+  if (instituteSolutionLooksLikeRawPdf(s)) return true
+  if (!instituteSolutionIsUsable(s)) return true
+  // OCR that dropped Greek/math leaves blanks like "(0, –) becomes (, )".
+  if (/\(\s*,\s*\)|becomes\s*\(\s*,|\by2\s*=|ˆ\s*ˆ|\\mathrm\{x\}\s*\\geq/.test(s) && !/\$\$/.test(s)) {
+    return true
+  }
+  // Figure-only scraps with almost no prose. Two or more drawings can be a valid chemistry
+  // Sol. (labels like "Aromatic" are inside the pictures — JEE Main Q81).
+  const words = (s.match(/[A-Za-z]{3,}/g) || []).length
+  const figs = (s.match(/\\includegraphics(?:\[[^\]]*\])?\{[^}]+\}|!\[[^\]]*\]\([^)]+\)/g) || []).length
+  if (words < 6 && figs > 0 && figs < 2) return true
+  return false
+}
+
 export function cleanInstituteSolutionBody(text) {
   let s = String(text ?? '')
   if (!s.trim()) return ''
@@ -321,19 +438,109 @@ export function cleanInstituteSolutionBody(text) {
   }
   cutAt(SOLUTION_TAIL_CHROME_RE)
   cutAt(MERGED_Q_IN_SOL_RE)
+  s = s.replace(INSTITUTE_PAGE_FURNITURE_RE, '\n')
   // Mathpix row-break turns \Delta / \triangle into "\\ Delta \mathrm{ORT}".
   s = s.replace(/\\\\\s*Delta\s*\\mathrm\{ORT\}/gi, '\\triangle\\mathrm{ORT}')
   s = s.replace(/(?:\\mathrm\{)?Delta\}?\s*\\mathrm\{ORT\}/gi, '\\triangle\\mathrm{ORT}')
   s = s.replace(/(?<![A-Za-z])Delta\s*\\mathrm\{ORT\}/gi, '\\triangle\\mathrm{ORT}')
   s = s.replace(/(?<![A-Za-z\\])Delta(?=\s*(?:ORT|ORT\b|\())/g, '\\triangle ')
+  // Keep real pictures; only drop empty placeholders.
   s = s.replace(/!\[\]\(\s*\)/g, '')
+  // `$\\end{itemize}$` / `$\\item[…]$` — drop the whole dollar wrap so we do not leave `$$`.
+  s = s.replace(/\$\s*\\item\s*\[[^\]]*\]\s*\$/g, '')
+  s = s.replace(/\$\s*\\(?:begin|end)\{(?:itemize|enumerate)\}\s*\$/g, '')
   s = s.replace(/\\item\s*\[[^\]]*\]\s*/g, '')
-  s = s.replace(/\\end\{aligned\}\$\$/g, '\\end{aligned}')
-  s = s
-    .replace(/\\(?:begin|end)\{(?:itemize|enumerate)\}/g, '')
-    .replace(/(?:\$\$\s*)+$/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  s = s.replace(/\\(?:begin|end)\{(?:itemize|enumerate)\}/g, '')
+  // Keep $$ around aligned — stripping them leaves raw \\mathrm as “code” on screen.
+  s = healInstituteSolutionMath(s)
+  // Drop a trailing leftover opener `$$` only when the $$ count is odd. An even count
+  // means the final `$$` closes a real display (S1 Q37 `$$…MeV$$`); the old aligned-only
+  // keep rule stripped that closer and Quality then saw page leftovers forever.
+  if (((s.match(/\$\$/g) || []).length % 2) === 1) s = s.replace(/\$\$\s*$/g, '')
+  s = s.replace(/(?:^|\n)\s*\$\$\s*$/g, '').replace(/\n{3,}/g, '\n\n').trim()
+  return s
+}
+
+/**
+ * Close broken Mathpix solution maths so students never see raw \\mathrm / half-dollars.
+ * @param {string} text
+ */
+export function healInstituteSolutionMath(text) {
+  let s = String(text ?? '')
+  if (!s.trim()) return s
+  // `\mathrm{e}^{- }}` (extra brace) from a smashed integrating-factor line.
+  s = s.replace(/\\mathrm\{e\}\^\{\s*-\s*\}\}/g, '\\mathrm{e}^{-}')
+  s = s.replace(/\\mathrm\{e\}\^\{\s*-\s*\}(?=\s*=)/g, '\\mathrm{e}^{-}')
+  // `$$W=$\\frac…$` — display opened then an inner `$` cut the math (Q33). Keep $$…$$.
+  s = s.replace(/\$\$([A-Za-z][A-Za-z0-9]*)=\$\\/g, (_, lead) => `$$${lead}=\\`)
+  // `$$6 $\\mathrm…$` / `$$3=$\\mathrm…$` — digit then a stray `$` before a command (Q72/Q73).
+  s = s.replace(/\$\$(\d+)\s+\$\\/g, (_, n) => `$$${n}\\`)
+  s = s.replace(/\$\$(\d+)=\$\\/g, (_, n) => `$$${n}\\`)
+  // FIITJEE empty-dollar holes where a figure was: ` $ $ $ $ $$…` → one display open.
+  // Require a leading space/start so a real closing `$` of inline math is not eaten.
+  s = s.replace(/(\s|^)(?:\$[ \t]+){2,}\$\$/g, '$1$$')
+  // Bare `Let } $…` / leading `} $` from a cut aligned opener (Q20).
+  s = s.replace(/(?:^|\n)\s*Let\s*\}\s*\$/g, '\n$')
+  s = s.replace(/(?:^|\n)\s*\}\s*\$/g, '\n$')
+  // `$\\mathrm{I}$ $$\\begin{aligned}` → close inline, open display on its own line.
+  s = s.replace(/\$(\\mathrm\{[^}]+\})\$\s*\$\$\\begin\{aligned\}/g, '$$$1$$\n$$\\begin{aligned}')
+  s = s.replace(/\$([^$\n]{1,80})\$\s*\$\$\\begin\{aligned\}/g, '$$$1$$\n$$\\begin{aligned}')
+  // `$IF=…$$\Rightarrow …$$` (odd dollars) → one display block.
+  s = s.replace(/\$([^$\n]{1,240}?)\$\$(\\Rightarrow[^$]{0,500}?)\$\$/g, (_, a, b) => `$$${a}${b}$$`)
+  // `$IF=…$ $\Rightarrow …$` / `$$` left by a bad wrapBareLatexRuns pass → one display.
+  s = s.replace(/\$([^$\n]{1,240}?)\$\s+\$(\\Rightarrow[^$]{0,500}?)\$\$?/g, (_, a, b) => `$$${a}${b}$$`)
+  // Other `$…$$` glued to a following command — close inline then open display.
+  // Skip the second `$` of a finished `$$…$$` so prose between two displays is kept (S1 Q66).
+  s = s.replace(/(^|[^$])\$([^$\n]{1,240}?)\$\$(?=\\|(?:\s*\\Rightarrow)|\$\$)/g, (_, lead, inner) => `${lead}$${inner}$ $$`)
+  // `\end{aligned}` must sit inside $$…$$; a lone trailing `$` is a cut closer.
+  s = s.replace(/\\end\{aligned\}\$(?!\$)/g, () => '\\end{aligned}$$')
+  // Prose after a closed aligned block with no $$ — close the display first.
+  s = s.replace(/\\end\{aligned\}(?!\s*\$)(?=\s*[A-Za-z])/g, () => '\\end{aligned}$$\n')
+  // Lone `$\\begin{aligned}` (missing a display dollar) → `$$\\begin{aligned}` (Q48–55).
+  // Replacement uses a function: in replace strings `$$` is only one `$`.
+  s = s.replace(/(^|[^$])\$\\begin\{aligned\}/gm, (_, lead) => `${lead}$$\\begin{aligned}`)
+  // Open `$$\begin{aligned}` … `\end{aligned}` at EOF without `$$`.
+  if (/\$\$\s*\\begin\{aligned\}/.test(s) && /\\end\{aligned\}\s*$/.test(s) && !/\\end\{aligned\}\s*\$\$\s*$/.test(s)) {
+    s = s.replace(/\\end\{aligned\}\s*$/, () => '\\end{aligned}$$')
+  }
+  // Also close the last aligned when a single `$` was left at EOF.
+  s = s.replace(/\\end\{aligned\}\$\s*$/g, () => '\\end{aligned}$$')
+  // Mid-solution `\end{aligned}` closed with one `$` before more prose.
+  s = s.replace(/\\end\{aligned\}\$(?!\$)(?=\s)/g, () => '\\end{aligned}$$')
+  // `$…\lambda$ and \mathrm{cf}…\Rightarrow$` — prose “and” closed math too early (Q7).
+  // Re-open `$` before the bare command so raw \mathrm is not left on screen.
+  s = s.replace(
+    /(\$(?:[^$\n]{1,200}?)\$)(\s+(?:and|or|then)\s+)(\\(?:mathrm|mathbf|mathbb|frac|text)\{)/g,
+    (_, a, mid, cmd) => `${a}${mid}$${cmd}`,
+  )
+  // `$10 A$$.` / `$2 $V_1=V_2$$` — OCR closed inline with `$$` (2014 P1 printed-key scraps).
+  // Do not match the second `$` of a real `$$…$$` display (wrapBareLatexRuns may promote
+  // `$\\xrightarrow…$` → `$$\\xrightarrow…$$`; eating that re-opens raw commands — S1 Q66).
+  s = s.replace(/(^|[^$])\$([^$\n]{1,120}?)\$\$(?=[\s.,;:!?]|$)/g, (_, lead, inner) => `${lead}$${inner}$`)
+  // `]$$Q=2\times…$.` — display opened then closed with a single `$`.
+  s = s.replace(/\$\$([^$\n]{1,160}?)\$\.(?=\s|$)/g, (_, inner) => `$$${inner}$$.`)
+  // `$$ Answer :` leftover after stripping `$\\end{itemize}$` — plain prose, not maths.
+  s = s.replace(/\$\$\s*(Answer\s*:)/gi, '$1')
+  // `$2 $V_{1}=…` — digit then a nested `$` before the real math (printed-key OCR).
+  s = s.replace(/\$(\d+)\s+\$([^$\n]{1,120}?)\$\$/g, (_, n, inner) => `$${n} ${inner}$`)
+  s = s.replace(/\$(\d+)\s+\$([^$\n]{1,120}?)\$/g, (_, n, inner) => `$${n} ${inner}$`)
+  // `Var. $=$\\frac…$` / bad heal `Var. $= $\\frac…` — empty dollars left `\frac` raw (S2 Q3).
+  s = s.replace(/\$=\$\\/g, '$=\\')
+  s = s.replace(/\$=\s+\$\\/g, '$=\\')
+  // `$$y_1=…$\n$$\\begin` / `$$…=14$` — display opened then closed with a single `$` (S2 Q3/Q51).
+  s = s.replace(/\$\$([^$\n]{1,240}?)\$\s*(?=\$\$)/g, (_, inner) => `$$${inner}$$\n`)
+  s = s.replace(/\$\$([^$\n]{1,240}?)\$\s*$/gm, (_, inner) => `$$${inner}$$`)
+  // `Proteins $$\xrightarrow{…}$ Peptides` — display opened then closed with one `$` (S1 Q66).
+  s = s.replace(/\$\$(\\xrightarrow\{[^}]*\}[^$\n]{0,80}?)\$(?!\$)/g, (_, inner) => `$$${inner}$$`)
+  // Open `$$…MeV` / `$$…` at EOF with no closer (S1 Q37 truncated institute Sol.).
+  // Do not pair a bare leftover opener `…$$` at EOF — cleanInstituteSolutionBody strips those.
+  if (
+    /\$\$/.test(s) &&
+    (s.match(/\$\$/g) || []).length % 2 === 1 &&
+    !/\$\$\s*$/.test(s)
+  ) {
+    s = `${s.trimEnd()}$$`
+  }
   return s
 }
 
@@ -346,24 +553,44 @@ export function instituteSolutionDirtyReason(text) {
   const raw = String(text ?? '')
   if (!raw.trim()) return ''
   const cleaned = cleanInstituteSolutionBody(raw)
-  if (cleaned === raw.trim()) return ''
-  if (SOLUTION_TAIL_CHROME_RE.test(raw) || /Maximum\s+Marks|marking scheme/i.test(raw)) {
-    return 'The solution still has section instructions or a marking scheme after Sol.; they are removed'
+  if (cleaned !== raw.trim()) {
+    if (SOLUTION_TAIL_CHROME_RE.test(raw) || /Maximum\s+Marks|marking scheme/i.test(raw)) {
+      return 'The solution still has section instructions or a marking scheme after Sol.; they are removed'
+    }
+    if (MERGED_Q_IN_SOL_RE.test(raw)) {
+      return 'The next question was glued into this solution; it is cut off'
+    }
+    if (SMASHED_DELTA_RE.test(raw)) {
+      return 'A smashed “Delta” in the solution is drawn as △'
+    }
+    if (/!\[\]\(\s*\)/.test(raw)) {
+      return 'Empty picture placeholders are removed from the solution'
+    }
+    if (INSTITUTE_PAGE_FURNITURE_RE.test(raw)) {
+      INSTITUTE_PAGE_FURNITURE_RE.lastIndex = 0
+      return 'A running page header is still inside the solution; it is removed'
+    }
   }
-  if (MERGED_Q_IN_SOL_RE.test(raw)) {
-    return 'The next question was glued into this solution; it is cut off'
-  }
-  if (SMASHED_DELTA_RE.test(raw)) {
-    return 'A smashed “Delta” in the solution is drawn as △'
-  }
-  if (/!\[\]\(\s*\)/.test(raw)) {
-    return 'Empty picture placeholders are removed from the solution'
+  INSTITUTE_PAGE_FURNITURE_RE.lastIndex = 0
+  if (instituteSolutionLooksLikeRawPdf(raw)) {
+    if (salvageInstituteSolutionBody(raw)) {
+      return 'PDF font junk is stripped so the readable institute wording stays'
+    }
+    return 'The solution is only raw PDF letters (not drawable); it is cleared — re-add the institute PDF (Mathpix) for drawn maths'
   }
   return ''
 }
 
 /** @param {unknown} text */
 export function instituteSolutionLooksDirty(text) {
+  return Boolean(instituteSolutionDirtyReason(text))
+}
+
+/**
+ * True when Quality can locally strip chrome or clear PDF-font junk.
+ * @param {unknown} text
+ */
+export function instituteSolutionChromeFixable(text) {
   return Boolean(instituteSolutionDirtyReason(text))
 }
 
@@ -378,19 +605,146 @@ export function instituteSolutionsMergedCount(read) {
 }
 
 /**
+ * Per question: keep Mathpix maths when it draws cleanly, and fill gaps from the PDF text.
+ * @param {ReturnType<typeof readInstituteSolutions>} readMp
+ * @param {ReturnType<typeof readInstituteSolutions>} readPdf
+ */
+/**
+ * Prefer a usable Mathpix / salvaged body over raw PDF font junk so merge keeps
+ * the maximum institute solutions students can actually read.
+ * @param {unknown} text
+ */
+function preferredInstituteSolutionBody(text) {
+  const raw = String(text ?? '')
+  if (!raw.trim()) return ''
+  const salvaged = salvageInstituteSolutionBody(raw)
+  if (salvaged) return salvaged
+  const cleaned = cleanInstituteSolutionBody(raw)
+  if (cleaned && !instituteSolutionLooksLikeRawPdf(cleaned)) return cleaned
+  return ''
+}
+
+/**
+ * PDF-only FIITJEE booklets often look fine on screen but their text layer is private-use
+ * maths fonts. Never keep that junk as a solution body — empty is better; Mathpix must fill it.
+ * @param {unknown} text
+ */
+function usableOrEmptyInstituteSolution(text) {
+  const preferred = preferredInstituteSolutionBody(text)
+  if (preferred && instituteSolutionIsUsable(preferred)) return preferred
+  return ''
+}
+
+export function mergeInstituteSolutionReads(readMp, readPdf) {
+  const a = readMp?.entries
+  const b = readPdf?.entries
+  if (!a?.size) {
+    if (!b?.size) return readPdf || readMp
+    // PDF-only: keep answers/questions, drop unreadable solution bodies.
+    const entries = new Map()
+    for (const [key, eb] of b) {
+      entries.set(key, { ...eb, solution: usableOrEmptyInstituteSolution(eb?.solution) })
+    }
+    return { ...readPdf, entries }
+  }
+  if (!b?.size) return readMp || readPdf
+  /** @type {Map<string, { answer: string, solution: string, question: string }>} */
+  const entries = new Map()
+  for (const key of new Set([...a.keys(), ...b.keys()])) {
+    const ea = a.get(key)
+    const eb = b.get(key)
+    if (!ea) {
+      entries.set(key, { ...eb, solution: usableOrEmptyInstituteSolution(eb?.solution) })
+      continue
+    }
+    if (!eb) {
+      entries.set(key, { ...ea, solution: usableOrEmptyInstituteSolution(ea?.solution) })
+      continue
+    }
+    // Mathpix first for solutions; PDF text only if Mathpix is empty and PDF is readable.
+    const solMp = usableOrEmptyInstituteSolution(ea.solution)
+    const solPdf = usableOrEmptyInstituteSolution(eb.solution)
+    let solution = ''
+    if (solMp && solPdf) {
+      const scoreA = instituteSolutionDisplayScore(solMp)
+      const scoreB = instituteSolutionDisplayScore(solPdf)
+      // Prefer Mathpix when scores are close — PDF salvages are often half-missing glyphs.
+      solution = scoreA + 3 >= scoreB ? solMp : solPdf
+    } else solution = solMp || solPdf
+    // Mathpix stems win over longer PDF font-junk (FIITJEE PUA / stacked digits).
+    const question = preferredInstituteQuestion(ea.question, eb.question)
+    const answer = String(ea.answer || '').trim() || String(eb.answer || '').trim()
+    entries.set(key, { answer, solution, question })
+  }
+  return {
+    entries,
+    subjects: [...new Set([...(readMp.subjects || []), ...(readPdf.subjects || [])])],
+    layout: readMp.layout || readPdf.layout,
+    sectionText: String(readMp.sectionText || readPdf.sectionText || ''),
+  }
+}
+
+/**
+ * True when a PDF text layer is mostly FIITJEE/Allen private-use maths fonts — looks fine
+ * on screen, but copy-paste / PyMuPDF text is unreadable. Solutions must come from Mathpix.
+ * @param {unknown} text
+ */
+export function pdfTextIsMathFontJunk(text) {
+  const s = String(text ?? '')
+  if (s.length < 400) return false
+  const pua = (s.match(PDF_PUA_RE) || []).length
+  PDF_PUA_RE.lastIndex = 0
+  return pua >= 40 && pua / s.length >= 0.002
+}
+
+/**
+ * Drop solution bodies that students cannot read; keep answers and repeated stems.
+ * @param {ReturnType<typeof readInstituteSolutions> | null | undefined} read
+ */
+export function stripUnusableInstituteSolutions(read) {
+  if (!read?.entries?.size) return read
+  /** @type {Map<string, { answer: string, solution: string, question: string }>} */
+  const entries = new Map()
+  for (const [key, entry] of read.entries) {
+    entries.set(key, { ...entry, solution: usableOrEmptyInstituteSolution(entry?.solution) })
+  }
+  return { ...read, entries }
+}
+
+/**
  * Prefer the scan that found more answers without gluing the next question into a solution.
- * Mathpix is preferred when the two are close and clean (better maths for wording matches); a
- * thin or merged Mathpix read of a long FIITJEE PDF loses to the PDF text.
+ * When both reads exist, merge per question so Mathpix maths wins over PDF font glyphs, while
+ * PDF coverage still fills questions Mathpix missed.
+ * High-PUA FIITJEE text layers contribute answers only — never solution bodies.
  * @param {string} mathpixText
  * @param {string} pdfText
  * @param {{ institute?: string }} [opts]
- * @returns {{ text: string, source: 'mathpix' | 'pdf' | 'mathpix-only' | 'pdf-only' | 'empty', read: ReturnType<typeof readInstituteSolutions> }}
+ * @returns {{ text: string, source: 'mathpix' | 'pdf' | 'mathpix-only' | 'pdf-only' | 'merged' | 'empty', read: ReturnType<typeof readInstituteSolutions> }}
  */
+/** Rebuild apply()-ready text from a parsed institute read. @param {ReturnType<typeof readInstituteSolutions>} read */
+function instituteReadToText(read) {
+  const parts = []
+  for (const [key, e] of read?.entries || []) {
+    const colon = key.lastIndexOf(':')
+    const head = key.slice(0, colon)
+    const n = key.slice(colon + 1)
+    const subject = head.startsWith('#') ? '' : head
+    if (subject) parts.push(subject.replace(/^./, (c) => c.toUpperCase()))
+    parts.push(`Q.${n} ${e.question || ''}`.trim())
+    if (e.answer) parts.push(`Ans. ${e.answer}`)
+    if (e.solution) parts.push(`Sol. ${e.solution}`)
+  }
+  return parts.join('\n')
+}
+
 export function pickInstituteSolutionsText(mathpixText, pdfText, opts = {}) {
   const mp = String(mathpixText ?? '').trim()
   const pdf = String(pdfText ?? '').trim()
   const readMp = mp ? readInstituteSolutions(mp, opts) : null
-  const readPdf = pdf ? readInstituteSolutions(pdf, opts) : null
+  const readPdfRaw = pdf ? readInstituteSolutions(pdf, opts) : null
+  const pdfIsJunk = pdfTextIsMathFontJunk(pdf)
+  // FIITJEE digital PDFs: keep Ans. from the text layer, never Sol. font junk.
+  const readPdf = pdfIsJunk ? stripUnusableInstituteSolutions(readPdfRaw) : readPdfRaw
   const score = (read) => instituteAnswerCount(read) - 3 * instituteSolutionsMergedCount(read)
   const nMp = score(readMp)
   const nPdf = score(readPdf)
@@ -398,12 +752,25 @@ export function pickInstituteSolutionsText(mathpixText, pdfText, opts = {}) {
     return { text: mp || pdf, source: 'empty', read: readMp || readPdf }
   }
   if (!instituteAnswerCount(readPdf)) return { text: mp, source: 'mathpix-only', read: readMp }
-  if (!instituteAnswerCount(readMp)) return { text: pdf, source: 'pdf-only', read: readPdf }
-  // Prefer Mathpix only when it is at least as clean/complete as the PDF text.
+  if (!instituteAnswerCount(readMp)) {
+    // Answers from the PDF are fine; strip unreadable solution bodies before apply.
+    const cleaned = mergeInstituteSolutionReads(
+      { entries: new Map(), subjects: [], layout: readPdf?.layout || 'repeated_questions', sectionText: '' },
+      readPdf,
+    )
+    return { text: instituteReadToText(cleaned) || pdf, source: 'pdf-only', read: cleaned }
+  }
+  // High-PUA FIITJEE layers: always Mathpix sols + PDF answers. Never prefer PDF Sol. bodies
+  // just because Mathpix found fewer answers (thin OCR still beats unreadable glyphs).
+  if (pdfIsJunk || (instituteAnswerCount(readMp) && instituteAnswerCount(readPdf))) {
+    const merged = mergeInstituteSolutionReads(readMp, readPdf)
+    return { text: instituteReadToText(merged) || mp, source: 'merged', read: merged }
+  }
   if (nMp >= nPdf && instituteSolutionsMergedCount(readMp) <= instituteSolutionsMergedCount(readPdf)) {
     return { text: mp, source: 'mathpix', read: readMp }
   }
-  return { text: pdf, source: 'pdf', read: readPdf }
+  // Readable PDF text (not PUA junk) may win coverage; still strip any unusable Sol. bodies.
+  return { text: instituteReadToText(stripUnusableInstituteSolutions(readPdf)) || pdf, source: 'pdf', read: stripUnusableInstituteSolutions(readPdf) }
 }
 
 /**

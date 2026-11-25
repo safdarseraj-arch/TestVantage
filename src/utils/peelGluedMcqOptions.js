@@ -9,6 +9,10 @@ import { consumeIncludeGraphics } from './mathpixMedia.js'
 import { parseQuestionText } from './parseQuestionText.js'
 import { optionsLookLikeAssertionCombinations } from './assertionCombinationMcq.js'
 import { keepLabelledStemStructures } from './restorePyqOptionFiguresFromOcr.js'
+import {
+  looksLikeMatchingListStem,
+  optionsLookLikeMatchAnswers,
+} from './parseMatchingListDisplay.js'
 
 const MCQ_OPTION_PROMPT_RE =
   /(?:Which of the following option\(s\) is\(are\) correct|The option\(s\) with correct sequence of reagents[\s\S]{0,160}?is\(are\))\s*\??/i
@@ -210,6 +214,14 @@ export function peelGluedMcqOptions(text, options = [], source = '') {
   if (optionsLookLikeAssertionCombinations(existing)) return { text: raw, options: existing }
   // Ranking chains "(C) < (A) < …" — stem keeps labelled compound drawings (A)–(E) (Q77).
   if (keepLabelledStemStructures(raw, existing)) return { text: raw, options: existing }
+  // Match List List-I (A)–(D) rows are not MCQ options (Main Q36 Maxwell / Q65 Ziegler).
+  // Still peel a glued "Codes:" option table (2014 P2 Q38).
+  if (
+    !/\bCodes\s*:/i.test(raw) &&
+    (looksLikeMatchingListStem(raw) || optionsLookLikeMatchAnswers(existing))
+  ) {
+    return { text: raw, options: existing }
+  }
 
   const promptEnd = findPromptEnd(raw)
   let stem = raw

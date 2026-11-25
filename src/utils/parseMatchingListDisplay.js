@@ -267,7 +267,8 @@ function stripLatexBold(text) {
 
 function isListHeaderCell(text) {
   const t = String(text ?? '').replace(/\$/g, '').trim()
-  return /^(?:\*{0,2}\s*)?(?:List|Column)\s*[-–]?\s*I{1,2}\s*(?:\*{0,2})?$/i.test(t)
+  // "List-I", "LIST I (Substances )", "Column II" — optional parenthetical after the Roman numeral.
+  return /^(?:\*{0,2}\s*)?(?:List|Column)\s*[-–]?\s*I{1,2}\b/i.test(t)
 }
 
 /**
@@ -452,20 +453,69 @@ export function rewriteLatexItemLabels(text) {
 
 function cleanTabularCell(cell) {
   return repairMatchListOcrGlitches(
-    stripLatexBold(rewriteLatexItemLabels(String(cell ?? '')))
+    stripLatexBold(
+      rewriteLatexItemLabels(
+        // \multicolumn{2}{|c|}{List-I} → List-I (KaTeX cannot keep the command).
+        expandTabularMultiCommands(String(cell ?? '')),
+      ),
+    )
       .replace(/\\hline\b/gi, '')
       .replace(/^\s*\\(?:centering|raggedright|raggedleft)\b/i, '')
       .replace(/\s+/g, ' ')
       .trim()
-      // "\textbf{P.} In process I" / "\textbf{1.} $8$" cells: the bold "P." is the row label.
-      .replace(/^([PQRSTU]|[1-6])\s*[.:]\s+/, '($1) '),
+      // "\textbf{P.} In process I" / "A. Ziegler" / "I. Rhodium" cells: the marker is the row label.
+      .replace(/^([A-DPQRSTU1-6]|I{1,3}|IV)\s*[.:]\s+/i, (_, lab) => `(${String(lab).toUpperCase()}) `)
+      .replace(/^([A-DPQRSTU1-6]|I{1,3}|IV)\s*[.:]\s*$/i, (_, lab) => `(${String(lab).toUpperCase()})`),
   )
 }
 
-/** Left = List-I / Column I; right (P) beside (A)–(D) is Column II, not List-I. */
+/** Keep only the cell text from \multicolumn / \multirow (same idea as latexTabularDisplay). */
+function expandTabularMultiCommands(text) {
+  const s = String(text ?? '')
+  if (!/\\(?:multirow|multicolumn)\b/.test(s)) return s
+  let out = ''
+  let last = 0
+  const re = /\\(?:multirow|multicolumn)\b/g
+  for (const m of s.matchAll(re)) {
+    let i = m.index + m[0].length
+    const groups = []
+    for (let g = 0; g < 3; g += 1) {
+      while (i < s.length && /\s/.test(s[i])) i += 1
+      if (s[i] !== '{') break
+      let depth = 0
+      let j = i
+      for (; j < s.length; j += 1) {
+        if (s[j] === '\\') {
+          j += 1
+          continue
+        }
+        if (s[j] === '{') depth += 1
+        else if (s[j] === '}') {
+          depth -= 1
+          if (depth === 0) break
+        }
+      }
+      if (j >= s.length) break
+      groups.push(s.slice(i + 1, j))
+      i = j + 1
+    }
+    if (groups.length < 3) continue
+    out += s.slice(last, m.index) + groups[2]
+    last = i
+  }
+  if (!last) return s
+  return out + s.slice(last)
+}
+
+/** Left = List-I / Column I; right (P)/(I)/(1) beside (A)–(D) is Column II / List-II. */
 function classifyTabularMatchCell(cell, side, leftCell) {
   const t = String(cell ?? '').trim()
   if (!t) return side === 'left' ? 'I' : 'II'
+  // Main: (I)–(IV) on the right (often beside A–D). Advanced: Roman on the left is List-I.
+  if (/^\(\s*(?:I{1,3}|IV)\s*\)/.test(t)) {
+    if (side === 'right' || /^\(\s*[ABCD]\s*\)/i.test(String(leftCell ?? ''))) return 'II'
+    return 'I'
+  }
   if (/^\(\s*[1-5]\s*\)/.test(t) && !/^\(\s*[PQRSABCD]\s*\)/i.test(t)) return 'II'
   if (/^\(\s*[ABCD]\s*\)/i.test(t)) return 'I'
   if (/^\(\s*[PQRS]\s*\)/i.test(t)) {
@@ -511,9 +561,20 @@ export function flattenTabularMatchLists(text) {
   const body = rest.slice(0, endRel)
   const intro = s.slice(0, beginAt).trim()
 
-  // Second column labelled (i)…(iv) is not a (1)…(5) List-II: keep the paper's table.
-  const romanRight = (body.match(/&\s*\(\s*(?:i{1,3}|iv|vi{0,3}|ix|x)\s*\)/gi) || []).length
-  if (endRel < rest.length && romanRight >= 2 && !/&\s*\(\s*[1-5]\s*\)/.test(body)) return s
+  // "Codes:" P/Q/R/S digit grids are the printed option key, not List-I/II columns.
+  // Leave the tabular so peelGluedMcqOptions can drop the whole Codes block.
+  if (
+    /(?:^|\n)\s*Codes\s*:\s*$/i.test(intro) ||
+    (/(?:^|\n)\s*&\s*P\s*&\s*Q\s*&\s*R\s*&\s*S\b/i.test(body) &&
+      (body.match(/\(\s*[A-D]\s*\)\s*&\s*\d/g) || []).length >= 2)
+  ) {
+    return repairMatchListOcrGlitches(s)
+  }
+
+  // Lowercase (i)…(iv) side labels are reaction / reading tables, not Match List-II.
+  // Uppercase (I)–(IV) ARE JEE Main List-II and must flatten (do not use /i here).
+  const romanRightLower = (body.match(/&\s*\(\s*(?:i{1,3}|iv|vi{0,3}|ix|x)\s*\)/g) || []).length
+  if (endRel < rest.length && romanRightLower >= 2 && !/&\s*\(\s*[1-5]\s*\)/.test(body)) return s
 
   let rows = splitTopLevelLatex(body, '\\\\')
   if (rows.length < 3) {
@@ -524,13 +585,34 @@ export function flattenTabularMatchLists(text) {
   const listIParts = []
   const listIIParts = []
   const usedColumnTitles = { I: false, II: false }
+  const labelOnly = (cell) =>
+    /^\(\s*(?:[A-DPQRS1-6]|I{1,3}|IV)\s*\)$/i.test(String(cell ?? '').trim())
   for (const row of rows) {
     const cols = splitTopLevelLatex(row, '&').map(cleanTabularCell)
     if (!cols.length) continue
+    // JEE Main 4-col: (A) & body & (I) & body  /  A. & body & I. & body
+    if (cols.length >= 4 && (labelOnly(cols[0]) || labelOnly(cols[2]))) {
+      const left = `${cols[0]} ${cols[1]}`.trim()
+      const right = `${cols[2]} ${cols[3]}`.trim()
+      if (isListHeaderCell(cols[0]) || isListHeaderCell(cols[1])) {
+        if (/column/i.test(`${cols[0]} ${cols[1]}`)) usedColumnTitles.I = true
+        if (/column/i.test(`${cols[2]} ${cols[3]}`)) usedColumnTitles.II = true
+        continue
+      }
+      if (isListHeaderCell(left) || isListHeaderCell(cols[0]) || isListHeaderCell(cols[1])) {
+        if (/column/i.test(left)) usedColumnTitles.I = true
+        continue
+      }
+      if (left && !isListHeaderCell(left)) listIParts.push(left)
+      if (right && !isListHeaderCell(right)) listIIParts.push(right)
+      continue
+    }
     const left = cols[0] || ''
     const right = cols.length > 1 ? cols.slice(1).join(' ').trim() : ''
     if (isListHeaderCell(left) && /column/i.test(left)) usedColumnTitles.I = true
     if (isListHeaderCell(right) && /column/i.test(right)) usedColumnTitles.II = true
+    // Two multicolumn headers on one row: "List-I" & "List-II"
+    if (isListHeaderCell(left) && isListHeaderCell(right)) continue
     if (left && !isListHeaderCell(left)) {
       if (classifyTabularMatchCell(left, 'left', left) === 'II') listIIParts.push(left)
       else listIParts.push(left)
@@ -542,15 +624,32 @@ export function flattenTabularMatchLists(text) {
   }
 
   const hasLabeledRows =
-    listIParts.some((p) => /\(\s*[PQRS]\s*\)/i.test(p)) ||
-    listIIParts.some((p) => /\(\s*[1-5PQRS]\s*\)/i.test(p))
+    listIParts.some((p) => /\(\s*[PQRSABCD]\s*\)/i.test(p)) ||
+    listIIParts.some((p) => /\(\s*(?:[1-5PQRS]|I{1,3}|IV)\s*\)/i.test(p))
   const hasListHeaders = rows.some((row) =>
     splitTopLevelLatex(row, '&').some((c) => isListHeaderCell(cleanTabularCell(c))),
   )
+  // Printed answer-key / option table: (A) & $P \rightarrow 2 ; Q \rightarrow 1$ — not List-I/II.
+  // Leave it alone so picture List-I (P)–(S) above the table stays the real list.
+  const mappingOptionRows = rows.filter((row) => {
+    const cols = splitTopLevelLatex(row, '&').map(cleanTabularCell)
+    if (cols.length < 2) return false
+    const left = String(cols[0] ?? '').trim()
+    const right = cols.slice(1).join(' ')
+    return (
+      /^\(\s*[A-D]\s*\)$/i.test(left) &&
+      /(?:\\rightarrow|\\to\b|→|->)/.test(right) &&
+      /(?:[PQRSABCD]|I{1,3}|IV)\s*(?:\\rightarrow|\\to\b|→|->)\s*\(?\s*[1-5PQRS]/i.test(right)
+    )
+  }).length
+  if (mappingOptionRows >= 2) return repairMatchListOcrGlitches(s)
+
   // A–D MCQ option tables (\hline (A) & …) are NOT match lists — leave them for option peel.
   const onlyAbcdLabels =
     !hasListHeaders &&
-    ![...listIParts, ...listIIParts].some((p) => /\(\s*[PQRS]\s*\)/i.test(p)) &&
+    ![...listIParts, ...listIIParts].some(
+      (p) => /\(\s*[PQRS]\s*\)/i.test(p) || /\(\s*(?:I{1,3}|IV|[1-5])\s*\)/.test(p),
+    ) &&
     [...listIParts, ...listIIParts].filter((p) => /\(\s*[A-D]\s*\)/i.test(p)).length >= 2
   if (onlyAbcdLabels && !/List-I|List-II|Column\s*I\b|Match\s+(?:the|each)/i.test(intro)) {
     return repairMatchListOcrGlitches(s)
@@ -585,14 +684,20 @@ export function looksLikeMatchingListStem(text) {
     if (pqrs >= 3 || abcd >= 3 || hasTitrate || hasFigures) return true
   }
   if (hasHeader && (pqrs >= 3 || abcd >= 3)) return true
-  if (/^List-I\b/m.test(t) && /^List-II\b/m.test(t) && (pqrs >= 2 || abcd >= 2 || nums >= 2)) return true
+  const roman = countMarkers(t, ROMAN_LIST_I)
+  if (/^List-I\b/m.test(t) && /^List-II\b/m.test(t) && (pqrs >= 2 || abcd >= 2 || nums >= 2 || roman >= 2)) {
+    return true
+  }
   if (MATCH_HINT.test(t) && pqrs >= 3 && nums >= 3) return true
   if (MATCH_HINT.test(t) && abcd >= 3 && pqrs >= 3) return true
+  if (MATCH_HINT.test(t) && abcd >= 3 && roman >= 3) return true
   // “Match each entry in List-I…” / “Match the column” + A–D or P–S rows
   // (rows often live in option boxes; stitch puts them on the stem first).
   if (MATCH_HINT.test(t) && (pqrs >= 3 || abcd >= 3)) return true
   if (MATCH_HINT.test(t) && hasTitrate) return true
   if (MATCH_HINT.test(t) && hasFigures) return true
+  // Bare multicolumn shells left after unwrapReactionStepTables (Main Q36).
+  if (MATCH_HINT.test(t) && /\d+\|[lcr]+\|List/i.test(raw)) return true
   return false
 }
 
@@ -747,7 +852,7 @@ function stripUnusableListTwo(stem) {
   return t.slice(0, cut).trim()
 }
 
-/** Answer-key rows like (P) → (1), not List-I statements. */
+/** Answer-key rows like (P) → (1) / (A)-(II) / A-IV, not List-I statements. */
 export function optionsLookLikeMatchAnswers(options) {
   const opts = (Array.isArray(options) ? options : [])
     .map((o) => String(o ?? '').trim())
@@ -757,7 +862,12 @@ export function optionsLookLikeMatchAnswers(options) {
     /\(\s*P\s*\)\s*\$?\s*(?:\\rightarrow|→|->)/i.test(o) ||
     /(?:^|[\s(;,])I\s*\)?\s*\$?\s*(?:\\rightarrow|→|->)[\s\S]*\bII\s*\)?\s*\$?\s*(?:\\rightarrow|→|->)/.test(o) ||
     /\bP\s*\}?\s*\$?\s*(?:\\rightarrow|→|->)\s*\$?\s*\(?[1-5QRS]/i.test(o) ||
-    /\bP\s*[-–]\s*[1-5]\b/i.test(o) && /\bQ\s*[-–]\s*[1-5]\b/i.test(o),
+    (/\bP\s*[-–]\s*[1-5]\b/i.test(o) && /\bQ\s*[-–]\s*[1-5]\b/i.test(o)) ||
+    // JEE Main Maxwell / Ziegler keys: (A) - (II), (B) - (III), …
+    (/\(\s*A\s*\)\s*[-–]\s*\(\s*(?:I{1,3}|IV)\s*\)/i.test(o) &&
+      /\(\s*B\s*\)\s*[-–]\s*\(\s*(?:I{1,3}|IV)\s*\)/i.test(o)) ||
+    // Compact Main keys: A-IV, B-III, C-I, D-II
+    (/^A\s*[-–]\s*(?:I{1,3}|IV)\b/i.test(o) && /B\s*[-–]\s*(?:I{1,3}|IV)\b/i.test(o)),
   )
   return mapping.length >= 2
 }
@@ -1694,17 +1804,26 @@ function parseMatchingListForDisplayUnsafe(text, options) {
 
   const numCount = countMarkers(listIIBlock, ['1', '2', '3', '4'])
   const colPQ = countMarkers(listIIBlock, ['P', 'Q', 'R', 'S'])
-  /** List-II can run to (6) (2018 P2 Q33, Q51, Q52). */
+  const romanII = countMarkers(listIIBlock, ROMAN_LIST_I)
+  /** List-II: Roman (I)–(IV) on Main; numbers (1)–(6); else Column II letters (P)–(U). */
   const listIILetters =
-    numCount >= 2 && numCount >= colPQ ? ['1', '2', '3', '4', '5', '6'] : ['P', 'Q', 'R', 'S', 'T', 'U']
+    romanII >= 2 && romanII >= numCount && romanII >= colPQ
+      ? ROMAN_LIST_I
+      : numCount >= 2 && numCount >= colPQ
+        ? ['1', '2', '3', '4', '5', '6']
+        : ['P', 'Q', 'R', 'S', 'T', 'U']
 
   let itemsII = splitMatchListItems(listIIBlock, listIILetters).filter((x) => String(x.text).trim())
   // Labels present but bodies empty (missing figs) — do not steal List-I media.
-  const listIILabeledEmpty = numCount >= 2 && itemsII.length < 2
+  const listIILabeledEmpty =
+    (numCount >= 2 || romanII >= 2) && itemsII.length < 2
   if (itemsII.length < 2 && !listIILabeledEmpty) {
     const peeled = peelNumericListII(itemsI, ['1', '2', '3', '4', '5'])
     itemsI = peeled.items.filter((x) => String(x.text).trim())
     itemsII = peeled.listII
+  }
+  if (itemsII.length < 2 && !listIILabeledEmpty && romanII >= 2) {
+    itemsII = splitMatchListItems(listIIBlock, ROMAN_LIST_I).filter((x) => String(x.text).trim())
   }
   if (itemsII.length < 2 && !listIILabeledEmpty) {
     const figs = itemsFromMathpixFigures(listIIBlock, ['1', '2', '3', '4', '5'])

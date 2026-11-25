@@ -742,6 +742,18 @@ function keepLeadingOptionLetter(body) {
   // Acidity / ranking chains: "(C) < (A) < (D) < …" — stripping left "< (A) < …" (Q77).
   if (/^<\s*\(\s*[A-E]\s*\)/.test(s) || /\(\s*[A-E]\s*\)\s*</.test(s)) return true
   if (/^(?:true|false)\b/i.test(s) && /\(\s*R\s*\)/i.test(s)) return true
+  // Main Match List keys: "(A) - (II), (B) - (III), …" — stripping left "- (II), (B) - …" (Q36).
+  if (
+    /\(\s*[A-D]\s*\)\s*[-–]\s*\(\s*(?:I{1,3}|IV)\s*\)/.test(s) ||
+    (/[A-D]\s*[-–]\s*(?:I{1,3}|IV)\b/i.test(s) &&
+      (s.match(/[A-D]\s*[-–]\s*(?:I{1,3}|IV)\b/gi) || []).length >= 2)
+  ) {
+    return true
+  }
+  // Rest after a mistaken strip: ", (B) and (D) only" / "and (C) only" / "only"
+  if (/^,\s*\(\s*[A-D]\s*\)/.test(s)) return true
+  if (/^(?:and|or)\s+\(\s*[A-D]\s*\)/i.test(s)) return true
+  if (/^only\b/i.test(s)) return true
   return false
 }
 

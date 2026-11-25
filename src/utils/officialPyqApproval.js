@@ -625,6 +625,9 @@ export function validateOfficialPyqForPublish(paper) {
 }
 
 const FACTS_UNKNOWN_LINE = /facts card is unknown/i
+/** Soft notes that must not stop Publish once cards themselves are clean (failedGoTo empty). */
+const SOFT_PUBLISH_QUALITY_LINE =
+  /institute(?:'s)? options could not be matched|looks like official Q|text differs from the institute|Hybrid AI got a different answer|its answer and solution were not used/i
 
 /**
  * The quality check failed (re-run when the saved mark is from an older check), or the card count is not the count the admin confirmed
@@ -646,12 +649,20 @@ function paperWideQualityBlockers(paper, filled) {
   if (quality?.passed === false) {
     const failed = Array.isArray(quality.failedGoTo) ? quality.failedGoTo : []
     // Confirmed facts stand in for a scan whose instructions give no section counts.
-    const lines = (Array.isArray(quality.lines) ? quality.lines : []).filter(
-      (line) => !(paper.adminFacts?.confirmedAt && FACTS_UNKNOWN_LINE.test(String(line))),
-    )
+    // Soft institute / Hybrid AI notes alone must not freeze Publish when no card failed.
+    const lines = (Array.isArray(quality.lines) ? quality.lines : []).filter((line) => {
+      const text = String(line)
+      if (paper.adminFacts?.confirmedAt && FACTS_UNKNOWN_LINE.test(text)) return false
+      if (!failed.length && SOFT_PUBLISH_QUALITY_LINE.test(text)) return false
+      if (!failed.length && FACTS_UNKNOWN_LINE.test(text) && paper.adminFacts?.confirmedAt) return false
+      return true
+    })
     if (failed.length || lines.length) {
       const nums = failed.slice(0, 24).join(', ')
-      errors.push(`The quality check has not passed.${nums ? ` Go to Q ${nums}.` : ` ${lines[0]}`} Fix it before continuing.`)
+      const tip = FACTS_UNKNOWN_LINE.test(String(lines[0] || ''))
+        ? ' Open “Paper facts”, check every row, and press Confirm — then Publish again.'
+        : ' Fix it before continuing.'
+      errors.push(`The quality check has not passed.${nums ? ` Go to Q ${nums}.` : ` ${lines[0] || ''}`}${tip}`)
     }
   }
   const facts = paper?.adminFacts?.confirmedAt ? factsForPaper(paper) : null

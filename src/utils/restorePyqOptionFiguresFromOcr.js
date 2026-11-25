@@ -26,6 +26,16 @@ function looksLikeBadOptionCrop(url) {
   return false
 }
 
+/** Tall stem slab only — wide short rows are multi-structure drawings (Q78 A–D), not bad crops. */
+function looksLikeTallBadStemCrop(url) {
+  const u = String(url ?? '')
+  if (!isOriginalCropUrl(u)) return false
+  const y0 = Number((u.match(/[?&]y0=([\d.]+)/i) || [])[1])
+  const y1 = Number((u.match(/[?&]y1=([\d.]+)/i) || [])[1])
+  if (Number.isFinite(y0) && Number.isFinite(y1) && Math.abs(y1 - y0) >= 0.12) return true
+  return false
+}
+
 /** @param {unknown} opt */
 function optionCropUrl(opt) {
   const m = String(opt ?? '').match(/\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}|!\[[^\]]*\]\(([^)]+)\)/)
@@ -69,12 +79,39 @@ function ocrWindowForCard(stem, source) {
 function smilesByMarker(source) {
   /** @type {Map<string, string>} */
   const map = new Map()
+  // Product-pair MCQs (S1 Q75) put two <smiles> under one (1)/(2) marker — keep both so
+  // option bodies stay distinct (single-SMILES capture made (1)=(2) and blocked crop repair).
+  const pairRe =
+    /(?:^|\n)\s*(?:\\item\s*\[\s*)?\(?\s*([1-4A-E])\s*\)?\s*\]?\s*(?:A\s*:\s*)?\n?\s*((?:(?:A\s*:\s*|B\s*:\s*)?<smiles>\s*[\s\S]*?\s*<\/smiles>\s*){1,4})/gi
+  for (const m of String(source ?? '').matchAll(pairRe)) {
+    const key = String(m[1] || '').toUpperCase()
+    const body = String(m[2] ?? '')
+      .replace(/\s*A\s*:\s*/gi, ' ')
+      .replace(/\s*B\s*:\s*/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const smiles = [...body.matchAll(/<smiles>\s*([\s\S]*?)\s*<\/smiles>/gi)].map((x) =>
+      String(x[1] ?? '').replace(/\s+/g, '').trim(),
+    )
+    if (!key || !smiles.length || smiles.some((s) => s.length < 4)) continue
+    map.set(key, smiles.map((s) => `<smiles>${s}</smiles>`).join(' '))
+  }
+  // pairRe can skip (2)/(4) when a prior match ate the newline before the next marker
+  // (S1 Q63 arenium). Always fill gaps from single-SMILES rows.
   for (const m of String(source ?? '').matchAll(SMILES_OPT_RE)) {
     const key = String(m[1] || '').toUpperCase()
     const smiles = String(m[2] ?? '').replace(/\s+/g, '').trim()
-    if (key && smiles.length >= 4) map.set(key, `<smiles>${smiles}</smiles>`)
+    if (key && smiles.length >= 4 && !map.has(key)) map.set(key, `<smiles>${smiles}</smiles>`)
   }
   return map
+}
+
+/** True when two or more options reuse the same original crop URL (paired mis-assign). */
+function optionCropsAreDuplicated(opts) {
+  const urls = opts.map(optionCropUrl).filter((u) => isOriginalCropUrl(u))
+  if (urls.length < 2) return false
+  const keys = urls.map((u) => String(u).split('?')[0])
+  return new Set(keys).size < keys.length
 }
 
 /**
@@ -121,25 +158,39 @@ function ocrOptionBodiesAreDistinct(bodies, count = 4) {
  * @param {unknown} source
  * @returns {T}
  */
+/** Compare sometimes prefixes structure crops with "A : B :" (Q75 product pairs). */
+function stripSpuriousOptionProductPrefixes(opt) {
+  return String(opt ?? '')
+    .replace(/^\s*A\s*:\s*B\s*:\s*/i, '')
+    .replace(/^\s*[AB]\s*:\s*(?=\\includegraphics|!\[|<smiles>)/i, '')
+    .trim()
+}
+
 export function preferOcrSmilesOverBadOptionCrops(q, source) {
   if (!q || typeof q !== 'object') return q
   const opts = Array.isArray(q.options) ? q.options.map((o) => String(o ?? '')) : []
   if (opts.length < 2) return q
+  let changed = false
+  const cleaned = opts.map((opt) => {
+    const next = stripSpuriousOptionProductPrefixes(opt)
+    if (next !== opt) changed = true
+    return next
+  })
   const window = ocrWindowForCard(q.text, source)
-  if (!window) return q
+  if (!window) return changed ? { ...q, options: cleaned } : q
   const smiles = smilesByMarker(window)
   const cdn = smiles.size ? new Map() : cdnFiguresByMarker(window)
   const bodies = smiles.size ? smiles : cdn
-  if (!bodies.size) return q
-  const allOriginalCrops = opts.every((opt) => isOriginalCropUrl(optionCropUrl(opt)))
+  if (!bodies.size) return changed ? { ...q, options: cleaned } : q
+  const allOriginalCrops = cleaned.every((opt) => isOriginalCropUrl(optionCropUrl(opt)))
+  const dupCrops = optionCropsAreDuplicated(cleaned)
   const fourNumbered =
     allOriginalCrops &&
-    opts.length >= 4 &&
+    cleaned.length >= 4 &&
     [1, 2, 3, 4].every((n) => bodies.has(String(n))) &&
-    ocrOptionBodiesAreDistinct(bodies, opts.length)
-  const distinctOcr = ocrOptionBodiesAreDistinct(bodies, opts.length)
-  let changed = false
-  const next = opts.map((opt, i) => {
+    ocrOptionBodiesAreDistinct(bodies, cleaned.length)
+  const distinctOcr = ocrOptionBodiesAreDistinct(bodies, cleaned.length)
+  const next = cleaned.map((opt, i) => {
     const url = optionCropUrl(opt)
     const fromNum = bodies.get(String(i + 1))
     const fromLetter = bodies.get(String.fromCharCode(65 + i))
@@ -147,8 +198,9 @@ export function preferOcrSmilesOverBadOptionCrops(q, source) {
     if (!body) return opt
     // Identical OCR SMILES/CDN bodies never beat a page crop — even a slightly wide
     // option box — or every FIITJEE structure option collapses to one drawing.
-    if (!distinctOcr && isOriginalCropUrl(url)) return opt
-    if (fourNumbered || looksLikeBadOptionCrop(url)) {
+    // Exception: duplicated crop URLs already fail Quality ("two options the same").
+    if (!distinctOcr && isOriginalCropUrl(url) && !dupCrops) return opt
+    if (fourNumbered || looksLikeBadOptionCrop(url) || (dupCrops && distinctOcr)) {
       changed = true
       return body
     }
@@ -191,13 +243,17 @@ export function preferOcrSmilesOverBadStemCrops(q, source) {
       },
     )
   }
-  // Bare stem figure with no label (Q78 Cyclohexene crop) — OCR often has `<smiles>` right after the name.
+  // Bare stem figure — only swap a *tall* bad crop when OCR has exactly one structure.
+  // Wide short A–D rows (Q78) look "clubbed" by width but must stay; never collapse them
+  // to the first bare SMILES (benzyl only).
   const figCount = (text.match(/\\includegraphics|!\[[^\]]*\]\(/g) || []).length
-  if (next === text && figCount === 1 && (smiles.size === 1 || bareSmiles.length >= 1)) {
-    const only = smiles.size === 1 ? [...smiles.values()][0] : `<smiles>${bareSmiles[0]}</smiles>`
+  const uniqueBare = [...new Set(bareSmiles)]
+  const oneOcr = smiles.size === 1 || (smiles.size === 0 && uniqueBare.length === 1)
+  if (next === text && figCount === 1 && oneOcr) {
+    const only = smiles.size === 1 ? [...smiles.values()][0] : `<smiles>${uniqueBare[0]}</smiles>`
     next = next.replace(
       /\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}|!\[[^\]]*\]\(([^)]+)\)/g,
-      (full, a, b) => (looksLikeBadOptionCrop(a || b) || isOriginalCropUrl(a || b) ? only : full),
+      (full, a, b) => (looksLikeTallBadStemCrop(a || b) ? only : full),
     )
   }
   if (next === text) return q

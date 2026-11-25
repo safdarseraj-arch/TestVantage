@@ -132,11 +132,11 @@ export function overlayOfficialPyqPublishedMeta(prev, patch) {
   }
 
   const chapter = String(patch?.chapter ?? '').trim()
-  if (chapter) next.chapter = chapter
+  if (chapter && !/^general$/i.test(chapter)) next.chapter = chapter
   else delete next.chapter
 
   const topic = String(patch?.topic ?? '').trim()
-  if (topic) next.topic = topic
+  if (topic && !/^general$/i.test(topic)) next.topic = topic
   else delete next.topic
 
   const questionType = String(patch?.questionType ?? '').trim()

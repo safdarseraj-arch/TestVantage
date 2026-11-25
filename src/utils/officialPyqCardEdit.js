@@ -202,13 +202,15 @@ export function stripOfficialPyqOptionSlotLabel(option) {
   if (!m) return s.trim()
   const rest = s.slice(m[0].length)
   const letter = String(m[1] || m[2] || '')
-  // Assertion / ranking / "which of the following" choice bodies keep their leading (A)/(B)/(C)/(D).
+  // Assertion / ranking / combination choice bodies keep their leading (A)/(B)/(C)/(D).
+  // Do not keep merely because the body has the word "and" (coordination pairs like
+  // "[Cr…] and [Cr…]") — that left "(A) $…$ and $…$" after Compare fill (2013 P2 Q31).
   if (
     /^[A-Da-d]$/.test(letter) &&
     (/^,\s*\(\s*[A-Da-d]\s*\)/.test(rest) ||
-      /\(\s*[A-Da-dEe]\s*\)/.test(rest) ||
-      /\band\b/i.test(rest) ||
-      /\bonly\b/i.test(rest) ||
+      /^(?:and|or)\s+\(\s*[A-Da-d]\s*\)/i.test(rest) ||
+      /^\(\s*[A-Da-dEe]\s*\)/.test(rest) ||
+      /^\s*only\b/i.test(rest) ||
       /^<\s*\(\s*[A-E]\s*\)/.test(rest) ||
       /^is\s+(?:true|false)\b/i.test(rest) ||
       /\(\s*R\s*\)/i.test(rest))
@@ -387,7 +389,18 @@ export function officialPyqDraftFromSuggestion(card, compare) {
     const kept = textWithOriginalFigureCrops(base.text, figures.text)
     if (kept) return { ...base, text: kept }
   }
-  const count = Math.max(base.options.length, opts.length, figures.options.length)
+  const type = String(card?.questionType ?? '').toLowerCase()
+  const isNumeric = type === 'integer' || type === 'numerical'
+  const hasOptionCrops = figures.options.some((arr) => Array.isArray(arr) && arr.length)
+  const hasSuggestedOpts = opts.some((o) => officialPyqOptionHasContent(stripOfficialPyqOptionSlotLabel(o)))
+  // Numerical cards must drop glued assertion/MCQ leftovers when Compare clears options
+  // (otherwise Auto-fix rejects: "adds options to a number-answer question").
+  // Still run stem crop/SMILES placement below — do not early-return with keepCardFigures,
+  // or clubbed crops wipe Q81 numbered SMILES into empty (1)(2) holes.
+  const clearNumericOptions = isNumeric && !hasOptionCrops && !hasSuggestedOpts
+  const count = clearNumericOptions
+    ? 0
+    : Math.max(base.options.length, opts.length, figures.options.length)
   /** Gemini sends "(A)" or "" for a drawing it cannot write; the card's own option stays then. */
   const options = Array.from({ length: count }, (_, i) => {
     const suggested = stripOfficialPyqOptionSlotLabel(opts[i])
@@ -415,8 +428,9 @@ export function officialPyqDraftFromSuggestion(card, compare) {
       if (/<smiles>/i.test(before)) {
         const bySmiles = stemSmilesWithOriginalCrops(before, crops)
         if (bySmiles) return bySmiles
-        // Prefer keeping the flag over applying clubbed / watermark slabs as a "fix".
-        return before
+        // Q81 numbered (1)–(4) compounds: keep SMILES flagged when crops are clubbed / short.
+        // Plain stem SMILES (Compare pictures with empty suggested text) still get placeCropFigures.
+        if (/(?:^|\n)\s*\(\s*[1-4]\s*\)\s*(?:\n\s*)?<smiles\b/i.test(before)) return before
       }
       const placed = placeCropFigures(before, withoutFigurePlaceholders(suggested) ? suggested : '', crops)
       return /<smiles>/i.test(placed) ? withoutLeftoverSmiles(placed) || placed : placed
@@ -430,7 +444,10 @@ export function officialPyqDraftFromSuggestion(card, compare) {
     if (stripped && !/<smiles>/i.test(stripped)) nextText = stripped
   }
   /** The key is checked against the options this fix puts on the card: "C" for four new option pictures (2012 P2 Q9). */
-  const printed = officialPyqPrintedAnswerPatch({ ...card, options }, compare)
+  const printed = officialPyqPrintedAnswerPatch(
+    clearNumericOptions ? { ...card, options: [] } : { ...card, options },
+    compare,
+  )
   /** A kept card picture must not come back on an option when it is the question's own figure (2013 P1 Q15). */
   return dropOptionFigureRepeatingStem({
     ...base,

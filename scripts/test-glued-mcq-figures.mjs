@@ -382,6 +382,36 @@ assert.equal(
   'Q75 stem stays prose-only when options already hold the drawings',
 )
 
+// S1 Q63: four distinct arenium SMILES must win over original page crops (pairRe gap fill).
+const q63Ocr = [
+  '63. The arenium ion which is not involved in the bromination of Aniline is ____.',
+  '(1)',
+  '<smiles>[NH2+]=C1C=CC=CC1Br</smiles>',
+  '(2)',
+  '<smiles>[NH3+]=C1C=CC(Br)C=C1</smiles>',
+  '(3)',
+  '<smiles>NC1=CC=CC(Br)[CH+]1</smiles>',
+  '(4)',
+  '<smiles>NC1=CC=C[CH+]C1Br</smiles>',
+  'Ans. (3)',
+].join('\n')
+const q63Crops = [
+  '\\includegraphics{/api/official-pyq/original/crops/q63-a.png?page=23&x0=0.21&y0=0.63&x1=0.33&y1=0.73}',
+  '\\includegraphics{/api/official-pyq/original/crops/q63-b.png?page=23&x0=0.57&y0=0.62&x1=0.66&y1=0.73}',
+  '\\includegraphics{/api/official-pyq/original/crops/q63-c.png?page=23&x0=0.21&y0=0.74&x1=0.32&y1=0.85}',
+  '\\includegraphics{/api/official-pyq/original/crops/q63-d.png?page=23&x0=0.57&y0=0.72&x1=0.69&y1=0.82}',
+]
+const q63Fixed = preferOcrSmilesOverBadOptionCrops(
+  {
+    text: 'The arenium ion which is not involved in the bromination of Aniline is ____.',
+    options: q63Crops,
+    printedNumber: 63,
+  },
+  q63Ocr,
+)
+assert.equal(q63Fixed.options.filter((o) => /<smiles>/i.test(String(o))).length, 4, 'Q63 prefers four OCR SMILES')
+assert.match(String(q63Fixed.options[2]), /NC1=CC=CC\(Br\)\[CH\+\]1/)
+
 // Q78: bare stem crop → cyclohexene SMILES, not an earlier enol SMILES from a wide OCR window.
 const q78Ocr = [
   'Highest enol content will be shown by:',
@@ -407,10 +437,190 @@ const q78Fixed = preferOcrSmilesOverBadStemCrops(
 assert.match(String(q78Fixed.text), /<smiles>C1=CCCCC1<\/smiles>/)
 assert.doesNotMatch(String(q78Fixed.text), /O=C1CC\(=O\)/)
 
+// S1 Q76: Compare crops → OCR SMILES; stem keeps the reaction CDN figure (not Sol. pages).
+const s1Q76Ocr = [
+  '76. The major product (P) in the following reaction is',
+  '![](https://cdn.mathpix.com/cropped/s1-76-stem.jpg?height=256&width=719&top_left_y=1091&top_left_x=382)',
+  '(1)',
+  '<smiles>BrCc1cccc(Br)c1</smiles>',
+  '(2)',
+  '<smiles>Oc1cccc(CCBr)c1</smiles>',
+  '(3)',
+  '<smiles>CC(Br)c1cccc(Br)c1</smiles>',
+  '(4)',
+  '<smiles>CC(Br)c1cccc(O)c1</smiles>',
+  'Ans. (4)',
+  'Sol.',
+  '![](https://cdn.mathpix.com/cropped/s1-76-sol-a.jpg?height=261&width=720&top_left_y=1926&top_left_x=385)',
+  '![](https://cdn.mathpix.com/cropped/s1-76-sol-b.jpg?height=714&width=1161&top_left_y=253&top_left_x=381)',
+  '77. Chlorine undergoes disproportionation in alkaline medium as shown below :',
+].join('\n')
+const s1Q76Crops = [
+  '\\includegraphics{/api/official-pyq/original/crops/s1-76-a.png?page=27&x0=0.2114&y0=0.4829&x1=0.3316&y1=0.5871}',
+  '\\includegraphics{/api/official-pyq/original/crops/s1-76-b.png?page=27&x0=0.5750&y0=0.4829&x1=0.6977&y1=0.5871}',
+  '\\includegraphics{/api/official-pyq/original/crops/s1-76-c.png?page=27&x0=0.2041&y0=0.5756&x1=0.3316&y1=0.6789}',
+  '\\includegraphics{/api/official-pyq/original/crops/s1-76-d.png?page=27&x0=0.5678&y0=0.5747&x1=0.6977&y1=0.6789}',
+]
+const s1Q76Stem =
+  'The major product (P) in the following reaction is\n\\includegraphics{https://cdn.mathpix.com/cropped/s1-76-stem.jpg?height=256&width=719&top_left_y=1091&top_left_x=382}'
+const s1Q76Prefer = preferOcrSmilesOverBadOptionCrops(
+  { text: s1Q76Stem, options: s1Q76Crops, printedNumber: 76 },
+  s1Q76Ocr,
+)
+assert.equal(s1Q76Prefer.options.filter((o) => /<smiles>/i.test(String(o))).length, 4, 'S1 Q76 prefers OCR SMILES over Compare crops')
+assert.match(String(s1Q76Prefer.options[3]), /CC\(Br\)c1cccc\(O\)c1/)
+const s1Q76Shown = officialPyqCardAsShown(
+  {
+    text: s1Q76Stem,
+    options: s1Q76Crops,
+    questionType: 'single_correct',
+    printedNumber: 76,
+    adminEdited: true,
+    editSource: 'auto_compare',
+  },
+  s1Q76Ocr,
+)
+assert.equal(s1Q76Shown.options.filter((o) => /<smiles>/i.test(String(o))).length, 4, 'S1 Q76 asShown shows SMILES options')
+assert.match(String(s1Q76Shown.text), /s1-76-stem\.jpg/, 'S1 Q76 stem keeps the reaction figure')
+assert.doesNotMatch(String(s1Q76Shown.text), /s1-76-sol/, 'S1 Q76 stem never pulls Sol. figures')
+
+// S1 Q77: disproportionation stays text; prior Q76 Sol. crop must not become the stem figure.
+const s1Q77Ocr = [
+  '77. Chlorine undergoes disproportionation in alkaline medium as shown below :',
+  '$\\mathrm{a} \\mathrm{Cl}_{2}+\\mathrm{b} \\mathrm{OH}^{-} \\rightarrow \\mathrm{c} \\mathrm{ClO}^{-}+\\mathrm{d} \\mathrm{Cl}^{-}$',
+  'The values of a, b, c and d in a balanced redox reaction are respectively:',
+  '(1) 2, 2, 1 and 3',
+  '(2) 1, 2, 1 and 1',
+  '(3) 2, 4, 1 and 3',
+  '(4) 3, 4, 4 and 2',
+  'Ans. (3)',
+].join('\n')
+const s1Q77Shown = officialPyqCardAsShown(
+  {
+    text: 'Chlorine undergoes disproportionation in alkaline medium as shown below :\n$\\mathrm{a} \\mathrm{Cl}_{2}+\\mathrm{b} \\mathrm{OH}^{-} \\rightarrow \\mathrm{c} \\mathrm{ClO}^{-}+\\mathrm{d} \\mathrm{Cl}^{-}$\nThe values of a, b, c and d in a balanced redox reaction are respectively:',
+    options: ['2, 2, 1 and 3', '1, 2, 1 and 1', '2, 4, 1 and 3', '3, 4, 4 and 2'],
+    questionType: 'single_correct',
+    printedNumber: 77,
+  },
+  `${s1Q76Ocr}\n${s1Q77Ocr}`,
+)
+assert.equal(
+  (String(s1Q77Shown.text).match(/\\includegraphics|!\[[^\]]*\]\(/g) || []).length,
+  0,
+  'S1 Q77 stem has no figure (equation is text; Sol. of Q76 stays out)',
+)
+assert.deepEqual(
+  s1Q77Shown.options.map((o) => String(o).replace(/\s+/g, ' ').trim()),
+  ['2, 2, 1 and 3', '1, 2, 1 and 1', '2, 4, 1 and 3', '3, 4, 4 and 2'],
+)
+
+// S1 Q78: multistep reaction — Compare crops → distinct OCR SMILES; stem keeps scheme CDN.
+const s1Q78Ocr = [
+  '78. The final product A formed in the following multistep reaction sequence is',
+  '![](https://cdn.mathpix.com/cropped/s1-78-stem.jpg?height=158&width=570&top_left_y=297&top_left_x=382)',
+  '(1)',
+  '<smiles>O=C(O)Cc1ccccc1</smiles>',
+  '(2)',
+  '<smiles>C/C(=N\\N)c1ccccc1</smiles>',
+  '(3)',
+  '<smiles>N/N=C/Cc1ccccc1</smiles>',
+  '(4)',
+  '<smiles>CCc1ccccc1</smiles>',
+  'Ans. (4)',
+  'Sol.',
+  '![](https://cdn.mathpix.com/cropped/s1-78-sol.jpg?height=569&width=934&top_left_y=927&top_left_x=890)',
+].join('\n')
+const s1Q78Crops = [
+  '\\includegraphics{/api/official-pyq/original/crops/s1-78-a.png?page=29&x0=0.2053&y0=0.1893&x1=0.3874&y1=0.2798}',
+  '\\includegraphics{/api/official-pyq/original/crops/s1-78-b.png?page=29&x0=0.5678&y0=0.1638&x1=0.7219&y1=0.2607}',
+  '\\includegraphics{/api/official-pyq/original/crops/s1-78-c.png?page=29&x0=0.2053&y0=0.2284&x1=0.4201&y1=0.3198}',
+  '\\includegraphics{/api/official-pyq/original/crops/s1-78-d.png?page=29&x0=0.5678&y0=0.2511&x1=0.7013&y1=0.3198}',
+]
+const s1Q78Stem =
+  'The final product A formed in the following multistep reaction sequence is\n\\includegraphics{https://cdn.mathpix.com/cropped/s1-78-stem.jpg?height=158&width=570&top_left_y=297&top_left_x=382}'
+const s1Q78Prefer = preferOcrSmilesOverBadOptionCrops(
+  { text: s1Q78Stem, options: s1Q78Crops, printedNumber: 78 },
+  s1Q78Ocr,
+)
+assert.equal(s1Q78Prefer.options.filter((o) => /<smiles>/i.test(String(o))).length, 4, 'S1 Q78 prefers OCR SMILES over Compare crops')
+assert.match(String(s1Q78Prefer.options[3]), /CCc1ccccc1/)
+const s1Q78Shown = officialPyqCardAsShown(
+  {
+    text: s1Q78Stem,
+    options: s1Q78Crops,
+    questionType: 'single_correct',
+    printedNumber: 78,
+    adminEdited: true,
+    editSource: 'auto_compare',
+  },
+  s1Q78Ocr,
+)
+assert.equal(s1Q78Shown.options.filter((o) => /<smiles>/i.test(String(o))).length, 4, 'S1 Q78 asShown shows SMILES options')
+assert.match(String(s1Q78Shown.text), /s1-78-stem\.jpg/, 'S1 Q78 stem keeps the multistep scheme')
+assert.doesNotMatch(String(s1Q78Shown.text), /s1-78-sol/, 'S1 Q78 stem never pulls Sol. figures')
+
 // Q60: PART - C (CHEMISTRY) under a Physics solution / institute field.
 const cleanedPart = stripTrailingPyqSectionHeader(
   '$$v=\\sqrt{673}$$\n\nPART - C (CHEMISTRY)',
 )
 assert.doesNotMatch(cleanedPart, /PART\s*-\s*C/i)
+
+// S2 Q36: tension Sol. must not keep Q37's resistor-circuit crop (two-column glue).
+const S2_CIRCUIT =
+  'https://cdn.mathpix.com/cropped/f53e8ce3-d097-4405-a7c6-a10c2f1f6367-15.jpg?height=351&width=551&top_left_y=998&top_left_x=1236'
+const s2Q36Ocr = [
+  '\\item[Q.] 36 A stone of mass 900 g is tied to a string and moved in a vertical circle of radius 1 m making 10 rpm. The tension in the string, when the stone is at the lowest point is (if $\\pi^{2}=9.8$ and $\\mathrm{g}=9.8 \\mathrm{~m} / \\mathrm{s}^{2}$ ):',
+  '(1) 17.8 N',
+  '(2) 8.82 N',
+  '(3) 97 N',
+  '(4) 9.8 N',
+  '\\end{itemize}',
+  'Ans. (4)',
+  '\\begin{itemize}',
+  '\\item[] Sol.',
+  '$$\\begin{aligned}',
+  '& \\mathrm{T}-\\mathrm{mg}=\\mathrm{m} \\ell \\omega^{2} \\\\',
+  '& \\mathrm{~T}=\\mathrm{mg}+\\mathrm{m} \\ell \\omega^{2} \\\\',
+  '& \\mathrm{~T}=9.8 \\mathrm{~N} .',
+  '\\end{aligned}$$',
+  `![](${S2_CIRCUIT})`,
+  '\\item[37.] In the given circuit, the current in resistance $\\mathrm{R}_{3}$ is:',
+  '(1) 2.5 A',
+  '(2) 1 A',
+  '(3) 1.5 A',
+  '(4) 2 A',
+  '\\end{itemize}',
+  'Ans. (2)',
+  '\\begin{itemize}',
+  '\\item[] Sol.',
+  '$$R_{eq}=5\\Omega$$',
+].join('\n')
+const s2Q36Healed = healUploadQuestionCard(
+  {
+    text: 'A stone of mass 900 g is tied to a string and moved in a vertical circle of radius 1 m making 10 rpm. The tension in the string, when the stone is at the lowest point is (if $\\pi^{2}=9.8$ and $\\mathrm{g}=9.8 \\mathrm{~m} / \\mathrm{s}^{2}$ ):',
+    options: ['17.8 N', '8.82 N', '97 N', '9.8 N'],
+    printedNumber: 36,
+    questionNumber: 36,
+    subject: 'physics',
+    solution:
+      '$$\\begin{aligned}\n& \\mathrm{T}-\\mathrm{mg}=\\mathrm{m} \\ell \\omega^{2} \\\\\n& \\mathrm{~T}=\\mathrm{mg}+\\mathrm{m} \\ell \\omega^{2} \\\\\n& \\mathrm{~T}=9.8 \\mathrm{~N} .\n\\end{aligned}$$\n' +
+      `\\includegraphics{${S2_CIRCUIT}}`,
+  },
+  s2Q36Ocr,
+)
+assert.match(String(s2Q36Healed.solution), /T=9\.8|T\}=9\.8/, 'S2 Q36 Sol. keeps tension math')
+assert.doesNotMatch(String(s2Q36Healed.solution), /f53e8ce3/, 'S2 Q36 Sol. drops stolen resistor circuit')
+const s2Q37Healed = healUploadQuestionCard(
+  {
+    text: 'In the given circuit, the current in resistance $\\mathrm{R}_{3}$ is:',
+    options: ['2.5 A', '1 A', '1.5 A', '2 A'],
+    printedNumber: 37,
+    questionNumber: 37,
+    subject: 'physics',
+    solution: '$$R_{eq}=5\\Omega$$',
+  },
+  s2Q36Ocr,
+)
+assert.match(String(s2Q37Healed.text), /f53e8ce3/, 'S2 Q37 stem recovers circuit figure from prior Sol. glue')
 
 console.log('test-glued-mcq-figures: ok')

@@ -18,11 +18,12 @@ import {
   applyOfficialPyqQualityGuards as applyOfficialBase,
   lightRepairOfficialPyqQuestions as lightRepairBase,
   healUploadQuestionCard as healBaseCard,
+  healCardSolutionFigures,
   matchQuestionMissingListI,
   ocrQuestionBodyForCard,
 } from './extendTruncatedStem.js'
 import { unwrapReactionStepTables } from './latexTabularDisplay.js'
-import { enrichMatchListsFromOcr } from './restoreMatchListsOcr.js'
+import { enrichMatchListsFromOcr, looksLikeTruncatedMainMatchList } from './restoreMatchListsOcr.js'
 import { isMatrixGridCard } from './matrixGridPyq.js'
 import { normalizeNumberedStemSmiles, repairScanStructureCodes } from './smilesDisplay.js'
 import { restoreStructureLabels } from './structureLabels.js'
@@ -37,6 +38,7 @@ import {
 } from './mathpixCleanPipeline.js'
 import { labelNumberedQuestions } from './numberedQuestionMarkers.js'
 import { restoreAssertionStatementsFromSource } from './assertionCombinationMcq.js'
+import { repairStatementThenMcqCard } from './statementThenMcq.js'
 import {
   preferOcrSmilesOverBadOptionCrops,
   preferOcrSmilesOverBadStemCrops,
@@ -134,9 +136,22 @@ function mathBreakWindow(stem, rawSource) {
  * @param {object} q
  * @param {unknown} source
  */
+/** Assertion / I–II leftovers glued onto a JEE Main numerical slot must not stay as options. */
+function clearGluedNumericalOptions(q, options) {
+  const type = String(q?.questionType ?? '').toLowerCase()
+  if (type !== 'integer' && type !== 'numerical') return options
+  const opts = Array.isArray(options) ? options : []
+  if (!opts.length) return opts
+  const looksLikeAssertionMcq = opts.some((o) =>
+    /(?:Both\s*\(\s*I\s*\)|Only\s*\(\s*I\s*\)|Both\s*\(\s*I\s*\)\s*and\s*\(\s*II\s*\))/i.test(String(o ?? '')),
+  )
+  return looksLikeAssertionMcq ? [] : opts
+}
+
 export function applyStoredOcrCardFixes(q, source) {
   if (isMatrixGridCard(q)) return q
   let withStatements = restoreAssertionStatementsFromSource(q, source)
+  withStatements = repairStatementThenMcqCard(withStatements, source)
   withStatements = restoreRankingOptionsFromSource(withStatements, source)
   withStatements = preferOcrSmilesOverBadOptionCrops(withStatements, source)
   withStatements = preferOcrSmilesOverBadStemCrops(withStatements, source)
@@ -159,18 +174,44 @@ export function applyStoredOcrCardFixes(q, source) {
     restoreGluedMatchOptionSpacing(withStatements?.options, optionWindow),
     optionWindow || mathBreakWindow(withStatements?.text, source),
   )
-  const options = Array.isArray(restoredOptions)
+  let options = Array.isArray(restoredOptions)
     ? restoredOptions.map((opt) => repairScanStructureCodes(opt))
     : restoredOptions
-  const text = restoreStructureLabels({ text: scanText, options }).text
+  options = clearGluedNumericalOptions(withStatements, options)
+  // Strip FIITJEE Solutions cover / instruction dumps glued under numerical stems.
+  let text = stripTrailingPyqSectionHeader(
+    restoreStructureLabels({ text: scanText, options }).text,
+  )
+  // Tabular LIST I/II already carries both columns — drop a trailing CDN crop of the
+  // same table (Q65) so validateMathpixQuestion / display parse are not confused.
+  if (
+    /\\begin\{tabular\}/i.test(text) &&
+    /LIST\s*I\b/i.test(text) &&
+    /LIST\s*II\b/i.test(text) &&
+    (text.match(/\b[A-D]\.\s*&/g) || []).length >= 3
+  ) {
+    text = text
+      .replace(
+        /\n*\\includegraphics\{https:\/\/cdn\.mathpix\.com\/[^}]+\}\s*$/i,
+        '',
+      )
+      .replace(/\n*!\[([^\]]*)\]\(https:\/\/cdn\.mathpix\.com\/[^)]+\)\s*$/i, '')
+      .trimEnd()
+  }
   const rawSol = String(withStatements?.solution ?? q?.solution ?? '')
-  const solution = rawSol
+  const cleanedSol = rawSol
     ? stripTrailingPyqSectionHeader(cleanInstituteSolutionBody(rawSol) || rawSol)
     : rawSol
   const rawInst = String(withStatements?.solutionInstitute ?? q?.solutionInstitute ?? '')
-  const solutionInstitute = rawInst
+  const cleanedInst = rawInst
     ? stripTrailingPyqSectionHeader(cleanInstituteSolutionBody(rawInst) || rawInst)
     : rawInst
+  const withSolFigs = healCardSolutionFigures(
+    { ...withStatements, solution: cleanedSol, solutionInstitute: cleanedInst },
+    source,
+  )
+  const solution = String(withSolFigs?.solution ?? cleanedSol)
+  const solutionInstitute = String(withSolFigs?.solutionInstitute ?? cleanedInst)
   const sameText = text === String(q?.text ?? '')
   const sameOpts = options === q?.options || JSON.stringify(options) === JSON.stringify(q?.options ?? [])
   const sameSol = solution === String(q?.solution ?? '')
@@ -196,9 +237,23 @@ export function storedCardMissesOcrFix(q, source) {
 }
 
 export function healUploadQuestionCard(q, rawSource, map) {
-  // Keep admin page-crops / rebuilt match tables; OCR heal was wiping them with SMILES.
-  if (q?.adminEdited === true) return q
   const source = scanOf(rawSource)
+  // Admin page-crops / rebuilt tables usually stay. Still heal stripped Match List
+  // shells (2|c|List) and Roman List-II mangled to Arabic (Main Q36/Q65).
+  if (q?.adminEdited === true) {
+    const text = String(q?.text ?? '')
+    const needsMatchHeal =
+      /\d+\s*\|\s*[lcr]+\s*\|\s*List/i.test(text) ||
+      looksLikeTruncatedMainMatchList(text) ||
+      (/Match\s+List/i.test(text) &&
+        /(?:List|Column)\s*[-–]?\s*II\b/i.test(text) &&
+        (text.match(/(?:^|\n)\s*\(\s*[1-4]\s*\)/g) || []).length >= 2 &&
+        (text.match(/\(\s*(?:I{1,3}|IV)\s*\)/g) || []).length < 2)
+    // Still prefer OCR SMILES over clubbed Compare crops (S1 Q63) and restore
+    // truncated Main Match Lists — same figure heals asShown already applies.
+    const base = needsMatchHeal ? enrichMatchListsFromOcr(q, source) : q
+    return applyStoredOcrCardFixes(base, source)
+  }
   return applyStoredOcrCardFixes(
     enrichMatchListsFromOcr(healBaseCard(q, source, map), source),
     source,

@@ -3,6 +3,7 @@ import katex from 'katex'
 import {
   looksLikeMatchingListStem,
   matchOptionsFoldedIntoLists,
+  optionsLookLikeMatchAnswers,
   parseMatchingListForDisplay,
   stitchMatchListSource,
   foldListIIFromOptionsIntoStem,
@@ -11,6 +12,11 @@ import {
   flattenTabularMatchLists,
   repairMatchListOcrGlitches,
 } from '../src/utils/parseMatchingListDisplay.js'
+import {
+  enrichMatchListsFromOcr,
+  looksLikeTruncatedMainMatchList,
+} from '../src/utils/restoreMatchListsOcr.js'
+import { sanitizeStemForDisplay } from '../src/utils/sanitizeStemForDisplay.js'
 import { splitSmilesDisplaySegments } from '../src/utils/smilesDisplay.js'
 import { repairMatchArrowLatex } from '../src/utils/latexValidateRepair.js'
 import { prepareTextForMathTextDisplay } from '../src/utils/prepareMathForRender.js'
@@ -851,5 +857,128 @@ assert.deepEqual(
   ['Alpha decay', '$\\beta^{+}$decay', 'Fission', 'Proton emission'],
 )
 assert.equal(nuclearRows?.listII?.length, 4)
+
+// JEE Main Match List: 4-col tabular with Roman List-II (Q36 Maxwell / Q65 Ziegler).
+const MAIN_Q36 = String.raw`Match List I with List II
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline \multicolumn{2}{|c|}{List-I} & \multicolumn{2}{|c|}{List-II} \\
+\hline (A) & $\oint \overrightarrow{\mathrm{B}} . \overrightarrow{\mathrm{d}}=0$ & (I) & Gauss' law for electricity \\
+\hline (B) & $\oint \overrightarrow{\mathrm{E}} . \overrightarrow{\mathrm{dl}}=0$ & (II) & Gauss law for magnetism \\
+\hline (C) & $\oint \overrightarrow{\mathrm{E}} \cdot \overrightarrow{\mathrm{dA}}=0$ & (III) & Faraday law \\
+\hline (D) & $\oint \overrightarrow{\mathrm{B}} \cdot \overrightarrow{\mathrm{dA}}=0$ & (IV) & Ampere - Maxwell law \\
+\hline
+\end{tabular}`
+const flatMain36 = flattenTabularMatchLists(MAIN_Q36)
+assert.doesNotMatch(flatMain36, /\\begin\{tabular\}/, 'Main Q36 tabular flattens')
+assert.doesNotMatch(flatMain36, /2\|c\|List/, 'Main Q36 does not leave multicolumn shells')
+const parsedMain36 = parseMatchingListForDisplay(MAIN_Q36)
+assert.ok(parsedMain36, 'Main Q36 parses')
+assert.deepEqual(
+  parsedMain36.listI.map((r) => r.label),
+  ['(A)', '(B)', '(C)', '(D)'],
+)
+assert.deepEqual(
+  parsedMain36.listII.map((r) => r.label),
+  ['(I)', '(II)', '(III)', '(IV)'],
+)
+assert.match(parsedMain36.listII[3].text, /Ampere/)
+
+const MAIN_Q65 = String.raw`Match List I with List II
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline \multicolumn{2}{|l|}{LIST I (Substances )} & \multicolumn{2}{|l|}{LIST II ( Element Present )} \\
+\hline A. & Ziegler catalyst & I. & Rhodium \\
+\hline B. & Blood Pigment & II. & Cobalt \\
+\hline C. & Wilkinson catalyst & III. & Iron \\
+\hline D. & Vitamin $\mathrm{B}_{12}$ & IV. & Titanium \\
+\hline
+\end{tabular}`
+const flatMain65 = flattenTabularMatchLists(MAIN_Q65)
+assert.doesNotMatch(flatMain65, /\\begin\{tabular\}/, 'Main Q65 tabular flattens')
+const parsedMain65 = parseMatchingListForDisplay(MAIN_Q65)
+assert.ok(parsedMain65, 'Main Q65 parses')
+assert.deepEqual(
+  parsedMain65.listI.map((r) => r.label),
+  ['(A)', '(B)', '(C)', '(D)'],
+)
+assert.deepEqual(
+  parsedMain65.listII.map((r) => r.label),
+  ['(I)', '(II)', '(III)', '(IV)'],
+)
+assert.match(parsedMain65.listI[0].text, /Ziegler/)
+assert.match(parsedMain65.listII[3].text, /Titanium/)
+
+// Truncated Main stems ("Match List…\n\nList-I") must rebuild from OCR tabular (S1 Q36/Q65).
+const S1_MATCH_OCR = String.raw`\item[36.] Match List I with List II
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline \multicolumn{2}{|c|}{List-I} & \multicolumn{2}{|c|}{List-II} \\
+\hline (A) & $\oint \overrightarrow{\mathrm{B}} . \overrightarrow{\mathrm{d}}=\mu_{0} \mathrm{i}_{\mathrm{c}}$ & (I) & Gauss' law for electricity \\
+\hline (B) & $\oint \overrightarrow{\mathrm{E}} . \overrightarrow{\mathrm{dl}}=0$ & (II) & Gauss law for magnetism \\
+\hline (C) & $\oint \overrightarrow{\mathrm{E}} \cdot \overrightarrow{\mathrm{dA}}=\frac{\mathrm{Q}}{\varepsilon_{0}}$ & (III) & Faraday law \\
+\hline (D) & $\oint \overrightarrow{\mathrm{B}} \cdot \overrightarrow{\mathrm{dA}}=0$ & (IV) & Ampere - Maxwell law \\
+\hline
+\end{tabular}
+Choose the correct answer from the options given below:
+(1) (A) - (II), (B) - (III), (C) - (I), (D) - (IV)
+(2) (A) - (IV), (B) - (I), (C) - (III), (D) - (II)
+(3) (A) - (IV), (B) - (III), (C) - (I), (D) - (II)
+(4) (A) - (I), (B) - (II), (C) - (III), (D) - (IV)
+
+\item[65.] Match List I with List II
+
+\begin{tabular}[t]{|l|l|l|l|}
+\hline \multicolumn{2}{|l|}{LIST I (Substances )} & \multicolumn{2}{|l|}{LIST II ( Element Present )} \\
+\hline A. & Ziegler catalyst & I. & Rhodium \\
+\hline B. & Blood Pigment & II. & Cobalt \\
+\hline C. & Wilkinson catalyst & III. & Iron \\
+\hline D. & Vitamin $\mathrm{B}_{12}$ & IV. & Titanium \\
+\hline
+\end{tabular}
+(1) A-II, B-IV, C-I, D-III
+(2) A-IV, B-III, C-I, D-II
+(3) A-II, B-III, C-IV, D-I
+(4) A-III, B-II, C-IV, D-I
+`
+const truncStem = 'Match List I with List II\n\nList-I'
+assert.equal(looksLikeTruncatedMainMatchList(truncStem), true, 'S1 truncated Match List detected')
+const rebuilt36 = enrichMatchListsFromOcr(
+  {
+    text: truncStem,
+    options: [
+      '(A) - (II), (B) - (III), (C) - (I), (D) - (IV)',
+      '(A) - (IV), (B) - (I), (C) - (III), (D) - (II)',
+      '(A) - (IV), (B) - (III), (C) - (I), (D) - (II)',
+      '(A) - (I), (B) - (II), (C) - (III), (D) - (IV)',
+    ],
+    printedNumber: 36,
+    pyqSlot: 36,
+  },
+  S1_MATCH_OCR,
+)
+assert.match(rebuilt36.text, /Gauss' law for electricity/, 'Q36 rebuild restores List-II')
+assert.match(rebuilt36.text, /\\oint/, 'Q36 rebuild keeps Maxwell oint rows')
+assert.equal(optionsLookLikeMatchAnswers(rebuilt36.options), true, 'Main (A)-(II) keys detected')
+const san36 = sanitizeStemForDisplay(rebuilt36.text, rebuilt36.options)
+assert.match(san36, /\\oint/, 'sanitize keeps Q36 List-I math')
+assert.match(san36, /Ampere/, 'sanitize keeps Q36 List-II')
+const shown36 = parseMatchingListForDisplay(san36, rebuilt36.options)
+assert.ok(shown36?.listI?.length === 4 && shown36?.listII?.length === 4, 'Q36 display parse has both lists')
+assert.doesNotMatch(String(shown36.listI[0].text), /^\s*,/, 'Q36 List-I is not option debris')
+
+const rebuilt65 = enrichMatchListsFromOcr(
+  { text: truncStem, options: ['A-II, B-IV, C-I, D-III', 'A-IV, B-III, C-I, D-II', 'A-II, B-III, C-IV, D-I', 'A-III, B-II, C-IV, D-I'], printedNumber: 65, pyqSlot: 65 },
+  S1_MATCH_OCR,
+)
+assert.match(rebuilt65.text, /Ziegler/, 'Q65 rebuild restores substances')
+assert.match(rebuilt65.text, /Titanium/, 'Q65 rebuild restores List-II')
+const san65 = sanitizeStemForDisplay(rebuilt65.text, rebuilt65.options)
+const shown65 = parseMatchingListForDisplay(san65, rebuilt65.options)
+assert.deepEqual(
+  shown65?.listI?.map((r) => r.text.trim()),
+  ['Ziegler catalyst', 'Blood Pigment', 'Wilkinson catalyst', 'Vitamin $B_{12}$'],
+)
+assert.equal(optionsLookLikeMatchAnswers(rebuilt65.options), true, 'Main A-IV keys detected')
 
 console.log('ok matching-list display + arrow repair')

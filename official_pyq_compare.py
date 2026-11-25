@@ -918,8 +918,10 @@ def _lighten_crop_watermark(pix: fitz.Pixmap) -> None:
         return
     w, h, n = pix.width, pix.height, pix.n
     mv = pix.samples_mv
-    # Gray-ish mid/dark candidates (hatch stipple + strokes). Keep coloured ink always.
+    # Gray wipe pool (includes pale hatch ~200–230). Coloured / light-blue ink is never a candidate.
     cand = bytearray(w * h)
+    # Stroke CCs only on mid/dark gray (mn < 190) so pale hatch cannot bridge stipple dots to ink.
+    stroke = bytearray(w * h)
     for y in range(h):
         row = y * w
         for x in range(w):
@@ -928,9 +930,11 @@ def _lighten_crop_watermark(pix: fitz.Pixmap) -> None:
             mx, mn = max(r, g, b), min(r, g, b)
             if mx - mn > 36:
                 continue  # colour — leave alone
-            if mn < 200:
+            if mn < 235:
                 cand[row + x] = 1
-    # Connected components of candidate gray; keep only sizable strokes.
+            if mn < 190:
+                stroke[row + x] = 1
+    # Connected components of stroke gray; keep only sizable ink / bond strokes.
     seen = bytearray(w * h)
     keep = bytearray(w * h)
     _min_stroke = 18
@@ -938,7 +942,7 @@ def _lighten_crop_watermark(pix: fitz.Pixmap) -> None:
         base = y0 * w
         for x0 in range(w):
             start = base + x0
-            if not cand[start] or seen[start]:
+            if not stroke[start] or seen[start]:
                 continue
             stack = [start]
             seen[start] = 1
@@ -951,13 +955,29 @@ def _lighten_crop_watermark(pix: fitz.Pixmap) -> None:
                     if ny < 0 or ny >= h or nx < 0 or nx >= w:
                         continue
                     nxt = ny * w + nx
-                    if cand[nxt] and not seen[nxt]:
+                    if stroke[nxt] and not seen[nxt]:
                         seen[nxt] = 1
                         stack.append(nxt)
                         comp.append(nxt)
-            if len(comp) >= _min_stroke:
-                for p in comp:
-                    keep[p] = 1
+            if len(comp) < _min_stroke:
+                continue
+            # Hatch grids connect into large mid-gray CCs (Q34 circuit crop leftovers).
+            # Real ink usually has dark pixels; mid-gray-only blobs are stamp — unless the CC
+            # is a long thin stroke (pale printed bonds / soft structure lines).
+            dark = 0
+            for p in comp:
+                pi = p * n
+                dark += 1 if min(mv[pi], mv[pi + 1], mv[pi + 2]) < 110 else 0
+            if dark < max(6, len(comp) // 12):
+                xs = [p % w for p in comp]
+                ys = [p // w for p in comp]
+                span_x = max(xs) - min(xs) + 1
+                span_y = max(ys) - min(ys) + 1
+                long, short = max(span_x, span_y), min(span_x, span_y)
+                if long < 16 or long < short * 3:
+                    continue
+            for p in comp:
+                keep[p] = 1
     # Dilate kept strokes 1px so anti-aliased edges survive the pale bleach.
     keep2 = bytearray(keep)
     for y in range(h):
@@ -981,23 +1001,54 @@ def _lighten_crop_watermark(pix: fitz.Pixmap) -> None:
             if mx - mn > 36:
                 continue
             idx = row + x
-            # Tiny gray stipple (hatch) — wipe even when fairly dark.
-            if cand[idx] and not keep[idx]:
+            # Pale pixels in the stroke halo are hatch kissing the bond, not ink.
+            if keep2[idx] and mx - mn <= 36 and mn >= 185:
                 mv[i] = 255
                 mv[i + 1] = 255
                 mv[i + 2] = 255
                 continue
-            if keep2[idx] or mn < 195 or mx > 252:
-                continue
-            if mn >= 205:
+            # Pale hatch / leftover mid-gray stipple — wipe when not on a kept stroke halo.
+            if cand[idx] and not keep2[idx] and mn >= 140:
                 mv[i] = 255
                 mv[i + 1] = 255
                 mv[i + 2] = 255
-            elif mn >= 195:
-                lift = int((255 - mn) * 0.7)
-                mv[i] = min(255, r + lift)
-                mv[i + 1] = min(255, g + lift)
-                mv[i + 2] = min(255, b + lift)
+                continue
+            if keep2[idx] or mn < 190 or mx > 252:
+                continue
+            if mn >= 190:
+                mv[i] = 255
+                mv[i + 1] = 255
+                mv[i + 2] = 255
+    # Final pass: mid-gray hatch islands not near real ink (Q34 empty corner grids).
+    near_ink = bytearray(w * h)
+    for y in range(h):
+        row = y * w
+        for x in range(w):
+            i = (row + x) * n
+            if min(mv[i], mv[i + 1], mv[i + 2]) < 90:
+                for dy in range(-3, 4):
+                    yy = y + dy
+                    if yy < 0 or yy >= h:
+                        continue
+                    for dx in range(-3, 4):
+                        xx = x + dx
+                        if 0 <= xx < w:
+                            near_ink[yy * w + xx] = 1
+    for y in range(h):
+        row = y * w
+        for x in range(w):
+            idx = row + x
+            if near_ink[idx] or keep2[idx]:
+                continue
+            i = idx * n
+            r, g, b = mv[i], mv[i + 1], mv[i + 2]
+            mx, mn = max(r, g, b), min(r, g, b)
+            if mx - mn > 36:
+                continue
+            if 100 <= mn <= 210:
+                mv[i] = 255
+                mv[i + 1] = 255
+                mv[i + 2] = 255
 
 
 def _pixmap_png_washed(pix: fitz.Pixmap) -> bytes:
@@ -1057,7 +1108,12 @@ def crops_for_mathpix_links(paper_id: str, urls: list[str], institute: bool = Fa
     `institute` cuts from the stored institute solutions PDF instead. Links read from that file are
     remembered, so a later cut from the original never puts its page under an institute link.
     """
-    path = _institute_file(paper_id) if institute else _original_file(paper_id)
+    # Prefer unwashed .raw for original crops so soft wash sees true hatch (not bleached residue).
+    path = (
+        _institute_file(paper_id)
+        if institute
+        else (_raw_original_file(paper_id) or _original_file(paper_id))
+    )
     if path is None or path.suffix != ".pdf":
         raise OriginalMissingError(INSTITUTE_MISSING_MESSAGE if institute else ORIGINAL_MISSING_MESSAGE)
     foreign = set() if institute else _institute_picture_ids(paper_id)
@@ -1225,8 +1281,9 @@ def crop_institute_solution_figures(paper_id: str) -> dict[str, Any]:
 
     Mathpix often OCR's FIITJEE drawings as labels only and never emits includegraphics.
     Returns one crop URL per (subject, question) that has a clear figure in its Sol. block.
+    Uses the raw (unwashed) PDF so vector text/labels survive; each crop pixmap is washed.
     """
-    path = _institute_file(paper_id)
+    path = _raw_institute_file(paper_id)
     if path is None or path.suffix != ".pdf":
         raise OriginalMissingError(INSTITUTE_MISSING_MESSAGE)
     figures: list[dict[str, Any]] = []

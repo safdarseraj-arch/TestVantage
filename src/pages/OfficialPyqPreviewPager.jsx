@@ -120,7 +120,6 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
 
   useEffect(() => {
     let cancelled = false
-    let inner = 0
     setReady(false)
     setShowMath(false)
     setCurrent(null)
@@ -157,15 +156,11 @@ const OfficialPyqPreviewPager = memo(function OfficialPyqPreviewPager({
         metaFn({ count: qs.length, filled })
       }
     }
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(loadPaper)
-    })
-    const fallback = setTimeout(loadPaper, 80)
+    // Load on this turn — double-rAF + 80ms fallback can leave the pager
+    // stuck on “Loading questions…” when the tab’s animation frames stall.
+    loadPaper()
     return () => {
       cancelled = true
-      cancelAnimationFrame(outer)
-      if (inner) cancelAnimationFrame(inner)
-      clearTimeout(fallback)
     }
   }, [paperId, reloadToken])
 

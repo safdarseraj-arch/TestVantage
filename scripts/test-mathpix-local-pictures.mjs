@@ -56,9 +56,10 @@ await test('failed <img> switches to the local copy once', () => {
 })
 
 await test('HTML pictures carry the same fallback', () => {
+  // Washed local is the primary src; if it 404s before keep finishes, fall back to CDN once.
   assert.match(
     localPictureOnErrorAttr(LINK),
-    /onerror="this\.onerror=null;this\.src='\/api\/official-pyq\/original\/mathpix-picture\?u=https%3A/,
+    /data-cdn-src="https:\/\/cdn\.mathpix\.com\/cropped\/[^"]+" onerror="if\(this\.dataset\.cdnFallback\)return;this\.dataset\.cdnFallback='1';this\.src='https:\/\/cdn\.mathpix\.com\/cropped\//,
   )
   assert.equal(localPictureOnErrorAttr('a.png'), '')
   const html = convertLatexTabularToArray(

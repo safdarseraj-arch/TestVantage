@@ -70,7 +70,8 @@ export function hasMathpixMedia(raw) {
     MATHPIX_HOST.test(t) ||
     /\\includegraphics/i.test(t) ||
     /\\begin\{figure\}/i.test(t) ||
-    /!\[[^\]]*\]\(\s*\$?\s*https?:\/\//i.test(t)
+    /!\[[^\]]*\]\(\s*\$?\s*https?:\/\//i.test(t) ||
+    /!\[[^\]]*\]\(\s*\/api\/official-pyq\/original\/crops\//i.test(t)
   )
 }
 
@@ -344,7 +345,8 @@ export function extractMathpixImageUrls(raw) {
     const clean = cleanMathpixImageUrl(u)
     if (MATHPIX_HOST.test(clean) && (/^https?:\/\//i.test(clean) || isOriginalCropUrl(clean))) urls.push(clean)
   }
-  const md = /!\[\s*[^\]]*\]\s*\(\s*(https?:\/\/cdn\.mathpix\.com\/[^\s)]+)/gi
+  const md =
+    /!\[\s*[^\]]*\]\s*\(\s*((?:https?:\/\/cdn\.mathpix\.com|\/api\/official-pyq\/original\/crops\/)[^\s)]+)/gi
   let m
   while ((m = md.exec(t)) !== null) push(m[1])
   let i = 0
@@ -454,8 +456,15 @@ export function splitMathpixMediaSegments(raw) {
   let last = 0
   let i = 0
   while (i < t.length) {
-    if (t.startsWith('![', i) && /cdn\.mathpix\.com/i.test(t.slice(i, i + 120))) {
-      const urlM = t.slice(i).match(/^!\[\s*[^\]]*\]\s*\(\s*(https?:\/\/cdn\.mathpix\.com\/[^\s)]+)/i)
+    if (
+      t.startsWith('![', i) &&
+      /cdn\.mathpix\.com|\/api\/official-pyq\/original\/crops\//i.test(t.slice(i, i + 160))
+    ) {
+      const urlM = t
+        .slice(i)
+        .match(
+          /^!\[\s*[^\]]*\]\s*\(\s*((?:https?:\/\/cdn\.mathpix\.com|\/api\/official-pyq\/original\/crops\/)[^\s)]+)/i,
+        )
       if (urlM) {
         if (i > last) {
           const chunk = t.slice(last, i)

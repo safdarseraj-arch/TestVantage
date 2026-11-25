@@ -853,7 +853,24 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
                 }
               }
               const result = healAndPersistOfficialPyqPaper(paper)
-              if (cancelled || !result?.changed) return
+              let changed = Boolean(result?.changed)
+              // FIITJEE booklet: restore Mathpix from notes when preparedText is PDF font junk,
+              // then fill any still-missing slots (never from unreadable PDF text).
+              if (!cancelled && String(paper.exam) === 'jee-main') {
+                try {
+                  const {
+                    healMissingOfficialPyqSlots,
+                    repairOfficialPyqBookletFromMathpixNotes,
+                  } = await import('../utils/officialPyqInstituteSolutions.js')
+                  const repaired = repairOfficialPyqBookletFromMathpixNotes(selectedId)
+                  if (repaired?.ok && repaired.repaired) changed = true
+                  const healed = await healMissingOfficialPyqSlots(selectedId)
+                  if (healed?.ok && healed.added > 0) changed = true
+                } catch {
+                  /* nonfatal */
+                }
+              }
+              if (cancelled || !changed) return
               setPreviewReload((x) => x + 1)
               bump()
             })

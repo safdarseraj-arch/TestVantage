@@ -8,7 +8,9 @@
 
 import {
   flattenTabularMatchLists,
+  looksLikeMatchingListStem,
   normalizeMatchAnswerKey,
+  optionsLookLikeMatchAnswers,
   rewriteLatexItemLabels,
   separateInterleavedMatchColumns,
   stripUnlabeledListTwoDump,
@@ -113,8 +115,13 @@ export function sanitizeStemForDisplay(text, options = []) {
     t = wrapOrDropLeftoverArray(t)
     t = normalizeSmashedChemDollars(t)
     // Assertion-combination / ranking MCQs keep (A)–(E) statements or drawings in the stem.
+    // Match List A–D / Roman rows are List cells, not glued MCQ options (Main Q36/Q65).
+    // A glued "Codes:" table still peels (2014 P2 Q38).
     const keepStemLabels =
-      optionsLookLikeAssertionCombinations(options) || keepLabelledStemStructures(t, options)
+      optionsLookLikeAssertionCombinations(options) ||
+      keepLabelledStemStructures(t, options) ||
+      (!/\bCodes\s*:/i.test(t) &&
+        (looksLikeMatchingListStem(t) || optionsLookLikeMatchAnswers(options)))
     if (!keepStemLabels) {
       t = peelGluedMcqOptions(t, options).text
     }

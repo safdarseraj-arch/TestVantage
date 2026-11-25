@@ -502,7 +502,20 @@ function writeLightPaper(paper) {
   rememberPaper(paper)
   try {
     if (typeof localStorage === 'undefined' || !paper?.id) return
-    localStorage.setItem(paperItemKey(paper.id), JSON.stringify(paperToLightRecord(paper)))
+    const light = paperToLightRecord(paper)
+    // Never wipe OCR: Re-parse / quality-check light writes used to replace the fat
+    // item with a preview row that omitted preparedText (S1 Match List + SMILES heals
+    // then had nothing to rebuild from).
+    let prevOcr = ''
+    try {
+      prevOcr = String(JSON.parse(localStorage.getItem(paperItemKey(paper.id)) || '{}')?.preparedText ?? '').trim()
+    } catch {
+      prevOcr = ''
+    }
+    const nextOcr = String(paper.preparedText ?? '').trim() || prevOcr
+    const payload =
+      nextOcr.length >= 80 ? { ...light, preparedText: nextOcr, hasOcr: true } : light
+    localStorage.setItem(paperItemKey(paper.id), JSON.stringify(payload))
   } catch {
     /* item cache is optional */
   }

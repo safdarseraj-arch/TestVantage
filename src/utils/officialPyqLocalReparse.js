@@ -14,7 +14,11 @@ import { stripEmptyFigureShells, stripEmptyImageMarkdown } from './mathpixMedia.
 import { LOCAL_QUALITY_REVISION } from './officialPyqLocalQuality.js'
 import { buildPaperFacts } from './officialPyqPaperFacts.js'
 import { adminFactsToPaperFacts, applyAdminFactsToQuestions } from './officialPyqAdminFacts.js'
-import { instituteFieldsOf } from './instituteSolutionsParse.js'
+import {
+  instituteFieldsOf,
+  instituteSolutionLooksLikeRawPdf,
+  pdfTextIsMathFontJunk,
+} from './instituteSolutionsParse.js'
 
 /** Confirmed admin facts re-shape the re-parsed cards; otherwise read facts from the OCR. */
 function shapeWithPaperFacts(paper, questions, preparedText) {
@@ -116,6 +120,12 @@ export function officialPyqStoredOcrTextLocal(paper) {
   const fromNotes = sanitizeMathpixOcrText(rawNotes)
   // The clean cuts the answers / solutions printed after the paper; the split reads them again.
   const endSection = storedEndAnswerSectionText(rawDedicated) || storedEndAnswerSectionText(rawNotes)
+  // FIITJEE / Allen text layers often land in preparedText as private-use maths fonts.
+  // Prefer Mathpix vision in notes over that soup (Shift 2 garbage stems).
+  const dedicatedIsJunk =
+    fromNotes.length >= 80 &&
+    (pdfTextIsMathFontJunk(rawDedicated) || instituteSolutionLooksLikeRawPdf(rawDedicated.slice(0, 8000)))
+  if (dedicatedIsJunk) return fromNotes + endSection
   // preparedText is a cleaned copy. If that clean ate figure URLs, the notes
   // copy still has them. Prefer the copy that still has the drawings.
   if (fromNotes.length >= 80 && mathpixFigureHits(rawNotes) > mathpixFigureHits(rawDedicated)) {
@@ -228,8 +238,14 @@ export function healAndPersistOfficialPyqPaper(paper, opts = {}) {
   const expected = expectedPyqPaperQuestionTarget(paper.exam, paper.session, preparedText)
   const prevFilled = (paper.questions ?? []).filter((q) => q?.placeholder !== true).length
   const healFilled = healed.filter((q) => q?.placeholder !== true).length
-  // Keep a full sitting (51→50) but allow dropping leftover extras (53→51).
-  if (expected >= 40 && prevFilled <= expected && healFilled === prevFilled - 1) {
+  // Keep a near-complete sitting (51→50) but allow dropping junk on tiny
+  // fragment papers (2→1 instruction-only) and leftover extras (53→51).
+  if (
+    expected >= 40 &&
+    prevFilled >= expected - 2 &&
+    prevFilled <= expected &&
+    healFilled === prevFilled - 1
+  ) {
     return {
       ok: true,
       changed: false,
@@ -446,6 +462,14 @@ function autoFixLostToFreshParse(old, fresh, paper) {
   ) {
     return true
   }
+  // Machine Compare option crops lose to OCR SMILES on the fresh parse (S1 Q63 arenium).
+  const oldCropOpts = (Array.isArray(old?.options) ? old.options : []).filter((o) =>
+    /\/api\/official-pyq\/original\/crops\//i.test(String(o ?? '')),
+  ).length
+  const freshSmilesOpts = (Array.isArray(fresh?.options) ? fresh.options : []).filter((o) =>
+    /<smiles>/i.test(String(o ?? '')),
+  ).length
+  if (oldCropOpts >= 2 && freshSmilesOpts >= 2) return true
   /** The fix kept the section instructions as its paragraph. */
   if (/This section contains/i.test(String(old?.passageText ?? '')) && !/This section contains/i.test(String(fresh?.passageText ?? ''))) return true
   if (optionShapeDisagrees(old, fresh)) return true

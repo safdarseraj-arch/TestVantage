@@ -7,6 +7,12 @@
 import { parseMatchColumnUpload, looksLikeMatchColumnUpload } from './parseMatchColumnUpload.js'
 import { hasOriginalPageCrop } from './mathpixMedia.js'
 import { isMatrixGridCard } from './matrixGridPyq.js'
+import {
+  flattenTabularMatchLists,
+  parseMatchingListForDisplay,
+  rewriteLatexItemLabels,
+} from './parseMatchingListDisplay.js'
+import { tidyMatchListText } from './matchListTidy.js'
 
 /** Whole words only: "blister copper" is not a List question. */
 const MATCH_WORD_RE = /\b(?:match|list|column)/i
@@ -54,14 +60,136 @@ function hasListTwo(text) {
   if (firstRow >= 0 && new Set([...t.slice(firstRow).matchAll(/\n[ \t]*\(\s*([1-5])\s*\)/g)].map((m) => m[1])).size >= 2) {
     return true
   }
+  const romanII = new Set(
+    [...t.matchAll(/(?:^|\n)[ \t]*\(\s*(I{1,3}|IV)\s*\)/g)].map((m) => m[1]),
+  ).size
+  if (romanII >= 2 && /(?:List|Column)\s*[-–]?\s*II\b/i.test(t)) return true
   return (
     /(?:List|Column)\s*[-–]?\s*II\b/i.test(t) &&
-    (/\(\s*[1-5]\s*\)/.test(t) || /\(\s*[PQRS]\s*\)/.test(t) || (/\\begin\{tabular\}/.test(t) && TABLE_ROW_RE('1-5').test(t)))
+    (/\(\s*[1-5]\s*\)/.test(t) ||
+      /\(\s*[PQRS]\s*\)/.test(t) ||
+      /\(\s*(?:I{1,3}|IV)\s*\)/.test(t) ||
+      (/\\begin\{tabular\}/.test(t) && TABLE_ROW_RE('1-5').test(t)))
   )
 }
 
 /** The next part / section heading ends the window: its words are never list rows. */
 const PAPER_HEADING_RE = /\n\s*(?:\\section\*?\{\s*)?(?:PART|SECTION)\s*[-–]?\s*(?:\d|[IVX]+)\b/i
+
+/** Bare `\multicolumn` leftovers after unwrapReactionStepTables (Main Q36 → `2|c|List-I`). */
+function looksLikeStrippedMatchShell(text) {
+  return /\d+\s*\|\s*[lcr]+\s*\|\s*List/i.test(String(text ?? ''))
+}
+
+/**
+ * Main Match List stem cut after the List-I heading (or with no A–D / Roman rows).
+ * OCR still has the tabular; rebuildMatchListStemFromOcr must run.
+ * @param {unknown} text
+ */
+export function looksLikeTruncatedMainMatchList(text) {
+  const t = String(text ?? '')
+  if (!/Match\s+List/i.test(t) && !/(?:List|Column)\s*[-–]?\s*I(?!I)\b/i.test(t)) return false
+  if (/\\begin\{tabular\}/i.test(t)) return false
+  const labeledAbcd =
+    (t.match(/(?:^|\n)\s*(?:\(\s*[A-D]\s*\)|[A-D]\.)\s+\S/g) || []).length
+  const romanIi = (t.match(/\(\s*(?:I{1,3}|IV)\s*\)/g) || []).length
+  const arabicIi = (t.match(/(?:^|\n)\s*\(\s*[1-5]\s*\)\s+\S/g) || []).length
+  const pqrs = (t.match(/(?:^|\n)\s*\(\s*[PQRS]\s*\)\s+\S/g) || []).length
+  // "Match List I with List II\n\nList-I" has headings but no row bodies.
+  return labeledAbcd < 2 && romanIi < 2 && arabicIi < 2 && pqrs < 2
+}
+
+/**
+ * OCR window for one printed Match List card (`\\item[N.]` / `*N.`).
+ * @param {string} src
+ * @param {number} printed
+ */
+function matchListOcrWindow(src, printed) {
+  const n = Number(printed)
+  if (!(n > 0)) return ''
+  const re = new RegExp(
+    String.raw`\\item\s*\[\s*${n}\s*\.?\s*\]|(?:^|\n)\s*(?:\\item\s*\[\s*\]\s*)?\*?\s*${n}\s*\.`,
+    'gi',
+  )
+  const m = re.exec(src)
+  if (!m || m.index == null) return ''
+  const start = m.index
+  const tail = src.slice(start + m[0].length)
+  // Cut before the next question; keep option rows that sit above Ans./Sol.
+  const nextQ = tail.search(
+    /\n\s*(?:\\item\s*\[[^\]]*\]\s*)?(?:\*\s*)?\d{1,3}\s*\.|\\item\s*\[\s*\d{1,3}\s*\.?\]/i,
+  )
+  let chunk = nextQ > 40 ? src.slice(start, start + m[0].length + nextQ) : src.slice(start, start + 3500)
+  const ansAt = chunk.search(/\n\s*Ans\.\s*\(/i)
+  if (ansAt > 80) chunk = chunk.slice(0, ansAt)
+  // Drop the item wrapper so flatten sees the tabular body.
+  return chunk.replace(/^[\s\S]*?(?=Match\s+List)/i, '')
+}
+
+/**
+ * Rebuild a Match List stem from the OCR tabular window (Main Q36/Q65).
+ * @param {string} text
+ * @param {string} src
+ * @param {number} [printed]
+ */
+function rebuildMatchListStemFromOcr(text, src, printed = 0) {
+  let window = matchListOcrWindow(src, printed)
+  if (!window) {
+    // Fall back: distinctive row text (Ziegler / Maxwell) near Match List.
+    const distinctive = String(text).match(
+      /Ziegler catalyst|Wilkinson catalyst|Ampere\s*-?\s*Maxwell|Gauss['’]?\s*law for electricity/i,
+    )
+    if (distinctive) {
+      const at = src.indexOf(distinctive[0])
+      if (at >= 0) {
+        const back = src.lastIndexOf('Match List', at)
+        const start = back >= 0 ? back : Math.max(0, at - 200)
+        const next = src.slice(start + 40).search(/\n\s*(?:\\item\s*\[[^\]]*\]\s*)?(?:\*\s*)?\d{1,3}\s*\.|Ans\.\s*\(/i)
+        window = next > 80 ? src.slice(start, start + 40 + next) : src.slice(start, start + 3200)
+      }
+    }
+  }
+  if (!window) return ''
+  const flat = tidyMatchListText(rewriteLatexItemLabels(flattenTabularMatchLists(window)))
+  const parsed = parseMatchingListForDisplay(flat)
+  if (!parsed?.listI?.length || parsed.listI.length < 2) return ''
+  if (!parsed.listII?.length || parsed.listII.length < 2) return ''
+  const intro = String(parsed.intro || 'Match List I with List II').trim()
+  const titleI = parsed.listITitle || 'List-I'
+  const titleII = parsed.listIITitle || 'List-II'
+  const blockI = parsed.listI.map((r) => `${r.label} ${String(r.text ?? '').trim()}`.trim()).join('\n')
+  const blockII = parsed.listII.map((r) => `${r.label} ${String(r.text ?? '').trim()}`.trim()).join('\n')
+  let outro = String(parsed.outro || '').trim()
+  // Keep the "Choose the correct answer…" line; drop glued (1)(2)(3)(4) option rows from the stem.
+  outro = outro
+    .replace(/(?:^|\n)\s*\(\s*[1-4]\s*\)\s+[A-D]\s*[-–].*$/gim, '')
+    // Main Maxwell style: (1) (A) - (II), (B) - (III), …
+    .replace(/(?:^|\n)\s*\(\s*[1-4]\s*\)\s+\(\s*[A-D]\s*\)\s*[-–].*$/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return [intro, `${titleI}\n${blockI}`, `${titleII}\n${blockII}`, outro].filter(Boolean).join('\n\n').trim()
+}
+
+/** Pull "(1) A-IV…" or "(1) (A) - (II)…" rows from the OCR window. */
+function matchOptionsFromOcrWindow(src, printed) {
+  const window = matchListOcrWindow(src, printed)
+  if (!window) return null
+  const compact = [...window.matchAll(/(?:^|\n)\s*\(\s*([1-4])\s*\)\s*([A-D]\s*[-–][^\n]+)/gi)]
+  const paired = [
+    ...window.matchAll(
+      /(?:^|\n)\s*\(\s*([1-4])\s*\)\s*((?:\(\s*[A-D]\s*\)\s*[-–]\s*\(\s*(?:I{1,3}|IV)\s*\)\s*,?\s*){2,})/gi,
+    ),
+  ]
+  const rows = compact.length >= 4 ? compact : paired
+  if (rows.length < 4) return null
+  /** @type {string[]} */
+  const opts = ['', '', '', '']
+  for (const m of rows) {
+    const i = Number(m[1]) - 1
+    if (i >= 0 && i < 4 && !opts[i]) opts[i] = String(m[2]).replace(/\s+/g, ' ').trim()
+  }
+  return opts.every(Boolean) ? opts : null
+}
 
 /**
  * If heal still left a match card without List-I or List-II, parse the OCR
@@ -75,6 +203,30 @@ export function enrichMatchListsFromOcr(q, source) {
   let text = String(q.text ?? '').trim()
   if (!text || src.length < 40) return q
   if (hasOriginalPageCrop(text) || hasOriginalPageCrop(q.passageText)) return q
+
+  const stripped = looksLikeStrippedMatchShell(text)
+  const truncatedMain = looksLikeTruncatedMainMatchList(text)
+  const stemRomanII = (text.match(/\(\s*(?:I{1,3}|IV)\s*\)/g) || []).length
+  const stemArabicII =
+    /(?:List|Column)\s*[-–]?\s*II\b/i.test(text) &&
+    (text.match(/(?:^|\n)\s*\(\s*[1-4]\s*\)/g) || []).length >= 2 &&
+    stemRomanII < 2
+  const printed = Number(q.printedNumber ?? q.questionNumber ?? q.pyqSlot) || 0
+  // Truncated Main stems ("Match List…\n\nList-I") never carry Arabic List-II rows in the
+  // card text, so stemArabicII alone missed Q36/Q65 — always rebuild from the OCR tabular.
+  if (
+    stripped ||
+    truncatedMain ||
+    (MATCH_WORD_RE.test(text) && stemArabicII && /Match\s+List/i.test(text))
+  ) {
+    const rebuilt = rebuildMatchListStemFromOcr(text, src, printed)
+    if (rebuilt && (stripped || truncatedMain || rebuilt.length >= 80)) {
+      const fromOcr = matchOptionsFromOcrWindow(src, printed)
+      const options = fromOcr || q.options
+      return { ...q, text: rebuilt, options, cleanStatus: undefined, cleanNotes: undefined }
+    }
+  }
+
   const needI = matchQuestionMissingListI({ text, options: q.options })
   const needII = MATCH_WORD_RE.test(text) && !hasListTwo(text)
   if (!needI && !needII) return q

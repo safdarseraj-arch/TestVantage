@@ -1578,6 +1578,20 @@ async def official_pyq_original_status(paper_id: str) -> dict[str, Any]:
         raise _compare_http_error(exc) from exc
 
 
+@app.get("/api/official-pyq/original/{paper_id}/text", tags=["Official PYQ"])
+async def official_pyq_original_text(paper_id: str) -> dict[str, Any]:
+    """Full text of the stored original PDF (PyMuPDF). Used to heal missed FIITJEE / Ans.–Sol. questions."""
+    import asyncio
+
+    import official_pyq_compare as opc
+
+    try:
+        result = await asyncio.to_thread(opc.original_pdf_text, paper_id)
+    except (opc.OriginalMissingError, ValueError) as exc:
+        raise _compare_http_error(exc) from exc
+    return {"ok": True, **result}
+
+
 @app.post("/api/official-pyq/original/{paper_id}", tags=["Official PYQ"])
 async def official_pyq_original_upload(paper_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
     """Store the original paper file for later compare. Does not parse or change questions."""

@@ -27,6 +27,7 @@ const { dropOptionFigureRepeatingStem } = await import('../src/utils/optionRepea
 const { findOptionsBlockStart } = await import('../src/utils/mcqOptionMarkers.js')
 const { officialPyqScanStructureReason, officialPyqScanStructurePlace } = await import('../src/utils/officialPyqScanStructures.js')
 const { officialPyqDraftFromSuggestion } = await import('../src/utils/officialPyqCardEdit.js')
+const { stemSmilesWithOriginalCrops } = await import('../src/utils/officialPyqCardTidy.js')
 const { repairOfficialPyqUntilQuality } = await import('../src/utils/officialPyqLocalQuality.js')
 
 let failed = 0
@@ -185,4 +186,87 @@ if (failed) {
   console.log(`\n${failed} check(s) failed`)
   process.exit(1)
 }
+
+// Q81-style: numbered stem compounds from SMILES — prefer page crops, never leave SMILES.
+{
+  const stem =
+    'Among the given organic compounds, the total number of aromatic compounds is ______\n(1)\n<smiles>C1=CC2C=CC=CC2C=C1</smiles>\n(2)\n<smiles>C1=C(Cc2ccccc2)CCCC1</smiles>\n(3)\n<smiles>C1=c2ccccc2=CC1</smiles>\n(4)\n<smiles>[O-]c1ccccc1-c1ccccc1</smiles>'
+  const crops = [
+    '/api/official-pyq/original/crops/opyq-x-p30-a.png?page=30&x0=0.20&y0=0.58&x1=0.38&y1=0.70',
+    '/api/official-pyq/original/crops/opyq-x-p30-b.png?page=30&x0=0.57&y0=0.58&x1=0.75&y1=0.70',
+    '/api/official-pyq/original/crops/opyq-x-p30-c.png?page=30&x0=0.20&y0=0.72&x1=0.38&y1=0.84',
+    '/api/official-pyq/original/crops/opyq-x-p30-d.png?page=30&x0=0.57&y0=0.72&x1=0.75&y1=0.84',
+  ]
+  const clubbed = [
+    '/api/official-pyq/original/crops/opyq-x-p30-wide.png?page=30&x0=0.15&y0=0.55&x1=0.85&y1=0.78',
+    '/api/official-pyq/original/crops/opyq-x-p30-tall.png?page=30&x0=0.20&y0=0.50&x1=0.40&y1=0.78',
+  ]
+  const replaced = stemSmilesWithOriginalCrops(stem, crops)
+  check('Q81-style stem drops SMILES when page crops exist', replaced && !/<smiles>/i.test(replaced), replaced?.slice(0, 120))
+  check('Q81-style stem keeps numbered labels with pictures', /\(1\)/.test(replaced) && /includegraphics/.test(replaced), replaced?.slice(0, 160))
+  check(
+    'Q81-style rejects clubbed / tall watermark crops instead of a bad fix',
+    stemSmilesWithOriginalCrops(stem, clubbed) === '',
+    'expected empty',
+  )
+  const draft = officialPyqDraftFromSuggestion(
+    { text: stem, options: [], questionType: 'integer', answerSource: 'unknown' },
+    {
+      verdict: 'differs',
+      printedAnswer: '3',
+      suggestedText: 'Among the given organic compounds, the total number of aromatic compounds is ________.\n(1) [figure]\n(2) [figure]\n(3) [figure]\n(4) [figure]',
+      suggestedFigures: { text: crops, passage: [], options: [] },
+    },
+  )
+  check('Q81-style Compare draft has no SMILES', !/<smiles>/i.test(draft.text), draft.text.slice(0, 160))
+  check('Q81-style Compare draft keeps the printed number answer', draft.answerKey === '3' || draft.answerFromPage === true, JSON.stringify({ key: draft.answerKey, fromPage: draft.answerFromPage }))
+  const badDraft = officialPyqDraftFromSuggestion(
+    { text: stem, options: [], questionType: 'integer', answerSource: 'unknown' },
+    {
+      verdict: 'differs',
+      printedAnswer: '3',
+      suggestedText: 'Among the given organic compounds, the total number of aromatic compounds is ________.\n(1) [figure]\n(2) [figure]',
+      suggestedFigures: { text: clubbed, passage: [], options: [] },
+    },
+  )
+  check('Q81-style keeps SMILES when only clubbed crops exist', /<smiles>/i.test(badDraft.text), badDraft.text.slice(0, 120))
+
+  const q33Stem =
+    'A proton moving with a constant velocity passes through a region of space without any change in its velocity. If $\\vec{E}$ and $\\vec{B}$ represent the electric and magnetic fields respectively, then the region of space may have:\n(A) $\\mathrm{E} = 0, \\mathrm{B} = 0$\n(B) $\\mathrm{E} = 0, \\mathrm{B} \\neq 0$\n(C) $\\mathrm{E} \\neq 0, \\mathrm{B} = 0$\n(D) $\\mathrm{E} \\neq 0, \\mathrm{B} \\neq 0$\nChoose the most appropriate answer from the options given below :'
+  const q33Draft = officialPyqDraftFromSuggestion(
+    {
+      text: 'A proton moving … If { } and { } …',
+      options: ['(A), (B) and (C) only', '(B), (C) and (D) only', '(C), (B) and (D) only', '(A), (B) and (D) only'],
+      questionType: 'single_correct',
+      answerSource: 'unknown',
+    },
+    {
+      verdict: 'differs',
+      printedAnswer: '3',
+      suggestedText: q33Stem,
+      suggestedOptions: [
+        '(A), (B) and (C) only',
+        '(A), (C) and (D) only',
+        '(A), (B) and (D) only',
+        '(B), (C) and (D) only',
+      ],
+      suggestedFigures: { text: [], passage: [], options: [] },
+    },
+  )
+  check('Q33-style keeps (A) in assertion choice options', q33Draft.options[0] === '(A), (B) and (C) only', q33Draft.options[0])
+  check('Q33-style option 2 keeps (A), (C) and (D) only', q33Draft.options[1] === '(A), (C) and (D) only', q33Draft.options[1])
+  check(
+    'Q33-style puts statements back in the stem',
+    /\(A\)/.test(q33Draft.text) &&
+      /\(D\)/.test(q33Draft.text) &&
+      /Choose the most appropriate/i.test(q33Draft.text),
+    `len=${q33Draft.text.length} · ${q33Draft.text.slice(0, 120)}`,
+  )
+}
+
+if (failed) {
+  console.log(`\n${failed} Q81/Q33 check(s) failed`)
+  process.exit(1)
+}
+
 console.log('\nAll 2012 P2 card checks passed')

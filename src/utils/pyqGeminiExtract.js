@@ -438,10 +438,19 @@ function polishEngineForPyq(engine) {
 /** @param {string} exam @param {string} [session] @param {string} [ocrText] */
 export function expectedPyqPaperQuestionTarget(exam, session, ocrText) {
   void session
+  // JEE Main sittings are 90 questions (30×3). Old catalog 30 under-counted FIITJEE booklets.
   const catalog =
-    exam === 'jee-advanced' ? 51 : exam === 'jee-main' ? 30 : exam === 'neet' ? 180 : 10
+    exam === 'jee-advanced' ? 51 : exam === 'jee-main' ? 90 : exam === 'neet' ? 180 : 10
   const fromOcr = inferOcrQuestionCount(ocrText)
-  if (fromOcr >= 8) return fromOcr
+  const raw = String(ocrText ?? '')
+  if (fromOcr >= 8) {
+    // Keep real short OCR counts (e.g. Advanced partial 18). Sparse markers on a long
+    // full-paper OCR must not report "~8" against a 90-card Main split.
+    if (catalog >= 40 && fromOcr < Math.floor(catalog * 0.35) && raw.length > 20000) {
+      return catalog
+    }
+    return fromOcr
+  }
   if (fromOcr >= 4 && !exam) return fromOcr
   return catalog
 }
@@ -744,9 +753,18 @@ export function formatOfficialPyqStoredNotes({ fileName, summaryLine, pdfText, v
 
 /** Prefer a dedicated preparedText field, then notes. */
 export function officialPyqStoredOcrText(paper) {
-  const dedicated = sanitizeMathpixOcrText(paper?.preparedText)
+  const rawDedicated = String(paper?.preparedText ?? '')
+  const dedicated = sanitizeMathpixOcrText(rawDedicated)
+  const fromNotes = sanitizeMathpixOcrText(extractPreparedTextFromPaperNotes(paper?.notes))
+  // Skip FIITJEE PDF font-junk in preparedText when Mathpix vision lives in notes.
+  const pua = (rawDedicated.match(/[\uE000-\uF8FF]/g) || []).length
+  const notesMath = (fromNotes.match(/\\frac|\$/g) || []).length
+  const dedicatedMath = (dedicated.match(/\\frac|\$/g) || []).length
+  if (fromNotes.length >= 80 && dedicated.length >= 80 && pua >= 40 && notesMath > dedicatedMath * 2) {
+    return fromNotes
+  }
   if (dedicated.length >= 80) return dedicated
-  return sanitizeMathpixOcrText(extractPreparedTextFromPaperNotes(paper?.notes))
+  return fromNotes
 }
 
 function buildStructuredPyqRows(structured, payload, defaults, slotMap) {

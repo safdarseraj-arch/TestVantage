@@ -37,6 +37,12 @@ export const OFFICIAL_PYQ_PORTALS = [
     note: 'National Testing Agency — exams, notices, and published materials.',
   },
   {
+    id: 'jee-main-portal',
+    label: 'JEE Main (NTA)',
+    url: 'https://jeemain.nta.ac.in/',
+    note: 'Official JEE Main portal — notices, answer keys, and question papers when NTA publishes them.',
+  },
+  {
     id: 'nta-exams',
     label: 'NTA Examinations',
     url: 'https://nta.ac.in/Examination',
@@ -129,17 +135,29 @@ export const OFFICIAL_PYQ_SOURCE_SLOTS = [
     downloadHint: 'Open archive → 2022 → Paper 2 PDF.',
     liveFetch: false,
   },
-  // —— JEE Main (NTA — PDFs often behind session portals; land on NTA) ——
+  // —— JEE Main (NTA — papers appear on the JEE Main portal when released; not always a direct PDF link) ——
+  {
+    id: 'jee-main-2025',
+    exam: 'jee-main',
+    year: 2025,
+    session: 'All sessions',
+    paperLabel: 'JEE Main 2025 (official NTA materials)',
+    sourceLabel: 'Official NTA JEE Main',
+    sourceUrl: 'https://jeemain.nta.ac.in/',
+    downloadHint:
+      'Open jeemain.nta.ac.in → look for Question Paper / Answer Key notices for your date & shift → download the official PDF → upload here. NTA does not keep one permanent PDF link per shift.',
+    liveFetch: false,
+  },
   {
     id: 'jee-main-2024',
     exam: 'jee-main',
     year: 2024,
     session: 'All sessions',
     paperLabel: 'JEE Main 2024 (official NTA materials)',
-    sourceLabel: 'Official NTA',
-    sourceUrl: 'https://nta.ac.in/Examination',
+    sourceLabel: 'Official NTA JEE Main',
+    sourceUrl: 'https://jeemain.nta.ac.in/',
     downloadHint:
-      'Download the official question paper / answer key PDF from NTA for your date & shift, then upload here.',
+      'Open jeemain.nta.ac.in → Question Paper / Answer Key for your date & shift → download → upload here. Set Date + Shift before upload. Institute solutions (FIITJEE etc.) go on the paper after upload, or upload the solutions booklet and we rebuild from Ans./Sol.',
     liveFetch: false,
   },
   {
@@ -148,9 +166,9 @@ export const OFFICIAL_PYQ_SOURCE_SLOTS = [
     year: 2023,
     session: 'All sessions',
     paperLabel: 'JEE Main 2023 (official NTA materials)',
-    sourceLabel: 'Official NTA',
-    sourceUrl: 'https://nta.ac.in/Examination',
-    downloadHint: 'Use NTA-published papers/keys for 2023 sessions only — not coaching mirrors.',
+    sourceLabel: 'Official NTA JEE Main',
+    sourceUrl: 'https://jeemain.nta.ac.in/',
+    downloadHint: 'Use NTA-published papers/keys for 2023 sessions only — not coaching mirrors. Open jeemain.nta.ac.in for notices.',
     liveFetch: false,
   },
   {
@@ -159,9 +177,9 @@ export const OFFICIAL_PYQ_SOURCE_SLOTS = [
     year: 2022,
     session: 'All sessions',
     paperLabel: 'JEE Main 2022 (official NTA materials)',
-    sourceLabel: 'Official NTA',
-    sourceUrl: 'https://nta.ac.in/Examination',
-    downloadHint: 'Upload the official NTA PDF for the year/session you hold.',
+    sourceLabel: 'Official NTA JEE Main',
+    sourceUrl: 'https://jeemain.nta.ac.in/',
+    downloadHint: 'Upload the official NTA PDF for the year/session you hold (from jeemain.nta.ac.in notices when available).',
     liveFetch: false,
   },
   // —— NEET UG ——
@@ -172,8 +190,8 @@ export const OFFICIAL_PYQ_SOURCE_SLOTS = [
     session: 'UG',
     paperLabel: 'NEET UG 2024 (official NTA materials)',
     sourceLabel: 'Official NTA NEET',
-    sourceUrl: 'https://neet.nta.nic.in',
-    downloadHint: 'Download official NEET UG paper/key from NTA NEET portal, then upload.',
+    sourceUrl: 'https://exams.nta.ac.in/NEET/',
+    downloadHint: 'Open exams.nta.ac.in/NEET → find Question Paper / Answer Key notice → download → upload here.',
     liveFetch: false,
   },
   {
@@ -183,8 +201,8 @@ export const OFFICIAL_PYQ_SOURCE_SLOTS = [
     session: 'UG',
     paperLabel: 'NEET UG 2023 (official NTA materials)',
     sourceLabel: 'Official NTA NEET',
-    sourceUrl: 'https://neet.nta.nic.in',
-    downloadHint: 'Use official NTA NEET materials only.',
+    sourceUrl: 'https://exams.nta.ac.in/NEET/',
+    downloadHint: 'Use official NTA NEET materials only (exams.nta.ac.in/NEET).',
     liveFetch: false,
   },
   {
@@ -194,8 +212,8 @@ export const OFFICIAL_PYQ_SOURCE_SLOTS = [
     session: 'UG',
     paperLabel: 'NEET UG 2022 (official NTA materials)',
     sourceLabel: 'Official NTA NEET',
-    sourceUrl: 'https://neet.nta.nic.in',
-    downloadHint: 'Upload the official NTA PDF you downloaded.',
+    sourceUrl: 'https://exams.nta.ac.in/NEET/',
+    downloadHint: 'Upload the official NTA PDF you downloaded from the NEET portal.',
     liveFetch: false,
   },
 ]

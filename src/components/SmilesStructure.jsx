@@ -22,6 +22,7 @@ export default function SmilesStructure({ smiles, height = 150, width = 240 }) {
       setVisible(true)
       return undefined
     }
+    let cancelled = false
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
@@ -32,7 +33,16 @@ export default function SmilesStructure({ smiles, height = 150, width = 240 }) {
       { rootMargin: '160px', threshold: 0.01 },
     )
     io.observe(el)
-    return () => io.disconnect()
+    // Hidden Cursor browser tabs often never report intersecting — draw anyway
+    // so options do not stay stuck on the "Chemical structure" placeholder.
+    const fallback = window.setTimeout(() => {
+      if (!cancelled) setVisible(true)
+    }, 120)
+    return () => {
+      cancelled = true
+      window.clearTimeout(fallback)
+      io.disconnect()
+    }
   }, [clean])
 
   useEffect(() => {

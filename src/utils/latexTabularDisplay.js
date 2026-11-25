@@ -385,7 +385,14 @@ function isPaperDataTabular(block) {
   const raw = String(block ?? '')
   if (!/\\hline\b/.test(raw)) return false
   if (/!\[/.test(raw) || /\\includegraphics\b/.test(raw)) return false
-  if (/List-I{1,2}/i.test(raw)) return false
+  // Match List / Column tables (hyphen or space: "LIST I (Substances)") stay for flatten/display.
+  if (/(?:List|Column)\s*[-–]?\s*I{1,2}\b/i.test(raw)) return false
+  if (
+    (raw.match(/\(\s*[A-D]\s*\)|^[ \t]*[A-D]\s*[.:]/gm) || []).length >= 2 &&
+    (raw.match(/\(\s*(?:I{1,3}|IV)\s*\)|^[ \t]*(?:I{1,3}|IV)\s*[.:]/gm) || []).length >= 2
+  ) {
+    return false
+  }
   return true
 }
 
@@ -825,8 +832,9 @@ export function healVisibleTableCommands(text) {
   return expandUnsupportedTableCommands(softenLeftRightInTables(String(text ?? '')))
 }
 
+/** Chemistry reagent steps are lowercase (i)/(ii)/(iii). Uppercase (I)–(IV) are Match List-II. */
 function isReactionStepLine(line) {
-  return /^\s*\$?\s*\(\s*[ivx]+\s*\)/i.test(String(line ?? '').replace(/\$/g, ' '))
+  return /^\s*\$?\s*\(\s*(?:i{1,3}|iv|vi{0,3}|ix|x)\s*\)/.test(String(line ?? '').replace(/\$/g, ' '))
 }
 
 function isReactionCondition(line) {
@@ -974,6 +982,16 @@ export function unwrapReactionStepTables(text) {
     const next = s.replace(
       /\\begin\{tabular\}(?:\[[^\]]*\])?\{[^}]*\}((?:(?!\\begin\{tabular\})[\s\S])*?)\\end\{tabular\}/gi,
       (full, body) => {
+        // JEE Main Match List tables use (A)–(D) × (I)–(IV); never flatten those as reaction steps.
+        if (/(?:List|Column)\s*[-–]?\s*I{1,2}\b/i.test(full) || /\\multicolumn\b/i.test(body)) {
+          return full
+        }
+        if (
+          (body.match(/\(\s*[A-D]\s*\)/g) || []).length >= 2 &&
+          (body.match(/\(\s*(?:I{1,3}|IV)\s*\)/g) || []).length >= 2
+        ) {
+          return full
+        }
         const lines = stepOnlyLines(body) || reactionLinesFromBody(body)
         return lines ? lines.join('\n\n') : full
       },

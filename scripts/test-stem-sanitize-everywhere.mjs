@@ -28,6 +28,16 @@ const previewMathSrc = readFileSync(join(SRC_ROOT, 'src/pages/OfficialPyqPreview
 const cardAsShownSrc = readFileSync(join(SRC_ROOT, 'src/utils/officialPyqCardAsShown.js'), 'utf8')
 assert.match(previewMathSrc, /officialPyqCardAsShown\(q, sourceText\)/, 'Preview draws the shared card view')
 assert.match(
+  previewMathSrc,
+  /official-pyq-review-solution|official-pyq-review-key/,
+  'Pending review must show printed / institute solutions',
+)
+assert.match(
+  previewMathSrc,
+  /formatOfficialPyqAnswerKey/,
+  'Pending review shows the answer key from the stored card',
+)
+assert.match(
   cardAsShownSrc,
   /healUploadQuestionCard\(q, sourceText\)/,
   'Rejected/pending/published preview must apply the shared heal',

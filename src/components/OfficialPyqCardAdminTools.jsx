@@ -295,13 +295,16 @@ function OriginalPagePanel({ paperId, index, card, onClose, cropTargets, onCrop 
   }, [paperId, index])
 
   const pageCount = Number(info?.page_count) || 0
-  const goTo = index + 1
+  const printed =
+    Number(card?.printedNumber ?? card?.pyqSlot ?? card?.questionNumber) > 0
+      ? Number(card.printedNumber ?? card.pyqSlot ?? card.questionNumber)
+      : index + 1
   const foundNote =
     info?.found_by === 'text_layer' || info?.found_by === 'saved_page_map'
-      ? `Q${goTo} found on page ${info.pages[0]}`
+      ? `Q${printed} found on page ${info.pages[0]}`
       : info?.found_by === 'image'
         ? 'Stored page image'
-        : `Could not find Q${goTo} automatically — use the page buttons`
+        : `Could not find Q${printed} automatically — use the page buttons`
 
   return (
     <div className="card official-pyq-original-page" style={PAGE_PANEL_STYLE} data-testid="official-pyq-original-page">
@@ -353,7 +356,7 @@ function OriginalPagePanel({ paperId, index, card, onClose, cropTargets, onCrop 
           {imgError ? <p className="upload-error">{imgError}</p> : null}
           <div style={PAGE_GRID_STYLE}>
             <div data-testid="official-pyq-original-page-card">
-              <p className="form-hint">This card (Q{goTo})</p>
+              <p className="form-hint">This card (Q{printed})</p>
               <Suspense fallback={<p className="form-hint">Loading card…</p>}>
                 <OfficialPyqPreviewMath q={card} />
               </Suspense>

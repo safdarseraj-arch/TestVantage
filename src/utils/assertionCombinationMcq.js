@@ -15,6 +15,9 @@ export function optionLooksLikeAssertionCombination(option) {
   ) {
     return true
   }
+  // "(B) and (C) only" / "(A) and (B) only" / "(B) only" (FIITJEE S_N1 halide MCQ)
+  if (/^\(\s*[A-D]\s*\)\s+(?:and|or)\s+\(\s*[A-D]\s*\)/i.test(s) && /\bonly\b/i.test(s)) return true
+  if (/^\(\s*[A-D]\s*\)\s+only\b/i.test(s)) return true
   return false
 }
 

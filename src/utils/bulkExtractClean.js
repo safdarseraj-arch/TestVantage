@@ -208,6 +208,11 @@ export function stripTrailingPyqSectionHeader(text) {
     .replace(/\s*(?:\\section\*?\{\s*)?JEE\s*\(\s*ADVANCED\s*\)\s*\d{4}\s*PAPER\s*[12]\b[^\n]*$/i, '')
     .replace(/\s+SECTION\s+\d+\s*(?:\(Maximum Marks:[^)]*\))?[\s\S]*$/i, '')
     .replace(/\bThis section contains\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)[\s\S]*$/i, '')
+    // FIITJEE Solutions booklet cover / instructions glued under a numerical stem
+    // ("FIITJ EE $$ Solutions to JEE(Main) -2024" … "Please read the instructions…").
+    .replace(/\n+\s*FIITJ\s*EE\b[\s\S]*$/i, '')
+    .replace(/\n+\s*Solutions\s+to\s+JEE\s*\(?\s*Main\s*\)?[\s\S]*$/i, '')
+    .replace(/\n+\s*Please\s+read\s+the\s+instructions\s+carefully[\s\S]*$/i, '')
     // Trailing marking-scheme chrome glued after a real stem (OCR option leak).
     .replace(
       /[\s,]*\.?\s*(?:ONLY\s+ONE|ONE\s+OR\s+MORE(?:\s+THAN\s+ONE)?)\s+of\s+these\s+four[\s\S]*$/i,

@@ -144,7 +144,17 @@ function filledMatchRows(text, letters) {
 }
 
 function hasListIEntries(text, options) {
-  const t = String(text ?? '')
+  const raw = String(text ?? '')
+  // FIITJEE 4-column match tables: A. & substance & I. & element — already has both lists.
+  if (
+    /\\begin\{tabular\}/i.test(raw) &&
+    /LIST\s*I\b/i.test(raw) &&
+    (raw.match(/\b[A-D]\.\s*&/g) || []).length >= 3 &&
+    (raw.match(/\b(?:I{1,3}|IV)\.\s*&/g) || []).length >= 2
+  ) {
+    return true
+  }
+  const t = flattenTabularMatchLists(raw)
   if (mathpixFiguresSupplyListI(t)) return true
   if ((t.match(/Titrate\s*:/gi) || []).length >= 2 && /(?:List|Column)\s*[-–]?\s*I(?!I)\b/i.test(t)) {
     return true
@@ -896,6 +906,7 @@ function stemMentionsFigure(text) {
     /conversion of P to Q|sequence of reagents/i.test(t) ||
     // JEE Main stems that point at a drawing without saying "figure"
     /\bfollowing (?:compound|circuit|structure|organic compounds?)\b/i.test(t) ||
+    /\bin the given circuit\b/i.test(t) ||
     /\bIUPAC name of following\b/i.test(t) ||
     /\b(?:circuits?|compound)\s+(?:is|are)\s+(?:reverse\s*-?\s*biased|aromatic)\b/i.test(t) ||
     /\bgiven organic compounds\b/i.test(t)
@@ -1102,6 +1113,96 @@ function passageWordingOwnsUrls(passage, source, urls) {
   return false
 }
 
+/**
+ * Locate a Mathpix CDN url (or its file basename) inside OCR text.
+ * @param {string} hay
+ * @param {string} url
+ */
+function indexOfMathpixUrl(hay, url) {
+  const t = String(hay ?? '')
+  const u = String(url ?? '')
+  if (!t || !u) return -1
+  const direct = t.indexOf(u)
+  if (direct >= 0) return direct
+  const file = u.split('?')[0]
+  if (file && file !== u) {
+    const at = t.indexOf(file)
+    if (at >= 0) return at
+  }
+  const base = file.split('/').pop()
+  return base && base.length >= 12 ? t.indexOf(base) : -1
+}
+
+/**
+ * End offset of the \\includegraphics / ![](…) markup that starts at `at`.
+ * @param {string} hay
+ * @param {number} at
+ */
+function mathpixMarkupEnd(hay, at) {
+  const t = String(hay ?? '')
+  const from = Math.max(0, Number(at) || 0)
+  const slice = t.slice(from)
+  const md = slice.match(/^!\[[^\]]*\]\([^)]*\)/)
+  if (md) return from + md[0].length
+  if (slice.startsWith('\\includegraphics')) {
+    const g = slice.match(/^\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/)
+    if (g) return from + g[0].length
+  }
+  const nl = slice.search(/\n/)
+  return from + (nl >= 0 ? nl : Math.min(slice.length, 220))
+}
+
+/**
+ * Sol. Mathpix crops glued from the next stem (FIITJEE two-column layout): the URL
+ * sits after this Sol. body and immediately before `\item[N+1.]` / next Q. Drop those.
+ * Also drop CDN urls that never appear in this card's OCR span.
+ */
+function dropStolenSolutionFiguresBySpan(solution, source, printedNumber, map) {
+  const t = String(solution ?? '').trim()
+  if (!t) return t
+  const urls = extractMathpixImageUrls(t)
+  if (!urls.length) return t
+  const src = String(source ?? '')
+  if (src.length < 40) return t
+  const span = ocrSpanForCard(src, printedNumber, map)
+  const hay = span.length >= 80 ? span : src
+  let next = t
+  for (const url of urls) {
+    if (isOriginalCropUrl(url)) continue
+    const atInSpan = span.length >= 80 ? indexOfMathpixUrl(span, url) : 0
+    if (span.length >= 80 && atInSpan < 0) {
+      next = stripUrlFromStem(next, url)
+      continue
+    }
+    const at = indexOfMathpixUrl(hay, url)
+    if (at < 0) continue
+    // Stem drawing copied into Sol.: figure sits before this card's Sol. marker.
+    const solAt = hay.search(/(?:^|\n)\s*(?:\\\\?item\s*\[\s*\]\s*)?(?:Sol\.|Solution\s*:)/i)
+    if (solAt >= 0 && at < solAt) {
+      next = stripUrlFromStem(next, url)
+      continue
+    }
+    const afterAt = mathpixMarkupEnd(hay, at)
+    const between = hay.slice(afterAt, afterAt + 480)
+    const nextQ = between.search(
+      /\\item\s*\[\s*(?:\d{1,3}\s*\.?|Q[^\]]*)\]|(?:^|\n)\s*(?:\\item\s*\[\s*\]\s*)?\*?\s*Q\s*\.?\s*\d{1,3}\b|(?:^|\n)\s*\*?\s*\d{1,3}\s*\./i,
+    )
+    if (nextQ < 0 || nextQ > 160) continue
+    const prose = between
+      .slice(0, nextQ)
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g, ' ')
+      .replace(/\\(?:begin|end)\{[^}]+\}/g, ' ')
+      .replace(/\$+/g, ' ')
+      .replace(/\\[a-zA-Z]+/g, ' ')
+      .replace(/[{}&]/g, ' ')
+      .replace(/\s+/g, '')
+    // No real Sol. prose between the crop and the next Q → crop belongs to that stem.
+    if (prose.length < 20) next = stripUrlFromStem(next, url)
+  }
+  return next.replace(/\n{3,}/g, '\n\n').trim()
+}
+
 /** Wrong-question drawings: drop URLs that are not in this card's OCR span. */
 function dropStolenFigures(stem, source, printedNumber, map, { passage = false } = {}) {
   const t = String(stem ?? '').trim()
@@ -1120,8 +1221,9 @@ function dropStolenFigures(stem, source, printedNumber, map, { passage = false }
   for (const url of urls) {
     // A picture cropped from this card's original page is never in the OCR and never stolen.
     if (isOriginalCropUrl(url)) continue
-    // Only drop when this card's OCR span clearly owns other figures and not this URL.
-    if (span && span.length >= 80 && spanUrls && spanUrls.size > 0 && !spanUrls.has(url)) {
+    // Drop CDN figures that sit outside this card's OCR span — including when the span
+    // itself has zero figures (Q77 pulled Q76's Sol drawing that ends just above *77.).
+    if (span && span.length >= 80 && spanUrls && !spanUrls.has(url)) {
       next = stripUrlFromStem(next, url)
       continue
     }
@@ -1157,6 +1259,127 @@ function dropStolenFigures(stem, source, printedNumber, map, { passage = false }
   }
   if (kept.length === extractMathpixImageUrls(next).length) return stripMathpixImageMarkup(next)
   return kept.reduce((s, url) => stripUrlFromStem(s, url), next).replace(/\n{3,}/g, '\n\n').trim()
+}
+
+
+/**
+ * True when a Sol. crop sits in OCR with almost no worked-solution prose after it
+ * before the next question marker — classic two-column glue (S2 Q36 tension Sol.
+ * pulled Q37's circuit stem crop).
+ */
+function mathpixUrlGluedBeforeNextQuestion(hay, urlAt) {
+  if (urlAt < 0) return false
+  const t = String(hay ?? '')
+  const from = urlAt
+  // Skip past this image's markdown / includegraphics so we measure real Sol. prose.
+  // urlAt is the URL start (inside ![]( or \includegraphics{): skip the URL itself and its closer.
+  let i = from
+  const urlTok = t.slice(i).match(/^[^\s)}]*/)
+  if (urlTok) i += urlTok[0].length
+  if (t[i] === ')' || t[i] === '}') i += 1
+  const tail = t.slice(i, i + 500)
+  const nextQ = nextQuestionMarkerAfter(tail, 0)
+  if (nextQ < 0 || nextQ > 180) return false
+  const between = tail
+    .slice(0, nextQ)
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g, ' ')
+    .replace(/\\(?:begin|end)\{[^}]+\}/g, ' ')
+    .replace(/\$+/g, ' ')
+    .replace(/\\[a-zA-Z]+/g, ' ')
+    .replace(/[{}&]/g, ' ')
+    .replace(/\s+/g, '')
+  return between.length < 20
+}
+
+/**
+ * S2 Q36 two-column glue: CDN crop in Sol. that OCR places nearer the next
+ * question marker (37. / \\item[37.] / *37.) than this card's Sol., or past
+ * that marker / inside the next stem before its Sol.
+ */
+function mathpixUrlOwnedByNextQuestion(src, url, printedNumber) {
+  const n = Number(printedNumber)
+  if (!Number.isFinite(n) || n <= 0) return false
+  const t = String(src ?? '')
+  const atInSrc = indexOfMathpixUrl(t, url)
+  if (atInSrc < 0) return false
+  const cardAt = questionMarkerIndexInSource(t, n)
+  if (cardAt < 0 || atInSrc < cardAt) return false
+  const nextQAt = nextQuestionMarkerAfter(t, cardAt + 2)
+  const solRe = /(?:^|\n)\s*(?:\\item\s*\[\s*\]\s*)?(?:Sol\.|Solution\s*:)/i
+  const afterCard = t.slice(cardAt)
+  const solRel = afterCard.search(solRe)
+  const solAt = solRel >= 0 ? cardAt + solRel : -1
+  // URL sits after the next question marker → belongs to that stem (or later).
+  if (nextQAt >= 0 && atInSrc >= nextQAt) return true
+  // Next-Q marker closer to the URL than this card's Sol. → glued next-stem crop.
+  if (nextQAt >= 0 && solAt >= 0 && Math.abs(atInSrc - nextQAt) < Math.abs(atInSrc - solAt)) {
+    return true
+  }
+  // URL in next card's stem window (before that card's Sol.).
+  if (nextQAt >= 0 && atInSrc > nextQAt) {
+    const nextSolRel = t.slice(nextQAt).search(solRe)
+    const nextSolAt = nextSolRel >= 0 ? nextQAt + nextSolRel : -1
+    if (nextSolAt < 0 || atInSrc < nextSolAt) return true
+  }
+  return false
+}
+
+/**
+ * Sol. figure ownership: drop Mathpix CDN crops that belong to another question.
+ * Two-column FIITJEE scans often glue the next stem's circuit/structure onto this Sol.
+ * Original-page crops are never stolen.
+ */
+function dropStolenSolutionFigures(solution, source, printedNumber, map) {
+  const t = String(solution ?? '').trim()
+  if (!t) return t
+  const urls = extractMathpixImageUrls(t)
+  if (!urls.length) return t
+  const src = String(source ?? '')
+  if (!src.trim()) return t
+  const span = ocrSpanForCard(src, printedNumber, map)
+  const hay = span.length >= 80 ? span : src
+  const solAt = hay.search(/(?:^|\n)\s*(?:\\item\s*\[\s*\]\s*)?(?:Sol\.|Solution\s*:)/i)
+  const solRegion = solAt >= 0 ? hay.slice(solAt) : hay
+  let next = t
+  for (const url of urls) {
+    if (isOriginalCropUrl(url)) continue
+    const inSpan = span.length >= 80 ? indexOfMathpixUrl(span, url) >= 0 : true
+    if (!inSpan) {
+      next = stripUrlFromStem(next, url)
+      continue
+    }
+    const atInHay = indexOfMathpixUrl(hay, url)
+    // Stem crop copied into Sol. (appears before this card's Sol. marker).
+    if (solAt >= 0 && atInHay >= 0 && atInHay < solAt) {
+      next = stripUrlFromStem(next, url)
+      continue
+    }
+    const atInSol = indexOfMathpixUrl(solRegion, url)
+    if (atInSol >= 0 && mathpixUrlGluedBeforeNextQuestion(solRegion, atInSol)) {
+      next = stripUrlFromStem(next, url)
+      continue
+    }
+    // Full-source fallback when the card span cut the next-Q marker off.
+    const atInSrc = indexOfMathpixUrl(src, url)
+    if (atInSrc >= 0 && mathpixUrlGluedBeforeNextQuestion(src, atInSrc)) {
+      next = stripUrlFromStem(next, url)
+      continue
+    }
+    // S2 Q36 two-column glue: next-Q nearer than Sol. (or URL past next-Q / in next stem).
+    if (mathpixUrlOwnedByNextQuestion(src, url, printedNumber)) {
+      next = stripUrlFromStem(next, url)
+    }
+  }
+  return dropStolenSolutionFiguresBySpan(next.replace(/\n{3,}/g, '\n\n').trim(), src, printedNumber, map)
+}
+
+/** Apply Sol. empty-shell cleanup + stolen-figure ownership. */
+function healSolutionFigureOwnership(solution, source, printedNumber, map) {
+  const raw = String(solution ?? '')
+  if (!raw.trim()) return raw
+  const cleaned = stripEmptyFigureShells(stripEmptyImageMarkdown(raw)).replace(/[ \t]{2,}/g, ' ').trim()
+  return dropStolenSolutionFigures(cleaned, source, printedNumber, map)
 }
 
 function spliceListIIntoStem(stem, listIBlock) {
@@ -1412,14 +1635,26 @@ function spliceListIIIntoStem(stem, listIIBlock) {
   return `${t}\n\n${block}`
 }
 
+/**
+ * Printed question openers: Advanced `Q.n` / `\item[Q.] n`, and Main/FIITJEE
+ * `\item[77.]` / `\item[] *77.` / `*77.`.
+ * @param {number} n
+ */
+function questionMarkerReFor(n) {
+  const num = Number(n)
+  return new RegExp(
+    String.raw`(?:\\item\s*\[\s*Q[^\]]*\]\s*|(?:^|\n)\s*Q\s*\.?\s*)${num}\b` +
+      String.raw`|\\item\s*\[\s*${num}\s*\.?\s*\]` +
+      String.raw`|(?:^|\n)\s*(?:\\item\s*\[\s*\]\s*)?\*?\s*${num}\s*\.`,
+    'gi',
+  )
+}
+
 function questionMarkerIndicesInSource(text, n) {
   const t = String(text ?? '')
   const num = Number(n)
   if (!Number.isFinite(num) || num < 1) return []
-  const re = new RegExp(
-    `(?:\\\\item\\s*\\[\\s*Q[^\\]]*\\]\\s*|(?:^|\\n)\\s*Q\\s*\\.?\\s*)${num}\\b`,
-    'gi',
-  )
+  const re = questionMarkerReFor(num)
   const out = []
   let m
   while ((m = re.exec(t))) {
@@ -1443,7 +1678,8 @@ function questionMarkerIndexInSource(text, n, stemHint = '') {
 
 function nextQuestionMarkerAfter(text, from) {
   const t = String(text ?? '')
-  const re = /(?:\\item\s*\[\s*Q[^\]]*\]\s*|(?:^|\n)\s*Q\s*\.?\s*)\d{1,3}\b/gi
+  const re =
+    /(?:\\item\s*\[\s*Q[^\]]*\]\s*|(?:^|\n)\s*Q\s*\.?\s*)\d{1,3}\b|\\item\s*\[\s*\d{1,3}\s*\.?\s*\]|(?:^|\n)\s*(?:\\item\s*\[\s*\]\s*)?\*?\s*\d{1,3}\s*\./gi
   re.lastIndex = Math.max(0, Number(from) || 0)
   const m = re.exec(t)
   return m && m.index != null ? m.index : -1
@@ -1544,6 +1780,39 @@ export function restoreMissingFiguresFromSource(stem, source, printedNumber, map
       if (!wantsFigure && short.length < 20) continue
       const extra = urls.map((u) => `\\includegraphics{${u}}`).join('\n')
       return `${text}\n${extra}`
+    }
+  }
+  // Two-column glue: a circuit/structure stem's drawing often sits at the end of
+  // the prior Sol., immediately before this Q marker (S2 Q37 after Q36 Sol.).
+  // Do not use bare "shown below" — that often means an equation already in the stem (Q77).
+  const wantsGluedStemFig =
+    /\bin the given circuit\b/i.test(text) ||
+    /\b(?:the )?circuit shown\b/i.test(text) ||
+    (/\bfollowing (?:compound|circuit|structure|organic compounds?)\b/i.test(text) &&
+      !/\\ce\{|\\rightarrow|→|->|\\begin\{aligned\}/.test(text))
+  if (wantsGluedStemFig && Number(printedNumber) > 0) {
+    const at = questionMarkerIndexInSource(src, printedNumber, text)
+    if (at > 40) {
+      const prior = src.slice(Math.max(0, at - 520), at)
+      const priorUrls = extractMathpixImageUrls(prior)
+      if (priorUrls.length) {
+        const last = priorUrls[priorUrls.length - 1]
+        const figAt = indexOfMathpixUrl(prior, last)
+        if (figAt >= 0) {
+          const afterFig = prior.slice(mathpixMarkupEnd(prior, figAt))
+          const prose = afterFig
+            .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+            .replace(/\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}/g, ' ')
+            .replace(/\\(?:begin|end)\{[^}]+\}/g, ' ')
+            .replace(/\$+/g, ' ')
+            .replace(/\\[a-zA-Z]+/g, ' ')
+            .replace(/[{}&]/g, ' ')
+            .replace(/\s+/g, '')
+          if (prose.length < 20 && !figureSubjectConflictsStem(text, prior)) {
+            return `${text}\n\\includegraphics{${last}}`
+          }
+        }
+      }
     }
   }
   return text
@@ -2266,6 +2535,14 @@ function cardNeedsFullHeal(q, text, passage, options, source, map) {
   const hasFigure = figures.length > 0
   if (!hasFigure && stemMentionsFigure(text) && /\\includegraphics|cdn\.mathpix/i.test(src)) return true
   if (hasFigure && dropStolenFigures(text, src, printedQuestionNumber(q), map) !== text) return true
+  const sol = String(q?.solution ?? '')
+  if (
+    sol &&
+    extractMathpixImageUrls(sol).length > 0 &&
+    dropStolenSolutionFigures(sol, src, printedQuestionNumber(q), map) !== sol
+  ) {
+    return true
+  }
   if (!/PARAGRAPH/i.test(src)) return false
   return passage.trim()
     ? officialPyqPassageNeedsOcrRefresh(passage, q, src)
@@ -2302,12 +2579,13 @@ export function healUploadQuestionCard(q, source, map) {
     peelForeignComprehensionFromStem(storedText, q) === storedText &&
     repairSmashedWeightSubscripts(storedText, source) === storedText &&
     !cardNeedsFullHeal(q, storedText, storedPassage, storedOpts, source, map)
+  const src = String(source ?? '')
   if (alreadyClean) {
     const unnumbered = stripRepeatedQuestionNumberPrefix(storedText)
     const peeled = peelPrintedAnswerFromStem(unnumbered === storedText.trim() ? storedText : unnumbered)
-    return peeled === storedText ? q : { ...q, text: peeled }
+    const base = peeled === storedText ? q : { ...q, text: peeled }
+    return healCardSolutionFigures(base, src, map)
   }
-  const src = String(source ?? '')
   const unglued = replaceConflictingStemFromOcr(
     { ...q, text: peelForeignComprehensionFromStem(String(q.text ?? ''), q) },
     src,
@@ -2403,10 +2681,29 @@ export function healUploadQuestionCard(q, source, map) {
           passageId: peeledCard.passageId,
           passageGroup: peeledCard.passageGroup,
         }
-  const rawSolution = String(healed.solution ?? '')
-  const solution = stripEmptyFigureShells(stripEmptyImageMarkdown(rawSolution)).replace(/[ \t]{2,}/g, ' ').trim()
-  const withSolution = solution === rawSolution ? healed : { ...healed, solution }
-  return stampOneQuestionTypeFromSectionMap(withSolution, src, map)
+  return stampOneQuestionTypeFromSectionMap(healCardSolutionFigures(healed, src, map), src, map)
+}
+
+/** Drop Sol. CDN crops that belong to another question (two-column glue / wrong span). */
+export function healCardSolutionFigures(q, source, map) {
+  if (!q || typeof q !== 'object') return q
+  const printedN = printedQuestionNumber(q)
+  const rawSolution = String(q.solution ?? '')
+  const rawInst = String(q.solutionInstitute ?? '')
+  const solution = rawSolution.trim()
+    ? healSolutionFigureOwnership(rawSolution, source, printedN, map)
+    : rawSolution
+  const solutionInstitute = rawInst.trim()
+    ? healSolutionFigureOwnership(rawInst, source, printedN, map)
+    : rawInst
+  const sameSol = solution === rawSolution
+  const sameInst = solutionInstitute === rawInst
+  if (sameSol && sameInst) return q
+  return {
+    ...q,
+    ...(sameSol ? {} : { solution }),
+    ...(sameInst ? {} : { solutionInstitute }),
+  }
 }
 
 function stripDuplicateOptionSmilesFromStem(text, options) {
@@ -3040,9 +3337,13 @@ export function prepareOfficialPyqHealContext(paper, opts = {}) {
   const existingCount = Array.isArray(workingPaper?.questions) ? workingPaper.questions.length : 0
   const examId = String(paper?.exam || paper?.examPatternId || '')
   const catalog =
-    examId === 'jee-advanced' ? 51 : examId === 'jee-main' ? 30 : examId === 'neet' ? 180 : 0
+    examId === 'jee-advanced' ? 51 : examId === 'jee-main' ? 90 : examId === 'neet' ? 180 : 0
   const markers = countMathpixQuestionMarkers(ocr)
-  const expected = markers >= 8 ? markers : catalog
+  // Sparse markers on a long OCR must not under-target a full Main sitting (90).
+  const expected =
+    markers >= 8 && !(catalog >= 40 && markers < Math.floor(catalog * 0.35) && ocr.length > 20000)
+      ? markers
+      : catalog
   const workingQs = Array.isArray(workingPaper?.questions) ? workingPaper.questions : []
   const leaked = officialPyqQuestionsHaveMistakenPassages(workingQs, ocr)
   const canRebuildFromOcr =

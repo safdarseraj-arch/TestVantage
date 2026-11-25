@@ -23,6 +23,7 @@ import { cutPrintedSolutionTail, detectAnswerFromPaper, readPrintedAnswerAndSolu
 import { applyEndAnswerSection, readEndAnswerSection } from './printedEndSolutions.js'
 import { annotateMathpixCleanStatus, cleanMathpixCardText, preCleanMathpixOcr } from './mathpixCleanPipeline.js'
 import { stripLeakedOptionsFromStem } from './stripLeakedOptionsFromStem.js'
+import { peelAssertionCombinationBlock } from './assertionCombinationMcq.js'
 import {
   attachOfficialPyqPassages,
   looksLikeOfficialPyqPassageOnly,
@@ -1087,6 +1088,15 @@ export function recoverOptionsFromStem(stem, options) {
     Array.isArray(options) ? options.map((o) => String(o ?? '')) : [],
     stem,
   )
+  // Statements (A)–(D) stay in the stem; (1)–(4) combination lines become the choices.
+  const assertion = peelAssertionCombinationBlock([stem, ...opts].filter(Boolean).join('\n'))
+  if (assertion) {
+    return {
+      options: assertion.options.slice(0, 4),
+      stem: assertion.stem,
+      instructionText: '',
+    }
+  }
   if (stemAlreadyHasNumberedReactionSteps(stem)) {
     const cut = stripSectionAndItemizeFromStem(stem)
     return {

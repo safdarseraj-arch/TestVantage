@@ -4,7 +4,8 @@
  * repeats its question is matched by wording and numbers, one entry per card; the printed number
  * only adds a small bonus. An entry without question text (answer key only) is matched by number,
  * and only while the numbers agree with the wording matches. A match not clearly better than the
- * next candidate is reported, never applied. No Gemini.
+ * next candidate is reported as unsure — unless the printed number also points at the same card,
+ * in which case it is applied so an institute upload keeps the maximum solutions. No Gemini.
  */
 import { endSectionEntriesForCards } from './printedEndSolutions.js'
 
@@ -224,13 +225,21 @@ export function matchInstituteEntries(cards, read, opts = {}) {
     const b = cardOf[a]
     if (b < 0) return
     const score = Number(scores[a][b].toFixed(3))
-    if (!sure(a, b)) {
+    const numberAgrees = numberCardOf.get(e.key) === b
+    // Wording alone is fuzzy, but the printed number points here → keep the institute solution.
+    if (!sure(a, b) && !numberAgrees) {
       unsure.push({ card: b, key: e.key, label: e.label, entry: e.entry, score })
       return
     }
-    matches[b] = { key: e.key, label: e.label, entry: e.entry, how: 'content', score }
+    matches[b] = {
+      key: e.key,
+      label: e.label,
+      entry: e.entry,
+      how: sure(a, b) ? 'content' : 'content+number',
+      score,
+    }
     used.add(e.key)
-    if (numberCardOf.get(e.key) === b) agree += 1
+    if (numberAgrees) agree += 1
   })
   const byContent = matches.filter(Boolean).length
   const numbersAgree = byContent < 3 || agree / byContent >= NUMBER_TRUST
@@ -240,12 +249,31 @@ export function matchInstituteEntries(cards, read, opts = {}) {
   let byNumber = 0
   if (numbersAgree) {
     byNumberFound.forEach((found, i) => {
-      if (!found || matches[i] || unsureCards.has(i) || skip(list[i])) return
+      if (!found || matches[i] || skip(list[i])) return
+      // Unsure wording that is the same entry the numbers pick → apply it (max institute sols).
+      if (unsureCards.has(i)) {
+        const guess = unsure.find((u) => u.card === i)
+        if (!guess || !found.keys.includes(guess.key)) return
+        matches[i] = {
+          key: guess.key,
+          label: guess.label,
+          entry: guess.entry,
+          how: 'number',
+          score: guess.score,
+        }
+        used.add(guess.key)
+        byNumber += 1
+        return
+      }
       if (found.keys.some((k) => textKeys.has(k) || used.has(k))) return
       found.keys.forEach((k) => used.add(k))
       matches[i] = { key: found.keys[0], label: instituteEntryLabel(found.keys[0]), entry: found, how: 'number' }
       byNumber += 1
     })
+  }
+  // Drop unsure rows that were promoted to matches above.
+  for (let i = unsure.length - 1; i >= 0; i -= 1) {
+    if (matches[unsure[i].card]) unsure.splice(i, 1)
   }
   const unsureKeys = new Set(unsure.map((u) => u.key))
   const unmatched = entries.filter((e) => !used.has(e.key) && !unsureKeys.has(e.key)).map((e) => e.label)
@@ -262,19 +290,45 @@ export function instituteOptionsOf(question) {
   const text = String(question ?? '')
   const env = text.match(/\\begin\{(?:enumerate|itemize)\}([\s\S]*?)\\end\{(?:enumerate|itemize)\}/)
   if (env) {
+    // Prefer labelled items "\item[(1)] …" / "\item[(A)] …" so a missing (1) still lands in the right slot.
+    /** @type {(string | null)[]} */
+    const byLabel = []
+    let labelled = 0
+    for (const m of env[1].matchAll(/\\item\s*\[\s*\(\s*([A-Da-d]|[1-4])\s*\)\s*\]\s*([\s\S]*?)(?=\\item\b|\\end\{|$)/g)) {
+      const idx = /\d/.test(m[1]) ? Number(m[1]) - 1 : m[1].toUpperCase().charCodeAt(0) - 65
+      if (idx < 0 || idx > 3) continue
+      byLabel[idx] = String(m[2] ?? '')
+        .replace(/\\end\{(?:itemize|enumerate)\}\s*$/i, '')
+        .trim()
+      labelled += 1
+    }
+    if (labelled >= 2) {
+      const out = [0, 1, 2, 3].map((i) => String(byLabel[i] ?? '').trim())
+      // Keep empty slots so Ans. (2)/(3)/(4) still map to the right index when Mathpix skipped (1).
+      if (out.filter(Boolean).length >= 2) return out
+    }
     const items = env[1]
       .split(/\\item\b(?:\s*\[[^\]]*\])?/)
       .slice(1)
-      .map((s) => s.trim())
-    if (items.length >= 2 && items.length <= 5 && items.every(Boolean)) return items
+      .map((s) =>
+        s
+          .replace(/\\end\{(?:itemize|enumerate)\}\s*$/i, '')
+          .trim(),
+      )
+      .filter(Boolean)
+    if (items.length >= 2 && items.length <= 5) return items
   }
   /** @type {RegExpMatchArray[]} */
   let run = []
   let digits = false
-  for (const m of text.matchAll(/(^|[\s$])\(\s*([A-Da-d]|[1-4])\s*\)\s*/g)) {
+  // Trailing [ \t]* only — do not let \s* eat the newline before the next "(2)" / "(B)".
+  for (const m of text.matchAll(/(^|[\s$])\(\s*([A-Da-d]|[1-4])\s*\)[ \t]*/g)) {
     const isDigit = /\d/.test(m[2])
     const idx = isDigit ? Number(m[2]) - 1 : m[2].toUpperCase().charCodeAt(0) - 65
+    if (idx < 0 || idx > 3) continue
     if (idx === 0) {
+      // Mid-line "(A)" / "(R)" inside Assertion–Reason choice text must not smash a (1)–(4) run.
+      if (digits && run.length >= 1 && !isDigit) continue
       run = [m]
       digits = isDigit
     } else if (run.length && idx === run.length && isDigit === digits) {

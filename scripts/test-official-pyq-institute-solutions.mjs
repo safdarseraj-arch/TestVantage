@@ -38,17 +38,28 @@ if (typeof globalThis.window === 'undefined') globalThis.window = globalThis
 const {
   instituteCardNotes,
   cleanInstituteSolutionBody,
+  healInstituteSolutionMath,
   instituteSolutionDirtyReason,
+  instituteSolutionIsUsable,
+  instituteSolutionLooksLikeRawPdf,
+  instituteSolutionLooksPoorForStudents,
+  mergeInstituteSolutionReads,
+  pdfTextIsMathFontJunk,
+  preferredInstituteQuestion,
   instituteStemOnly,
   instituteTextDifference,
   normalizeInstituteAnswer,
   pickInstituteSolutionsText,
   readInstituteSolutions,
+  salvageInstituteSolutionBody,
 } = await import('../src/utils/instituteSolutionsParse.js')
 const {
   applyInstituteSolutionsToOfficialPyqPaper,
+  injectInstituteSolutionFigure,
   instituteResultNote,
+  instituteSolutionHasFigure,
   keepInstitutePicturesLocal,
+  rebuildOfficialPyqFromInstituteSolutionsOcr,
 } = await import('../src/utils/officialPyqInstituteSolutions.js')
 const { addOfficialPyqPendingPaper, clearOfficialPyqPendingPapers, getOfficialPyqPendingPaper, updateOfficialPyqPendingPaper } =
   await import('../src/utils/officialPyqPendingStore.js')
@@ -451,6 +462,41 @@ await test('the exam\'s own answer file still overwrites as before', () => {
   assert.equal(out[1].correctIndex, 2)
 })
 
+await test('a missing Sol. drawing is put back as includegraphics (empty $ $ $$ hole)', () => {
+  const crop = '/api/official-pyq/original/crops/opyq-x-institute-p3-abc.png?page=3&x0=0.1&y0=0.2&x1=0.4&y1=0.5'
+  const raw =
+    'Also $\\mathrm{q}=2 \\Rightarrow \\mathrm{~S}(\\mathrm{p}, 2)$ $ $ $ $$\\mathrm{T}: \\frac{\\sqrt{3} x}{6}=1$$'
+  assert.equal(instituteSolutionHasFigure(raw), false)
+  const next = injectInstituteSolutionFigure(raw, crop)
+  assert.match(next, /\\includegraphics\{\/api\/official-pyq\/original\/crops\/opyq-x-institute-p3-abc\.png/)
+  assert.match(next, /\$\$\\mathrm\{T\}:/)
+  assert.equal(instituteSolutionHasFigure(next), true)
+  assert.equal(injectInstituteSolutionFigure(next, crop), next)
+})
+
+await test('figure-only chemistry Sol. with several drawings is kept', () => {
+  const sol = [
+    '\\includegraphics{https://cdn.mathpix.com/cropped/x-30.jpg?height=158&width=663&top_left_y=2267&top_left_x=385}',
+    '\\includegraphics{https://cdn.mathpix.com/cropped/x-31.jpg?height=161&width=702&top_left_y=255&top_left_x=383}',
+    '\\includegraphics{https://cdn.mathpix.com/cropped/x-31.jpg?height=158&width=593&top_left_y=435&top_left_x=385}',
+  ].join('\n')
+  assert.equal(instituteSolutionLooksPoorForStudents(sol), false)
+})
+
+await test('booklet-as-paper keeps institute Sol. Mathpix links for local crops', () => {
+  const picture = 'https://cdn.mathpix.com/cropped/6b8031a5-d7d4-4570-987a-d0b6d84e7400-30.jpg?height=158&width=663&top_left_y=2267&top_left_x=385'
+  const paper = {
+    notes: 'Extract summary: Rebuilt 90 questions from institute solutions OCR (FIITJEE) · 90 answers · 90 solutions',
+    instituteSolutions: { rebuiltFromOcr: true },
+    questions: Array.from({ length: 30 }, (_, i) => ({
+      text: 'Q' + (i + 1),
+      solution: i === 0 ? ('See \\includegraphics{' + picture + '}') : 'words enough here for a prose solution about the answer choice',
+      solutionSource: 'institute',
+    })),
+  }
+  assert.deepEqual(mathpixPictureLinksOfPaper(paper), [picture])
+})
+
 await test('institute pictures are kept from the institute PDF, never cut from the original', async () => {
   const paper = {
     questions: [
@@ -594,7 +640,8 @@ await test('options in another order: the answer follows the option text; option
   assert.deepEqual(result.reordered, [1, 7])
   assert.equal(q[11].correctIndex, undefined, 'options do not line up: no answer')
   assert.equal(q[11].instituteOptionsUnmatched, 'A')
-  assert.equal(q[11].solution, undefined)
+  assert.ok(String(q[11].solution || '').trim(), 'solution is still filled when only the letter answer is blocked')
+  assert.equal(q[11].solutionSource, 'institute')
   assert.deepEqual(result.optionsUnmatched, [12])
   assert.deepEqual(result.disagreements, [{ n: 3, institute: 'C', official: 'B' }])
   const lines = localOfficialPyqQualityCheck(getOfficialPyqPendingPaper(id)).lines
@@ -625,7 +672,7 @@ await test('an answer-key-only file is matched by number, per subject segment', 
   assert.match(instituteResultNote(result, { institute: 'FIITJEE' }), /Matched 0 question\(s\) by wording and 4 by number/)
 })
 
-await test('a question that fits two cards equally is listed as not sure, never applied', () => {
+await test('wording look-alikes: printed number decides so the institute solution is kept', () => {
   resetAll()
   const lines = (eq) =>
     `The value of the constant $k$ for which the two given straight lines ${eq} are parallel to each other is`
@@ -658,24 +705,59 @@ await test('a question that fits two cards equally is listed as not sure, never 
   const q = getOfficialPyqPendingPaper(paper.id).questions
   assert.equal(q[0].correctIndex, 1)
   assert.equal(q[0].solutionSource, 'institute')
-  for (const card of [q[1], q[2]]) {
-    assert.equal(card.correctNumerical, undefined, 'not applied to either look-alike')
-    assert.equal(card.correctInteger, undefined)
-    assert.equal(card.solution, undefined)
-  }
-  assert.deepEqual(result.unsure, [{ n: 2, label: 'Q.2', answer: '3' }])
-  assert.deepEqual(q[1].instituteUnsureMatch, { label: 'Q.2', answer: '3' })
-  assert.equal(result.byContent, 1)
-  const quality = localOfficialPyqQualityCheck(getOfficialPyqPendingPaper(paper.id)).lines
-  assert.ok(
-    quality.includes('Go to Q 2. Institute Q.2 looks like official Q 2 but not sure — its answer and solution were not used; check.'),
-    quality.join(' | '),
-  )
+  // Printed Q.2 + institute Q.2 agree → keep the institute solution even if Q.3 looks similar.
+  assert.equal(q[1].correctNumerical, 3)
+  assert.equal(q[1].solutionSource, 'institute')
+  assert.match(String(q[1].solution || ''), /Equal slopes|k=3/)
+  assert.equal(q[2].correctNumerical, undefined, 'look-alike Q.3 does not steal Q.2')
+  assert.equal(q[2].solution, undefined)
+  assert.equal(result.unsure.length, 0)
+  assert.ok(result.byContent >= 2)
   const note = instituteResultNote(result, { institute: 'Allen' })
-  assert.match(note, /Matched 1 question\(s\) by wording and 0 by number; 0 institute question\(s\) not matched; 1 not sure\./)
-  assert.match(note, /Not sure, so not used — check: institute Q\.2 looks like official Q 2\./)
-  const edited = { ...q[1], adminEdited: true, correctNumerical: 3 }
-  assert.equal(instituteCardNotes(edited).unsure, null, 'gone once the admin has set the card')
+  assert.match(note, /Matched \d+ question\(s\) by wording/)
+  assert.doesNotMatch(note, /1 not sure/)
+})
+
+await test('true unsure (no number agreement) still skips the answer', () => {
+  resetAll()
+  const paper = addOfficialPyqPendingPaper({
+    exam: 'jee-main',
+    year: 2024,
+    session: 'Shift 2',
+    paperLabel: 'JEE Main 2024 (true unsure fixture)',
+    paperId: `jee-main-2024-true-unsure-${Math.random().toString(36).slice(2, 8)}`,
+    questions: [
+      {
+        id: 'tu-1',
+        pyqSlot: 1,
+        printedNumber: 10,
+        subject: MATH,
+        questionType: 'numerical',
+        text: 'The value of the constant $k$ for which the two given straight lines $2 x+k y=3$ and $4 x+6 y=5$ are parallel to each other is',
+      },
+      {
+        id: 'tu-2',
+        pyqSlot: 2,
+        printedNumber: 11,
+        subject: MATH,
+        questionType: 'numerical',
+        text: 'The value of the constant $k$ for which the two given straight lines $k x+2 y=1$ and $3 x+6 y=7$ are parallel to each other is',
+      },
+    ],
+  })
+  const text = [
+    'Mathematics',
+    'Q.2 The value of the constant k for which the two given straight lines are parallel to each other is',
+    'Ans. 3',
+    'Sol. Equal slopes give $k=3$.',
+  ].join('\n')
+  const result = applyInstituteSolutionsToOfficialPyqPaper(paper.id, text, { institute: 'Allen' })
+  assert.equal(result.ok, true, result.error)
+  const q = getOfficialPyqPendingPaper(paper.id).questions
+  // Institute Q.2 does not share a printed number with either card (10 / 11) → unsure, no answers.
+  assert.equal(q[0].correctNumerical, undefined)
+  assert.equal(q[1].correctNumerical, undefined)
+  assert.ok(result.unsure.length >= 1)
 })
 
 await test('the matcher on its own: entries without text follow the numbers only while the numbers agree', async () => {
@@ -741,10 +823,10 @@ await test('FIITJEE layout: *Q.3, Ans.. then Sol. (A), *Q8., and a lowercase "an
 await test('when Mathpix is thin, the PDF text with more answers is preferred', () => {
   const thin = 'Mathematics\nQ.1 A short one?\nAns.\n2\nSol.\nTwo.\n'
   const picked = pickInstituteSolutionsText(thin, FIITJEE, { institute: 'FIITJEE' })
-  assert.equal(picked.source, 'pdf')
+  assert.ok(picked.source === 'pdf' || picked.source === 'merged', picked.source)
   assert.ok(picked.read.entries.size >= 10, `expected many FIITJEE entries, got ${picked.read.entries.size}`)
   const rich = pickInstituteSolutionsText(FIITJEE, thin, { institute: 'FIITJEE' })
-  assert.ok(rich.source === 'mathpix' || rich.source === 'mathpix-only')
+  assert.ok(rich.source === 'mathpix' || rich.source === 'mathpix-only' || rich.source === 'merged')
   assert.equal(pickInstituteSolutionsText('', '', { institute: 'FIITJEE' }).source, 'empty')
   const note = instituteResultNote(
     { answers: 1, solutions: 1, disagreements: [], notFound: [], textDiffers: [], byContent: 1, byNumber: 0, unmatched: [], unsure: [] },
@@ -828,9 +910,11 @@ await test('Mathpix glued "\\item[] *Q. 4" onto Q.2 is split; Q.2 solution does 
 
 await test('page and helper wiring', () => {
   const page = fs.readFileSync(new URL('../src/pages/OfficialPyqPending.jsx', import.meta.url), 'utf8')
-  assert.match(page, /Add institute solutions \(PDF\)/)
+  assert.match(page, /Add institute solutions \(1–3 PDFs\)|Add institute solutions \(PDF\)/)
   assert.match(page, /data-testid="official-pyq-institute-name"/)
   assert.match(page, /data-testid="official-pyq-institute-file-input"/)
+  assert.match(page, /multiple/, 'institute solutions input accepts subject-wise parts')
+  assert.match(page, /official-pyq-institute-mathpix-reread|Re-read institute with Mathpix/)
   assert.match(page, /!isOtherPaper\(selected\) &&/)
   const tools = fs.readFileSync(new URL('../src/components/OfficialPyqCardAdminTools.jsx', import.meta.url), 'utf8')
   assert.match(tools, /Use institute wording/)
@@ -838,9 +922,278 @@ await test('page and helper wiring', () => {
   assert.match(vite, /'\/api\/official-pyq\/original': hybridFastApiProxy\(\)/)
   const main = fs.readFileSync(new URL('../main.py', import.meta.url), 'utf8')
   assert.match(main, /@app\.post\("\/api\/official-pyq\/original\/\{paper_id\}\/institute"/)
+  assert.match(main, /@app\.get\("\/api\/official-pyq\/original\/\{paper_id\}\/institute\/text"/)
+  assert.match(main, /@app\.get\("\/api\/official-pyq\/original\/\{paper_id\}\/institute\/file"/)
   assert.match(main, /@app\.post\("\/api\/official-pyq\/original\/\{paper_id\}\/institute\/mathpix-crops"/)
+  assert.match(main, /@app\.post\("\/api\/official-pyq\/original\/\{paper_id\}\/institute\/solution-figures"/)
+  assert.match(String(fs.readFileSync(new URL('../official_pyq_compare.py', import.meta.url), 'utf8')), /def crop_institute_solution_figures/)
+  const comparePy = fs.readFileSync(new URL('../official_pyq_compare.py', import.meta.url), 'utf8')
+  assert.match(comparePy, /def institute_pdf_text/)
+  assert.match(comparePy, /def institute_pdf_bytes/)
 })
 
+await test('PDF private-use letters score worse than Mathpix LaTeX; merge keeps drawn maths', () => {
+  const pua = `Sol.\n${'\uF028\uF029'.repeat(6)}\n10\n9\nt\nx\nf x t\n8\n7\n6`
+  const latex = 'Sol. $$\\begin{aligned}& x=3\\\\ & y=4\\end{aligned}$$'
+  assert.equal(instituteSolutionLooksLikeRawPdf(pua), true)
+  assert.equal(instituteSolutionLooksLikeRawPdf(latex), false)
+  assert.match(instituteSolutionDirtyReason(pua), /raw PDF letters|re-add the institute PDF|PDF font junk/i)
+  assert.equal(salvageInstituteSolutionBody(pua), '')
+  assert.equal(instituteSolutionIsUsable(latex), true)
+  const mixed = `${'\uF028'.repeat(4)} Hence the answer is 3.\nArea is positive.`
+  assert.match(salvageInstituteSolutionBody(mixed), /Hence the answer is 3/)
+  const readMp = readInstituteSolutions(`Mathematics\nQ.1 Stem A\nAns. B\n${latex}`, { institute: 'FIITJEE' })
+  const readPdf = readInstituteSolutions(`Mathematics\nQ.1 Stem A longer wording here\nAns. B\n${pua}\nQ.2 Stem B only in PDF\nAns. A\nSol. plain words only answer.`, {
+    institute: 'FIITJEE',
+  })
+  const merged = mergeInstituteSolutionReads(readMp, readPdf)
+  assert.match(merged.entries.get('mathematics:1').solution, /begin\{aligned\}/)
+  assert.ok(merged.entries.get('mathematics:2')?.answer || merged.entries.get('mathematics:2')?.solution)
+  assert.match(String(merged.entries.get('mathematics:2')?.solution || ''), /plain words/i)
+  const latexStem = 'Let $e_1$ be the eccentricity of $\\frac{x^{2}}{16}-\\frac{y^{2}}{9}=1$'
+  const junkStem = `Let e1 be\n2\n2\nx\ny\n1\n16\n9\n${'\uF028'.repeat(10)}`
+  assert.match(preferredInstituteQuestion(latexStem, junkStem), /\\frac\{x\^\{2\}\}/)
+  assert.match(
+    String(mergeInstituteSolutionReads(
+      readInstituteSolutions(`Mathematics\nQ.1 ${latexStem}\nAns. D\n${latex}`, { institute: 'FIITJEE' }),
+      readInstituteSolutions(`Mathematics\nQ.1 ${junkStem} longer stacked digits soup here\nAns. D\n${pua}`, {
+        institute: 'FIITJEE',
+      }),
+    ).entries.get('mathematics:1')?.question || ''),
+    /\\frac\{x\^\{2\}\}/,
+  )
+  const picked = pickInstituteSolutionsText(
+    `Mathematics\nQ.1 Stem A\nAns. B\n${latex}`,
+    `Mathematics\nQ.1 Stem A longer\nAns. B\n${pua}\nQ.2 Stem B\nAns. A\nSol. ok.`,
+    { institute: 'FIITJEE' },
+  )
+  assert.equal(picked.source, 'merged')
+  assert.match(picked.read.entries.get('mathematics:1').solution, /aligned/)
+})
+
+const { instituteOptionsOf } = await import('../src/utils/instituteSolutionsMatch.js')
+
+await test('Assertion (A) / Reason (R) stem is not cut at the (A) label', () => {
+  clearOfficialPyqPendingPapers()
+  const fillers = Array.from({ length: 7 }, (_, i) => {
+    const n = i + 2
+    return `*${n}. Filler stem number ${n} with enough words.\n(1) A\n(2) B\n(3) C\n(4) D\nAns. (1)\nSol. Done.`
+  })
+  const ocr = [
+    'Physics',
+    '*1. Given below are two statements: one is labelled as Assertion (A) and the other is labelled as Reason (R).',
+    'Assertion (A): In Vernier calliper if positive zero error exists, then while taking measurements, the reading taken will be more than the actual reading.',
+    'Reason (R): The zero error in Vernier Calliper might have happened due to manufacturing defect or due to rough handling.',
+    'In the light of the above statements, choose the correct answer from the options given below :',
+    'Options.',
+    '(1) Both (A) and (R) are correct but (R) is not the correct explanation of (A)',
+    '(2) (A) is false but (R) is true',
+    '(3) (A) is true but (R) is false',
+    '(4) Both (A) and (R) are correct and (R) is the correct explanation of (A)',
+    'Ans. (1)',
+    'Sol. For positive error measured reading is more than true reading.',
+    ...fillers,
+  ].join('\n')
+  const paper = addOfficialPyqPendingPaper({
+    exam: 'jee-main',
+    year: 2024,
+    status: 'pending_review',
+    preparedText: ocr,
+    questions: [{ id: 't-q1', text: 'placeholder', printedNumber: 1 }],
+  })
+  const rebuilt = rebuildOfficialPyqFromInstituteSolutionsOcr(paper.id, { institute: 'FIITJEE', ocrText: ocr })
+  assert.equal(rebuilt.ok, true, rebuilt.error || 'rebuild ok')
+  const q1 = (rebuilt.paper?.questions || []).find((q) => Number(q.printedNumber || q.pyqSlot) === 1)
+  assert.ok(q1, 'Q1 built')
+  assert.match(String(q1.text), /Assertion\s*\(\s*A\s*\)/i)
+  assert.match(String(q1.text), /Reason\s*\(\s*R\s*\)/i)
+  assert.doesNotMatch(String(q1.text), /Options\./i)
+  assert.doesNotMatch(String(q1.text), /\n\s*Assertion\s*\(\s*A\s*\)/i, 'Assertion stays on same paragraph')
+  assert.doesNotMatch(String(q1.text), /\n\s*Reason\s*\(\s*R\s*\)/i, 'Reason stays on same paragraph')
+  assert.doesNotMatch(String(q1.text), /\\begin\{itemize\}|\\item\s*\[/i)
+  assert.equal((q1.options || []).filter(Boolean).length, 4)
+})
+
+await test('repeated identical <smiles> option lines are kept (not dropped as furniture)', () => {
+  const smiles = '<smiles>N#CC(O)C#N</smiles>'
+  const raw = [
+    'Chemistry',
+    '*75. Bond line formula of $\\mathrm{HOCH}(\\mathrm{CN})_{2}$ is',
+    '(1)',
+    smiles,
+    '(2)',
+    smiles,
+    '(3)',
+    smiles,
+    '(4)',
+    smiles,
+    'Ans. (3)',
+    'Sol. Correct representation.',
+  ].join('\n')
+  const read = readInstituteSolutions(raw, { institute: 'FIITJEE' })
+  const entry = read.entries.get('chemistry:75') || read.entries.get('#0:75')
+  assert.ok(entry, 'Q75 entry present')
+  assert.equal((String(entry.question).match(/<smiles>/gi) || []).length, 4)
+  const opts = instituteOptionsOf(entry.question)
+  assert.equal(opts?.filter(Boolean).length, 4)
+})
+
+await test('FIITJEE PDF font junk is never kept as a solution when Mathpix is missing', () => {
+  const pua = `Sol.\n${'\uF028\uF029'.repeat(8)}\n10\n9\nt\nx\nf x t`
+  const readPdf = readInstituteSolutions(
+    `Mathematics\nQ.1 Stem only in PDF\nAns. A\n${pua}\nQ.2 Stem two\nAns. B\nSol. Hence the answer is two.`,
+    { institute: 'FIITJEE' },
+  )
+  const merged = mergeInstituteSolutionReads(
+    { entries: new Map(), subjects: [], layout: 'repeated_questions', sectionText: '' },
+    readPdf,
+  )
+  assert.equal(String(merged.entries.get('mathematics:1')?.solution || ''), '')
+  assert.equal(merged.entries.get('mathematics:1')?.answer, 'A')
+  assert.match(String(merged.entries.get('mathematics:2')?.solution || ''), /Hence the answer is two/)
+  assert.equal(instituteSolutionLooksPoorForStudents(pua), true)
+  assert.equal(instituteSolutionLooksPoorForStudents('Hence the area equals three halves clearly.'), false)
+  const junkLayer = `${'FIITJEE header page text\n'.repeat(10)}${'\uF028'.repeat(120)}${'Ans. B Sol. stacked\n'.repeat(30)}`
+  assert.equal(pdfTextIsMathFontJunk(junkLayer), true)
+  // Thin Mathpix + high-PUA PDF: Mathpix Sol. wins; PDF contributes Ans. only (never PUA Sol.).
+  const thinMp = [
+    'Mathematics',
+    'Q.1 A short one?',
+    'Ans. A',
+    'Sol. Use $\\det(kA)=k^3\\det A$. Answer is (A).',
+    'Q.2 Another?',
+    'Ans. B',
+    'Sol. Plain readable working for option (B).',
+  ].join('\n')
+  const junkPdf = [
+    `${'FIITJEE Solutions page header text for length. '.repeat(8)}`,
+    'Mathematics',
+    'Q.1 Stem from PDF layer with enough surrounding text for the junk detector',
+    'Ans. A',
+    `Sol.\n${'\uF028\uF029'.repeat(80)}`,
+    'Q.2 Stem two from PDF also padded with ordinary words around the private-use maths',
+    'Ans. B',
+    `Sol.\n${'\uF030'.repeat(120)}`,
+    'Q.3 Extra PDF-only question that Mathpix missed entirely this time',
+    'Ans. C',
+    `Sol.\n${'\uF031'.repeat(160)}`,
+  ].join('\n')
+  assert.equal(pdfTextIsMathFontJunk(junkPdf), true)
+  const forced = pickInstituteSolutionsText(thinMp, junkPdf, { institute: 'FIITJEE' })
+  assert.equal(forced.source, 'merged')
+  assert.match(String(forced.read.entries.get('mathematics:1')?.solution || ''), /det/)
+  assert.doesNotMatch(String(forced.read.entries.get('mathematics:1')?.solution || ''), /\uF028/)
+  assert.equal(String(forced.read.entries.get('mathematics:3')?.answer || ''), 'C', 'PDF Ans. still fills Mathpix gaps')
+  assert.equal(String(forced.read.entries.get('mathematics:3')?.solution || ''), '', 'PUA Sol. never kept')
+  assert.doesNotMatch(
+    [...forced.read.entries.values()].map((e) => e.solution || '').join('\n'),
+    /[\uE000-\uF8FF]/,
+    'no private-use glyphs in any kept Sol.',
+  )
+})
+
+await test('institute upload replaces Hybrid AI when Mathpix has a usable solution', () => {
+  resetAll()
+  const MATH = 'Mathematics'
+  const paper = addOfficialPyqPendingPaper({
+    exam: 'jee-advanced',
+    year: 2024,
+    session: 'Paper 1',
+    paperLabel: 'maximize institute sols',
+    paperId: `jee-advanced-2024-p1-max-inst-${Math.random().toString(36).slice(2, 8)}`,
+    sourceLabel: 'Official (test)',
+    status: 'approved',
+    questions: [
+      {
+        id: 'max-inst-1',
+        pyqSlot: 1,
+        printedNumber: 1,
+        subject: MATH,
+        questionType: 'single',
+        text: 'A particle moves on the parabola y equals x squared under gravity alone',
+        options: ['1', '2', '3', '4'],
+        correctIndex: 1,
+        answerSource: 'from_paper',
+        solution: 'AI wrote this temporary solution.',
+        solutionSource: 'hybrid_ai',
+      },
+      {
+        id: 'max-inst-2',
+        pyqSlot: 2,
+        printedNumber: 2,
+        subject: MATH,
+        questionType: 'single',
+        text: 'The ellipse x squared over nine plus y squared over four equals one has eccentricity',
+        options: ['1', '2', '3', '4'],
+        correctIndex: 0,
+        answerSource: 'from_paper',
+        solution: 'AI second.',
+        solutionSource: 'hybrid_ai',
+      },
+    ],
+  })
+  const text = [
+    'Mathematics',
+    'Q.1 A particle moves on the parabola y equals x squared under gravity alone',
+    '(A) 1 (B) 2 (C) 3 (D) 4',
+    'Ans. B',
+    'Sol. $$\\begin{aligned}& x=3\\end{aligned}$$',
+    'Q.2 The ellipse x squared over nine plus y squared over four equals one has eccentricity',
+    '(A) 1 (B) 2 (C) 3 (D) 4',
+    'Ans. A',
+    'Sol. Hence the area equals three halves.',
+  ].join('\n')
+  const result = applyInstituteSolutionsToOfficialPyqPaper(paper.id, text, { institute: 'FIITJEE' })
+  assert.equal(result.ok, true, result.error)
+  const saved = getOfficialPyqPendingPaper(paper.id)
+  assert.equal(saved.questions[0].solutionSource, 'institute')
+  assert.match(saved.questions[0].solution, /aligned|x=3/)
+  assert.equal(saved.questions[1].solutionSource, 'institute')
+  assert.match(saved.questions[1].solution, /area equals three halves/i)
+  assert.ok(result.solutions >= 2)
+})
+
+await test('broken integrating-factor $$ / e^{- }} in a solution is healed for display', () => {
+  const broken = [
+    '$$\\begin{aligned}',
+    '& f^{\\prime}(x)-\\frac{10}{x} f(x)=-\\frac{9}{x^{2}}',
+    '\\end{aligned}',
+    'Integrating factor $\\mathrm{e}^{- }}=\\frac{1}{\\mathrm{x}^{10}}$$\\Rightarrow \\frac{f(x)}{x^{10}}=\\frac{9}{11 x^{11}}+c$$',
+    '$$\\begin{aligned}',
+    '& c=\\frac{13}{11}',
+    '\\end{aligned}$',
+  ].join('\n')
+  const healed = healInstituteSolutionMath(broken)
+  assert.doesNotMatch(healed, /\\mathrm\{e\}\^\{-\s*\}\}/)
+  assert.match(healed, /\\end\{aligned\}\$\$\s*\n\s*Integrating/)
+  assert.match(healed, /\\end\{aligned\}\$\$\s*$/)
+  assert.match(healed, /\$\$\\mathrm\{e\}\^\{-\}=\\frac\{1\}\{\\mathrm\{x\}\^\{10\}\}\\Rightarrow/)
+  assert.doesNotMatch(healed, /\\mathrm\{e\}\^\{\s*-\s*\}\}/)
+  const cleaned = cleanInstituteSolutionBody(broken)
+  assert.match(cleaned, /\\end\{aligned\}\$\$/)
+  assert.doesNotMatch(cleaned, /\\mathrm\{e\}\^\{\s*-\s*\}\}/)
+})
+
+await test('S1 Q37 truncated $$…MeV and Q66 $$\\xrightarrow…$ heal for display', async () => {
+  const { wrapBareLatexRuns } = await import('../src/utils/wrapBareLatexRuns.js')
+  const { visibleLatexSourceHits } = await import('../src/utils/visibleLatexSource.js')
+  const heal = (s) =>
+    healInstituteSolutionMath(wrapBareLatexRuns(healInstituteSolutionMath(cleanInstituteSolutionBody(s) || s)))
+  const q37 =
+    '$\\mathrm{Q}=(\\Delta \\mathrm{M}) \\mathrm{c}^{2}$\n' +
+    '$$\\mathrm{Q}=\\left[\\mathrm{M}(\\mathrm{Li})+\\mathrm{M}\\left({ }_{1} \\mathrm{H}^{2}\\right)-2 \\mathrm{M}\\left({ }_{2} \\mathrm{H}^{4}\\right)\\right] \\times 931.5 \\mathrm{MeV}'
+  const q66 =
+    'Proteins $$\\xrightarrow{\\text { Hydrolysis }}$ Peptides $\\xrightarrow{\\text { Hydrolysis }} \\alpha-$ amino acids'
+  const h37 = heal(q37)
+  const h66 = heal(q66)
+  assert.equal(visibleLatexSourceHits(q37).length > 0, true)
+  assert.equal(visibleLatexSourceHits(q66).length > 0, true)
+  assert.deepEqual(visibleLatexSourceHits(h37), [])
+  assert.deepEqual(visibleLatexSourceHits(h66), [])
+  assert.ok(h37.endsWith('$$'), h37.slice(-40))
+  assert.ok(h37.includes('\\mathrm{MeV}$$'), h37.slice(-40))
+  assert.ok(h66.includes('$$\\xrightarrow{\\text { Hydrolysis }}$$'), h66)
+})
 resetAll()
 if (failed) {
   console.error(`\n${failed} institute solutions test(s) failed`)

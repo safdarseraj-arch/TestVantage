@@ -8,15 +8,24 @@ import { QuestionStem, OptionBody } from '../components/QuestionMediaLite.jsx'
 import { matchOptionsFoldedIntoLists } from '../utils/parseMatchingListDisplay.js'
 import { looksLikeParagraphPropertyOptions } from '../utils/passage.js'
 import { officialPyqCardAsShown } from '../utils/officialPyqCardAsShown.js'
+import { formatOfficialPyqAnswerKey, officialPyqCardHasAnswerKey } from '../utils/officialPyqCardEdit.js'
 import { isMatrixGridCard } from '../utils/matrixGridPyq.js'
 import MatrixGridView from '../components/MatrixGridView.jsx'
 
 export default function OfficialPyqPreviewMath({ q, sourceText = '', sourceTick = 0 }) {
-  const { text, options, passage, questionImage, healError } = useMemo(
+  const { text, options, passage, questionImage, healed, healError } = useMemo(
     () => officialPyqCardAsShown(q, sourceText),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [q, sourceText, sourceTick],
   )
+  // Answer / solution live on the stored card (heal only touches stem + passage).
+  const keyCard = healed || q
+  const answerKey = officialPyqCardHasAnswerKey(keyCard)
+    ? formatOfficialPyqAnswerKey(keyCard)
+    : officialPyqCardHasAnswerKey(q)
+      ? formatOfficialPyqAnswerKey(q)
+      : ''
+  const solution = String(keyCard?.solution ?? q?.solution ?? '').trim()
   const flagProblems = q?.adminApproved !== true
   const grid = isMatrixGridCard(q)
   const hidePassageProps = looksLikeParagraphPropertyOptions(options, passage)
@@ -64,6 +73,26 @@ export default function OfficialPyqPreviewMath({ q, sourceText = '', sourceTick 
         </ol>
       ) : null}
       {grid ? <MatrixGridView question={q} showKey highlightProblems={flagProblems} /> : null}
+      {answerKey || solution ? (
+        <div className="official-pyq-review-key" data-testid="official-pyq-review-key">
+          {answerKey ? (
+            <p className="official-pyq-review-answer" data-testid="official-pyq-review-answer">
+              <strong>Answer:</strong> {answerKey}
+            </p>
+          ) : null}
+          {solution ? (
+            <div className="official-pyq-solution-preview" data-testid="official-pyq-review-solution">
+              <span className="metadata-label">Solution</span>
+              <QuestionStem
+                text={solution}
+                options={[]}
+                highlightProblems={false}
+                className="official-pyq-simple-stem"
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </>
   )
 }

@@ -5,7 +5,7 @@
  */
 
 import { applyStoredOcrCardFixes, healUploadQuestionCard } from './uploadQualityGuards.js'
-import { extractMathpixImageUrls } from './mathpixMedia.js'
+import { extractMathpixImageUrls, hasOriginalPageCrop } from './mathpixMedia.js'
 import { officialPyqCardAllowsPassage, peelOfficialPyqCardForDisplay } from './passage.js'
 import { restoreMissingFiguresFromSource } from './extendTruncatedStem.js'
 import { restoreLabelledFigureOptions } from './labelledFigureOptions.js'
@@ -35,12 +35,15 @@ export function officialPyqCardAsShown(q, rawSourceText = '') {
   try {
     if (q?.adminEdited === true) {
       healed = peelOfficialPyqCardForDisplay(q, '')
+      const stemHasCrop = hasOriginalPageCrop(healed?.text ?? q?.text)
       const optionFigs = (Array.isArray(healed?.options) ? healed.options : []).filter((o) =>
         /\\includegraphics|!\[[^\]]*\]\(|<smiles>/i.test(String(o ?? '')),
       ).length
       // When options already hold the drawings (Q75 bond-line crops), do not pull a neighbouring
       // OCR figure into the stem — that pasted the wrong reaction scheme above the options.
-      if (optionFigs < 2) {
+      // When the stem already has the page crop (Q78 A–D halides), skip OCR figure restore
+      // and SMILES prefer — those replaced the full drawing with one benzyl SMILES.
+      if (!stemHasCrop && optionFigs < 2) {
         const printed = Number(q?.printedNumber ?? q?.questionNumber)
         const nextText = restoreMissingFiguresFromSource(healed?.text ?? q?.text, sourceText, printed)
         if (nextText !== String(healed?.text ?? '')) {
@@ -49,6 +52,8 @@ export function officialPyqCardAsShown(q, rawSourceText = '') {
       }
       // Figure restore can copy option drawings into the stem; peel when options already hold them.
       healed = restoreLabelledFigureOptions(healed, sourceText)
+      // Still apply OCR option/assertion fixes. Stem SMILES-prefer no longer replaces a
+      // good wide A–D crop (Q78); keep applyStoredOcrCardFixes for option heals.
       if (sourceText.length >= 40) {
         healed = applyStoredOcrCardFixes(healed, sourceText)
       }

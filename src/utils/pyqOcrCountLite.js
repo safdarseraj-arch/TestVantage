@@ -8,7 +8,8 @@ import { countMathpixQuestionMarkers, sanitizeMathpixOcrText } from './mathpixQu
 /** @param {'jee-main' | 'jee-advanced' | 'neet' | string} exam */
 export function pyqCatalogQuestionTarget(exam) {
   if (exam === 'jee-advanced') return 51
-  if (exam === 'jee-main') return 30
+  // Full JEE Main sitting is 90 (20 SCQ + 10 numerical × 3). Old 30 under-counted FIITJEE booklets.
+  if (exam === 'jee-main') return 90
   if (exam === 'neet') return 180
   return 10
 }
@@ -36,12 +37,22 @@ export function quickOcrQuestionCount(ocrText) {
 
 /**
  * Expected sitting size is the question markers actually in this OCR.
- * Catalog (51 / 30 / 180) is only the fallback when the OCR has no countable questions.
+ * Catalog (51 / 90 / 180) is the fallback when OCR has no countable questions,
+ * or when Mathpix markers are sparse on a long full-paper OCR (FIITJEE booklets).
  */
 export function expectedPyqTargetFromOcrLite(exam, ocrText) {
+  const catalog = pyqCatalogQuestionTarget(exam)
   const markers = quickOcrQuestionCount(ocrText)
-  if (markers >= 8) return markers
-  return pyqCatalogQuestionTarget(exam)
+  const raw = String(ocrText ?? '')
+  if (markers >= 8) {
+    // Keep real short OCR counts (e.g. Advanced partial 18). Do not let ~8 markers
+    // on a 60k+ char Main/Adv/NEET OCR override the known full-paper size.
+    if (catalog >= 40 && markers < Math.floor(catalog * 0.35) && raw.length > 20000) {
+      return catalog
+    }
+    return markers
+  }
+  return catalog
 }
 
 function liteTypeCounts(questions) {
@@ -71,10 +82,21 @@ export function buildLiteExtractionSummary(input = {}) {
   const exam = String(input.exam ?? '')
   const markers = quickOcrQuestionCount(ocrText)
   const filled = questions.filter((q) => String(q?.text ?? q?.stem ?? '').trim()).length
-  // Real marker count wins. A filled paper with no OCR text is not "catalog 51".
-  let expected = markers >= 8 ? markers : 0
+  // Prefer a coherent expected size: sparse markers on a long OCR / full split must not
+  // report "~8" when the sitting catalog (or filled cards) is ~90 / 51 / 180.
+  let expected = expectedPyqTargetFromOcrLite(exam, ocrText)
   if (expected < 8 && filled >= 8 && ocrText.trim().length < 80) expected = filled
-  else if (expected < 8) expected = expectedPyqTargetFromOcrLite(exam, ocrText)
+  const catalog = pyqCatalogQuestionTarget(exam)
+  if (
+    catalog >= 40 &&
+    filled >= catalog - 2 &&
+    filled <= catalog + 2 &&
+    (markers < Math.floor(catalog * 0.35) || Math.abs(expected - filled) > 2)
+  ) {
+    expected = filled
+  }
+  const displayOcrCount =
+    catalog >= 40 && markers < Math.floor(catalog * 0.35) && filled >= catalog - 2 ? filled : markers
   const reserved = questions.length - filled
   const typeCounts = liteTypeCounts(questions.filter((q) => String(q?.text ?? '').trim()))
   const ocrFigures = (ocrText.match(/\\includegraphics|cdn\.mathpix\.com/gi) || []).length
@@ -87,12 +109,12 @@ export function buildLiteExtractionSummary(input = {}) {
   return {
     expected,
     pdf: {
-      questionCount: markers,
+      questionCount: displayOcrCount,
       figureQuestions: ocrFigures,
       instructionBlocks: instrBlocks,
     },
     latex: {
-      questionCount: markers,
+      questionCount: displayOcrCount,
       markers,
       figureQuestions: ocrFigures,
       errors: ocrErrors,

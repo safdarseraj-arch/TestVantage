@@ -1166,29 +1166,66 @@
   color: #64748b;
 }
 
+.diag-tabs-meta--strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  font-size: 0.86rem;
+  color: #14532d;
+}
+
+.diag-more-insights {
+  margin: 0.85rem 0 0.35rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.diag-more-insights > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  list-style: none;
+}
+
+.diag-more-insights > summary::-webkit-details-marker {
+  display: none;
+}
+
+.diag-more-insights[open] > summary {
+  margin-bottom: 0.55rem;
+}
+
 .diag-roi,
 .diag-balance {
   margin: 0 0 0.85rem;
   padding: 0.65rem 0.75rem;
   border-radius: 10px;
   border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  background: #fff;
 }
 
-.diag-roi {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+.diag-more-insights .diag-balance,
+.diag-more-insights .diag-anomaly,
+.diag-more-insights .diag-trend {
+  margin-bottom: 0.65rem;
 }
 
-.diag-roi-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem 1rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 0.82rem;
-  color: #14532d;
+.diag-more-insights .diag-balance:last-child,
+.diag-more-insights .diag-anomaly:last-child,
+.diag-more-insights .diag-trend:last-child {
+  margin-bottom: 0;
 }
 
 .diag-balance-list {

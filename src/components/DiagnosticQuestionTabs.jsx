@@ -190,96 +190,29 @@ export default function DiagnosticQuestionTabs({
         )}
       </div>
 
-      <div className="diag-tabs-meta form-hint">
-        {tabs.studentCount} student{tabs.studentCount === 1 ? '' : 's'} · sample floor{' '}
-        {tabs.sampleFloor} · Mistake {tabs.summary.highMistake} · Skip {tabs.summary.highSkip} ·
-        Struggle-only {tabs.summary.combinedOnly}
-        {tabs.summary.suspectKey > 0 ? ` · Suspect key ${tabs.summary.suspectKey}` : ''}
-        {tabs.summary.belowFloor > 0
-          ? ` · ${tabs.summary.belowFloor} still warming up (under ${tabs.sampleFloor} servings)`
-          : ''}
-      </div>
-
-      {roi?.ready ? (
-        <div className="diag-roi" aria-label="School diagnostic summary">
-          <strong>School diagnostic summary</strong>
-          <p className="form-hint" style={{ margin: '0.25rem 0 0.45rem' }}>
-            {roi.takeaway}
-          </p>
-          <ul className="diag-roi-stats">
-            <li>
-              <strong>{roi.questionsFlagged}</strong> flags
-            </li>
-            <li>
-              <strong>{roi.verifiedReviewed}</strong> reviewed
-            </li>
-            <li>
+      {tabs.ready ? (
+        <div className="diag-tabs-meta diag-tabs-meta--strip" aria-label="Class summary">
+          <span>
+            <strong>{tabs.studentCount}</strong> students
+          </span>
+          <span>
+            <strong>{roi?.questionsFlagged ?? 0}</strong> flags
+          </span>
+          <span>
+            <strong>{roi?.verifiedReviewed ?? 0}</strong> reviewed
+          </span>
+          {roi?.wrongKeysCaught ? (
+            <span>
               <strong>{roi.wrongKeysCaught}</strong> wrong keys
-            </li>
-            <li>
-              <strong>{roi.students}</strong> students
-            </li>
-          </ul>
+            </span>
+          ) : null}
+          {tabs.summary.belowFloor > 0 ? (
+            <span className="form-hint">{tabs.summary.belowFloor} warming up</span>
+          ) : null}
         </div>
-      ) : null}
-
-      {paperBalance?.ready ? (
-        <div className="diag-balance" aria-label="Smart paper balance">
-          <strong>Smart paper balance</strong>
-          <p className="form-hint" style={{ margin: '0.25rem 0 0.45rem' }}>
-            {paperBalance.takeaway}
-          </p>
-          <ul className="diag-balance-list">
-            {paperBalance.suggestions.slice(0, 6).map((s) => (
-              <li key={s.questionId}>
-                <span className={`diag-badge diag-badge--${s.action}`}>{s.action.replace(/_/g, ' ')}</span>{' '}
-                {s.index != null ? `Q${s.index}` : 'Q?'} · {subjectLabel(s)} — {s.reason}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {trendPoints.length > 0 && (
-        <div className="diag-trend" aria-label="Diagnostic trend snapshot">
-          <strong className="diag-trend-title">Trend snapshot</strong>
-          <p className="form-hint" style={{ margin: '0.15rem 0 0.45rem' }}>
-            Last {trendPoints.length} class rollup
-            {trendPoints.length === 1 ? '' : 's'} saved on this browser (not a live warehouse).
-          </p>
-          <div className="diag-trend-row">
-            {[...trendPoints].reverse().map((p, i) => (
-              <div key={`${p.at}-${i}`} className="diag-trend-pill" title={formatWhen(p.at)}>
-                <span className="diag-trend-pill-when">{formatWhen(p.at)}</span>
-                <span>
-                  M {p.highMistake} · S {p.highSkip} · C {p.combinedOnly}
-                  {p.suspectKey ? ` · QA ${p.suspectKey}` : ''}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+      ) : (
+        <p className="form-hint diag-tabs-meta">Load a classroom batch to see question flags.</p>
       )}
-
-      {anomalies?.ready ? (
-        <div className="diag-anomaly" role="status">
-          <strong>Paper-leak / anomaly check</strong>
-          <p className="form-hint" style={{ margin: '0.25rem 0 0.5rem' }}>
-            {anomalies.takeaway}
-          </p>
-          <ul className="diag-anomaly-list">
-            {anomalies.flags.slice(0, 5).map((f) => (
-              <li key={`${f.questionId}-${f.code}`}>
-                <span className="diag-badge diag-badge--anomaly">{f.label}</span>{' '}
-                {f.index != null ? `Q${f.index}` : 'Q?'} · {subjectLabel(f)}
-                {f.chapter ? ` · ${f.chapter}` : ''} — {f.message}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : tabs.ready ? (
-        <p className="form-hint diag-anomaly-ok">{anomalies?.takeaway}</p>
-      ) : null}
 
       <div className="diag-tabs-bar" role="tablist" aria-label="Diagnostic views">
         {TABS.map((t) => {
@@ -483,10 +416,77 @@ export default function DiagnosticQuestionTabs({
         </div>
       )}
 
+      {(paperBalance?.ready || anomalies?.ready || trendPoints.length > 0) && (
+        <details className="diag-more-insights" open={Boolean(anomalies?.ready)}>
+          <summary>
+            More insights
+            <span className="form-hint">
+              {[
+                paperBalance?.ready ? 'paper balance' : null,
+                anomalies?.ready ? 'anomaly' : null,
+                trendPoints.length ? 'trend' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </summary>
+          {paperBalance?.ready ? (
+            <div className="diag-balance" aria-label="Smart paper balance">
+              <strong>Smart paper balance</strong>
+              <p className="form-hint" style={{ margin: '0.25rem 0 0.45rem' }}>
+                {paperBalance.takeaway}
+              </p>
+              <ul className="diag-balance-list">
+                {paperBalance.suggestions.slice(0, 5).map((s) => (
+                  <li key={s.questionId}>
+                    <span className={`diag-badge diag-badge--${s.action}`}>
+                      {s.action.replace(/_/g, ' ')}
+                    </span>{' '}
+                    {s.index != null ? `Q${s.index}` : 'Q?'} · {subjectLabel(s)} — {s.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {anomalies?.ready ? (
+            <div className="diag-anomaly" role="status">
+              <strong>Anomaly check</strong>
+              <p className="form-hint" style={{ margin: '0.25rem 0 0.5rem' }}>
+                {anomalies.takeaway}
+              </p>
+              <ul className="diag-anomaly-list">
+                {anomalies.flags.slice(0, 4).map((f) => (
+                  <li key={`${f.questionId}-${f.code}`}>
+                    <span className="diag-badge diag-badge--anomaly">{f.label}</span>{' '}
+                    {f.index != null ? `Q${f.index}` : 'Q?'} · {subjectLabel(f)}
+                    {f.chapter ? ` · ${f.chapter}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {trendPoints.length > 0 ? (
+            <div className="diag-trend" aria-label="Diagnostic trend snapshot">
+              <strong className="diag-trend-title">Trend</strong>
+              <div className="diag-trend-row">
+                {[...trendPoints].reverse().map((p, i) => (
+                  <div key={`${p.at}-${i}`} className="diag-trend-pill" title={formatWhen(p.at)}>
+                    <span className="diag-trend-pill-when">{formatWhen(p.at)}</span>
+                    <span>
+                      M {p.highMistake} · S {p.highSkip} · C {p.combinedOnly}
+                      {p.suspectKey ? ` · QA ${p.suspectKey}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </details>
+      )}
+
       <p className="form-hint diag-tabs-foot">
-        Routing uses a {tabs.sampleFloor}+ exposure floor and 50% / 45% hysteresis so near-threshold
-        questions do not flap in and out. Attempt error % = wrong among those who tried (skips
-        excluded).
+        Flags need {tabs.sampleFloor}+ exposures; 50% / 45% hysteresis avoids flapping. Attempt error
+        ignores skips.
       </p>
     </section>
   )

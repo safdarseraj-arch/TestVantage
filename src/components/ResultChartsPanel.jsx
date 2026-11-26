@@ -332,82 +332,73 @@ export default function ResultChartsPanel({
         </ChartCard>
 
         <ChartCard
-          title="Trap fall & time sinks"
-          subtitle="How you handled questions most classmates get wrong or skip"
+          title="Fix first"
+          subtitle={
+            trapMetrics?.ready
+              ? `Trap fall ${trapMetrics.trapFallRate ?? '—'}% · time-sink skip ${trapMetrics.timeSinkRate ?? '—'}% — redo these before the next mock`
+              : 'Questions classmates miss that you also missed — open and fix'
+          }
           className="rcx-span-2"
         >
-          {!trapMetrics?.ready ? (
-            <ChartEmpty message={trapMetrics?.takeaway || 'Need cohort flags for this paper.'} />
-          ) : (
-            <>
-              <div className="rcx-band-kpis">
-                <div>
-                  <strong>
-                    {trapMetrics.trapFallRate != null ? `${trapMetrics.trapFallRate}%` : '—'}
-                  </strong>
-                  <span className="form-hint" style={{ display: 'block' }}>
-                    Trap fall ({trapMetrics.tabAWrongAttempt}/{trapMetrics.tabASeen} high-mistake)
-                  </span>
-                </div>
-                <div>
-                  <strong>
-                    {trapMetrics.timeSinkRate != null ? `${trapMetrics.timeSinkRate}%` : '—'}
-                  </strong>
-                  <span className="form-hint" style={{ display: 'block' }}>
-                    Time-sink skip ({trapMetrics.tabBTimeSinkSkip}/{trapMetrics.tabBSeen} high-skip)
-                  </span>
-                </div>
+          {trapMetrics?.ready ? (
+            <div className="rcx-band-kpis" style={{ marginBottom: '0.65rem' }}>
+              <div>
+                <strong>
+                  {trapMetrics.trapFallRate != null ? `${trapMetrics.trapFallRate}%` : '—'}
+                </strong>
+                <span className="form-hint" style={{ display: 'block' }}>
+                  Trap fall ({trapMetrics.tabAWrongAttempt}/{trapMetrics.tabASeen})
+                </span>
               </div>
-              <p className="form-hint" style={{ marginBottom: 0 }}>
-                {trapMetrics.takeaway}
-              </p>
-            </>
-          )}
-        </ChartCard>
-
-        <ChartCard
-          title="Personal Fix Queue"
-          subtitle="High-mistake traps and combined-struggle items you missed — fix these first"
-          className="rcx-span-2"
-        >
+              <div>
+                <strong>
+                  {trapMetrics.timeSinkRate != null ? `${trapMetrics.timeSinkRate}%` : '—'}
+                </strong>
+                <span className="form-hint" style={{ display: 'block' }}>
+                  Time-sink ({trapMetrics.tabBTimeSinkSkip}/{trapMetrics.tabBSeen})
+                </span>
+              </div>
+            </div>
+          ) : null}
           {!fixQueue?.ready || !fixQueue.items?.length ? (
-            <ChartEmpty message={fixQueue?.takeaway || 'No Fix Queue items yet.'} />
+            <ChartEmpty
+              message={
+                fixQueue?.takeaway ||
+                trapMetrics?.takeaway ||
+                'When more classmates finish this paper, your fix list appears here.'
+              }
+            />
           ) : (
-            <>
-              <ul className="rcx-fix-queue">
-                {fixQueue.items.map((item) => (
-                  <li key={item.questionId} className="rcx-fix-queue-item">
-                    <div>
-                      <strong>
-                        {item.index != null ? `Q${item.index}` : 'Question'} · {item.reasonLabel}
-                      </strong>
-                      <span className="form-hint" style={{ display: 'block' }}>
-                        {(item.subject || '—').toString()}
-                        {item.chapter ? ` · ${item.chapter}` : ''} · peer struggle{' '}
-                        {item.peerStrugglePct}% · you {item.grade}
-                      </span>
-                    </div>
-                    <div className="rcx-fix-queue-actions">
-                      {typeof onOpenQuestion === 'function' ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => onOpenQuestion(item.questionId)}
-                        >
-                          Open in Question-wise
-                        </button>
-                      ) : null}
-                      <Link to="/practice" className="btn btn-ghost btn-sm">
-                        Practice
-                      </Link>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <p className="form-hint" style={{ marginBottom: 0 }}>
-                {fixQueue.takeaway}
-              </p>
-            </>
+            <ul className="rcx-fix-queue">
+              {fixQueue.items.map((item) => (
+                <li key={item.questionId} className="rcx-fix-queue-item">
+                  <div>
+                    <strong>
+                      {item.index != null ? `Q${item.index}` : 'Question'} · {item.reasonLabel}
+                    </strong>
+                    <span className="form-hint" style={{ display: 'block' }}>
+                      {(item.subject || '—').toString()}
+                      {item.chapter ? ` · ${item.chapter}` : ''} · peer {item.peerStrugglePct}% · you{' '}
+                      {item.grade}
+                    </span>
+                  </div>
+                  <div className="rcx-fix-queue-actions">
+                    {typeof onOpenQuestion === 'function' ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => onOpenQuestion(item.questionId)}
+                      >
+                        Open
+                      </button>
+                    ) : null}
+                    <Link to="/practice" className="btn btn-ghost btn-sm">
+                      Practice
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </ChartCard>
 

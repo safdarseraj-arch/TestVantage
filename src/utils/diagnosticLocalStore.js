@@ -5,7 +5,9 @@
 
 const VERIFICATION_KEY = 'testvantage-diag-verification-v1'
 const TREND_KEY = 'testvantage-diag-trend-v1'
+const ROLLUP_KEY = 'testvantage-diag-rollup-cache-v1'
 export const TREND_MAX_POINTS = 12
+export const ROLLUP_MAX_ENTRIES = 24
 
 /** @typedef {'verified'|'wrong_key'|'keep'} VerificationStatus */
 
@@ -147,4 +149,61 @@ export function getDiagnosticTrendSnapshots(opts = {}) {
 export function clearDiagnosticTrendStore() {
   if (typeof localStorage === 'undefined') return
   localStorage.removeItem(TREND_KEY)
+}
+
+/**
+ * Local rollup cache (browser “DB” MVP) — full tab summary keyed by testId.
+ * @returns {{ byTestId: Record<string, object>, order: string[] }}
+ */
+function loadRollupCache() {
+  try {
+    if (typeof localStorage === 'undefined') return { byTestId: {}, order: [] }
+    const raw = localStorage.getItem(ROLLUP_KEY)
+    if (!raw) return { byTestId: {}, order: [] }
+    const parsed = JSON.parse(raw)
+    return {
+      byTestId: parsed?.byTestId && typeof parsed.byTestId === 'object' ? parsed.byTestId : {},
+      order: Array.isArray(parsed?.order) ? parsed.order : [],
+    }
+  } catch {
+    return { byTestId: {}, order: [] }
+  }
+}
+
+function saveRollupCache(data) {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(ROLLUP_KEY, JSON.stringify(data))
+}
+
+/**
+ * @param {string} testId
+ * @param {object} payload — compact rollup (tabs summary, paperBalance takeaway, etc.)
+ */
+export function saveDiagnosticRollupCache(testId, payload) {
+  const id = String(testId || 'all')
+  const data = loadRollupCache()
+  data.byTestId[id] = {
+    ...(payload && typeof payload === 'object' ? payload : {}),
+    testId: id,
+    savedAt: Date.now(),
+  }
+  data.order = [id, ...data.order.filter((x) => x !== id)].slice(0, ROLLUP_MAX_ENTRIES)
+  const keep = new Set(data.order)
+  for (const key of Object.keys(data.byTestId)) {
+    if (!keep.has(key)) delete data.byTestId[key]
+  }
+  saveRollupCache(data)
+  return data.byTestId[id]
+}
+
+/** @param {string} [testId] */
+export function getDiagnosticRollupCache(testId) {
+  const data = loadRollupCache()
+  if (testId) return data.byTestId[String(testId)] || null
+  return data.order.map((id) => data.byTestId[id]).filter(Boolean)
+}
+
+export function clearDiagnosticRollupCache() {
+  if (typeof localStorage === 'undefined') return
+  localStorage.removeItem(ROLLUP_KEY)
 }

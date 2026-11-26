@@ -30,6 +30,8 @@ const {
   buildRetestDelta,
   detectAnomalyFlags,
   summarizeDiagnosticTrendPoint,
+  suggestSmartPaperBalance,
+  buildSchoolDiagnosticRoiSummary,
   ENTER_THRESHOLD_PCT,
   EXIT_THRESHOLD_PCT,
 } = await import('../src/utils/diagnosticQuestionAnalytics.js')
@@ -38,6 +40,9 @@ const {
   setVerificationStatus,
   getVerificationStatus,
   getVerificationAuditLog,
+  saveDiagnosticRollupCache,
+  getDiagnosticRollupCache,
+  clearDiagnosticRollupCache,
   clearVerificationStore,
   recordDiagnosticTrendSnapshot,
   getDiagnosticTrendSnapshots,
@@ -338,5 +343,27 @@ assert.ok(
   demoTrap || demoPack.rollups.questions.some((q) => Object.keys(q.optionWrong || {}).length > 0),
   'expected some optionWrong data from demo batch',
 )
+
+const balance = suggestSmartPaperBalance(full.tabs)
+assert.equal(balance.ready, true)
+assert.ok(balance.suggestions.length >= 1)
+
+const roi = buildSchoolDiagnosticRoiSummary(full.tabs, { 'q-trap': { status: 'wrong_key' } })
+assert.equal(roi.ready, true)
+assert.equal(roi.wrongKeysCaught, 1)
+assert.ok(roi.questionsFlagged >= 1)
+
+clearDiagnosticRollupCache()
+saveDiagnosticRollupCache('diag-paper', {
+  summary: full.tabs.summary,
+  studentCount: full.tabs.studentCount,
+  paperBalanceTakeaway: balance.takeaway,
+})
+const cached = getDiagnosticRollupCache('diag-paper')
+assert.equal(cached.testId, 'diag-paper')
+assert.ok(cached.summary)
+
+assert.ok(full.paperBalance)
+assert.ok(full.roi)
 
 console.log('test-diagnostic-question-analytics: ok')

@@ -1166,6 +1166,51 @@
   color: #64748b;
 }
 
+.diag-roi,
+.diag-balance {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.diag-roi {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.diag-roi-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  color: #14532d;
+}
+
+.diag-balance-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  color: #334155;
+}
+
+.diag-balance-list li + li {
+  margin-top: 0.35rem;
+}
+
+.diag-badge--swap,
+.diag-badge--clarify_or_drop,
+.diag-badge--hold_or_fix_key,
+.diag-badge--review_or_swap,
+.diag-badge--shorten_or_move {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
 .diag-anomaly {
   margin: 0 0 0.85rem;
   padding: 0.65rem 0.75rem;

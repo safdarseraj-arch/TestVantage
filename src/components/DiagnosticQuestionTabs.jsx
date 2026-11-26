@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   buildDiagnosticAnalyticsPack,
   buildDistractorBreakdown,
+  buildSchoolDiagnosticRoiSummary,
   DEFAULT_SAMPLE_FLOOR,
+  suggestSmartPaperBalance,
   summarizeDiagnosticTrendPoint,
 } from '../utils/diagnosticQuestionAnalytics.js'
 import {
@@ -10,6 +12,7 @@ import {
   getDiagnosticTrendSnapshots,
   getVerificationAuditLog,
   recordDiagnosticTrendSnapshot,
+  saveDiagnosticRollupCache,
   setVerificationStatus,
 } from '../utils/diagnosticLocalStore.js'
 
@@ -96,21 +99,36 @@ export default function DiagnosticQuestionTabs({
   const { tabs, anomalies } = pack
   const summaryKey = `${tabs.studentCount}-${tabs.summary.highMistake}-${tabs.summary.highSkip}-${tabs.summary.combinedOnly}-${tabs.summary.suspectKey}`
 
+  const verificationMapEarly = useMemo(() => getAllVerificationStatuses(), [verifyTick])
+  const paperBalance = useMemo(() => suggestSmartPaperBalance(tabs), [tabs])
+  const roi = useMemo(
+    () => buildSchoolDiagnosticRoiSummary(tabs, verificationMapEarly),
+    [tabs, verificationMapEarly],
+  )
+
   useEffect(() => {
     if (!tabs?.ready) return
     const titleLabel =
       (testFilter && testOptions.find((t) => t.id === testFilter)?.label) ||
       (testOptions.length === 1 ? testOptions[0].label : 'All papers')
+    const cacheId = testFilter || 'all'
     recordDiagnosticTrendSnapshot(
       summarizeDiagnosticTrendPoint(tabs, {
-        testId: testFilter || 'all',
+        testId: cacheId,
         testTitle: titleLabel || '',
       }),
     )
+    saveDiagnosticRollupCache(cacheId, {
+      testTitle: titleLabel || '',
+      summary: tabs.summary,
+      studentCount: tabs.studentCount,
+      paperBalanceTakeaway: paperBalance.takeaway,
+      roiTakeaway: roi.takeaway,
+    })
     setTrendTick((n) => n + 1)
     // summaryKey captures rollup changes without depending on a new tabs object identity
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional summaryKey gate
-  }, [summaryKey, testFilter, tabs?.ready])
+  }, [summaryKey, testFilter, tabs?.ready, paperBalance.takeaway, roi.takeaway])
 
   const trendPoints = useMemo(() => {
     void trendTick
@@ -120,10 +138,7 @@ export default function DiagnosticQuestionTabs({
     })
   }, [testFilter, trendTick])
 
-  const verificationMap = useMemo(() => {
-    void verifyTick
-    return getAllVerificationStatuses()
-  }, [verifyTick])
+  const verificationMap = verificationMapEarly
 
   const auditLog = useMemo(() => {
     void verifyTick
@@ -184,6 +199,46 @@ export default function DiagnosticQuestionTabs({
           ? ` · ${tabs.summary.belowFloor} still warming up (under ${tabs.sampleFloor} servings)`
           : ''}
       </div>
+
+      {roi?.ready ? (
+        <div className="diag-roi" aria-label="School diagnostic summary">
+          <strong>School diagnostic summary</strong>
+          <p className="form-hint" style={{ margin: '0.25rem 0 0.45rem' }}>
+            {roi.takeaway}
+          </p>
+          <ul className="diag-roi-stats">
+            <li>
+              <strong>{roi.questionsFlagged}</strong> flags
+            </li>
+            <li>
+              <strong>{roi.verifiedReviewed}</strong> reviewed
+            </li>
+            <li>
+              <strong>{roi.wrongKeysCaught}</strong> wrong keys
+            </li>
+            <li>
+              <strong>{roi.students}</strong> students
+            </li>
+          </ul>
+        </div>
+      ) : null}
+
+      {paperBalance?.ready ? (
+        <div className="diag-balance" aria-label="Smart paper balance">
+          <strong>Smart paper balance</strong>
+          <p className="form-hint" style={{ margin: '0.25rem 0 0.45rem' }}>
+            {paperBalance.takeaway}
+          </p>
+          <ul className="diag-balance-list">
+            {paperBalance.suggestions.slice(0, 6).map((s) => (
+              <li key={s.questionId}>
+                <span className={`diag-badge diag-badge--${s.action}`}>{s.action.replace(/_/g, ' ')}</span>{' '}
+                {s.index != null ? `Q${s.index}` : 'Q?'} · {subjectLabel(s)} — {s.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {trendPoints.length > 0 && (
         <div className="diag-trend" aria-label="Diagnostic trend snapshot">

@@ -977,6 +977,137 @@ export function summarizeDiagnosticTrendPoint(tabs, meta = {}) {
 }
 
 /**
+ * Smart paper balancing (local MVP) — suggest drop/swap/keep for high-struggle items.
+ * @param {ReturnType<typeof routeDiagnosticTabs>} tabs
+ * @param {{ maxSuggestions?: number }} [opts]
+ */
+export function suggestSmartPaperBalance(tabs, opts = {}) {
+  const max = Math.max(3, Number(opts.maxSuggestions) || 8)
+  if (!tabs?.ready) {
+    return {
+      ready: false,
+      suggestions: [],
+      takeaway: 'Need a class cohort before paper-balance tips appear.',
+    }
+  }
+
+  /** @type {Map<string, object>} */
+  const byId = new Map()
+  const bump = (q, action, reason, priority) => {
+    if (!q?.questionId) return
+    const prev = byId.get(q.questionId)
+    if (prev && prev.priority <= priority) return
+    byId.set(q.questionId, {
+      questionId: q.questionId,
+      index: q.index,
+      subject: q.subject,
+      chapter: q.chapter,
+      action,
+      reason,
+      priority,
+      mistakePct: q.mistakePct,
+      skipPct: q.skipPct,
+      strugglePct: q.strugglePct,
+      triageBadge: q.triageBadge,
+    })
+  }
+
+  for (const q of tabs.suspect || []) {
+    bump(
+      q,
+      'hold_or_fix_key',
+      'Suspect Key — verify the answer before the next print run.',
+      1,
+    )
+  }
+  for (const q of tabs.tabCombined || []) {
+    bump(
+      q,
+      'swap',
+      'Combined struggle — swap for a same-topic item with cleaner history.',
+      2,
+    )
+  }
+  for (const q of tabs.tabA || []) {
+    bump(
+      q,
+      q.triageBadge === 'time_sink' ? 'shorten_or_move' : 'review_or_swap',
+      'High mistake — keep only if it matches the blueprint; else swap.',
+      3,
+    )
+  }
+  for (const q of tabs.tabB || []) {
+    bump(
+      q,
+      'clarify_or_drop',
+      'High skip — clarify wording/time or drop if it is not a must-test skill.',
+      4,
+    )
+  }
+
+  const suggestions = [...byId.values()]
+    .sort((a, b) => a.priority - b.priority || (a.index ?? 0) - (b.index ?? 0))
+    .slice(0, max)
+
+  const dropLike = suggestions.filter((s) =>
+    ['swap', 'clarify_or_drop', 'hold_or_fix_key'].includes(s.action),
+  ).length
+
+  return {
+    ready: suggestions.length > 0,
+    suggestions,
+    takeaway: suggestions.length
+      ? `${suggestions.length} balance tip${suggestions.length === 1 ? '' : 's'} · ${dropLike} need a closer look before the next paper.`
+      : 'Paper looks balanced on current Tab A/B/Combined flags.',
+  }
+}
+
+/**
+ * Lightweight school / B2B ROI-style summary from diagnostics + verification (local only).
+ * @param {ReturnType<typeof routeDiagnosticTabs>} tabs
+ * @param {Record<string, { status?: string }>} [verificationByQuestion]
+ */
+export function buildSchoolDiagnosticRoiSummary(tabs, verificationByQuestion = {}) {
+  if (!tabs?.ready) {
+    return {
+      ready: false,
+      takeaway: 'Load a class batch to see the school diagnostic summary.',
+    }
+  }
+  const flagged =
+    (tabs.summary?.highMistake || 0) +
+    (tabs.summary?.highSkip || 0) +
+    (tabs.summary?.combinedOnly || 0) +
+    (tabs.summary?.suspectKey || 0)
+  const verified = Object.values(verificationByQuestion || {}).filter(
+    (v) => v?.status === 'verified' || v?.status === 'wrong_key',
+  ).length
+  const wrongKey = Object.values(verificationByQuestion || {}).filter(
+    (v) => v?.status === 'wrong_key',
+  ).length
+  const students = tabs.studentCount || 0
+  // Rough “marks rescued” heuristic: ~2 marks × students × verified/fixed items (MVP story only).
+  const estimatedMarksTouched = students * Math.max(flagged, 1) * 0.15
+
+  return {
+    ready: true,
+    students,
+    questionsFlagged: flagged,
+    highMistake: tabs.summary?.highMistake ?? 0,
+    highSkip: tabs.summary?.highSkip ?? 0,
+    suspectKey: tabs.summary?.suspectKey ?? 0,
+    verifiedReviewed: verified,
+    wrongKeysCaught: wrongKey,
+    estimatedMarksTouched: roundPct(estimatedMarksTouched, 0),
+    takeaway: wrongKey
+      ? `Caught ${wrongKey} wrong-key item${wrongKey === 1 ? '' : 's'} before the next print — that is real QA ROI.`
+      : flagged
+        ? `${flagged} struggle flag${flagged === 1 ? '' : 's'} across ${students} student${students === 1 ? '' : 's'} — use Fix Queue + paper-balance tips next.`
+        : 'No struggle flags yet — keep collecting attempts.',
+  }
+}
+
+/**
  * One-shot builder: rollups → tabs (+ optional student trap pack).
  * @param {object[]} attempts
  * @param {{
@@ -1001,6 +1132,8 @@ export function buildDiagnosticAnalyticsPack(attempts = [], opts = {}) {
         })
       : null
   const anomalies = detectAnomalyFlags(rollups.questions, { sampleFloor: opts.sampleFloor })
+  const paperBalance = suggestSmartPaperBalance(tabs)
+  const roi = buildSchoolDiagnosticRoiSummary(tabs)
 
-  return { rollups, tabs, student, anomalies }
+  return { rollups, tabs, student, anomalies, paperBalance, roi }
 }

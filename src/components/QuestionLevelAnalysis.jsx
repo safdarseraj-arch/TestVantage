@@ -123,6 +123,9 @@ function CohortTable({ rows, studentGrades }) {
  *   subjectFilter?: string
  *   perQuestion?: object[]
  *   initialQuestionId?: string | null
+ *   wrongReasons?: Record<string, string>
+ *   autoErrorTypes?: Record<string, string>
+ *   onWrongReasonChange?: (questionId: string, tagId: string | null) => void
  * }} props
  */
 export default function QuestionLevelAnalysis({
@@ -132,6 +135,9 @@ export default function QuestionLevelAnalysis({
   subjectFilter = 'overall',
   perQuestion,
   initialQuestionId = null,
+  wrongReasons = {},
+  autoErrorTypes = {},
+  onWrongReasonChange,
 }) {
   const [cohortOpen, setCohortOpen] = useState(false)
 
@@ -175,8 +181,11 @@ export default function QuestionLevelAnalysis({
           subjectFilter={subjectFilter}
           peerStatsByQuestionId={peerStatsByQuestionId}
           title="Question-wise analysis"
-          subtitle="Green = correct, red = wrong. Use Time sinks for slow + wrong. Open Your vs correct for device peer %."
+          subtitle="Green = correct, red = wrong. On wrongs, tap Why I got it wrong so Analytics Error DNA learns your real causes."
           initialQuestionId={initialQuestionId}
+          wrongReasons={wrongReasons}
+          autoErrorTypes={autoErrorTypes}
+          onWrongReasonChange={onWrongReasonChange}
         />
 
         {rows.length > 0 && (

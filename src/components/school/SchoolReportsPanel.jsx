@@ -1,10 +1,25 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import ClassroomDiagnosticHeatmap from '../ClassroomDiagnosticHeatmap.jsx'
+import { getAllStudentAttemptsAsync } from '../../utils/attemptHistory.js'
 
 /**
  * Lightweight school reports — attendance, fees, exams at a glance.
  */
 export default function SchoolReportsPanel({ snapshot, onGoTab }) {
   const { attendance, fees, counts, upcomingExams, schedule } = snapshot
+  const [attempts, setAttempts] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const rows = await getAllStudentAttemptsAsync({ limit: 300 })
+      if (!cancelled) setAttempts(rows)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const rows = [
     {
@@ -65,6 +80,12 @@ export default function SchoolReportsPanel({ snapshot, onGoTab }) {
           Open student results
         </Link>
       </div>
+
+      <ClassroomDiagnosticHeatmap
+        attempts={attempts}
+        title="Classroom diagnostic heatmap"
+        subtitle="Failure hotspots by chapter and subject across student attempts on this device."
+      />
 
       <div className="school-report-table-wrap">
         <table className="school-report-table">

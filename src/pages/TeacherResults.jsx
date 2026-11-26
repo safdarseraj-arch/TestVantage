@@ -15,6 +15,7 @@ import {
 } from '../utils/seedDemoBatchResults.js'
 import PortalPage from '../components/PortalPage.jsx'
 import OrgServerSyncPanel from '../components/OrgServerSyncPanel.jsx'
+import ClassroomDiagnosticHeatmap from '../components/ClassroomDiagnosticHeatmap.jsx'
 
 /** @typedef {'overall'|'Physics'|'Chemistry'|'Maths'} RankBy */
 
@@ -155,6 +156,14 @@ export default function TeacherResults() {
         <p className="form-hint" role="status">
           {demoNote}
         </p>
+      )}
+
+      {attempts.length > 0 && (
+        <ClassroomDiagnosticHeatmap
+          attempts={attempts}
+          title="Classroom diagnostic heatmap"
+          subtitle="Cohort failure rate by chapter / subject — use for re-teach priorities."
+        />
       )}
 
       {batchSummary.count > 0 && (

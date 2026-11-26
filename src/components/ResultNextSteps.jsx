@@ -10,6 +10,8 @@ export default function ResultNextSteps({
   topWeakChapter,
   topWeakSubjects = [],
   testTypeId,
+  wrongCount = 0,
+  onMistakeRetest,
 }) {
   const navigate = useNavigate()
 
@@ -35,6 +37,18 @@ export default function ResultNextSteps({
             <small>Targeted chapter drill</small>
           </span>
         </button>
+
+        {typeof onMistakeRetest === 'function' && wrongCount > 0 && (
+          <button type="button" className="si-next-step" onClick={onMistakeRetest}>
+            <span className="si-next-step-icon" aria-hidden>
+              ♻
+            </span>
+            <span className="si-next-step-text">
+              <strong>Mistake-only retest</strong>
+              <small>{wrongCount} wrong · timed mini-paper</small>
+            </span>
+          </button>
+        )}
 
         <Link to="/analytics" className="si-next-step">
           <span className="si-next-step-icon" aria-hidden>

@@ -958,6 +958,74 @@
   border: 0;
 }
 
+/* Classroom diagnostic heatmap */
+.school-heatmap {
+  margin: 0 0 1.25rem;
+}
+
+.school-heatmap-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.school-heatmap-meta {
+  margin: 0 0 0.65rem;
+}
+
+.school-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.55rem;
+}
+
+.school-heatmap-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  min-height: 96px;
+}
+
+.school-heatmap-sub {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.school-heatmap-cell strong {
+  font-size: 0.88rem;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.school-heatmap-rate {
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: #9a3412;
+}
+
+.school-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.school-heatmap-swatch {
+  flex: 1;
+  max-width: 160px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #fef3c7, #fb7185);
+}
+
 @media (max-width: 640px) {
   .school-student-card {
     flex-direction: column;

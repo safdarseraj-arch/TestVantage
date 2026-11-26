@@ -54,8 +54,37 @@ const teacherOk = validateTeacherProfile({
   subjects: ['physics'],
   standards: ['class_12'],
   experience: '8',
+  onboardingMode: 'independent',
+  examSpecializations: ['jee-main'],
 })
 assert.equal(teacherOk.ok, true)
+assert.equal(teacherOk.profile.onboardingMode, 'independent')
+assert.equal(teacherOk.profile.personalVaultOwned, true)
+assert.equal(teacherOk.profile.entitlements.can_upload_personal_qb, true)
+assert.equal(teacherOk.profile.entitlements.can_contribute_school_qb, false)
+
+const schoolOk = validateTeacherProfile({
+  dob: '1988-03-01',
+  subjects: ['physics'],
+  standards: ['class_12'],
+  onboardingMode: 'school',
+  schoolInviteCode: 'school-demo',
+})
+assert.equal(schoolOk.ok, true)
+assert.equal(schoolOk.profile.onboardingMode, 'school')
+assert.equal(schoolOk.profile.schoolInviteCode, 'SCHOOL-DEMO')
+assert.ok(schoolOk.profile.campusName)
+assert.equal(schoolOk.profile.entitlements.can_contribute_school_qb, true)
+assert.equal(schoolOk.profile.entitlements.can_view_system_qb, true)
+
+const badSchool = validateTeacherProfile({
+  dob: '1988-03-01',
+  subjects: ['physics'],
+  standards: ['class_12'],
+  onboardingMode: 'school',
+  schoolInviteCode: 'NOPE',
+})
+assert.equal(badSchool.ok, false)
 
 const sReg = registerUser({ name: 'Asha', email: 'asha.onboard@test.com', password: 'pass12' })
 assert.equal(sReg.ok, true)
@@ -92,10 +121,16 @@ const tDone = completeTeacherProfile(tReg.user.id, {
   subjects: ['chemistry', 'physics'],
   standards: ['class_11', 'class_12'],
   experience: '',
+  onboardingMode: 'independent',
+  examSpecializations: ['jee-main', 'jee-advanced'],
+  watermarkText: 'Ms Rao · confidential',
 })
 assert.equal(tDone.ok, true)
 const teacher = getUserById(tReg.user.id)
 assert.equal(teacher.profileComplete, true)
+assert.equal(teacher.profile.onboardingMode, 'independent')
+assert.deepEqual(teacher.profile.examSpecializations, ['jee-main', 'jee-advanced'])
+assert.equal(teacher.profile.watermarkText, 'Ms Rao · confidential')
 assert.ok(teacher.permissions.includes(PERMS.CREATE_PAPER))
 assert.ok(teacher.permissions.includes(PERMS.UPLOAD_QUESTIONS))
 assert.ok(!teacher.permissions.includes(PERMS.PUBLISH_QUESTIONS))
@@ -132,8 +167,12 @@ const legacyTeacherDone = completeTeacherProfile(existingTeacher.id, {
   dob: '1985-01-15',
   subjects: ['mathematics'],
   standards: ['class_11'],
+  onboardingMode: 'school',
+  schoolInviteCode: 'CAMPUS-TV',
 })
 assert.equal(legacyTeacherDone.ok, true)
+assert.equal(getUserById(existingTeacher.id).profile.onboardingMode, 'school')
+assert.equal(getUserById(existingTeacher.id).profile.entitlements.can_contribute_school_qb, true)
 assert.ok(getUserById(existingTeacher.id).permissions.includes(PERMS.UPLOAD_QUESTIONS))
 assert.ok(!getUserById(existingTeacher.id).permissions.includes(PERMS.PUBLISH_QUESTIONS))
 
@@ -165,10 +204,13 @@ const teacherResave = completeTeacherProfile(tReg.user.id, {
   subjects: ['physics'],
   standards: ['class_12'],
   experience: 'IIT coaching, 10 years',
+  onboardingMode: 'independent',
+  examSpecializations: ['neet'],
 })
 assert.equal(teacherResave.ok, true)
 assert.equal(getUserById(tReg.user.id).profile.experience, 'IIT coaching, 10 years')
 assert.deepEqual(getUserById(tReg.user.id).profile.subjects, ['physics'])
+assert.deepEqual(getUserById(tReg.user.id).profile.examSpecializations, ['neet'])
 
 const { ensureDemoAccounts, DEMO_ACCOUNTS } = await import('../src/utils/demoAccounts.js')
 ensureDemoAccounts()

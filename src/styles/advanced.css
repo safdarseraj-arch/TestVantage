@@ -5483,6 +5483,62 @@ h4.compose-entry-title .draft-conf-inline {
   color: var(--primary);
 }
 
+.rad-diff-sitter {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0d9488;
+}
+
+.rad-sitter-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(145deg, #f0fdfa 0%, #ecfeff 100%);
+  border: 1px solid #99f6e4;
+}
+
+.rad-sitter-eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0f766e;
+}
+
+.rad-sitter-pct {
+  font-size: 1.75rem;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.rad-sitter-note {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.rad-clock-stamina {
+  padding: 1rem 1.1rem 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.rad-clock-stamina-head h3 {
+  margin: 0 0 0.15rem;
+  font-size: 1.05rem;
+}
+
+.rad-stamina-grid-clock {
+  margin-top: 1rem;
+}
+
 /* Chapter table */
 .rad-chapter-table-wrap {
   overflow-x: auto;

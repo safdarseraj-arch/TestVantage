@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { savePracticePrefill } from '../utils/aiMastery.js'
+import { buildChapterResourceLinks } from '../utils/chapterResourceLinks.js'
 
 const SORT_OPTIONS = [
   { id: 'accuracy', label: 'Weakest first' },
@@ -86,10 +87,28 @@ export default function WeakChaptersPanel({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t) => (
+            {sorted.map((t) => {
+              const links = buildChapterResourceLinks({
+                chapter: t.chapter,
+                subjects: chapterSubjects[t.chapter] ?? [],
+                examPatternId,
+              })
+              return (
               <tr key={t.chapter} className={t.accuracy < 50 ? 'si-weak-row--low' : ''}>
                 <td>
                   <strong>{t.chapter}</strong>
+                  {links.ncertUrl && (
+                    <div className="si-weak-ncert">
+                      <a
+                        href={links.ncertUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="si-ncert-link"
+                      >
+                        NCERT chapter ↗
+                      </a>
+                    </div>
+                  )}
                 </td>
                 <td>
                   <span className={`si-weak-acc${t.accuracy < 50 ? ' low' : ''}`}>
@@ -109,7 +128,7 @@ export default function WeakChaptersPanel({
                   </button>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

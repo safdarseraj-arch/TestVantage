@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { QuestionStem, SolutionMedia } from './QuestionMedia'
 import QuestionPeerStatsBlock from './QuestionPeerStatsBlock'
+import WhyWrongTagPicker from './WhyWrongTagPicker.jsx'
 import {
   shouldHideStemTextWithImage,
   shouldShowQuestionStemImage,
@@ -11,6 +12,7 @@ import ReportQuestionButton from './ReportQuestionModal.jsx'
 import AskDoubtButton from './AskDoubtButton.jsx'
 import MatrixGridView from './MatrixGridView.jsx'
 import { isMatrixGridCard } from '../utils/matrixGridPyq.js'
+import { getWrongReasonForQuestion } from '../utils/wrongReasonTags.js'
 
 const GRADE_ICON = {
   correct: '✓',
@@ -50,6 +52,9 @@ const DETAIL_TABS = [
  *   subtitle?: string
  *   peerStatsByQuestionId?: Map<string, object>
  *   initialQuestionId?: string | null
+ *   wrongReasons?: Record<string, string>
+ *   autoErrorTypes?: Record<string, string>
+ *   onWrongReasonChange?: (questionId: string, tagId: string | null) => void
  * }} props
  */
 export default function ResultQuestionWisePanel({
@@ -59,6 +64,9 @@ export default function ResultQuestionWisePanel({
   subtitle = 'Tap any question number to view it here — your result is colour-coded.',
   peerStatsByQuestionId,
   initialQuestionId = null,
+  wrongReasons = {},
+  autoErrorTypes = {},
+  onWrongReasonChange,
 }) {
   const [filter, setFilter] = useState('all')
   const [chapterFilter, setChapterFilter] = useState('all')
@@ -261,23 +269,28 @@ export default function ResultQuestionWisePanel({
         <aside className="rqw-sidebar" aria-label="Question numbers">
           <p className="rqw-sidebar-label">Questions</p>
           <div className="rqw-q-grid">
-            {filtered.map((pq) => (
-              <button
-                key={pq.questionId}
-                type="button"
-                className={`rqw-q-pill rqw-q-${pq.grade}${selected?.questionId === pq.questionId ? ' active' : ''}${pq.marked ? ' marked' : ''}`}
-                onClick={() => {
-                  setSelectedId(pq.questionId)
-                  setDetailTab('question')
-                }}
-                title={`Q${pq.index} — ${GRADE_LABEL[pq.grade] ?? pq.grade}`}
-              >
-                <span className="rqw-q-pill-num">{pq.index}</span>
-                <span className="rqw-q-pill-icon" aria-hidden>
-                  {GRADE_ICON[pq.grade] ?? '·'}
-                </span>
-              </button>
-            ))}
+            {filtered.map((pq) => {
+              const tagged =
+                (pq.grade === 'wrong' || pq.grade === 'partial') &&
+                !!getWrongReasonForQuestion(wrongReasons, pq.questionId)
+              return (
+                <button
+                  key={pq.questionId}
+                  type="button"
+                  className={`rqw-q-pill rqw-q-${pq.grade}${selected?.questionId === pq.questionId ? ' active' : ''}${pq.marked ? ' marked' : ''}${tagged ? ' tagged' : ''}`}
+                  onClick={() => {
+                    setSelectedId(pq.questionId)
+                    setDetailTab('question')
+                  }}
+                  title={`Q${pq.index} — ${GRADE_LABEL[pq.grade] ?? pq.grade}${tagged ? ' · tagged' : ''}`}
+                >
+                  <span className="rqw-q-pill-num">{pq.index}</span>
+                  <span className="rqw-q-pill-icon" aria-hidden>
+                    {GRADE_ICON[pq.grade] ?? '·'}
+                  </span>
+                </button>
+              )
+            })}
           </div>
           {filtered.length === 0 && (
             <p className="form-hint rqw-sidebar-empty">No questions match this filter.</p>
@@ -356,6 +369,17 @@ export default function ResultQuestionWisePanel({
               </div>
 
               <div className="rqw-detail-body">
+                {(selected.grade === 'wrong' || selected.grade === 'partial') &&
+                  typeof onWrongReasonChange === 'function' && (
+                    <WhyWrongTagPicker
+                      value={getWrongReasonForQuestion(wrongReasons, selected.questionId)}
+                      autoType={
+                        autoErrorTypes[selected.questionId] || selected.autoErrorType || null
+                      }
+                      onChange={(tagId) => onWrongReasonChange(selected.questionId, tagId)}
+                    />
+                  )}
+
                 {detailTab === 'question' && (
                   <div className="rqw-question-view">
                     <QuestionStem

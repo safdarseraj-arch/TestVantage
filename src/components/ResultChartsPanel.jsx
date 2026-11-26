@@ -20,6 +20,7 @@ import {
   PolarRadiusAxis,
   Radar,
 } from 'recharts'
+import { Link } from 'react-router-dom'
 import {
   buildOutcomeDonut,
   buildSubjectScoreBars,
@@ -28,6 +29,16 @@ import {
   buildMarketSnapshot,
   cohortSubjectAvgPcts,
 } from '../utils/resultCharts.js'
+import {
+  buildSkipIq,
+  buildErrorDnaTypes,
+  buildPassTimeline,
+  buildDreamCollegeGapTeaser,
+  buildBioClockInsight,
+  buildScoreFloorCeilingBand,
+} from '../utils/resultAdvancedAnalytics.js'
+import AttemptQualityMatrix from './AttemptQualityMatrix.jsx'
+import WhatIfScoreSimulator from './WhatIfScoreSimulator.jsx'
 
 function ChartEmpty({ message }) {
   return (
@@ -65,6 +76,12 @@ function tipLabel(tip, i) {
 export default function ResultChartsPanel({ data, test, attempts = [], scoreComparison = null }) {
   const result = data?.result
   const examPatternId = test?.examPatternId ?? data?.examPatternId
+  const questionTimes = data?.questionTimes ?? {}
+  const sessionTelemetry = data?.sessionTelemetry ?? null
+  const paperDurationSec = Number(data?.durationSeconds ?? test?.durationMinutes ?? 0)
+    ? Number(data?.durationSeconds) || Number(test?.durationMinutes || 0) * 60
+    : 0
+  const questions = test?.questions ?? []
 
   const donut = useMemo(() => (result ? buildOutcomeDonut(result) : []), [result])
   const cohortAvgs = useMemo(() => {
@@ -86,6 +103,82 @@ export default function ResultChartsPanel({ data, test, attempts = [], scoreComp
   const snapshot = useMemo(
     () => buildMarketSnapshot(data, attempts, scoreComparison),
     [data, attempts, scoreComparison],
+  )
+  const skipIq = useMemo(
+    () =>
+      result
+        ? buildSkipIq({ result, questionTimes, sessionTelemetry, paperDurationSec })
+        : null,
+    [result, questionTimes, sessionTelemetry, paperDurationSec],
+  )
+  const wrongReasons = data?.wrongReasons ?? {}
+  const errorDna = useMemo(
+    () =>
+      result
+        ? buildErrorDnaTypes({
+            result,
+            questionTimes,
+            paperDurationSec,
+            questions,
+            wrongReasons,
+          })
+        : null,
+    [result, questionTimes, paperDurationSec, questions, wrongReasons],
+  )
+  const passTimeline = useMemo(
+    () =>
+      result
+        ? buildPassTimeline({ result, sessionTelemetry, examPatternId })
+        : null,
+    [result, sessionTelemetry, examPatternId],
+  )
+  const dreamGap = useMemo(
+    () =>
+      result
+        ? buildDreamCollegeGapTeaser({
+            result,
+            questionTimes,
+            paperDurationSec,
+            questions,
+            examPatternId,
+            estimatedAIR: data?.estimatedAIR,
+          })
+        : null,
+    [result, questionTimes, paperDurationSec, questions, examPatternId, data?.estimatedAIR],
+  )
+
+  const bioClock = useMemo(
+    () =>
+      buildBioClockInsight({
+        currentAttempt: {
+          startedAt: data?.startedAt,
+          submittedAt: data?.submittedAt,
+          score: result?.score,
+          maxScore: result?.maxScore,
+          accuracy: result?.accuracy,
+        },
+        attempts: attempts.map((a) => ({
+          startedAt: a.startedAt,
+          submittedAt: a.submittedAt,
+          score: a.score,
+          maxScore: a.maxScore,
+          accuracy: a.accuracy,
+        })),
+      }),
+    [data?.startedAt, data?.submittedAt, result, attempts],
+  )
+
+  const scoreBand = useMemo(
+    () =>
+      result
+        ? buildScoreFloorCeilingBand({
+            result,
+            questionTimes,
+            paperDurationSec,
+            questions,
+          })
+        : null,
+    [result, questionTimes, paperDurationSec, questions],
   )
 
   const totalOutcome = donut.reduce((s, d) => s + d.value, 0)
@@ -139,6 +232,306 @@ export default function ResultChartsPanel({ data, test, attempts = [], scoreComp
       )}
 
       <div className="rcx-grid">
+        <ChartCard
+          title="Behavioural diagnostics"
+          subtitle="4-quadrant attempt quality + potential score recovery"
+          className="rcx-span-2 rcx-behaviour"
+        >
+          <AttemptQualityMatrix
+            result={result}
+            questionTimes={questionTimes}
+            paperDurationSec={paperDurationSec}
+            questions={questions}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="What-if simulator"
+          subtitle="Slide to model marks if you clean avoidable mistakes"
+          className="rcx-span-2"
+        >
+          <WhatIfScoreSimulator
+            result={result}
+            questionTimes={questionTimes}
+            paperDurationSec={paperDurationSec}
+            questions={questions}
+          />
+        </ChartCard>
+
+        <ChartCard
+          title="Score floor vs ceiling"
+          subtitle="Optimistic / pessimistic band from What-If and consistency"
+          className="rcx-span-2"
+        >
+          {!scoreBand?.ready ? (
+            <ChartEmpty message={scoreBand?.takeaway || 'No band yet.'} />
+          ) : (
+            <>
+              <div className="rcx-band-kpis">
+                <div>
+                  <strong>
+                    {scoreBand.floor.score}
+                    <span className="rcx-band-pctile">~{scoreBand.floor.percentile}</span>
+                  </strong>
+                  <span>Floor (pessimistic)</span>
+                </div>
+                <div className="rcx-band-mid">
+                  <strong>
+                    {scoreBand.mid.score}
+                    <span className="rcx-band-pctile">~{scoreBand.mid.percentile}</span>
+                  </strong>
+                  <span>This attempt</span>
+                </div>
+                <div>
+                  <strong>
+                    {scoreBand.ceiling.score}
+                    <span className="rcx-band-pctile">~{scoreBand.ceiling.percentile}</span>
+                  </strong>
+                  <span>Ceiling (optimistic)</span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={scoreBand.chart} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} />
+                  <Tooltip
+                    formatter={(value, name, item) => [
+                      `${value} marks · ~${item?.payload?.percentile ?? '—'} %ile`,
+                      name,
+                    ]}
+                  />
+                  <Bar dataKey="score" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                    {scoreBand.chart.map((d) => (
+                      <Cell key={d.key} fill={d.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="aqm-takeaway">{scoreBand.takeaway}</p>
+            </>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title="Exam-slot biological clock"
+          subtitle="Performance by time of day (from start / submit times)"
+          className="rcx-span-2"
+        >
+          {!bioClock.ready ? (
+            <ChartEmpty message={bioClock.takeaway} />
+          ) : (
+            <>
+              {bioClock.currentSlot && (
+                <p className="form-hint rcx-bio-current">
+                  This attempt: <strong>{bioClock.currentSlot.label}</strong> (
+                  {bioClock.currentSlot.range})
+                </p>
+              )}
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={bioClock.chart} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                    axisLine={false}
+                    tickFormatter={(v) => `${v}%`}
+                  />
+                  <Tooltip
+                    formatter={(value, name, item) => [
+                      value == null ? '—' : `${value}%`,
+                      name === 'avgPct' ? 'Avg score %' : name,
+                    ]}
+                    labelFormatter={(label, payload) => {
+                      const row = payload?.[0]?.payload
+                      return row ? `${label} · ${row.range} · ${row.count} attempt(s)` : label
+                    }}
+                  />
+                  <Bar dataKey="avgPct" name="Avg score %" radius={[6, 6, 0, 0]} maxBarSize={40}>
+                    {bioClock.chart.map((d) => (
+                      <Cell
+                        key={d.id}
+                        fill={d.isCurrent ? '#2563eb' : d.avgPct != null ? '#94a3b8' : '#e2e8f0'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="aqm-takeaway">{bioClock.takeaway}</p>
+            </>
+          )}
+        </ChartCard>
+
+        {dreamGap?.ready && (
+          <ChartCard
+            title="Dream-college gap"
+            subtitle="What-if silly fixes × Career Compass cutoffs"
+            className="rcx-span-2 rcx-dream-gap"
+          >
+            <div className="rcx-dream-body">
+              <p className="rcx-dream-headline">{dreamGap.headline}</p>
+              <p className="form-hint">{dreamGap.detail}</p>
+              <div className="rcx-dream-kpis">
+                <div>
+                  <strong>
+                    {dreamGap.currentScore} → {dreamGap.nextScore}
+                  </strong>
+                  <span>Marks</span>
+                </div>
+                <div>
+                  <strong>
+                    ~{Number(dreamGap.currentAir).toLocaleString('en-IN')} → ~
+                    {Number(dreamGap.nextAir).toLocaleString('en-IN')}
+                  </strong>
+                  <span>Est. AIR</span>
+                </div>
+                {dreamGap.gapClosedPct != null && (
+                  <div>
+                    <strong>{dreamGap.gapClosedPct}%</strong>
+                    <span>Gap closed</span>
+                  </div>
+                )}
+              </div>
+              <Link to="/career-compass" className="btn btn-ghost btn-sm">
+                Open Career Compass →
+              </Link>
+            </div>
+          </ChartCard>
+        )}
+
+        <ChartCard
+          title="Skip IQ"
+          subtitle="How you leave questions — glance, linger, or never open"
+        >
+          {!skipIq || skipIq.skipped === 0 ? (
+            <ChartEmpty message={skipIq?.insight || 'No skips on this paper.'} />
+          ) : (
+            <>
+              <div className="rcx-skip-kpis">
+                <div>
+                  <strong>{skipIq.skipRate}%</strong>
+                  <span>Skip rate</span>
+                </div>
+                <div>
+                  <strong>{skipIq.avgSkipSec}s</strong>
+                  <span>Avg on skips</span>
+                </div>
+                <div>
+                  <strong className={`rcx-skip-band rcx-skip-${skipIq.band}`}>{skipIq.band}</strong>
+                  <span>Skip IQ</span>
+                </div>
+              </div>
+              {skipIq.chart.length > 0 && (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={skipIq.chart}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={48}
+                      outerRadius={72}
+                      paddingAngle={2}
+                      stroke="none"
+                    >
+                      {skipIq.chart.map((d) => (
+                        <Cell key={d.key} fill={d.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+              <p className="aqm-takeaway">{skipIq.takeaway}</p>
+            </>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title="Error DNA"
+          subtitle="Your tags (Misread · Concept · Calc · Guess…) when set; else auto silly · overtime · concept · calc"
+        >
+          {!errorDna?.chart?.length ? (
+            <ChartEmpty message={errorDna?.takeaway || 'No wrong answers to tag.'} />
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={210}>
+                <PieChart>
+                  <Pie
+                    data={errorDna.chart}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={48}
+                    outerRadius={74}
+                    paddingAngle={2}
+                    stroke="none"
+                  >
+                    {errorDna.chart.map((d) => (
+                      <Cell key={d.key} fill={d.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, name, item) => [
+                      `${value} Q · ~${item?.payload?.marks ?? 0} marks`,
+                      name,
+                    ]}
+                  />
+                  <Legend verticalAlign="bottom" height={40} iconType="circle" />
+                </PieChart>
+              </ResponsiveContainer>
+              <p className="aqm-takeaway">{errorDna.takeaway}</p>
+            </>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title="Pass-1 · subject path"
+          subtitle={
+            passTimeline?.hasTelemetry
+              ? 'Live subject switches and first-pass vs revisit'
+              : 'Subject path (estimated until a new timed mock records switches)'
+          }
+          className="rcx-span-2"
+        >
+          {!passTimeline ? (
+            <ChartEmpty message="No timeline data yet." />
+          ) : (
+            <div className="rcx-pass-wrap">
+              <div className="rcx-pass-kpis">
+                <div>
+                  <strong>{passTimeline.firstPass.accuracy}%</strong>
+                  <span>Pass-1 accuracy ({passTimeline.firstPass.count} Q)</span>
+                </div>
+                <div>
+                  <strong>{passTimeline.revisit.count}</strong>
+                  <span>Revisits · {passTimeline.revisit.accuracy}% correct</span>
+                </div>
+                <div>
+                  <strong>{passTimeline.switchCount}</strong>
+                  <span>Subject switches</span>
+                </div>
+              </div>
+              {passTimeline.subjectPath.length > 0 && (
+                <ol className="rcx-pass-path">
+                  {passTimeline.subjectPath.map((step, i) => (
+                    <li key={`${step.subjectId}-${step.t}-${i}`}>
+                      <span className="rcx-pass-time">{step.label}</span>
+                      <strong>{step.subject}</strong>
+                      {step.estimated ? <em>est.</em> : null}
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {passTimeline.takeaway ? <p className="aqm-takeaway">{passTimeline.takeaway}</p> : null}
+            </div>
+          )}
+        </ChartCard>
+
         <ChartCard
           title="Answer mix"
           subtitle="Correct, wrong, and skipped on this paper"

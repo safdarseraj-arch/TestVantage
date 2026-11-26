@@ -82,12 +82,122 @@
   color: #94a3b8;
 }
 
+.onboarding-path-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-bottom: 0.55rem;
+}
+
+.onboarding-path-card {
+  text-align: left;
+  font: inherit;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.onboarding-path-card strong {
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.onboarding-path-card span {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #64748b;
+}
+
+.onboarding-path-card.is-on {
+  background: #eef2ff;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+}
+
+.onboarding-ip-hint {
+  margin: 0 0 0.85rem;
+}
+
+.onboarding-signature-preview-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.onboarding-signature-preview {
+  max-height: 48px;
+  max-width: 160px;
+  object-fit: contain;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.25rem;
+}
+
+.teacher-workbench-strip {
+  margin-bottom: 1rem;
+}
+
+.teacher-workbench-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.teacher-workbench-strip-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.teacher-entitlement-list {
+  list-style: none;
+  margin: 0.65rem 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.teacher-entitlement-list li {
+  font-size: 0.75rem;
+  font-weight: 650;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.teacher-entitlement-list li.is-on {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+
+.teacher-entitlement-list li.is-off {
+  opacity: 0.72;
+}
+
 @media (max-width: 768px) {
   .onboarding-shell {
     grid-template-columns: 1fr;
   }
 
   .onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-path-grid {
     grid-template-columns: 1fr;
   }
 

@@ -713,7 +713,8 @@
 
 .auth-mode-tabs {
   display: flex;
-  gap: 0.35rem;
+  flex-wrap: wrap;
+  gap: 0.3rem;
   padding: 0.3rem;
   margin-bottom: 1.25rem;
   border-radius: 12px;
@@ -721,17 +722,19 @@
 }
 
 .auth-mode-tabs button {
-  flex: 1;
-  padding: 0.55rem 0.75rem;
+  flex: 1 1 auto;
+  min-width: 4.5rem;
+  padding: 0.5rem 0.45rem;
   border: none;
   border-radius: 9px;
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   font-weight: 650;
   color: #64748b;
   background: transparent;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
 }
 
 .auth-mode-tabs button.active {

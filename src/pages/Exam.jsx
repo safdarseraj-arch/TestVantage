@@ -97,6 +97,19 @@ import {
   normalizeCdfDurationChoice,
 } from '../utils/cdfTest.js'
 import { loadPublishedUploadedQuestions } from '../utils/questionBank.js'
+import ExamStrategyPlanCard from '../components/ExamStrategyPlanCard.jsx'
+import { loadExamStrategyPlan } from '../utils/examStrategyPlan.js'
+
+/** Lightweight exam session telemetry for Result analytics (stamina clock, pass-1, switches). */
+function createEmptySessionTelemetry() {
+  return {
+    navEvents: /** @type {{ t: number, questionId: string, subject?: string, action: string, visitN: number }[]} */ ([]),
+    subjectSwitches: /** @type {{ t: number, from?: string, to: string }[]} */ ([]),
+    firstSeenAt: /** @type {Record<string, number>} */ ({}),
+    answerAt: /** @type {Record<string, number>} */ ({}),
+    visitCounts: /** @type {Record<string, number>} */ ({}),
+  }
+}
 
 export default function Exam() {
   const { testId } = useParams()
@@ -134,6 +147,8 @@ export default function Exam() {
   const deadlineAtRef = useRef(null)
   const skipCalibratedInitRef = useRef(false)
   const examNavRef = useRef(/** @type {Record<string, unknown>} */ ({}))
+  const sessionTelemetryRef = useRef(createEmptySessionTelemetry())
+  const lastTelemetrySubjectRef = useRef(/** @type {string | null} */ (null))
   const ownerKey = getOwnerKey(session?.userId)
 
   const [liveQuestions, setLiveQuestions] = useState(/** @type {import('../data/tests').Question[]} */ ([]))
@@ -393,6 +408,56 @@ export default function Exam() {
     return cdfSecondsForQuestion(q)
   }, [isCdf, q])
 
+  const elapsedExamSeconds = useCallback(() => {
+    const start = startedAtRef.current
+    if (!start) return 0
+    return Math.max(0, Math.round((Date.now() - start) / 1000))
+  }, [])
+
+  const trackQuestionEnter = useCallback(
+    (question) => {
+      if (!question?.id) return
+      const tel = sessionTelemetryRef.current
+      const t = elapsedExamSeconds()
+      const subject = question.subject
+      const prevCount = tel.visitCounts[question.id] ?? 0
+      const visitN = prevCount + 1
+      tel.visitCounts[question.id] = visitN
+      if (tel.firstSeenAt[question.id] == null) tel.firstSeenAt[question.id] = t
+      if (tel.navEvents.length < 400) {
+        tel.navEvents.push({
+          t,
+          questionId: question.id,
+          subject,
+          action: 'enter',
+          visitN,
+        })
+      }
+      if (subject && lastTelemetrySubjectRef.current && lastTelemetrySubjectRef.current !== subject) {
+        if (tel.subjectSwitches.length < 80) {
+          tel.subjectSwitches.push({
+            t,
+            from: lastTelemetrySubjectRef.current,
+            to: subject,
+          })
+        }
+      }
+      if (subject) lastTelemetrySubjectRef.current = subject
+    },
+    [elapsedExamSeconds],
+  )
+
+  const trackAnswerMoment = useCallback(
+    (questionId) => {
+      if (!questionId) return
+      const tel = sessionTelemetryRef.current
+      if (tel.answerAt[questionId] == null) {
+        tel.answerAt[questionId] = elapsedExamSeconds()
+      }
+    },
+    [elapsedExamSeconds],
+  )
+
   const recordQuestionTime = useCallback(() => {
     if (!q) return
     const elapsed = Math.round((Date.now() - questionEnteredAtRef.current) / 1000)
@@ -518,6 +583,7 @@ export default function Exam() {
     const percentile = scoreToPercentile(result.score, result.maxScore)
     const airPoolSize = getExamAirPoolSize(test.examPatternId)
     const estimatedAIR = estimateAIR(percentile, test.examPatternId)
+    const examPlan = loadExamStrategyPlan(test.id, ownerKey)
     clearExamProgress(test.id, ownerKey)
     const payload = {
       testId: test.id,
@@ -538,11 +604,13 @@ export default function Exam() {
       airPoolSize,
       tabViolations: proctorTabViolations,
       questionTimes,
+      sessionTelemetry: sessionTelemetryRef.current,
       sectionMode,
       calibratedStanding,
       calibratedSectionResults: isCalibrated ? calibratedSectionResults : undefined,
       visitedIds: [...visitedIdsRef.current],
       submitReason: source,
+      examPlan: examPlan ?? null,
     }
     sessionStorage.setItem(`testvantage-result-${test.id}`, JSON.stringify(payload))
     const attemptId = `att-${Date.now()}`
@@ -555,9 +623,13 @@ export default function Exam() {
       tabViolations: proctorTabViolations,
       submitReason: source,
       questionTimes,
+      sessionTelemetry: sessionTelemetryRef.current,
       visitedIds: [...visitedIdsRef.current],
       calibratedStanding,
       calibratedSectionResults: isCalibrated ? calibratedSectionResults : undefined,
+      startedAt: startedAtRef.current ?? submittedAt - durationSeconds * 1000,
+      submittedAt,
+      examPlan: examPlan ?? null,
       result: {
         score: result.score,
         maxScore: result.maxScore,
@@ -597,6 +669,8 @@ export default function Exam() {
       unattempted: result.unattempted,
       durationSeconds,
       submittedAt,
+      startedAt: startedAtRef.current ?? submittedAt - durationSeconds * 1000,
+      examPlan: examPlan ?? null,
       percentile,
       estimatedAIR,
       airPoolSize,
@@ -701,6 +775,7 @@ export default function Exam() {
       activeSectionId,
       lockedSections: [...lockedSections],
       questionTimes,
+      sessionTelemetry: sessionTelemetryRef.current,
       visitedIds: [...visitedIdsRef.current],
       tabViolations,
       isCalibrated,
@@ -738,6 +813,16 @@ export default function Exam() {
       deadlineAtRef.current = saved.deadlineAt
       questionEnteredAtRef.current = Date.now()
       visitedIdsRef.current = new Set(saved.visitedIds ?? [])
+      sessionTelemetryRef.current = {
+        ...createEmptySessionTelemetry(),
+        ...(saved.sessionTelemetry ?? {}),
+        navEvents: [...(saved.sessionTelemetry?.navEvents ?? [])],
+        subjectSwitches: [...(saved.sessionTelemetry?.subjectSwitches ?? [])],
+        firstSeenAt: { ...(saved.sessionTelemetry?.firstSeenAt ?? {}) },
+        answerAt: { ...(saved.sessionTelemetry?.answerAt ?? {}) },
+        visitCounts: { ...(saved.sessionTelemetry?.visitCounts ?? {}) },
+      }
+      lastTelemetrySubjectRef.current = null
       setAnswers(saved.answers ?? {})
       setMarked(new Set(saved.marked ?? []))
       setCurrentIndex(saved.currentIndex ?? 0)
@@ -767,6 +852,8 @@ export default function Exam() {
     startedAtRef.current = Date.now()
     deadlineAtRef.current = Date.now() + test.durationMinutes * 60 * 1000
     visitedIdsRef.current = new Set()
+    sessionTelemetryRef.current = createEmptySessionTelemetry()
+    lastTelemetrySubjectRef.current = null
     const first = examQuestions[0]
     if (first?.id) visitedIdsRef.current.add(first.id)
     setAnswers(buildInitialAnswers(examQuestions))
@@ -1083,17 +1170,26 @@ export default function Exam() {
     return () => window.removeEventListener('keydown', onEnter)
   }, [started])
 
+  // Clock + subject-switch telemetry whenever the live question changes
+  useEffect(() => {
+    if (!started || submittedRef.current || !q?.id) return
+    trackQuestionEnter(q)
+    // Depend on question id only — avoid double-counting when object identity churns
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, q?.id, trackQuestionEnter])
+
   useEffect(() => {
     /** @param {Event} ev */
     const onIntegerAnswer = (ev) => {
       const detail = /** @type {CustomEvent<{ questionId?: string, value?: string | null }>} */ (ev).detail
       const id = detail?.questionId
       if (!id) return
+      trackAnswerMoment(id)
       setAnswers((prev) => ({ ...prev, [id]: detail.value ?? null }))
     }
     window.addEventListener(EXAM_INTEGER_ANSWER_EVENT, onIntegerAnswer)
     return () => window.removeEventListener(EXAM_INTEGER_ANSWER_EVENT, onIntegerAnswer)
-  }, [])
+  }, [trackAnswerMoment])
 
   useEffect(() => {
     /** @param {Event} ev */
@@ -1103,6 +1199,7 @@ export default function Exam() {
       ).detail
       const id = detail?.questionId
       if (!id) return
+      trackAnswerMoment(id)
       if (detail.mode === 'grid') {
         const row = detail.row
         const col = detail.col
@@ -1111,8 +1208,8 @@ export default function Exam() {
           const cur = normalizeMatrixAnswerKey(/** @type {Record<number, number[]>} */ (prev[id]))
           return { ...prev, [id]: toggleMatrixGridCell(cur, row, col) }
         })
-      return
-    }
+        return
+      }
       if (detail.mode === 'option') {
         const optionIndex = detail.optionIndex
         if (!Number.isInteger(optionIndex)) return
@@ -1121,7 +1218,7 @@ export default function Exam() {
     }
     window.addEventListener(EXAM_MATRIX_ANSWER_EVENT, onMatrixAnswer)
     return () => window.removeEventListener(EXAM_MATRIX_ANSWER_EVENT, onMatrixAnswer)
-  }, [])
+  }, [trackAnswerMoment])
 
   useEffect(() => {
     /** @param {Event} ev */
@@ -1132,6 +1229,7 @@ export default function Exam() {
       const id = detail?.questionId
       const value = detail?.value
       if (!id || typeof value !== 'number' || Number.isNaN(value)) return
+      trackAnswerMoment(id)
       setAnswers((prev) => {
         if (detail.mode === 'multi') {
           const cur = Array.isArray(prev[id]) ? [...prev[id]] : []
@@ -1146,7 +1244,7 @@ export default function Exam() {
     }
     window.addEventListener(EXAM_MCQ_ANSWER_EVENT, onMcqAnswer)
     return () => window.removeEventListener(EXAM_MCQ_ANSWER_EVENT, onMcqAnswer)
-  }, [])
+  }, [trackAnswerMoment])
 
   if (!test) {
     return (
@@ -1413,6 +1511,16 @@ export default function Exam() {
             </div>
           )}
         </div>
+
+        {!isPractice && !isSpeed && !isCdf && examQuestions.length > 0 && (
+          <ExamStrategyPlanCard
+            testId={test.id}
+            examPatternId={test.examPatternId}
+            paperMinutes={test.durationMinutes}
+            ownerKey={ownerKey}
+            initialPlan={loadExamStrategyPlan(test.id, ownerKey)}
+          />
+        )}
 
         {resumeOffer && (
           <div className="exam-resume-card card">
@@ -1893,7 +2001,10 @@ export default function Exam() {
             question={q}
             allQuestions={test.questions}
             answer={answers[q.id]}
-            onChange={(val) => setAnswers((prev) => ({ ...prev, [q.id]: val }))}
+            onChange={(val) => {
+              trackAnswerMoment(q.id)
+              setAnswers((prev) => ({ ...prev, [q.id]: val }))
+            }}
             answerResetKey={answerResetKey}
             optionPerm={getOptionPermForQuestion(examLayout, q.id)}
           />

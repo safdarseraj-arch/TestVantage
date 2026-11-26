@@ -44,11 +44,21 @@ const cacheDir =
 const TRANSFORMERS_CDN =
   'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.4.0/+esm'
 
-/** Rollup hangs bundling @huggingface/transformers — load from CDN in production. */
+/** Rollup/Vite hang crawling @huggingface/transformers — keep external; load from CDN. */
 function transformersImportMapPlugin() {
+  const isTransformers = (id) =>
+    id === '@huggingface/transformers' || id.startsWith('@huggingface/transformers/')
+  const isOnnxWeb = (id) =>
+    id === 'onnxruntime-web' || id.startsWith('onnxruntime-web/')
   return {
     name: 'transformers-importmap',
     apply: 'build',
+    enforce: 'pre',
+    resolveId(id) {
+      if (isTransformers(id) || isOnnxWeb(id)) {
+        return { id, external: true }
+      }
+    },
     transformIndexHtml(html) {
       const map = `<script type="importmap">${JSON.stringify({
         imports: { '@huggingface/transformers': TRANSFORMERS_CDN },
@@ -68,7 +78,8 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['pdfjs-dist', 'tesseract.js'],
+    // Keep recharts prebundled — missing cache entries 504 and break Analytics/Charts.
+    include: ['pdfjs-dist', 'tesseract.js', 'recharts'],
     exclude: ['@huggingface/transformers'],
   },
   worker: {

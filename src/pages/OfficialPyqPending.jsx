@@ -32,6 +32,7 @@ import {
   isBookPaper,
   isOtherPaper,
   officialPyqPaperQuestionCount,
+  restoreOfficialPyqPendingFromIdbIfNeeded,
 } from '../utils/officialPyqPendingStore'
 import ErrorBoundary from '../components/ErrorBoundary.jsx'
 import OfficialPyqReplicaControls from '../components/OfficialPyqReplicaControls.jsx'
@@ -391,6 +392,17 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
     let cancelled = false
     ;(async () => {
       try {
+        // Recover from IndexedDB before any public snapshot seed — LS quota used to
+        // drop papers, then the 6-paper snapshot looked like “everything vanished”.
+        const recovered = await restoreOfficialPyqPendingFromIdbIfNeeded()
+        if (cancelled) return
+        if (recovered?.recovered && recovered.count > 0) {
+          setMessage(
+            `Restored ${recovered.count} Official PYQ paper${recovered.count === 1 ? '' : 's'} from durable browser storage.`,
+          )
+          bump()
+        }
+        if (listOfficialPyqPendingSummaries('all').length > 0) return
         const result = await applyOfficialPyqPublicSnapshotOnce()
         if (cancelled || !result?.ok || result.skipped) return
         writeOfficialPyqUi({ filter: 'pending_review', openId: readOfficialPyqUi().openId })
@@ -1912,7 +1924,8 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
           shift — open the portal, find the notice for your date, download, then upload.
           {' '}
           <strong>2. Date + Shift</strong> — for JEE Main, set the exam date and shift before upload (or edit
-          them later on the open paper).
+          them later on the open paper). This keeps each sitting as its own row so papers do not overwrite
+          each other.
           {' '}
           <strong>3. Solutions</strong> — if answers/solutions are in a separate institute PDF, upload the
           paper first, then use “Add institute solutions”. If solutions are split into Physics / Chemistry /
@@ -1922,6 +1935,10 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
           <strong>4. Hybrid AI</strong> — fills only leftover empty tags/answers/solutions after Approve.
           {' '}
           Do not approve a JEE Advanced paper under 40 questions (full paper ~51).
+          {' '}
+          <strong>Keep safe:</strong> papers now also save in durable browser storage (IndexedDB), not only
+          the small localStorage box that used to drop later uploads. Still use Cursor’s browser at
+          127.0.0.1 — clearing site data will wipe them.
         </p>
         )}
         <Suspense fallback={<p className="form-hint">Loading OCR options…</p>}>

@@ -33,16 +33,26 @@ export default function GoLiveReadiness() {
             {deployReady
               ? goLiveReady
                 ? 'Core teaching features are ready for a pilot. Add HTTPS before opening to all students.'
-                : 'Ready to deploy on a server (npm run live:deploy). Finish HTTPS and passwords before a public pilot.'
+                : 'App code is deploy-ready. Live students still need a server: rent VPS → set passwords → npm run live:deploy → HTTPS. Open More → Go-live Guide for the full checklist.'
               : 'Some items still need work before deploy. You can keep building safely in Cursor.'}
           </p>
         </div>
         <div
           className={`go-live-verdict ${deployReady ? (goLiveReady ? 'go-live-verdict--ok' : 'go-live-verdict--warn') : 'go-live-verdict--warn'}`}
         >
-          {deployReady ? (goLiveReady ? 'Pilot ready' : 'Deploy ready') : 'Not deploy ready'}
+          {deployReady ? (goLiveReady ? 'Pilot ready' : 'Deploy ready — server steps left') : 'Not deploy ready'}
         </div>
       </div>
+
+      {deployReady && !goLiveReady ? (
+        <ol className="form-hint" data-testid="go-live-founder-next" style={{ marginTop: '0.75rem', paddingLeft: '1.2rem' }}>
+          <li>Rent a cloud computer (≈4 GB Docker droplet) — do not run live:deploy on this laptop.</li>
+          <li>Point testvantages.com DNS to that server IP.</li>
+          <li>On the server: copy project → set .env.production passwords → run <code>npm run live:deploy</code>.</li>
+          <li>Add HTTPS, then invite 5–10 pilot students.</li>
+          <li>Full “10 lakh students” scale stays later — it does not block a small pilot.</li>
+        </ol>
+      ) : null}
 
       <div className="go-live-summary-row">
         <span className="go-live-pill go-live-pill--ready">

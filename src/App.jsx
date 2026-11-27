@@ -115,7 +115,21 @@ const QuickRevision = lazyPage(() => import('./pages/QuickRevision'), 'Quick Rev
 const FormulaPocket = lazyPage(() => import('./pages/FormulaPocket'), 'Formula Sheet')
 const DailyTarget = lazyPage(() => import('./pages/DailyTarget'), 'Today’s Target')
 const DailyPracticeSheet = lazyPage(() => import('./pages/DailyPracticeSheet'), 'Daily Practice Sheet')
-const PlacementCheck = lazyPage(() => import('./pages/PlacementCheck'), 'Placement check')
+const DiagnosticDrillHighMistake = lazyPage(
+  () =>
+    import('./pages/DiagnosticDrillPage').then((m) => ({
+      default: m.HighMistakeQuestionsPage,
+    })),
+  'High mistake',
+)
+const DiagnosticDrillHighSkip = lazyPage(
+  () =>
+    import('./pages/DiagnosticDrillPage').then((m) => ({
+      default: m.HighSkipQuestionsPage,
+    })),
+  'High skip',
+)
+const PlacementCheck = lazyPage(() => import('./pages/PlacementCheck'), 'Starter Diagnosis')
 const TestSeries = lazyPage(() => import('./pages/TestSeries'), 'Series calendar')
 const Doubts = lazyPage(() => import('./pages/Doubts'), 'Ask Your Doubt')
 const StudentMockTest = lazyPage(() => import('./pages/StudentMockTest'), 'Mock test')
@@ -350,7 +364,15 @@ export default function App() {
         <Route path="formula-sheet" element={withSuspense(<FormulaPocket />, 'Loading formula sheet…')} />
         <Route path="daily-target" element={withSuspense(<DailyTarget />, 'Loading today’s target…')} />
         <Route path="daily-sheet" element={withSuspense(<DailyPracticeSheet />, 'Loading daily sheet…')} />
-        <Route path="placement-check" element={withSuspense(<PlacementCheck />, 'Loading placement check…')} />
+        <Route
+          path="high-mistake"
+          element={withSuspense(<DiagnosticDrillHighMistake />, 'Loading High mistake…')}
+        />
+        <Route
+          path="high-skip"
+          element={withSuspense(<DiagnosticDrillHighSkip />, 'Loading High skip…')}
+        />
+        <Route path="placement-check" element={withSuspense(<PlacementCheck />, 'Loading Starter Diagnosis…')} />
         <Route path="test-series" element={withSuspense(<TestSeries />, 'Loading series calendar…')} />
         <Route path="doubts" element={withSuspense(<Doubts />, 'Loading doubts…')} />
         <Route path="mock-test" element={withSuspense(<StudentMockTest />, 'Loading mock test…')} />

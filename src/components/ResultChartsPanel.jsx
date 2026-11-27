@@ -54,9 +54,9 @@ function ChartEmpty({ message }) {
   )
 }
 
-function ChartCard({ title, subtitle, children, className = '' }) {
+function ChartCard({ title, subtitle, children, className = '', ...rest }) {
   return (
-    <div className={`rcx-card card ${className}`.trim()}>
+    <div className={`rcx-card card ${className}`.trim()} {...rest}>
       <div className="rcx-card-head">
         <h3>{title}</h3>
         {subtitle ? <p>{subtitle}</p> : null}
@@ -219,7 +219,7 @@ export default function ResultChartsPanel({
       {
         ready: false,
         takeaway:
-          'When more classmates finish this same paper, Trap fall and Time-sink rates appear here.',
+          'When more classmates finish this same paper, High-mistake and High-skip rates appear here.',
         trapFallRate: null,
         timeSinkRate: null,
         tabASeen: 0,
@@ -235,7 +235,7 @@ export default function ResultChartsPanel({
           ready: false,
           items: [],
           takeaway:
-            'When more classmates finish this paper, your personal Fix Queue appears here.',
+            'When more classmates finish this paper, your High-mistake / High-skip fix list appears here.',
         }
 
     const priorSamePaper = (attempts || []).filter((a) => {
@@ -332,13 +332,14 @@ export default function ResultChartsPanel({
         </ChartCard>
 
         <ChartCard
-          title="Fix first"
+          title="High mistake & High skip — fix first"
           subtitle={
             trapMetrics?.ready
-              ? `Trap fall ${trapMetrics.trapFallRate ?? '—'}% · time-sink skip ${trapMetrics.timeSinkRate ?? '—'}% — redo these before the next mock`
-              : 'Questions classmates miss that you also missed — open and fix'
+              ? `High mistake ${trapMetrics.trapFallRate ?? '—'}% · High skip ${trapMetrics.timeSinkRate ?? '—'}% — redo these before the next mock`
+              : 'Questions classmates miss or skip that you also missed — open and fix'
           }
           className="rcx-span-2"
+          data-testid="result-high-mistake-skip"
         >
           {trapMetrics?.ready ? (
             <div className="rcx-band-kpis" style={{ marginBottom: '0.65rem' }}>
@@ -347,7 +348,7 @@ export default function ResultChartsPanel({
                   {trapMetrics.trapFallRate != null ? `${trapMetrics.trapFallRate}%` : '—'}
                 </strong>
                 <span className="form-hint" style={{ display: 'block' }}>
-                  Trap fall ({trapMetrics.tabAWrongAttempt}/{trapMetrics.tabASeen})
+                  High mistake ({trapMetrics.tabAWrongAttempt}/{trapMetrics.tabASeen})
                 </span>
               </div>
               <div>
@@ -355,7 +356,7 @@ export default function ResultChartsPanel({
                   {trapMetrics.timeSinkRate != null ? `${trapMetrics.timeSinkRate}%` : '—'}
                 </strong>
                 <span className="form-hint" style={{ display: 'block' }}>
-                  Time-sink ({trapMetrics.tabBTimeSinkSkip}/{trapMetrics.tabBSeen})
+                  High skip ({trapMetrics.tabBTimeSinkSkip}/{trapMetrics.tabBSeen})
                 </span>
               </div>
             </div>
@@ -392,8 +393,11 @@ export default function ResultChartsPanel({
                         Open
                       </button>
                     ) : null}
-                    <Link to="/practice" className="btn btn-ghost btn-sm">
-                      Practice
+                    <Link
+                      to={item.reason === 'high_skip' ? '/high-skip' : '/high-mistake'}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      {item.reason === 'high_skip' ? 'High skip' : 'High mistake'}
                     </Link>
                   </div>
                 </li>
@@ -594,7 +598,7 @@ export default function ResultChartsPanel({
         {dreamGap?.ready && (
           <ChartCard
             title="Dream-college gap"
-            subtitle="What-if silly fixes × Career Compass cutoffs"
+            subtitle="What-if silly fixes × Career Guide cutoffs"
             className="rcx-span-2 rcx-dream-gap"
           >
             <div className="rcx-dream-body">
@@ -622,7 +626,7 @@ export default function ResultChartsPanel({
                 )}
               </div>
               <Link to="/career-compass" className="btn btn-ghost btn-sm">
-                Open Career Compass →
+                Open Career Guide →
               </Link>
             </div>
           </ChartCard>

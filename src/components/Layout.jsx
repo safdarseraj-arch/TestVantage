@@ -17,147 +17,194 @@ import {
 import { peekUploadedQuestions } from '../utils/questionBank.js'
 import { countHybridAiDrafts } from '../utils/questionBankSubBank.js'
 
-import { STUDENT_PREPARE_NAV } from '../data/studentPrepareModes'
+/* Student nav rule of thumb:
+ * Practice = learn & revise · Tests = timed papers · PYQ = past papers
+ * Progress = scores + what next · Challenges = habit & peers · More = extras
+ */
+const NAV_PRACTICE = [
+  { to: '/prepare', label: 'Practice Hub', icon: '🎓', title: 'All practice modes' },
+  { to: '/practice', label: 'Syllabus Practice', icon: '📖', title: 'Self-paced chapter drills' },
+  { to: '/high-mistake', label: 'High mistake', icon: '❌', title: 'Practice or test trap questions' },
+  { to: '/high-skip', label: 'High skip', icon: '⏭️', title: 'Practice or test often-skipped questions' },
+  { to: '/cdf-test', label: 'CDF Mastery', icon: '⏱️', title: 'Concept · Definition · Formula' },
+  { to: '/quick-revision', label: 'Quick Revision', icon: '📝', title: 'Chapter notes and cheat sheets' },
+  { to: '/formula-sheet', label: 'Formula Sheet', icon: '📌', title: 'Pin formulas you forget' },
+  { to: '/daily-target', label: 'Daily Target', icon: '🎯', title: 'Clear weak chapters today' },
+  { to: '/daily-sheet', label: 'Daily Practice Sheet', icon: '📄', title: 'Dated chapter sheet' },
+]
 
-const NAV_COMPETE = [
-  { to: '/todays-drill', label: 'Today’s Drill', icon: '🗓️', title: 'Daily mixed set' },
-  { to: '/peer-pulse', label: 'Peer Pulse', icon: '🔗', title: 'Spar Code peer link' },
-  { to: '/merit-stride', label: 'Merit Stride', icon: '✨', title: 'Points, badges, focus' },
-  { to: '/study-circle', label: 'Study Circle', icon: '👥', title: 'Cohort Code rooms' },
-  { to: '/doubts', label: 'Ask Your Doubt', icon: '💬', title: 'Doubt on a question' },
-  { to: '/earn', label: 'Earn & Refer', icon: '💸', title: 'Referral & campus side-income' },
+const NAV_TEST = [
+  { to: '/mock-test', label: 'Mock Builder', icon: '🎯', title: 'Build your own full mock' },
+  { to: '/speed-test', label: 'Speed Test', icon: '⚡', title: 'Timed easy–medium drill' },
+  { to: '/test-series', label: 'Series Calendar', icon: '📆', title: 'Week-by-week mock schedule' },
+  { to: '/tests', label: 'Mock Tests', icon: '📋', title: 'Assigned and sample papers' },
+  { to: '/placement-check', label: 'Starter Diagnosis', icon: '📍', title: 'Short paper → weak chapters → today’s plan' },
+]
+
+const NAV_CHALLENGES = [
+  { to: '/todays-drill', label: 'Daily Challenge', icon: '🗓️', title: 'Mixed set for today' },
+  { to: '/peer-pulse', label: 'Peer Match', icon: '🔗', title: 'Spar with a classmate' },
+  { to: '/study-circle', label: 'Study Groups', icon: '👥', title: 'Cohort rooms' },
+  { to: '/doubts', label: 'Ask a Doubt', icon: '💬', title: 'Question help' },
+  { to: '/merit-stride', label: 'Rewards', icon: '✨', title: 'Points and badges' },
+]
+
+const NAV_PROGRESS = [
+  { to: '/my-results', label: 'My Results', icon: '📊', title: 'All finished attempts' },
+  { to: '/analytics', label: 'Score Analytics', icon: '📈', title: 'Trends and study path' },
+  { to: '/form-forecast', label: 'Rank Forecast', icon: '🎯', title: 'Practice AIR and Exam Fit' },
+  { to: '/leaderboard', label: 'Rankings', icon: '🏆', title: 'Peer standings' },
+]
+
+const NAV_PYQ = [
+  { to: '/practice/pyq', label: 'PYQ Bank', icon: '📅', title: 'Six study modes on one page' },
+  { to: '/practice/similar-pyq', label: 'Similar PYQ', icon: '🔁', title: 'AI-similar / replica practice' },
 ]
 
 const NAV_MORE = [
-  { to: '/tour', label: 'TestVantages Tour', icon: '🗺️' },
-  { to: '/campus-earn', label: 'Campus Earn', icon: '🎓', title: 'University mentor side-income' },
+  { to: '/career-compass', label: 'Career Guide', icon: '🧭', title: 'Marks → rank → colleges' },
+  { to: '/exam-pulse', label: 'Exam Updates', icon: '📡', title: 'Dates, counselling, focus notes' },
+  { to: '/earn', label: 'Refer & Earn', icon: '💸', title: 'Share TestVantage and earn' },
+  { to: '/campus-earn', label: 'Campus Referrals', icon: '🎓', title: 'University mentor track' },
+  { to: '/tour', label: 'Product Tour', icon: '🗺️', title: 'Map of every tab' },
+  { to: '/profile', label: 'Profile', icon: '👤', title: 'Your details and invite code' },
 ]
 const NAV_MORE_ADMIN = [
   ...NAV_MORE,
-  { to: '/go-live-guide', label: 'Go live guide', icon: '🚀' },
-  { to: '/admin/referrals', label: 'Referral admin', icon: '📈' },
+  { to: '/go-live-guide', label: 'Go-live Guide', icon: '🚀' },
+  { to: '/admin/referrals', label: 'Referral Admin', icon: '📈' },
 ]
 
 const ADMIN_NAV = [
   { to: '/question-bank', label: 'Question Bank', icon: '📚' },
   { to: '/question-bank/ai-generate', label: 'Hybrid AI', icon: '🤖' },
   { to: '/upload', label: 'Upload PDF', icon: '📄' },
-  { to: '/question-bank/review', label: 'Review & publish', icon: '✅' },
-  { to: '/question-bank/reports', label: 'Question reports', icon: '🚩' },
-  { to: '/merge-banks', label: 'Merge banks', icon: '🔀' },
+  { to: '/question-bank/review', label: 'Review & Publish', icon: '✅' },
+  { to: '/question-bank/reports', label: 'Question Reports', icon: '🚩' },
+  { to: '/merge-banks', label: 'Merge Banks', icon: '🔀' },
   { to: '/create-test', label: 'Create Test', icon: '➕' },
-  { to: '/admin/paper-patterns', label: 'Paper patterns', icon: '📐' },
+  { to: '/admin/paper-patterns', label: 'Paper Patterns', icon: '📐' },
   { to: '/edit-test', label: 'Edit Test', icon: '✏️' },
-  { to: '/admin/schools', label: 'School Management', icon: '🏫' },
+  { to: '/admin/schools', label: 'Schools', icon: '🏫' },
   { to: '/teacher/results', label: 'Student Results', icon: '👥' },
-  { to: '/admin', label: 'OCR settings', icon: '⚙️' },
-  { to: '/admin/referrals', label: 'Referral admin', icon: '📈' },
+  { to: '/admin', label: 'OCR Settings', icon: '⚙️' },
+  { to: '/admin/referrals', label: 'Referral Admin', icon: '📈' },
 ]
 
 const PAGE_TITLES = {
   '/': 'Home',
   '/home': 'Home',
-  '/prepare': 'Prepare Centre',
-  '/prep-hub': 'Prepare Centre',
-  '/peer-pulse': 'Peer Pulse',
-  '/todays-drill': 'Today’s Drill',
-  '/merit-stride': 'Merit Stride',
-  '/study-circle': 'Study Circle',
-  '/tour': 'TestVantages Tour',
-  '/site-map': 'TestVantages Tour',
-  '/go-live-guide': 'Go Live Guide',
+  '/prepare': 'Practice Hub',
+  '/prep-hub': 'Practice Hub',
+  '/peer-pulse': 'Peer Match',
+  '/todays-drill': 'Daily Challenge',
+  '/merit-stride': 'Rewards',
+  '/study-circle': 'Study Groups',
+  '/tour': 'Product Tour',
+  '/site-map': 'Product Tour',
+  '/go-live-guide': 'Go-live Guide',
   '/tests': 'Mock Tests',
   '/practice': 'Syllabus Practice',
-  '/speed-test': 'Precision Speed Test',
-  '/cdf-test': 'CDF Mastery Test',
+  '/speed-test': 'Speed Test',
+  '/cdf-test': 'CDF Mastery',
   '/quick-revision': 'Quick Revision',
-  '/formula-sheet': 'My Formula Sheet',
-  '/daily-target': 'Today’s Target',
+  '/formula-sheet': 'Formula Sheet',
+  '/daily-target': 'Daily Target',
   '/daily-sheet': 'Daily Practice Sheet',
-  '/placement-check': 'Placement check',
-  '/mock-test': 'AI Mock Builder',
+  '/high-mistake': 'High mistake',
+  '/high-skip': 'High skip',
+  '/placement-check': 'Starter Diagnosis',
+  '/mock-test': 'Mock Builder',
   '/my-results': 'My Results',
-  '/analytics': 'Analytics',
-  '/form-forecast': 'Form Forecast',
-  '/leaderboard': 'Leaderboard',
-  '/career-compass': 'Career Compass',
-  '/exam-pulse': 'Exam Pulse',
+  '/analytics': 'Score Analytics',
+  '/form-forecast': 'Rank Forecast',
+  '/leaderboard': 'Rankings',
+  '/career-compass': 'Career Guide',
+  '/exam-pulse': 'Exam Updates',
   '/test-series': 'Test Series',
   '/pyq': 'PYQ Bank',
   '/practice/pyq': 'PYQ Bank',
   '/practice/similar-pyq': 'Similar PYQ',
-  '/official-pyq': 'Approve official papers',
-  '/any-paper': 'Upload any paper',
+  '/official-pyq': 'Approve Official Papers',
+  '/any-paper': 'Upload Any Paper',
   '/upload': 'Upload PDF',
-  '/doubts': 'Ask Your Doubt',
+  '/doubts': 'Ask a Doubt',
   '/question-bank': 'Question Bank',
   '/question-bank/ai-generate': 'Hybrid AI',
   '/question-bank/review': 'Review & Publish',
   '/question-bank/reports': 'Question Reports',
-  '/merge-banks': 'Merge banks',
+  '/merge-banks': 'Merge Banks',
   '/create-test': 'Create Test',
   '/edit-test': 'Edit Test',
   '/publish-review': 'Publish Review',
   '/paper-manifest': 'Paper Manifest',
   '/admin': 'Admin Settings',
-  '/admin/schools': 'School Management',
+  '/admin/schools': 'Schools',
   '/teacher': 'Teacher Home',
   '/teacher/lecture-questions': 'Lecture Questions',
   '/teacher/results': 'Student Results',
   '/admin/paper-patterns': 'Paper Patterns',
   '/login': 'Sign In',
   '/profile': 'Profile',
-  '/earn': 'Earn & Refer',
-  '/campus-earn': 'Campus Earn',
+  '/earn': 'Refer & Earn',
+  '/campus-earn': 'Campus Referrals',
   '/admin/referrals': 'Referral Admin',
 }
 
 const BREADCRUMB = {
   '/': 'Home',
-  '/prepare': 'Prepare',
-  '/prep-hub': 'Prepare',
-  '/peer-pulse': 'Compete',
-  '/todays-drill': 'Compete',
-  '/merit-stride': 'Compete',
-  '/study-circle': 'Compete',
-  '/tour': 'Help',
-  '/site-map': 'Help',
-  '/go-live-guide': 'Help',
-  '/tests': 'Practice',
-  '/my-results': 'Insights',
-  '/analytics': 'Insights',
-  '/form-forecast': 'Insights',
-  '/leaderboard': 'Insights',
-  '/career-compass': 'Insights',
-  '/exam-pulse': 'Insights',
-  '/test-series': 'Practice',
-  '/pyq': 'Practice',
-  '/practice/pyq': 'Practice',
-  '/practice/similar-pyq': 'Practice',
-  '/official-pyq': 'Admin',
-  '/any-paper': 'Admin',
-  '/upload': 'Admin',
+  '/home': 'Home',
+  '/prepare': 'Practice',
+  '/prep-hub': 'Practice',
+  '/practice': 'Practice',
   '/cdf-test': 'Practice',
   '/quick-revision': 'Practice',
   '/formula-sheet': 'Practice',
   '/daily-target': 'Practice',
-  '/doubts': 'Community',
-  '/question-bank': 'Admin',
-  '/question-bank/ai-generate': 'Admin',
-  '/question-bank/review': 'Admin',
-  '/question-bank/reports': 'Admin',
-  '/create-test': 'Admin',
-  '/edit-test': 'Admin',
+  '/daily-sheet': 'Practice',
+  '/high-mistake': 'Practice',
+  '/high-skip': 'Practice',
+  '/mock-test': 'Tests',
+  '/speed-test': 'Tests',
+  '/test-series': 'Tests',
+  '/tests': 'Tests',
+  '/placement-check': 'Tests',
+  '/todays-drill': 'Challenges',
+  '/peer-pulse': 'Challenges',
+  '/merit-stride': 'Challenges',
+  '/study-circle': 'Challenges',
+  '/doubts': 'Challenges',
+  '/my-results': 'Progress',
+  '/analytics': 'Progress',
+  '/form-forecast': 'Progress',
+  '/leaderboard': 'Progress',
+  '/pyq': 'PYQ',
+  '/practice/pyq': 'PYQ',
+  '/practice/similar-pyq': 'PYQ',
+  '/career-compass': 'More',
+  '/exam-pulse': 'More',
+  '/tour': 'More',
+  '/site-map': 'More',
+  '/go-live-guide': 'More',
+  '/earn': 'More',
+  '/campus-earn': 'More',
+  '/profile': 'More',
+  '/official-pyq': 'Admin',
+  '/any-paper': 'Admin',
+  '/upload': 'Admin',
+  '/question-bank': 'Content',
+  '/question-bank/ai-generate': 'Content',
+  '/question-bank/review': 'Content',
+  '/question-bank/reports': 'Content',
+  '/create-test': 'Classroom',
+  '/edit-test': 'Classroom',
   '/admin': 'Admin',
   '/admin/schools': 'Admin',
   '/admin/paper-patterns': 'Admin',
-  '/teacher': 'Teacher',
-  '/teacher/lecture-questions': 'Teacher',
-  '/teacher/results': 'Teacher',
+  '/teacher': 'Classroom',
+  '/teacher/lecture-questions': 'Classroom',
+  '/teacher/results': 'Classroom',
   '/login': 'Account',
-  '/profile': 'Account',
-  '/earn': 'Compete',
-  '/campus-earn': 'Help',
   '/admin/referrals': 'Admin',
 }
 
@@ -206,6 +253,9 @@ function pathMatches(item, pathname, search = '') {
     if (itemParams?.has('hub')) {
       return pageParams.get('hub') === itemParams.get('hub')
     }
+    if (itemParams?.has('mode')) {
+      return pageParams.get('mode') === itemParams.get('mode')
+    }
     if (pathOnly === '/question-bank') {
       return !pageParams.get('hub') || pageParams.get('hub') === 'view'
     }
@@ -215,6 +265,7 @@ function pathMatches(item, pathname, search = '') {
   if (
     pathOnly !== '/' &&
     pathOnly !== '/teacher' &&
+    pathOnly !== '/practice' &&
     !itemParams &&
     pathname.startsWith(`${pathOnly}/`) &&
     !(pathOnly === '/question-bank' && pathname.startsWith('/question-bank/'))
@@ -269,7 +320,7 @@ function ChromeDropdown({ id, label, hubTo, items, pathname, search, openId, set
         <div id={panelId} className="chrome-nav-dropdown" role="menu">
           {items.map((item) => (
             <Link
-              key={item.to}
+              key={`${item.to}::${item.label}`}
               to={item.to}
               role="menuitem"
               className={`chrome-nav-dropdown-link${pathMatches(item, pathname, search) ? ' is-active' : ''}`}
@@ -333,59 +384,43 @@ export default function Layout() {
   const navRef = useRef(null)
   const navListId = useId()
 
-  const navPractice = STUDENT_PREPARE_NAV
-
-  const navInsights = [
-    { to: '/my-results', label: 'My Results', icon: '📊' },
-    { to: '/analytics', label: 'Analytics', icon: '📈' },
-    { to: '/form-forecast', label: 'Form Forecast', icon: '🎯' },
-    { to: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
-    { to: '/career-compass', label: 'Career Compass', icon: '🧭' },
-    { to: '/exam-pulse', label: 'Exam Pulse', icon: '📡' },
-  ]
-
   const navTeacher = [
-    { to: '/teacher', label: 'Teacher home', icon: '🏠' },
+    { to: '/teacher', label: 'Teacher Home', icon: '🏠' },
     ...(hasPermission(PERMS.UPLOAD_QUESTIONS)
       ? [
           {
             to: accessMainBank
               ? '/question-bank?hub=view'
               : '/question-bank?hub=view&view=draft&owner=teacher',
-            label: accessMainBank ? 'Question bank' : 'My question bank',
+            label: accessMainBank ? 'Question Bank' : 'My Question Bank',
             icon: '📚',
           },
-          { to: '/teacher/lecture-questions', label: 'Lecture set', icon: '🎓' },
+          { to: '/teacher/lecture-questions', label: 'Lecture Set', icon: '🎓' },
           { to: '/teacher/lecture-planner', label: 'Lecture Planner', icon: '📋' },
-          { to: '/question-bank?hub=upload&owner=teacher', label: 'Upload questions', icon: '⬆️' },
+          { to: '/question-bank?hub=upload&owner=teacher', label: 'Upload Questions', icon: '⬆️' },
           { to: '/question-bank/ai-generate', label: 'Hybrid AI', icon: '🤖' },
           { to: '/upload', label: 'Upload PDF', icon: '📄' },
         ]
       : []),
     ...(accessMainBank && hasPermission(PERMS.UPLOAD_QUESTIONS)
-      ? [{ to: '/question-bank/review', label: 'Review & publish', icon: '✅' }]
+      ? [{ to: '/question-bank/review', label: 'Review & Publish', icon: '✅' }]
       : []),
     ...(hasPermission(PERMS.UPLOAD_QUESTIONS)
-      ? [{ to: '/question-bank/reports', label: 'Question reports', icon: '🚩' }]
+      ? [{ to: '/question-bank/reports', label: 'Question Reports', icon: '🚩' }]
       : []),
     ...(hasPermission(PERMS.CREATE_PAPER)
       ? [
-          { to: '/create-test?pool=mine', label: 'Prepare test paper', icon: '📝' },
-          { to: '/edit-test', label: 'Edit paper', icon: '✏️' },
-          { to: '/admin/paper-patterns', label: 'Paper patterns', icon: '📐' },
+          { to: '/create-test?pool=mine', label: 'Create Paper', icon: '📝' },
+          { to: '/edit-test', label: 'Edit Paper', icon: '✏️' },
+          { to: '/admin/paper-patterns', label: 'Paper Patterns', icon: '📐' },
         ]
       : []),
     ...(hasPermission(PERMS.VIEW_STUDENT_RESULTS)
-      ? [{ to: '/teacher/results', label: 'Student results', icon: '👥' }]
+      ? [{ to: '/teacher/results', label: 'Student Results', icon: '👥' }]
       : []),
     ...(hasPermission(PERMS.MANAGE_SCHOOLS) || hasPermission(PERMS.ASSIGN_TESTS)
       ? [{ to: '/admin/schools', label: 'Schools', icon: '🏫' }]
       : []),
-  ]
-
-  const prepareItems = [
-    { to: '/prepare', label: 'Prepare centre', icon: '🎓', title: 'All prepare modes' },
-    ...navPractice,
   ]
 
   const homeLink = isTeacher
@@ -398,7 +433,7 @@ export default function Layout() {
   const signedIn = isAdmin || isUser || isTeacher
   const inExam = pathname.startsWith('/exam/')
   /* Students never see Question Bank. Signed-out founders and all staff see it in the main bar
-     (not buried under Teaching / More). Opening the page still requires Teacher or Admin sign-in. */
+     (not buried under Classroom / Explore). Opening the page still requires Teacher or Admin sign-in. */
   const showQuestionBankTab = !isStudentView
   const questionBankTo =
     !signedIn || accessMainBank
@@ -522,13 +557,13 @@ export default function Layout() {
           <span />
         </div>
 
-        {pathname === '/official-pyq' || pathname.startsWith('/official-pyq/') ? null : (
+        {homeActive ? (
           <div className="chrome-banner-wrap">
             <ErrorBoundary compact title="Highlights">
               <FeatureHighlightCarousel compact className="tv-feature-carousel--chrome" />
             </ErrorBoundary>
           </div>
-        )}
+        ) : null}
 
         <nav
           className={`chrome-nav${mobileNavOpen ? ' is-open' : ''}`}
@@ -556,15 +591,15 @@ export default function Layout() {
                 }}
                 pathname={pathname}
                 search={search}
-                className="chrome-nav-link chrome-nav-link--bank"
+                className="chrome-nav-link"
               />
             ) : null}
 
             <ChromeDropdown
-              id="prepare"
-              label="Prepare"
+              id="practice"
+              label="Practice"
               hubTo="/prepare"
-              items={prepareItems}
+              items={NAV_PRACTICE}
               pathname={pathname}
               search={search}
               openId={openMenu}
@@ -572,10 +607,10 @@ export default function Layout() {
             />
 
             <ChromeDropdown
-              id="compete"
-              label="Compete"
-              hubTo="/todays-drill"
-              items={NAV_COMPETE}
+              id="test"
+              label="Tests"
+              hubTo="/mock-test"
+              items={NAV_TEST}
               pathname={pathname}
               search={search}
               openId={openMenu}
@@ -583,10 +618,32 @@ export default function Layout() {
             />
 
             <ChromeDropdown
-              id="insights"
-              label="Insights"
+              id="pyq"
+              label="PYQ"
+              hubTo="/practice/pyq"
+              items={NAV_PYQ}
+              pathname={pathname}
+              search={search}
+              openId={openMenu}
+              setOpenId={setOpenMenu}
+            />
+
+            <ChromeDropdown
+              id="progress"
+              label="Progress"
               hubTo="/my-results"
-              items={navInsights}
+              items={NAV_PROGRESS}
+              pathname={pathname}
+              search={search}
+              openId={openMenu}
+              setOpenId={setOpenMenu}
+            />
+
+            <ChromeDropdown
+              id="challenges"
+              label="Challenges"
+              hubTo="/todays-drill"
+              items={NAV_CHALLENGES}
               pathname={pathname}
               search={search}
               openId={openMenu}
@@ -596,7 +653,7 @@ export default function Layout() {
             {isTeacher ? (
               <ChromeDropdown
                 id="teacher"
-                label="Teaching"
+                label="Classroom"
                 hubTo="/teacher"
                 items={navTeacher}
                 pathname={pathname}
@@ -643,7 +700,7 @@ export default function Layout() {
           <div className="topbar-actions">
             {pathname === '/go-live-guide' && !isAdmin ? null : (
               <Link to="/prepare" className="btn btn-primary btn-sm">
-                Prepare centre
+                Practice Hub
               </Link>
             )}
           </div>

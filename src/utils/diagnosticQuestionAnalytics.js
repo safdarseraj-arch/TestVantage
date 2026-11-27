@@ -660,15 +660,15 @@ export function buildStudentTrapMetrics(opts = {}) {
   const timeSinkRate = tabBSeen > 0 ? roundPct((tabBTimeSinkSkip / tabBSeen) * 100) : null
 
   let takeaway =
-    'Finish this paper with more classmates so high-mistake and high-skip lists can coach your next mock.'
+    'Finish this paper with more classmates so High-mistake and High-skip lists can coach your next mock.'
   if (trapFallRate != null && trapFallRate >= 40) {
-    takeaway = `Trap fall ${trapFallRate}% — you attempted high-mistake questions and still lost marks. Next mock: skip faster when unsure.`
+    takeaway = `High-mistake hit rate ${trapFallRate}% — you attempted hard traps and still lost marks. Next mock: skip faster when unsure.`
   } else if (timeSinkRate != null && timeSinkRate >= 30) {
-    takeaway = `Time-sink rate ${timeSinkRate}% — you burned 90s+ on high-skip items before leaving. Cap first pass at ~60s.`
+    takeaway = `High-skip time-sink ${timeSinkRate}% — you burned 90s+ on questions others leave. Cap first pass at ~60s.`
   } else if (trapFallRate != null && trapFallRate < 25 && tabASeen >= 2) {
-    takeaway = `Trap fall only ${trapFallRate}% on high-mistake items — solid negative-marking discipline.`
+    takeaway = `High-mistake hit rate only ${trapFallRate}% — solid negative-marking discipline.`
   } else if (trapFallRate != null || timeSinkRate != null) {
-    takeaway = 'Use Trap fall and Time-sink rates to train selection skill, not just syllabus coverage.'
+    takeaway = 'Use High-mistake and High-skip rates to train selection skill, not just syllabus coverage.'
   }
 
   return {
@@ -684,7 +684,7 @@ export function buildStudentTrapMetrics(opts = {}) {
 }
 
 /**
- * Personal Fix Queue — student’s high Trap-Fall / Combined Struggle items to redo.
+ * Personal Fix Queue — student’s High-mistake / High-skip / Combined Struggle items to redo.
  *
  * @param {{
  *   perQuestion?: object[]
@@ -697,10 +697,11 @@ export function buildPersonalFixQueue(opts = {}) {
   const tabs = opts.tabs
   const limit = Math.max(1, Number(opts.limit) || 12)
   if (!tabs?.ready || !perQ.length) {
-    return { ready: false, items: [], takeaway: 'Need classmates on this paper before a Fix Queue appears.' }
+    return { ready: false, items: [], takeaway: 'Need classmates on this paper before High-mistake / High-skip lists appear.' }
   }
 
   const tabA = new Map((tabs.tabA || []).map((q) => [q.questionId, q]))
+  const tabB = new Map((tabs.tabB || []).map((q) => [q.questionId, q]))
   const combined = new Map((tabs.tabCombined || []).map((q) => [q.questionId, q]))
   /** @type {object[]} */
   const items = []
@@ -713,11 +714,18 @@ export function buildPersonalFixQueue(opts = {}) {
     if (!struggled) continue
 
     const inA = tabA.get(id)
+    const inB = tabB.get(id)
     const inC = combined.get(id)
-    if (!inA && !inC) continue
+    if (!inA && !inB && !inC) continue
 
-    const reason = inA ? 'trap_fall' : 'combined_struggle'
-    const rollup = inA || inC
+    const reason = inA ? 'trap_fall' : inB ? 'high_skip' : 'combined_struggle'
+    const rollup = inA || inB || inC
+    const reasonLabel =
+      reason === 'trap_fall'
+        ? 'High mistake'
+        : reason === 'high_skip'
+          ? 'High skip'
+          : 'Combined struggle'
     items.push({
       questionId: id,
       index: pq.index ?? rollup.index ?? null,
@@ -725,11 +733,11 @@ export function buildPersonalFixQueue(opts = {}) {
       chapter: pq.chapter || rollup.chapter || '',
       grade,
       reason,
-      reasonLabel: reason === 'trap_fall' ? 'High-mistake trap' : 'Combined struggle',
+      reasonLabel,
       peerMistakePct: rollup.mistakePct,
       peerSkipPct: rollup.skipPct,
       peerStrugglePct: rollup.strugglePct,
-      priority: reason === 'trap_fall' ? 0 : 1,
+      priority: reason === 'trap_fall' ? 0 : reason === 'high_skip' ? 1 : 2,
     })
   }
 

@@ -37,11 +37,17 @@ export default function MyResults() {
               Analytics
             </Link>
             <Link to="/prepare" className="btn btn-primary btn-sm">
-              Prepare centre
+              Practice Hub
             </Link>
           </>
         }
       />
+
+      <p className="form-hint" data-testid="my-results-high-mistake-hint" style={{ marginTop: 0 }}>
+        Categories:{' '}
+        <Link to="/high-mistake">High mistake</Link> · <Link to="/high-skip">High skip</Link> — Practice
+        or Take test from the Practice Hub. After a paper, Charts → Fix first shows your personal list.
+      </p>
 
       {!isUser ? (
         <div className="insight-notice-card">

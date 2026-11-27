@@ -27,7 +27,7 @@ export function getGoLiveChecklistStatic() {
       area: 'Student',
       feature: 'Result analysis & My Results',
       status: 'ready',
-      note: 'Score, subject breakdown, solutions, analytics.',
+      note: 'Score, solutions, Charts → High mistake & High skip (after classmates finish the same paper). Teachers: Classroom → Student Results.',
     },
     {
       id: 'practice-pyq',
@@ -104,7 +104,7 @@ export function getGoLiveChecklistStatic() {
       area: 'Platform',
       feature: '10 lakh concurrent students',
       status: 'blocked',
-      note: 'Needs cloud hosting, CDN, auto-scaling (planned for later).',
+      note: 'Later phase (CDN + auto-scale). Does not block a small school pilot.',
     },
     {
       id: 'https',

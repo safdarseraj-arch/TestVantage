@@ -198,7 +198,7 @@ export default function Doubts() {
     <div className="page doubts-page">
       <div className="section-header">
         <div>
-          <h1>Ask Your Doubt</h1>
+          <h1>Ask a Doubt</h1>
           <p className="lead">
             Post doubts and solutions by <strong>typing</strong>, uploading{' '}
             <strong>Word / PDF / image</strong>, or <strong>voice</strong> (microphone).

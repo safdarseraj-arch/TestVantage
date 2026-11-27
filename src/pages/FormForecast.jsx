@@ -70,7 +70,7 @@ export default function FormForecastPage() {
         actions={
           <>
             <Link to="/career-compass" className="btn btn-primary btn-sm">
-              Career Compass
+              Career Guide
             </Link>
             <Link to="/analytics" className="btn btn-ghost btn-sm">
               Analytics
@@ -80,7 +80,7 @@ export default function FormForecastPage() {
       />
 
       <p className="ff-bridge form-hint">
-        <strong>Practice form vs exam day:</strong> Form Forecast reads your mocks. Career Compass
+        <strong>Practice form vs exam day:</strong> Rank Forecast reads your mocks. Career Guide
         turns marks into NTA AIR, colleges, and choice filling — use both side by side.
       </p>
 
@@ -90,12 +90,12 @@ export default function FormForecastPage() {
         precision={precision}
       />
 
-      {/* ── Form Forecast ── */}
+      {/* ── Rank Forecast ── */}
       <section className="ff-panel ff-panel--forecast card" id="form-forecast">
         <header className="ff-panel-head">
           <div>
             <p className="ff-eyebrow">Practice AIR · NTA curves</p>
-            <h2>Form Forecast</h2>
+            <h2>Rank Forecast</h2>
             <p className="form-hint">
               Speed + accuracy + difficulty from your attempts → projected AIR with a confidence
               band. JEE Main, Advanced, and NEET when you have data.
@@ -123,14 +123,14 @@ export default function FormForecastPage() {
         {!active?.ready ? (
           <div className="insight-empty-state ff-empty">
             <div className="insight-empty-icon">📡</div>
-            <h3>Unlock Form Forecast</h3>
+            <h3>Unlock Rank Forecast</h3>
             <p>{active?.formNote}</p>
             <div className="insight-empty-actions">
               <Link to="/mock-test" className="btn btn-primary">
                 AI Mock Builder
               </Link>
               <Link to="/prepare" className="btn btn-ghost">
-                Prepare centre
+                Practice Hub
               </Link>
             </div>
           </div>
@@ -184,7 +184,7 @@ export default function FormForecastPage() {
                 to={`/career-compass?exam=${active.examId}&marks=${active.practiceMarks}`}
                 className="btn btn-primary btn-sm"
               >
-                Open Career Compass with these marks →
+                Open Career Guide with these marks →
               </Link>
               <Link to="/my-results" className="btn btn-ghost btn-sm">
                 My results
@@ -395,11 +395,11 @@ export default function FormForecastPage() {
       </section>
 
       <footer className="ff-foot">
-        <Link to="/prepare">Prepare centre</Link>
+        <Link to="/prepare">Practice Hub</Link>
         <span aria-hidden>·</span>
-        <Link to="/exam-pulse">Exam Pulse</Link>
+        <Link to="/exam-pulse">Exam Updates</Link>
         <span aria-hidden>·</span>
-        <Link to="/career-compass">Career Compass</Link>
+        <Link to="/career-compass">Career Guide</Link>
         <span aria-hidden>·</span>
         <Link to="/analytics">Analytics</Link>
       </footer>

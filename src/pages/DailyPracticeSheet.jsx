@@ -66,11 +66,11 @@ export default function DailyPracticeSheet() {
     <div className="page prepare-mode-page daily-sheet-page">
       <PreparePageHero
         modeId="daily-sheet"
-        lead="A dated chapter sheet from your bank — like a class DPP. Print it, or attempt it here. Today’s Drill stays the mixed compete set."
+        lead="A dated chapter sheet from your bank — like a class DPP. Print it, or attempt it here. Daily Challenge stays the mixed compete set."
         actions={
           <>
             <Link to="/todays-drill" className="btn btn-ghost btn-sm">
-              Today’s Drill
+              Daily Challenge
             </Link>
             <Link to="/daily-target" className="btn btn-ghost btn-sm">
               Today’s Target

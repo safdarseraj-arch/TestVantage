@@ -30,9 +30,9 @@ export default function MeritStride() {
     <div className="page student-portal-page tv-compete-page">
       <header className="tv-compete-hero" style={{ '--tv-accent': '#7c3aed' }}>
         <Link to="/prepare" className="insight-page-back">
-          ← Prepare centre
+          ← Practice Hub
         </Link>
-        <p className="insight-page-eyebrow">Merit Stride</p>
+        <p className="insight-page-eyebrow">Rewards</p>
         <h1>Merit Points · Stride Badges · Focus Goals</h1>
         <p className="insight-page-lead">
           Earn Merit Points from practice and tests, unlock Stride Badges, and hit a daily Focus
@@ -109,7 +109,7 @@ export default function MeritStride() {
         <h2>Recent Merit</h2>
         {state.history.length === 0 ? (
           <p className="form-hint">
-            Finish <Link to="/todays-drill">Today’s Drill</Link> or any practice/test to start earning.
+            Finish <Link to="/todays-drill">Daily Challenge</Link> or any practice/test to start earning.
           </p>
         ) : (
           <ul className="tv-stat-list">

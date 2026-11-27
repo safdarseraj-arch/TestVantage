@@ -77,7 +77,7 @@ export default function MentorMicrosite() {
           <h1>Mentor page not found</h1>
           <p className="insight-page-lead">
             Ask your mentor for their latest link, or open{' '}
-            <Link to="/campus-earn">Campus Earn</Link>.
+            <Link to="/campus-earn">Campus Referrals</Link>.
           </p>
         </header>
       </div>

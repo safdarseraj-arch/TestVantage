@@ -43,7 +43,7 @@ export const ARKE_ROWS = [
   {
     area: 'Daily practice sheet after class',
     they: 'Yes — Daily Practice Sheets on the JEE program',
-    we: 'Today’s Drill is a mixed 10-Q compete set',
+    we: 'Daily Challenge is a mixed 10-Q compete set',
     session: 'Added Daily Practice Sheet (chapter sheet + print)',
     skip: '—',
   },
@@ -58,7 +58,7 @@ export const ARKE_ROWS = [
     area: 'Where-you-stand diagnostic',
     they: 'Yes — AST scholarship test as a lead funnel',
     we: 'Mocks and Forecast after you already attempt',
-    session: 'Added Placement check (short mixed paper → Today’s Target)',
+    session: 'Added Starter Diagnosis (short paper → weak chapters → today’s plan)',
     skip: 'No fee-scholarship product or their AST name',
   },
   {
@@ -71,7 +71,7 @@ export const ARKE_ROWS = [
   {
     area: '30-minute human doubt + video answers',
     they: 'Yes — they claim 24/7 desk, 30 min at peak',
-    we: 'Ask Your Doubt (peers / staff on a question)',
+    we: 'Ask a Doubt (peers / staff on a question)',
     session: 'Already had (Acadza pass)',
     skip: 'No paid 30-minute human desk or their video pack',
   },
@@ -85,7 +85,7 @@ export const ARKE_ROWS = [
   {
     area: 'Analytics and weak-area path',
     they: 'Yes — they advertise AI reports',
-    we: 'Results, Analytics, Form Forecast, Career Compass',
+    we: 'Results, Analytics, Rank Forecast, Career Guide',
     session: 'Already had',
     skip: '—',
   },

@@ -119,7 +119,7 @@ export default function ReferralDashboard() {
           <Link to="/home" className="insight-page-back">
             ← Home
           </Link>
-          <p className="insight-page-eyebrow">Earn & Refer</p>
+          <p className="insight-page-eyebrow">Refer & Earn</p>
           <h1>Start promoting TestVantages</h1>
           <p className="insight-page-lead">
             Students, teachers, and ambassadors share one kit: your code, mentor page, and promo
@@ -130,7 +130,7 @@ export default function ReferralDashboard() {
         <section className="card create-section tv-earn-first-run" data-testid="earn-first-run">
           <h2>Three quick steps</h2>
           <ol className="tv-earn-steps">
-            <li>Pick how you promote (you can change this later on Campus Earn).</li>
+            <li>Pick how you promote (you can change this later on Campus Referrals).</li>
             <li>Copy your share code or open the promo gallery templates.</li>
             <li>Send on WhatsApp — when friends upgrade after free mocks, earnings show in Pending.</li>
           </ol>
@@ -169,7 +169,7 @@ export default function ReferralDashboard() {
               Create my share kit
             </button>
             <Link to="/campus-earn" className="btn btn-ghost">
-              Campus Earn details
+              Campus Referrals details
             </Link>
           </div>
           <p className="form-hint" style={{ marginTop: '0.75rem' }}>
@@ -253,7 +253,7 @@ export default function ReferralDashboard() {
         <Link to="/home" className="insight-page-back">
           ← Home
         </Link>
-        <p className="insight-page-eyebrow">Earn & Refer</p>
+        <p className="insight-page-eyebrow">Refer & Earn</p>
         <h1>{partner.displayName || partner.name}</h1>
         <p className="insight-page-lead">
           {PARTNER_TYPE_LABELS[partner.partnerType] || partner.partnerType}

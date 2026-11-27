@@ -31,7 +31,7 @@ const PRODUCTS = [
     rows: ARKE_ROWS,
     sources: ARKE_SOURCES,
     sessionNote:
-      'ARKE session: Daily Practice Sheet, Placement check, Series calendar. Live class studio and 30-minute video desk skipped.',
+      'ARKE session: Daily Practice Sheet, Starter Diagnosis, Series calendar. Live class studio and 30-minute video desk skipped.',
   },
 ]
 
@@ -49,10 +49,10 @@ export default function HowWeCompare() {
       actions={
         <>
           <Link to="/tour" className="btn btn-ghost btn-sm">
-            TestVantages Tour
+            Product Tour
           </Link>
           <Link to="/prepare" className="btn btn-primary btn-sm">
-            Prepare centre
+            Practice Hub
           </Link>
         </>
       }
@@ -111,7 +111,7 @@ export default function HowWeCompare() {
             Daily Practice Sheet
           </Link>
           <Link to="/placement-check" className="btn btn-ghost btn-sm">
-            Placement check
+            Starter Diagnosis
           </Link>
           <Link to="/test-series" className="btn btn-ghost btn-sm">
             Series calendar

@@ -74,7 +74,7 @@ export default function TodaysDrill() {
       }
       navigate(`/exam/${result.test.id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start Today’s Drill.')
+      setError(err instanceof Error ? err.message : 'Could not start Daily Challenge.')
     } finally {
       setBusy(false)
     }
@@ -84,9 +84,9 @@ export default function TodaysDrill() {
     <div className="page student-portal-page tv-compete-page">
       <header className="tv-compete-hero" style={{ '--tv-accent': '#c2410c' }}>
         <Link to="/prepare" className="insight-page-back">
-          ← Prepare centre
+          ← Practice Hub
         </Link>
-        <p className="insight-page-eyebrow">Today’s Drill</p>
+        <p className="insight-page-eyebrow">Daily Challenge</p>
         <h1>One mixed set. Every day.</h1>
         <p className="insight-page-lead">
           A short JEE or NEET mix from your published bank — finish it to earn Merit Points and see
@@ -117,7 +117,7 @@ export default function TodaysDrill() {
               {progress.score}/{progress.maxScore}
             </strong>
             {progress.accuracy != null ? ` · ${progress.accuracy}% accuracy` : ''}. You can still
-            re-open Prepare centre for more practice.
+            re-open Practice Hub for more practice.
           </p>
         ) : progress?.testId ? (
           <p className="form-hint">You have an unfinished drill for today — resume below.</p>
@@ -126,7 +126,7 @@ export default function TodaysDrill() {
         )}
         {!progress?.completed && (
           <button type="button" className="btn btn-primary" disabled={busy} onClick={start}>
-            {busy ? 'Building…' : progress?.testId ? 'Resume Today’s Drill →' : 'Start Today’s Drill →'}
+            {busy ? 'Building…' : progress?.testId ? 'Resume Daily Challenge →' : 'Start Daily Challenge →'}
           </button>
         )}
         {error && <p className="form-error">{error}</p>}
@@ -137,8 +137,8 @@ export default function TodaysDrill() {
         <section className="card create-section">
           <h2>Today’s standing</h2>
           <p className="form-hint">
-            Real finishers of Today’s Drill today
-            {standing.total <= 1 ? ' — invite friends via Peer Pulse to fill the board.' : '.'}
+            Real finishers of Daily Challenge today
+            {standing.total <= 1 ? ' — invite friends via Peer Match to fill the board.' : '.'}
           </p>
           <p>
             Rank <strong>#{standing.rank}</strong> of {standing.total}
@@ -159,7 +159,7 @@ export default function TodaysDrill() {
 
       <p className="form-hint">
         Prefer full control? Use <Link to="/practice">Syllabus Practice</Link> or{' '}
-        <Link to="/prepare">Prepare centre</Link>.
+        <Link to="/prepare">Practice Hub</Link>.
       </p>
     </div>
   )

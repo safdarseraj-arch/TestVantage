@@ -50,9 +50,9 @@ export const COMPARE_THEIR_LIST = [
 
 export const COMPARE_OUR_LIST = [
   {
-    title: 'Prepare centre',
+    title: 'Practice Hub',
     detail:
-      'One student hub: AI Mock Builder, Syllabus Practice, Precision Speed, CDF Mastery, Quick Revision, My Formula Sheet, Today’s Target, Daily Practice Sheet, Placement check, Series calendar, PYQ Bank, Mock tests.',
+      'One student hub: AI Mock Builder, Syllabus Practice, Precision Speed, CDF Mastery, Quick Revision, My Formula Sheet, Today’s Target, Daily Practice Sheet, Starter Diagnosis, Series calendar, PYQ Bank, Mock tests.',
   },
   {
     title: 'Question Bank (staff only)',
@@ -71,12 +71,12 @@ export const COMPARE_OUR_LIST = [
   {
     title: 'Compete',
     detail:
-      'Today’s Drill, Peer Pulse, Merit Stride, Study Circle, Ask Your Doubt (including from a result question).',
+      'Daily Challenge, Peer Match, Rewards, Study Groups, Ask a Doubt (including from a result question).',
   },
   {
     title: 'Insights',
     detail:
-      'My Results, Analytics, Form Forecast (practice AIR, Exam Fit, Revision Ladder, Precision Map, Insight Coach), Career Compass (exam-day colleges), Exam Pulse, Leaderboard.',
+      'My Results, Analytics, Rank Forecast (practice AIR, Exam Fit, Revision Ladder, Precision Map, Insight Coach), Career Guide (exam-day colleges), Exam Updates, Leaderboard.',
   },
   {
     title: 'Teaching',
@@ -110,7 +110,7 @@ export const COMPARE_ROWS = [
   {
     area: 'Backlog / daily target',
     they: 'Yes — Backlog Remover plan',
-    we: 'Partly — Revision Ladder + Today’s Drill',
+    we: 'Partly — Revision Ladder + Daily Challenge',
     session: 'Added Today’s Target (weak chapters, 15/25/40 Q)',
     skip: '—',
   },
@@ -118,27 +118,27 @@ export const COMPARE_ROWS = [
     area: 'Doubt on a question',
     they: 'Yes — paid mentor chat (they say under 12 hours)',
     we: 'Page existed but was off the menu',
-    session: 'Wired Ask Your Doubt + result “Ask doubt”',
+    session: 'Wired Ask a Doubt + result “Ask doubt”',
     skip: 'No paid 12-hour human mentor desk',
   },
   {
     area: 'Speed under the clock',
     they: 'Yes — picking/clicking + race rankers',
-    we: 'Yes — Precision Speed, CDF timers, Peer Pulse',
+    we: 'Yes — Precision Speed, CDF timers, Peer Match',
     session: 'Already had',
     skip: 'No separate “race All-India rankers” product',
   },
   {
     area: 'Rank and college guess',
     they: 'Yes — from practice scores',
-    we: 'Yes — Form Forecast (practice form) and Career Compass (exam-day colleges)',
+    we: 'Yes — Rank Forecast (practice form) and Career Guide (exam-day colleges)',
     session: 'Already had',
     skip: '—',
   },
   {
     area: 'Weak-area reports',
     they: 'Yes — weak / slow / mistake / danger + one-click remedy',
-    we: 'Yes — result analysis, Analytics, Form Forecast, question reports',
+    we: 'Yes — result analysis, Analytics, Rank Forecast, question reports',
     session: 'Already had',
     skip: '—',
   },

@@ -304,7 +304,7 @@ export default function Profile() {
               Open Earn dashboard
             </Link>
             <Link to="/campus-earn" className="btn btn-ghost btn-sm">
-              Campus Earn
+              Campus Referrals
             </Link>
           </div>
           <p className="form-hint" style={{ marginTop: '0.75rem' }}>

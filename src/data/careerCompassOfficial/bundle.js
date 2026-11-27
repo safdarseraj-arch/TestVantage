@@ -1,5 +1,5 @@
 /**
- * Bundled official Career Compass snapshot (regenerate via fetch-career-compass-official.mjs).
+ * Bundled official Career Guide snapshot (regenerate via fetch-career-compass-official.mjs).
  */
 import { buildOfficialCareerCompassBundle } from '../../utils/careerCompassOfficialMerge.js'
 

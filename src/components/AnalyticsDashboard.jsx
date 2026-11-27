@@ -136,16 +136,16 @@ export default function AnalyticsDashboard({ stats, attempts = [] }) {
       {(primary?.ready || fit.score > 0) && (
         <section className="ff-analytics-teaser card">
           <div className="ff-analytics-teaser-main">
-            <p className="ff-eyebrow">Also on Form Forecast</p>
+            <p className="ff-eyebrow">Also on Rank Forecast</p>
             <h2>Practice AIR snapshot</h2>
             <p className="form-hint">
               {primary?.ready
-                ? `${primary.examLabel} practice AIR ~${Number(primary.air).toLocaleString('en-IN')} · Exam Fit ${fit.score}/100 — full detail on Form Forecast.`
-                : `Exam Fit ${fit.score}/100 — open Form Forecast for practice AIR, Precision Map, and Insight Coach.`}
+                ? `${primary.examLabel} practice AIR ~${Number(primary.air).toLocaleString('en-IN')} · Exam Fit ${fit.score}/100 — full detail on Rank Forecast.`
+                : `Exam Fit ${fit.score}/100 — open Rank Forecast for practice AIR, Precision Map, and Insight Coach.`}
             </p>
           </div>
           <Link to="/form-forecast" className="btn btn-primary btn-sm">
-            Open Form Forecast →
+            Open Rank Forecast →
           </Link>
         </section>
       )}
@@ -185,7 +185,7 @@ export default function AnalyticsDashboard({ stats, attempts = [] }) {
       <p className="si-cohort-note">
         <span className="si-cohort-badge">Your history</span>
         These charts are from your attempts on this device. Practice AIR and national-style
-        estimates live on Form Forecast and are labelled as estimates.
+        estimates live on Rank Forecast and are labelled as estimates.
       </p>
 
       <div className="rad-main-tabs si-analytics-tabs" role="tablist" aria-label="Analytics sections">

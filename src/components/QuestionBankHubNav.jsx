@@ -38,7 +38,7 @@ export default function QuestionBankHubNav({
             className={`bank-hub-top-tab ${section === 'upload' ? 'active' : ''}`}
             onClick={() => onHubChange('upload')}
           >
-            Upload
+            Add questions
           </button>
         ) : (
           <Link
@@ -47,7 +47,7 @@ export default function QuestionBankHubNav({
             aria-selected={section === 'upload'}
             className={`bank-hub-top-tab bank-hub-top-tab-link ${section === 'upload' ? 'active' : ''}`}
           >
-            Upload
+            Add questions
           </Link>
         )}
         {onHubChange ? (
@@ -58,7 +58,7 @@ export default function QuestionBankHubNav({
             className={`bank-hub-top-tab ${section === 'view' ? 'active' : ''}`}
             onClick={() => onHubChange('view')}
           >
-            Saved questions
+            Saved
             <span className="bank-hub-top-tab-count">{counts.total}</span>
           </button>
         ) : (
@@ -68,7 +68,7 @@ export default function QuestionBankHubNav({
             aria-selected={section === 'view'}
             className={`bank-hub-top-tab bank-hub-top-tab-link ${section === 'view' ? 'active' : ''}`}
           >
-            Saved questions
+            Saved
             <span className="bank-hub-top-tab-count">{counts.total}</span>
           </Link>
         )}
@@ -80,7 +80,7 @@ export default function QuestionBankHubNav({
             className={`bank-hub-top-tab ${section === 'review' ? 'active' : ''}`}
             onClick={() => onHubChange('review')}
           >
-            Review & publish
+            Review
             {counts.draft > 0 && (
               <span className="bank-hub-top-tab-count bank-hub-top-tab-count-warn">{counts.draft}</span>
             )}
@@ -92,7 +92,7 @@ export default function QuestionBankHubNav({
             aria-selected={section === 'review'}
             className={`bank-hub-top-tab bank-hub-top-tab-link ${section === 'review' ? 'active' : ''}`}
           >
-            Review & publish
+            Review
             {counts.draft > 0 && (
               <span className="bank-hub-top-tab-count bank-hub-top-tab-count-warn">{counts.draft}</span>
             )}
@@ -105,7 +105,7 @@ export default function QuestionBankHubNav({
             aria-selected={section === 'reports'}
             className={`bank-hub-top-tab bank-hub-top-tab-link ${section === 'reports' ? 'active' : ''}`}
           >
-            Question reports
+            Reports
             {(counts.reportsOpen ?? 0) > 0 && (
               <span className="bank-hub-top-tab-count bank-hub-top-tab-count-warn">
                 {counts.reportsOpen}
@@ -121,7 +121,7 @@ export default function QuestionBankHubNav({
             className={`bank-hub-top-tab ${section === 'manage' ? 'active' : ''}`}
             onClick={() => onHubChange('manage')}
           >
-            Manage meta
+            Tags
           </button>
         ) : (
           <Link
@@ -130,7 +130,7 @@ export default function QuestionBankHubNav({
             aria-selected={section === 'manage'}
             className={`bank-hub-top-tab bank-hub-top-tab-link ${section === 'manage' ? 'active' : ''}`}
           >
-            Manage meta
+            Tags
           </Link>
         )}
       </div>

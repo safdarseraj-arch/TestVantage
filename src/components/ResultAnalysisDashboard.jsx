@@ -458,7 +458,7 @@ export default function ResultAnalysisDashboard({
 
           <p className="si-ff-hint form-hint">
             Cross-test Exam Fit and Revision Ladder:{' '}
-            <Link to="/form-forecast">Form Forecast</Link> ·{' '}
+            <Link to="/form-forecast">Rank Forecast</Link> ·{' '}
             <Link to="/form-forecast#revision-ladder">Revision Ladder</Link>
           </p>
         </div>

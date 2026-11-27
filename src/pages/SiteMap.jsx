@@ -96,7 +96,7 @@ export default function SiteMap() {
       role="platform"
       className="page sitemap-page"
       eyebrow="Help & guide"
-      title="TestVantages Tour"
+      title="Product Tour"
       subtitle="Clear names, what’s inside, where to find it, and an Open link — grouped like the real top nav."
       actions={
         <button type="button" className="btn btn-primary btn-sm sitemap-print-btn" onClick={handlePrint}>
@@ -119,10 +119,10 @@ export default function SiteMap() {
           ))}
         </ul>
         <p>
-          Follow the <strong>top navigation</strong>: Home → Question Bank → Prepare → Compete →
-          Insights. Each row below has a name, what you get inside, where to click (path + nav), and
-          Open when the page can load directly. The top banner is marketing only. Question Bank sits
-          next to Home for staff (and before you sign in). Students never see it. Teaching appears
+          Follow the <strong>top navigation</strong>: Home → Practice → Tests → PYQ → Progress →
+          Challenges → More. Each row below has a name, what you get inside, where to click (path + nav), and
+          Open when the page can load directly. The Home banner is marketing only (not shown on other pages). Question Bank sits
+          next to Home for staff (and before you sign in). Students never see it. Classroom appears
           after Teacher sign-in. Old link <code>/prep-hub</code> redirects to{' '}
           <code>/prepare</code>.
         </p>
@@ -177,29 +177,29 @@ export default function SiteMap() {
         <h3>Bookmark these while testing</h3>
         <ul className="sitemap-bookmarks">
           <li>
-            <Link to="/tour">TestVantages Tour</Link> — <code>/tour</code> (same as{' '}
+            <Link to="/tour">Product Tour</Link> — <code>/tour</code> (same as{' '}
             <code>/site-map</code>)
           </li>
           <li>
             <Link to="/home">Home</Link> — <code>/home</code>
           </li>
           <li>
-            <Link to="/prepare">Prepare centre</Link> — <code>/prepare</code>
+            <Link to="/prepare">Practice Hub</Link> — <code>/prepare</code>
           </li>
           <li>
-            <Link to="/todays-drill">Compete · Today’s Drill</Link> — <code>/todays-drill</code>
+            <Link to="/todays-drill">Challenges · Daily Challenge</Link> — <code>/todays-drill</code>
           </li>
           <li>
-            <Link to="/my-results">Insights · My Results</Link> — <code>/my-results</code>
+            <Link to="/my-results">Progress · My Results</Link> — <code>/my-results</code>
           </li>
           <li>
-            <Link to="/form-forecast">Form Forecast</Link> — <code>/form-forecast</code>
+            <Link to="/form-forecast">Rank Forecast</Link> — <code>/form-forecast</code>
           </li>
           <li>
-            <Link to="/analytics">Analytics</Link> — <code>/analytics</code>
+            <Link to="/analytics">Score Analytics</Link> — <code>/analytics</code>
           </li>
           <li>
-            <Link to="/career-compass">Career Compass</Link> — <code>/career-compass</code>
+            <Link to="/career-compass">Career Guide</Link> — <code>/career-compass</code>
           </li>
           <li>
             <Link to="/profile">Profile &amp; invites</Link> — <code>/profile</code>

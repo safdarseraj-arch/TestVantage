@@ -21,7 +21,7 @@ export default function Analytics() {
               My results
             </Link>
             <Link to="/form-forecast" className="btn btn-ghost btn-sm">
-              Form Forecast
+              Rank Forecast
             </Link>
             <Link to="/mock-test" className="btn btn-primary btn-sm">
               AI Mock Builder
@@ -36,7 +36,7 @@ export default function Analytics() {
           <h2>Your analytics unlock after your first mock</h2>
           <p>
             Take a timed test or build your own AI paper — then see percentile trends, weak chapters,
-            and a study path here. Practice AIR and Exam Fit live on Form Forecast.
+            and a study path here. Practice AIR and Exam Fit live on Rank Forecast.
           </p>
           <div className="insight-empty-actions">
             <Link to="/mock-test" className="btn btn-primary">

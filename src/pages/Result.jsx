@@ -128,13 +128,13 @@ export default function Result() {
         <h1>Result unavailable</h1>
         <p className="lead">
           This attempt was saved without enough detail to reopen analysis. Take the test again from
-          Prepare centre.
+          Practice Hub.
         </p>
         <Link to="/my-results" className="btn btn-ghost">
           My results
         </Link>
         <Link to="/prepare" className="btn btn-primary">
-          Prepare centre
+          Practice Hub
         </Link>
       </div>
     )
@@ -363,7 +363,7 @@ export default function Result() {
 
       <p className="si-ff-hint form-hint">
         For practice AIR, Exam Fit, and Revision Ladder across all mocks, open{' '}
-        <Link to="/form-forecast">Form Forecast</Link>.
+        <Link to="/form-forecast">Rank Forecast</Link>.
       </p>
 
       <ResultAnalysisDashboard

@@ -78,10 +78,10 @@ export default function ExamPulse() {
               {refreshing ? 'Refreshing…' : 'Refresh briefing'}
             </button>
             <Link to="/form-forecast" className="btn btn-ghost btn-sm">
-              Form Forecast
+              Rank Forecast
             </Link>
             <Link to="/career-compass" className="btn btn-primary btn-sm">
-              Career Compass
+              Career Guide
             </Link>
           </>
         }
@@ -113,7 +113,7 @@ export default function ExamPulse() {
         ))}
       </div>
 
-      <div className="ep-tabs" role="tablist" aria-label="Exam Pulse categories">
+      <div className="ep-tabs" role="tablist" aria-label="Exam Updates categories">
         <button
           type="button"
           role="tab"

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import PracticeSyllabusPicker from './practice/PracticeSyllabusPicker'
 import StudentMockPaperSummary from './StudentMockPaperSummary'
 import { EXAM_PATTERNS } from '../data/examPatterns'
@@ -57,8 +57,14 @@ export default function PyqStudyModesPanel({
   onError,
 }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const modeFromUrl = searchParams.get('mode')
+  const initialMode =
+    modeFromUrl && PYQ_ALL_MODES.some((m) => m.id === modeFromUrl)
+      ? /** @type {PyqPanelModeId} */ (modeFromUrl)
+      : 'syllabus-practice'
   const [examId, setExamId] = useState('jee-main')
-  const [studyMode, setStudyMode] = useState(/** @type {PyqPanelModeId} */ ('syllabus-practice'))
+  const [studyMode, setStudyMode] = useState(/** @type {PyqPanelModeId} */ (initialMode))
   const [syllabus, setSyllabus] = useState(EMPTY_SYLLABUS)
   const [questionCount, setQuestionCount] = useState(10)
   const [paperPatternId, setPaperPatternId] = useState('')
@@ -67,6 +73,12 @@ export default function PyqStudyModesPanel({
   const [localError, setLocalError] = useState('')
   const [calendarYear, setCalendarYear] = useState(null)
   const bankLabel = subBankPracticeLabel(subBankType)
+
+  useEffect(() => {
+    if (modeFromUrl && PYQ_ALL_MODES.some((m) => m.id === modeFromUrl)) {
+      setStudyMode(/** @type {PyqPanelModeId} */ (modeFromUrl))
+    }
+  }, [modeFromUrl])
 
   const examLabel = getPyqExamLabel(examId)
   const pattern = EXAM_PATTERNS.find((p) => p.id === examId)

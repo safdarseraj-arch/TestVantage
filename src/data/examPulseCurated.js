@@ -1,5 +1,5 @@
 /**
- * Exam Pulse — curated baseline headlines for JEE / NEET aspirants.
+ * Exam Updates — curated baseline headlines for JEE / NEET aspirants.
  * Used when live RSS / Gemini is offline. Prefer official portals + reputable education desks.
  */
 
@@ -180,7 +180,7 @@ export const EXAM_PULSE_CURATED = [
   },
 ]
 
-/** Category tabs for the Exam Pulse UI */
+/** Category tabs for the Exam Updates UI */
 export const EXAM_PULSE_CATEGORIES = [
   { id: 'exams', label: 'Exam updates', hint: 'JEE · NEET · NTA' },
   { id: 'admissions', label: 'Counselling', hint: 'JoSAA · CSAB · MCC' },

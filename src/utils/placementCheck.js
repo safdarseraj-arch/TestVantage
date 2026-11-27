@@ -1,6 +1,6 @@
 /**
- * Placement check — short mixed diagnostic from your bank.
- * Suggests Today’s Target chapters. Not a scholarship product.
+ * Starter Diagnosis (route /placement-check) — short mixed diagnostic from your bank.
+ * Suggests Today’s Target chapters. Not a scholarship or job-placement exam.
  */
 import { getExamPattern } from '../data/examPatterns.js'
 import { loadPublishedUploadedQuestions } from './questionBank.js'
@@ -56,7 +56,7 @@ export function createPlacementCheck(config) {
   if (answerable.length < 6) {
     return {
       ok: false,
-      error: 'Need at least six published questions for a placement check. Publish a few in Question Bank.',
+      error: 'Need at least six published questions for a Starter Diagnosis. Publish a few in Question Bank.',
     }
   }
 
@@ -89,8 +89,8 @@ export function createPlacementCheck(config) {
   /** @type {import('../data/tests').Test} */
   const test = {
     id,
-    title: `Placement check — ${exam?.shortName ?? examId}`,
-    description: 'Short mixed paper to see where you stand, then a weak-chapter plan.',
+    title: `Starter Diagnosis — ${exam?.shortName ?? examId}`,
+    description: 'Short paper → see weak chapters → set today’s plan.',
     examPatternId: examId,
     testTypeId: 'practice',
     durationMinutes: Math.max(25, Math.ceil(prepared.length * 2)),

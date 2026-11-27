@@ -1,12 +1,12 @@
 /**
  * Persisted counselling fill (Gemini and/or local seed).
- * Refresh: Career Compass admin tab "Update data", or node scripts/fill-counselling-data.mjs
+ * Refresh: Career Guide admin tab "Update data", or node scripts/fill-counselling-data.mjs
  * Runtime prediction does NOT call Gemini.
  */
 export const COUNSELLING_FILL = {
   "filledAt": 1789611278226,
   "source": "gemini",
-  "hint": "Gemini key found. Kept last published placements (unknown stays Not available). Indicative counselling data - not official NTA live results. If Gemini is offline we keep the last filled tables. Admin can refresh from Career Compass → Update data.",
+  "hint": "Gemini key found. Kept last published placements (unknown stays Not available). Indicative counselling data - not official NTA live results. If Gemini is offline we keep the last filled tables. Admin can refresh from Career Guide → Update data.",
   "colleges": {
     "iit-madras": {
       "website": "https://www.iitm.ac.in",

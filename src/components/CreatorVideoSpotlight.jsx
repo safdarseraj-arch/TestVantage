@@ -16,7 +16,7 @@ export default function CreatorVideoSpotlight({ limit = 6 }) {
         <h2>Creator spotlight</h2>
         <p className="form-hint">
           Approved mentor and faculty videos will appear here. Promoters can submit links from{' '}
-          <Link to="/earn">Earn & Refer</Link>.
+          <Link to="/earn">Refer & Earn</Link>.
         </p>
       </section>
     )

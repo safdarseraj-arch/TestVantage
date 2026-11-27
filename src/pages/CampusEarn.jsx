@@ -92,7 +92,7 @@ export default function CampusEarn() {
         <Link to="/home" className="insight-page-back">
           ← Home
         </Link>
-        <p className="insight-page-eyebrow">Campus Earn</p>
+        <p className="insight-page-eyebrow">Campus Referrals</p>
         <h1>Side income for college mentors</h1>
         <p className="insight-page-lead">
           Share 2 free NTA-pattern JEE / NEET diagnostic mocks. Earn 10%–15% when aspirants upgrade
@@ -228,7 +228,7 @@ export default function CampusEarn() {
       {dash ? <ShareKitPanel share={dash.share} partner={dash.partner} /> : null}
 
       <p className="form-hint">
-        Already promoting? <Link to="/earn">Open Earn & Refer dashboard</Link>
+        Already promoting? <Link to="/earn">Open Refer & Earn dashboard</Link>
       </p>
     </div>
   )

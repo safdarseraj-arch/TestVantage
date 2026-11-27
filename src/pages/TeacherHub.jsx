@@ -148,7 +148,7 @@ export default function TeacherHub() {
       role="teacher"
       eyebrow="Teacher home"
       title={greetingLine(fullName)}
-      subtitle="Personal Vault, lecture plan, and papers — student mocks stay under Prepare."
+      subtitle="Personal Vault, lecture plan, and papers — student mocks stay under Practice."
       actions={
         <>
           <Link to="/earn#promo-gallery" className="btn btn-primary btn-sm">

@@ -329,7 +329,7 @@ export default function Login() {
 
   const formLead = isAmbassadorMode
     ? isRegister
-      ? 'This login is for promoting TestVantage and earning when friends join. Register free, then get your share link.'
+      ? 'This login is for promoting TestVantages and earning when friends join. Register free, then get your share link.'
       : 'Sign in with your ambassador email and password to open Earn and your share kit.'
     : isTeacherMode
       ? schoolInviteHit

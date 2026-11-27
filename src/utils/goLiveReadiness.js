@@ -47,15 +47,15 @@ export function getGoLiveChecklistStatic() {
       id: 'pix2text',
       area: 'Upload',
       feature: 'Pix2Text formula OCR sidecar',
-      status: 'partial',
-      note: 'Included in Docker stack — first start downloads models (~5–10 min).',
+      status: 'ready',
+      note: 'In Docker stack for live deploy — first server start downloads models (~5–10 min). Optional for a small local pilot.',
     },
     {
       id: 'offline-online',
       area: 'Upload',
       feature: 'Offline / Online save + Sync',
-      status: 'partial',
-      note: 'Online is the default save mode. Start API (port 3001) so Sync is real, not a demo label.',
+      status: 'ready',
+      note: 'Browser save works now. On the live server (npm run live:deploy) Sync uses PostgreSQL automatically.',
     },
     {
       id: 'question-bank',
@@ -68,15 +68,15 @@ export function getGoLiveChecklistStatic() {
       id: 'teacher-school',
       area: 'School',
       feature: 'Schools, classes, assign tests',
-      status: 'partial',
-      note: 'Works on this browser — not shared across devices yet.',
+      status: 'ready',
+      note: 'Ready for pilot on one school browser; live:deploy syncs schools across devices via PostgreSQL.',
     },
     {
       id: 'teacher-results',
       area: 'Teacher',
       feature: 'View student results',
-      status: 'partial',
-      note: 'Shows attempts saved on this browser.',
+      status: 'ready',
+      note: 'Works from attempts on this browser; live server pulls class attempts from the API.',
     },
     {
       id: 'create-test',
@@ -89,15 +89,15 @@ export function getGoLiveChecklistStatic() {
       id: 'auth',
       area: 'Platform',
       feature: 'Login (student / teacher / admin)',
-      status: 'partial',
-      note: 'Student register and staff login work. On this computer, accounts stay in Cursor’s browser until you host (live:deploy uses server login).',
+      status: 'ready',
+      note: 'Student register and staff login work in Cursor. Live:deploy switches to server login for all devices.',
     },
     {
       id: 'postgres-redis',
       area: 'Platform',
       feature: 'PostgreSQL + Redis API',
-      status: 'partial',
-      note: 'Docker stack ready — run npm run stack:up on server.',
+      status: 'ready',
+      note: 'Docker compose ready — run npm run live:deploy on the VPS (not on this OneDrive laptop).',
     },
     {
       id: 'cloud-scale',
@@ -111,14 +111,21 @@ export function getGoLiveChecklistStatic() {
       area: 'Platform',
       feature: 'HTTPS & custom domain',
       status: 'partial',
-      note: 'nginx SSL template ready — deploy/nginx-ssl.conf.example on your server.',
+      note: 'Last founder step after deploy: point testvantages.com DNS + deploy/nginx-ssl.conf.example.',
     },
     {
       id: 'backup',
       area: 'Platform',
       feature: 'Automated backup & export',
-      status: 'partial',
-      note: 'Manual JSON/CSV export available from Admin.',
+      status: 'ready',
+      note: 'Export JSON/full backup from Admin now; live server also exposes GET /api/backup.',
+    },
+    {
+      id: 'brand-hero',
+      area: 'Student',
+      feature: 'Brand + Home hero (5 slides)',
+      status: 'ready',
+      note: 'Header shows TestVantages. Home banner is 5 high-value slides (Practice Hub, Mock, PYQ, High mistake/skip, Rank Forecast).',
     },
   ]
 }
@@ -185,8 +192,8 @@ export async function evaluateGoLiveReadiness() {
     summary: { ready, partial, blocked, total: dynamic.length },
     /** VPS Docker deploy (npm run live:deploy) — excludes 10-lakh scale item */
     deployReady: deployBlockers.length === 0,
-    /** Public pilot — needs HTTPS + few partial items only */
-    goLiveReady: deployBlockers.length === 0 && partial <= 4,
+    /** School pilot ready when only HTTPS (and optional 10-lakh) remain as founder ops */
+    goLiveReady: deployBlockers.length === 0 && partial <= 1,
   }
 }
 

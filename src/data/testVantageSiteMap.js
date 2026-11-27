@@ -32,7 +32,7 @@ export const SITE_MAP_STUDENT_FLOW = [
       {
         to: '/home',
         label: 'Home banner',
-        desc: 'Rotating product highlights on Home only — not a separate app. Other pages keep the tabs without this banner.',
+        desc: 'Five rotating product highlights on Home only (Practice Hub, Mock, PYQ, High mistake/skip, Rank Forecast). Other pages keep the tabs without this banner.',
         where: 'Strip under the brand bar on Home',
         pathLabel: '(banner · Home only)',
         openable: false,

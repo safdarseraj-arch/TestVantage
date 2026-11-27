@@ -32,7 +32,7 @@ export default function GoLiveReadiness() {
           <p className="form-hint">
             {deployReady
               ? goLiveReady
-                ? 'Core teaching features are ready for a pilot. Add HTTPS before opening to all students.'
+                ? 'TestVantages is pilot-ready. Last step for the public: point testvantages.com DNS and turn on HTTPS after live:deploy.'
                 : 'App code is deploy-ready. Live students still need a server: rent VPS → set passwords → npm run live:deploy → HTTPS. Open More → Go-live Guide for the full checklist.'
               : 'Some items still need work before deploy. You can keep building safely in Cursor.'}
           </p>

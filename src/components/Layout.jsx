@@ -64,7 +64,7 @@ const NAV_PYQ = [
 const NAV_MORE = [
   { to: '/career-compass', label: 'Career Guide', icon: '🧭', title: 'Marks → rank → colleges' },
   { to: '/exam-pulse', label: 'Exam Updates', icon: '📡', title: 'Dates, counselling, focus notes' },
-  { to: '/earn', label: 'Refer & Earn', icon: '💸', title: 'Share TestVantage and earn' },
+  { to: '/earn', label: 'Refer & Earn', icon: '💸', title: 'Share TestVantages and earn' },
   { to: '/campus-earn', label: 'Campus Referrals', icon: '🎓', title: 'University mentor track' },
   { to: '/tour', label: 'Product Tour', icon: '🗺️', title: 'Map of every tab' },
   { to: '/profile', label: 'Profile', icon: '👤', title: 'Your details and invite code' },
@@ -499,7 +499,7 @@ export default function Layout() {
             <Link to={homeLink} className="chrome-brand">
               <span className="brand-mark">TV</span>
               <span className="chrome-brand-text">
-                Test<span className="accent">Vantage</span>
+                Test<span className="accent">Vantages</span>
               </span>
             </Link>
 

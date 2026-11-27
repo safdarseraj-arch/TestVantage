@@ -38,6 +38,7 @@ import OfficialPyqReplicaControls from '../components/OfficialPyqReplicaControls
 import OfficialPyqHybridFill from '../components/OfficialPyqHybridFill.jsx'
 import OfficialPyqTabList, { paperListTitle } from './OfficialPyqTabList.jsx'
 import OfficialPyqPreviewPager from './OfficialPyqPreviewPager.jsx'
+import OfficialPyqKnownUploadErrors from '../components/OfficialPyqKnownUploadErrors.jsx'
 import { resetOfficialPyqSplitWorker, peekOfficialPyqSplitKeep } from '../utils/officialPyqSplitWorker.js'
 import {
   listOfficialPyqMissingSlots,
@@ -1975,6 +1976,8 @@ export default function OfficialPyqPending({ kind = 'official', embedded = false
         )}
       </section>
       )}
+
+      <OfficialPyqKnownUploadErrors />
 
       <section className="card official-pyq-list">
         <h2>2. Review &amp; approve</h2>

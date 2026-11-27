@@ -5,7 +5,7 @@
  * - Compare this question with the original paper page (Gemini vision).
  * - Show original page: the original PDF page picture beside
  *   the card, drawn locally on the server. No Gemini.
- * - Crop a picture from that page into the question, passage, or an option
+ * - Crop a picture from that page into the question, passage, solution, or an option
  *   (the server copies the pixels; nothing is redrawn).
  * Never shown on published papers. Never publishes.
  */
@@ -564,6 +564,7 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
     { id: 'text', label: 'Question text' },
     ...(hasPassage ? [{ id: 'passage', label: 'Passage' }] : []),
     ...Array.from({ length: optionCount }, (_, i) => ({ id: String(i), label: `Option ${String.fromCharCode(65 + i)}` })),
+    { id: 'solution', label: 'Solution' },
   ]
 
   function onCropPicked(target, url) {
@@ -1021,6 +1022,22 @@ export default function OfficialPyqCardAdminTools({ paperId, index, card, onSave
                 data-testid="official-pyq-edit-answer"
                 onChange={(e) => setDraft((d) => ({ ...d, answerKey: e.target.value }))}
               />
+            </label>
+          ) : null}
+          {!draft.grid ? (
+            <label className="official-pyq-edit-field" style={FIELD_STYLE}>
+              Solution (text + optional cropped figure)
+              <textarea
+                style={{ ...INPUT_STYLE, minHeight: '7rem', fontFamily: 'inherit' }}
+                value={draft.solution ?? ''}
+                data-testid="official-pyq-edit-solution"
+                placeholder="Worked solution. If a figure is missing, use Crop → Solution."
+                onChange={(e) => setDraft((d) => ({ ...d, solution: e.target.value }))}
+              />
+              <span className="form-hint" style={{ marginTop: '0.35rem' }}>
+                Same crop tool as Question / Options: crop on the original page, then choose{' '}
+                <strong>Solution</strong>.
+              </span>
             </label>
           ) : null}
           {hasFigure ? (

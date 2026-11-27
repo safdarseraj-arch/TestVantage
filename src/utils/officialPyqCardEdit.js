@@ -157,6 +157,7 @@ export function officialPyqDraftFigureProblem(draft) {
   const parts = [
     ['Question text', draft?.text],
     ['Passage', draft?.passageText],
+    ['Solution', draft?.solution],
     ...(Array.isArray(draft?.options) ? draft.options : []).map((o, i) => [`Option ${LETTERS[i] ?? i + 1}`, o]),
   ]
   for (const [where, value] of parts) {
@@ -168,9 +169,10 @@ export function officialPyqDraftFigureProblem(draft) {
 
 /**
  * Put a picture cropped from the original page into the draft. An option picture
- * replaces that option; question / passage pictures go on a new line at the end.
- * @param {{ text: string, passageText: string, options: string[] }} draft
- * @param {string} target 'text' | 'passage' | option index
+ * replaces that option; question / passage / solution pictures go on a new line
+ * (solution prefers an empty math hole when Mathpix left one).
+ * @param {{ text: string, passageText: string, options: string[], solution?: string }} draft
+ * @param {string} target 'text' | 'passage' | 'solution' | option index
  * @param {string} url
  */
 export function insertOfficialPyqCropFigure(draft, target, url) {
@@ -180,6 +182,23 @@ export function insertOfficialPyqCropFigure(draft, target, url) {
   if (target === 'text') return { ...draft, text: `${String(draft.text ?? '').trimEnd()}\n${fig}`.trim() }
   if (target === 'passage') {
     return { ...draft, passageText: `${String(draft.passageText ?? '').trimEnd()}\n${fig}`.trim() }
+  }
+  if (target === 'solution') {
+    let s = String(draft.solution ?? '')
+    if (/\\includegraphics|!\[[^\]]*\]\([^)]+\)/i.test(s)) {
+      return { ...draft, solution: `${s.trimEnd()}\n${fig}`.trim() }
+    }
+    const withHole = s.replace(/(?:\$\s+){2,}(?=\$\$)/, `\n\n${fig}\n\n`)
+    if (withHole !== s) return { ...draft, solution: withHole.trim() }
+    const display = s.match(/\$\$[\s\S]*?\$\$/)
+    if (display && display.index != null) {
+      const at = display.index + display[0].length
+      return {
+        ...draft,
+        solution: `${s.slice(0, at).trim()}\n\n${fig}\n\n${s.slice(at).trim()}`.trim(),
+      }
+    }
+    return { ...draft, solution: `${s.trim()}\n\n${fig}`.trim() }
   }
   const options = (draft.options || []).slice()
   options[Number(target)] = fig
@@ -270,6 +289,7 @@ export function officialPyqDraftFromCard(card) {
     text: String(card?.text ?? card?.stem ?? ''),
     passageText: String(card?.passageText ?? ''),
     options: Array.isArray(card?.options) ? card.options.map((o) => String(o ?? '')) : [],
+    solution: String(card?.solution ?? ''),
     answerKey: formatOfficialPyqAnswerKey(card),
     removeFigure: false,
   }
@@ -669,6 +689,17 @@ export function applyOfficialPyqCardDraft(card, draft) {
     const passage = draft.passageText.trim()
     if (passage) next.passageText = passage
     else delete next.passageText
+  }
+  if (typeof draft.solution === 'string') {
+    const solution = draft.solution.trim()
+    const before = String(base.solution ?? '').trim()
+    if (solution) {
+      next.solution = solution
+      if (solution !== before) next.solutionSource = 'admin_edit'
+    } else {
+      delete next.solution
+      delete next.solutionSource
+    }
   }
   return next
 }

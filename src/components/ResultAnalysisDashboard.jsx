@@ -439,7 +439,7 @@ export default function ResultAnalysisDashboard({
           <CohortDataNote studentCount={scoreComparison.studentCount} />
 
           <VerticalCompareChart
-            title="Overall & subject-wise marks"
+            title="Overall & subject-wise marks (bar)"
             subtitle={`You vs local best, local top 10%, local top 25%, and device average${
               scoreComparison.studentCount > 0
                 ? ` · ${scoreComparison.studentCount} attempt${scoreComparison.studentCount === 1 ? '' : 's'} on this device`
@@ -508,11 +508,12 @@ export default function ResultAnalysisDashboard({
           <InsightCallout title="Pacing">
             {timeSinks.sinks.length
               ? `${timeSinks.sinks.length} time sink${timeSinks.sinks.length === 1 ? '' : 's'} — questions slower than ~${timeSinks.threshold}s that still went wrong. Tap a row to open it.`
-              : `Average ${timeDetail.avgSeconds}s per question. No slow-and-wrong sinks in this view.`}
+              : `Average ${timeDetail.avgSeconds}s per question. No slow-and-wrong sinks in this view.`}{' '}
+            Open Question-wise → Your vs correct for visit timeline, toughness, and Hybrid ideal time per question.
           </InsightCallout>
 
           <VerticalCompareChart
-            title="Average time per question"
+            title="Average time per question (bar)"
             subtitle="Lower is better — your seconds vs device average"
             categories={timeBehaviour.categories.map((c) => ({
               id: c.id,
@@ -623,6 +624,8 @@ export default function ResultAnalysisDashboard({
             studentGrades={studentGrades}
             subjectFilter={subjectTab}
             perQuestion={result.perQuestion}
+            sessionTelemetry={sessionTelemetry}
+            demoTimeline={Boolean(data?.demoAnalysis)}
             initialQuestionId={focusQuestionId}
             wrongReasons={wrongReasons}
             autoErrorTypes={autoErrorTypes}

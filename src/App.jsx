@@ -145,6 +145,8 @@ const PracticeSimilarPyqBank = lazyPage(
 )
 const SiteMap = lazyPage(() => import('./pages/SiteMap'), 'Site map')
 const GoLiveGuide = lazyPage(() => import('./pages/GoLiveGuide'), 'Go live guide')
+const DemoReportCard = lazyPage(() => import('./pages/DemoReportCard'), 'Demo report card')
+const DemoTestAnalysis = lazyPage(() => import('./pages/DemoTestAnalysis'), 'Demo test analysis')
 const PaperPatterns = lazyPage(() => import('./pages/PaperPatterns'), 'Paper patterns')
 const GeneratorDashboard = lazyPage(
   () => import('./components/GeneratorDashboard.jsx'),
@@ -433,6 +435,14 @@ export default function App() {
         <Route path="exam/:testId" element={withSuspense(<Exam />, 'Loading exam…')} />
         <Route path="result/:testId" element={withSuspense(<Result />, 'Loading result…')} />
         <Route path="my-results" element={withSuspense(<MyResults />, 'Loading results…')} />
+        <Route
+          path="demo/report-card"
+          element={withSuspense(<DemoReportCard />, 'Loading demo report card…')}
+        />
+        <Route
+          path="demo/test-analysis"
+          element={withSuspense(<DemoTestAnalysis />, 'Loading sample analysis…')}
+        />
         <Route path="analytics" element={withSuspense(<Analytics />, 'Loading analytics…')} />
         <Route path="leaderboard" element={withSuspense(<Leaderboard />, 'Loading leaderboard…')} />
         <Route

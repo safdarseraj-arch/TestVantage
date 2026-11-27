@@ -51,6 +51,18 @@ const NAV_CHALLENGES = [
 
 const NAV_PROGRESS = [
   { to: '/my-results', label: 'My Results', icon: '📊', title: 'All finished attempts' },
+  {
+    to: '/demo/report-card',
+    label: 'Demo report card',
+    icon: '🧾',
+    title: 'Sample parent/student one-page report',
+  },
+  {
+    to: '/demo/test-analysis',
+    label: 'Sample analysis',
+    icon: '🔎',
+    title: 'Full Result tabs for a demo student attempt',
+  },
   { to: '/analytics', label: 'Score Analytics', icon: '📈', title: 'Trends and study path' },
   { to: '/form-forecast', label: 'Rank Forecast', icon: '🎯', title: 'Practice AIR and Exam Fit' },
   { to: '/leaderboard', label: 'Rankings', icon: '🏆', title: 'Peer standings' },

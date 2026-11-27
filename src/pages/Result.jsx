@@ -22,6 +22,7 @@ import { getTestById } from '../data/tests'
 import WeakChaptersPanel from '../components/WeakChaptersPanel'
 import ResultNextSteps from '../components/ResultNextSteps'
 import ResultShareReport from '../components/ResultShareReport'
+import AutoDiagnosticReportBanner from '../components/AutoDiagnosticReportBanner'
 import PlanAdherencePanel from '../components/PlanAdherencePanel'
 import RoughSheetPanel from '../components/RoughSheetPanel'
 import { buildChapterSubjectMap, buildWeakTopics } from '../utils/testAnalysis'
@@ -324,7 +325,21 @@ export default function Result() {
         />
       )}
 
-      <ResultShareReport data={data} test={test} studentName={data.userName} />
+      <AutoDiagnosticReportBanner
+        attemptId={attemptId || storedAttempt?.id || null}
+        test={test}
+        data={data}
+        studentName={data.userName}
+        attempts={attempts}
+      />
+
+      <ResultShareReport
+        data={data}
+        test={test}
+        studentName={data.userName}
+        attempts={attempts}
+        attemptId={attemptId || storedAttempt?.id || null}
+      />
 
       <PlanAdherencePanel
         plan={examPlan}

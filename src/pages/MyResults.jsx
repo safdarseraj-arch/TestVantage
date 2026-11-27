@@ -33,6 +33,12 @@ export default function MyResults() {
         pageId="my-results"
         actions={
           <>
+            <Link to="/demo/test-analysis" className="btn btn-ghost btn-sm">
+              Sample analysis
+            </Link>
+            <Link to="/demo/report-card" className="btn btn-ghost btn-sm">
+              Demo report card
+            </Link>
             <Link to="/analytics" className="btn btn-ghost btn-sm">
               Analytics
             </Link>

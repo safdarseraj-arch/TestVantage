@@ -265,6 +265,18 @@ export const SITE_MAP_STUDENT_FLOW = [
         next: 'Result',
       },
       {
+        to: '/demo/report-card',
+        label: 'Demo report card',
+        desc: 'Fixed sample for Aarav Sharma — one-page parent/student marks report (print or download). No real attempt needed.',
+        where: 'Top nav → Progress → Demo report card · path /demo/report-card',
+      },
+      {
+        to: '/demo/test-analysis',
+        label: 'Sample analysis',
+        desc: 'Full Result & analysis for Aarav Sharma on the JEE Main sample paper — Overall, Time, Question-wise, Charts, Insight Coach.',
+        where: 'Top nav → Progress → Sample analysis · path /demo/test-analysis',
+      },
+      {
         to: '/analytics',
         label: 'Score Analytics',
         desc: 'Trends over time: streak, weak chapters, and a study path. Use Rank Forecast for practice AIR and Exam Fit.',

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import ResultQuestionWisePanel from './ResultQuestionWisePanel'
 import { getQuestionType } from '../data/questionTypes'
 import { buildQuestionLevelCohortStats, buildPerQuestionPeerStats, filterPerQuestionForSubject } from '../utils/testAnalysis.js'
+import { buildDemoPeerStatsForQuestions } from '../utils/questionLevelDiagnostics.js'
 
 const DIFF_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
 
@@ -122,6 +123,8 @@ function CohortTable({ rows, studentGrades }) {
  *   studentGrades?: Map<string, string>
  *   subjectFilter?: string
  *   perQuestion?: object[]
+ *   sessionTelemetry?: object | null
+ *   demoTimeline?: boolean
  *   initialQuestionId?: string | null
  *   wrongReasons?: Record<string, string>
  *   autoErrorTypes?: Record<string, string>
@@ -134,6 +137,8 @@ export default function QuestionLevelAnalysis({
   studentGrades,
   subjectFilter = 'overall',
   perQuestion,
+  sessionTelemetry = null,
+  demoTimeline = false,
   initialQuestionId = null,
   wrongReasons = {},
   autoErrorTypes = {},
@@ -146,10 +151,20 @@ export default function QuestionLevelAnalysis({
     [testId, questions],
   )
 
-  const peerStatsByQuestionId = useMemo(
-    () => buildPerQuestionPeerStats(testId, questions),
-    [testId, questions],
-  )
+  const peerStatsByQuestionId = useMemo(() => {
+    const real = buildPerQuestionPeerStats(testId, questions)
+    const sample = real.values().next().value
+    if (!demoTimeline || (sample && sample.studentCount >= 2)) return real
+    return buildDemoPeerStatsForQuestions(questions, perQuestion)
+  }, [testId, questions, perQuestion, demoTimeline])
+
+  const questionsById = useMemo(() => {
+    const m = new Map()
+    for (const q of questions ?? []) {
+      if (q?.id) m.set(q.id, q)
+    }
+    return m
+  }, [questions])
 
   const rows = useMemo(() => {
     if (subjectFilter === 'overall') return allRows
@@ -180,8 +195,11 @@ export default function QuestionLevelAnalysis({
           perQuestion={perQuestion}
           subjectFilter={subjectFilter}
           peerStatsByQuestionId={peerStatsByQuestionId}
+          questionsById={questionsById}
+          sessionTelemetry={sessionTelemetry}
+          demoTimeline={demoTimeline}
           title="Question-wise analysis"
-          subtitle="Green = correct, red = wrong. On wrongs, tap Why I got it wrong so Analytics Error DNA learns your real causes."
+          subtitle="Green = correct, red = wrong. Open Your vs correct for accuracy bands, visit timeline, toughness, and ideal time."
           initialQuestionId={initialQuestionId}
           wrongReasons={wrongReasons}
           autoErrorTypes={autoErrorTypes}

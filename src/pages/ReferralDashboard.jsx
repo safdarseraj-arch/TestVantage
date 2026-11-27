@@ -173,7 +173,8 @@ export default function ReferralDashboard() {
             </Link>
           </div>
           <p className="form-hint" style={{ marginTop: '0.75rem' }}>
-            Already an ambassador? Sign in under the Ambassador tab on Login — then open this page
+            Demo: Login → Try as ambassador (<code>ambassador@testvantage.com</code> /{' '}
+            <code>ambassador123</code>). Already an ambassador? Use the Ambassador tab on Login — then open this page
             again to create your kit if it is missing.
           </p>
         </section>

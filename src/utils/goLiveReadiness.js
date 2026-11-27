@@ -127,6 +127,41 @@ export function getGoLiveChecklistStatic() {
       status: 'ready',
       note: 'Header shows TestVantages. Home banner is 5 high-value slides (Practice Hub, Mock, PYQ, High mistake/skip, Rank Forecast).',
     },
+    {
+      id: 'diag-national-peers',
+      area: 'Diagnostics',
+      feature: 'Live peer bands (Top 1% / Top 500)',
+      status: 'partial',
+      note: 'Wired: GET /api/diagnostics/peer-stats/:testId. Full capacity after live:deploy when many students sit the same paper.',
+    },
+    {
+      id: 'diag-answer-flips',
+      area: 'Diagnostics',
+      feature: 'Answer-flip / OMR forensics',
+      status: 'ready',
+      note: 'New exam sittings log option changes into the diagnostic PDF. OMR bubble events attach when OMR path is used.',
+    },
+    {
+      id: 'diag-adv-dual',
+      area: 'Diagnostics',
+      feature: 'JEE Advanced P1 + P2 merged report',
+      status: 'ready',
+      note: 'Link Paper 1 and Paper 2 attempts for one merged diagnostic pack (Result → share report).',
+    },
+    {
+      id: 'diag-full-length',
+      area: 'Diagnostics',
+      feature: 'Full-length PDF density (75–180 Q)',
+      status: 'ready',
+      note: 'Report scales with paper size. Use full mocks / Official PYQ — not only the 9-Q sample demo.',
+    },
+    {
+      id: 'diag-auto-after-submit',
+      area: 'Diagnostics',
+      feature: 'Auto diagnostic after test / practice',
+      status: 'ready',
+      note: 'Every submit queues the full multi-page report. Result page shows Open / Print when ready. Live:deploy syncs reports to /api/diagnostics/reports.',
+    },
   ]
 }
 
@@ -177,6 +212,28 @@ export async function evaluateGoLiveReadiness() {
   }
   if (platformScale && !apiOnline) {
     patch(dynamic, 'offline-online', 'partial', 'Production scale on — start API (npm run api / stack:up).')
+  }
+  if (apiOnline) {
+    patch(
+      dynamic,
+      'diag-national-peers',
+      'partial',
+      'Peer API online — Top 1% / Top 500 fill automatically as students submit each paper (needs ~50+ for strong bands, 500+ for true Top 500).',
+    )
+  }
+  if (apiOnline && platformScale && storage?.storage?.postgresOk) {
+    patch(
+      dynamic,
+      'diag-national-peers',
+      'ready',
+      'Live peer stats endpoint active with PostgreSQL attempts — national/school Top 1% / Top 500 unlock with volume.',
+    )
+    patch(
+      dynamic,
+      'diag-auto-after-submit',
+      'ready',
+      'Auto reports generate after submit and sync to /api/diagnostics/reports on the live server.',
+    )
   }
 
   const ready = dynamic.filter((i) => i.status === 'ready').length

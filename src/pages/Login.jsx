@@ -9,7 +9,12 @@ import {
   TEACHER_ONBOARDING_PATH,
   afterAuthPath,
 } from '../utils/userProfiles'
-import { DEMO_ACCOUNTS, ensureDemoAccounts, getDemoAdminHint } from '../utils/demoAccounts.js'
+import {
+  DEMO_ACCOUNTS,
+  ensureDemoAccounts,
+  getDemoAdminHint,
+  getDemoTryAccounts,
+} from '../utils/demoAccounts.js'
 import { findUserByInviteCode, normalizeInviteCode } from '../utils/invites.js'
 import { lookupSchoolInvite, rememberSchoolInvite } from '../utils/facultyWorkbench.js'
 import { readCapturedReferral } from '../utils/referralEngine.js'
@@ -270,7 +275,13 @@ export default function Login() {
         navigate('/question-bank', { replace: true })
         return
       }
-      setMode(account.key === 'student' ? 'student' : 'teacher')
+      setMode(
+        account.key === 'ambassador'
+          ? 'ambassador'
+          : account.key === 'student'
+            ? 'student'
+            : 'teacher',
+      )
       setEmail(account.email)
       setPassword(account.password)
       const result = await loginAsUser(account.email, account.password)
@@ -279,7 +290,7 @@ export default function Login() {
         return
       }
       const dest = afterAuthPath(result.session, account.home)
-      navigate(dest, { replace: true })
+      navigate(isAuthPath(dest) ? account.home : dest, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Demo sign-in failed. Press F5 and try again.')
     } finally {
@@ -576,11 +587,20 @@ export default function Login() {
 
           <div className="auth-demo-panel">
             <p className="auth-demo-lead">
-              <strong>Demo logins</strong> — practice accounts so you can try the product as a
-              student, teacher, school staff, or admin. They are labeled Demo, not real people.
+              <strong>Demo logins</strong> — try as student, teacher, school, ambassador, or admin.
+              Labeled Demo (not real people).
+            </p>
+            <p className="form-hint" style={{ marginTop: 0 }}>
+              <strong>School dashboard:</strong> Login → <strong>Try as school</strong> (or Teacher
+              tab with school email) → opens{' '}
+              <strong>School Management</strong> at{' '}
+              <code>/admin/schools</code>. Also: top nav → Admin / Classroom → <strong>Schools</strong>.
+              <br />
+              <strong>Ambassador:</strong> Login → Ambassador tab or <strong>Try as ambassador</strong>{' '}
+              → <strong>Refer &amp; Earn</strong> at <code>/earn</code>.
             </p>
             <div className="auth-demo-try">
-              {DEMO_ACCOUNTS.map((account) => (
+              {getDemoTryAccounts().map((account) => (
                 <button
                   key={account.key}
                   type="button"
@@ -596,7 +616,7 @@ export default function Login() {
               ))}
             </div>
             <ul className="auth-demo-creds">
-              {DEMO_ACCOUNTS.map((account) => {
+              {getDemoTryAccounts().map((account) => {
                 const adminHint = account.role === 'admin' ? getDemoAdminHint() : null
                 return (
                   <li key={account.key}>

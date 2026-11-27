@@ -19,26 +19,26 @@ const FEATURED_ACTIONS = [
   {
     to: '/form-forecast',
     icon: '🎯',
-    title: 'Form Forecast',
+    title: 'Rank Forecast',
     desc: 'Practice AIR, Exam Fit /100, Revision Ladder, Precision Map & Insight Coach.',
-    cta: 'Open Form Forecast →',
+    cta: 'Open Rank Forecast →',
     accent: '#b45309',
     primary: true,
   },
   {
     to: '/career-compass',
     icon: '🧭',
-    title: 'Career Compass',
+    title: 'Career Guide',
     desc: 'Exam-day marks → AIR → colleges & choice filling for JEE + NEET.',
-    cta: 'Open Career Compass →',
+    cta: 'Open Career Guide →',
     accent: '#0284c7',
   },
   {
     to: '/todays-drill',
     icon: '🗓️',
-    title: 'Today’s Drill',
-    desc: 'One mixed daily set — habit under the Compete tab.',
-    cta: 'Start Today’s Drill →',
+    title: 'Daily Challenge',
+    desc: 'One mixed daily set — habit under the Challenges tab.',
+    cta: 'Start Daily Challenge →',
     accent: '#0f766e',
   },
 ]
@@ -46,45 +46,69 @@ const FEATURED_ACTIONS = [
 const STUDENT_PILLARS = [
   {
     icon: '📝',
-    label: 'Prepare',
+    label: 'Practice',
     links: [
-      { to: '/prepare', icon: '🎓', label: 'Prepare centre', desc: 'All prepare modes' },
-      { to: '/mock-test', icon: '🎯', label: 'AI Mock Builder', desc: 'AI paper · your syllabus' },
-      { to: '/tests', icon: '📋', label: 'Mock tests', desc: 'Assigned & sample papers' },
-      { to: '/practice', icon: '📖', label: 'Syllabus practice', desc: 'Mixed chapters · no timer' },
-      { to: '/speed-test', icon: '⚡', label: 'Speed test', desc: '15–60 min timed drill' },
-      { to: '/cdf-test', icon: '⏱️', label: 'CDF test', desc: 'Concept, Definition & Formula' },
-      { to: '/quick-revision', icon: '📝', label: 'Quick Revision', desc: 'Definitions & formulas by chapter' },
-      { to: '/formula-sheet', icon: '📌', label: 'My Formula Sheet', desc: 'Pin formulas you keep forgetting' },
-      { to: '/daily-target', icon: '🎯', label: 'Today’s Target', desc: 'Clear backlog chapters today' },
-      { to: '/pyq', icon: '📅', label: 'PYQ bank', desc: 'Previous year · six modes' },
+      { to: '/prepare', icon: '🎓', label: 'Practice Hub', desc: 'All practice modes' },
+      { to: '/practice', icon: '📖', label: 'Syllabus Practice', desc: 'Mixed chapters · no timer' },
+      { to: '/high-mistake', icon: '❌', label: 'High mistake', desc: 'Practice or test trap questions' },
+      { to: '/high-skip', icon: '⏭️', label: 'High skip', desc: 'Practice or test often-skipped questions' },
+      { to: '/cdf-test', icon: '⏱️', label: 'CDF Mastery', desc: 'Concept, Definition & Formula' },
+      { to: '/quick-revision', icon: '📝', label: 'Quick Revision', desc: 'Notes & cheat sheets' },
+      { to: '/formula-sheet', icon: '📌', label: 'Formula Sheet', desc: 'Pin formulas you forget' },
+      { to: '/daily-target', icon: '🎯', label: 'Daily Target', desc: 'Clear backlog chapters today' },
+      { to: '/daily-sheet', icon: '📄', label: 'Daily Practice Sheet', desc: 'Dated chapter sheet' },
+    ],
+  },
+  {
+    icon: '📋',
+    label: 'Tests',
+    links: [
+      { to: '/mock-test', icon: '🎯', label: 'Mock Builder', desc: 'AI paper · your syllabus' },
+      { to: '/speed-test', icon: '⚡', label: 'Speed Test', desc: '15–60 min timed drill' },
+      { to: '/test-series', icon: '📆', label: 'Series Calendar', desc: 'Week-by-week mocks' },
+      { to: '/tests', icon: '📋', label: 'Mock Tests', desc: 'Assigned & sample papers' },
+      { to: '/placement-check', icon: '📍', label: 'Starter Diagnosis', desc: 'Short paper → weak chapters → today’s plan' },
+    ],
+  },
+  {
+    icon: '📅',
+    label: 'PYQ',
+    links: [
+      { to: '/practice/pyq', icon: '📅', label: 'PYQ Bank', desc: 'Previous year · six modes' },
+      { to: '/practice/similar-pyq', icon: '🔁', label: 'Similar PYQ', desc: 'AI-similar practice' },
     ],
   },
   {
     icon: '📊',
-    label: 'Insights',
+    label: 'Progress',
     links: [
-      { to: '/my-results', icon: '📋', label: 'My results', desc: 'Full attempt history' },
-      { to: '/analytics', icon: '📈', label: 'Analytics', desc: 'Trends · streak · study path' },
-      { to: '/form-forecast', icon: '🎯', label: 'Form Forecast', desc: 'Practice AIR · Exam Fit · coach' },
-      { to: '/career-compass', icon: '🧭', label: 'Career Compass', desc: 'Exam-day AIR · colleges' },
-      { to: '/leaderboard', icon: '🏆', label: 'Leaderboard', desc: 'Real attempt standings' },
-      { to: '/exam-pulse', icon: '📡', label: 'Exam Pulse', desc: 'Exams · admissions · focus' },
-      { to: '/profile', icon: '👤', label: 'Profile & invites', desc: 'Your details · share invite code' },
-      { to: '/earn', icon: '💸', label: 'Earn & Refer', desc: 'Wallet · campus side-income' },
+      { to: '/my-results', icon: '📋', label: 'My Results', desc: 'Full attempt history' },
+      { to: '/analytics', icon: '📈', label: 'Score Analytics', desc: 'Trends · streak · study path' },
+      { to: '/form-forecast', icon: '🎯', label: 'Rank Forecast', desc: 'Practice AIR · Exam Fit · coach' },
+      { to: '/leaderboard', icon: '🏆', label: 'Rankings', desc: 'Real attempt standings' },
     ],
   },
   {
     icon: '🔗',
-    label: 'Compete',
+    label: 'Challenges',
     links: [
-      { to: '/todays-drill', icon: '🗓️', label: 'Today’s Drill', desc: 'Daily mixed set' },
-      { to: '/peer-pulse', icon: '🔗', label: 'Peer Pulse', desc: 'Spar Code · one peer' },
-      { to: '/merit-stride', icon: '✨', label: 'Merit Stride', desc: 'Points · badges · focus' },
-      { to: '/study-circle', icon: '👥', label: 'Study Circle', desc: 'Cohort Code rooms' },
-      { to: '/doubts', icon: '💬', label: 'Ask Your Doubt', desc: 'Doubt on a question' },
-      { to: '/earn', icon: '💸', label: 'Earn & Refer', desc: 'Share link · vanity code' },
-      { to: '/campus-earn', icon: '🎓', label: 'Campus Earn', desc: 'University mentor program' },
+      { to: '/todays-drill', icon: '🗓️', label: 'Daily Challenge', desc: 'Daily mixed set' },
+      { to: '/peer-pulse', icon: '🔗', label: 'Peer Match', desc: 'Spar Code · one peer' },
+      { to: '/study-circle', icon: '👥', label: 'Study Groups', desc: 'Cohort Code rooms' },
+      { to: '/doubts', icon: '💬', label: 'Ask a Doubt', desc: 'Doubt on a question' },
+      { to: '/merit-stride', icon: '✨', label: 'Rewards', desc: 'Points · badges · focus' },
+    ],
+  },
+  {
+    icon: '⋯',
+    label: 'More',
+    links: [
+      { to: '/career-compass', icon: '🧭', label: 'Career Guide', desc: 'Exam-day AIR · colleges' },
+      { to: '/exam-pulse', icon: '📡', label: 'Exam Updates', desc: 'Exams · admissions · focus' },
+      { to: '/earn', icon: '💸', label: 'Refer & Earn', desc: 'Share link · wallet' },
+      { to: '/campus-earn', icon: '🎓', label: 'Campus Referrals', desc: 'University mentor track' },
+      { to: '/tour', icon: '🗺️', label: 'Product Tour', desc: 'Map of every tab' },
+      { to: '/profile', icon: '👤', label: 'Profile', desc: 'Your details · invite code' },
     ],
   },
 ]
@@ -97,8 +121,8 @@ const TRUST_ITEMS = [
 ]
 
 const EXPLORE_LINKS = [
-  { to: '/tour', label: 'TestVantages Tour', primary: true },
-  { to: '/prepare', label: 'Prepare centre' },
+  { to: '/tour', label: 'Product Tour', primary: true },
+  { to: '/prepare', label: 'Practice Hub' },
 ]
 const EXPLORE_LINKS_ADMIN = [
   ...EXPLORE_LINKS,
@@ -242,7 +266,7 @@ function StudentDashboard({ session }) {
           </p>
           <div className="sp-hero-actions">
             <Link to="/prepare" className="sp-btn sp-btn-primary">
-              Open prepare centre
+              Open Practice Hub
             </Link>
             {demoStudent ? (
               <Link to={`/exam/${sampleMockId}`} className="sp-btn sp-btn-glass">
@@ -250,7 +274,7 @@ function StudentDashboard({ session }) {
               </Link>
             ) : null}
             <Link to="/mock-test" className="sp-btn sp-btn-glass">
-              AI Mock Builder
+              Mock Builder
             </Link>
             {stats.lastAttempt ? (
               <Link
@@ -316,15 +340,15 @@ function StudentDashboard({ session }) {
         </section>
       ) : null}
 
-      <section className="sp-featured-strip" aria-label="Prepare centre">
+      <section className="sp-featured-strip" aria-label="Practice Hub">
         <Link
           to="/prepare"
           className="sp-featured-card sp-featured-card--primary"
           style={{ '--sp-accent': '#2563eb' }}
         >
           <span className="sp-featured-icon">🎓</span>
-          <h3>Prepare centre</h3>
-          <p>All prepare modes in one place — AI Mock Builder, practice, speed, CDF, PYQ, and mock tests.</p>
+          <h3>Practice Hub</h3>
+          <p>All practice modes in one place — Mock Builder, syllabus drills, speed, CDF, PYQ, and mock tests.</p>
           <span className="sp-featured-cta">Choose your mode →</span>
         </Link>
       </section>
@@ -348,7 +372,7 @@ function StudentDashboard({ session }) {
       <section className="sp-pillars">
         <div className="sp-pillars-head">
           <h2>Your learning centre</h2>
-          <p>Prepare · Insights · Compete — same buckets as the top nav.</p>
+          <p>Practice · Tests · PYQ · Progress · Challenges — same as the top nav.</p>
         </div>
         <div className="sp-pillar-grid">
           {STUDENT_PILLARS.map((pillar) => (
@@ -685,7 +709,7 @@ function MarketingHome({ isUser, isTeacher, isAdmin, canManageSchools }) {
           Go to Mock Tests
         </Link>
           <Link to="/tour" className="c1-btn c1-btn-glass c1-btn-sm">
-            TestVantages Tour →
+            Product Tour →
           </Link>
         </div>
       </section>

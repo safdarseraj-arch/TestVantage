@@ -41,7 +41,7 @@ export default function PlacementCheck() {
       }
       navigate(`/exam/${result.test.id}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start placement check.')
+      setError(err instanceof Error ? err.message : 'Could not start Starter Diagnosis.')
     } finally {
       setBusy(false)
     }
@@ -57,7 +57,7 @@ export default function PlacementCheck() {
     <div className="page prepare-mode-page placement-check-page">
       <PreparePageHero
         modeId="placement-check"
-        lead="A short mixed paper to see where you stand. After you finish, we suggest three weak chapters for Today’s Target. This is not a fee-scholarship test."
+        lead="Short paper → see weak chapters → set today’s plan. After you finish, we suggest three weak chapters for Today’s Target. This is not a scholarship or job-placement exam."
         actions={
           <>
             <Link to="/daily-target" className="btn btn-ghost btn-sm">
@@ -86,7 +86,7 @@ export default function PlacementCheck() {
         </div>
         <p className="form-hint">About 15 mixed questions. About 25–30 minutes.</p>
         <button type="button" className="btn btn-primary" disabled={busy} onClick={start}>
-          {busy ? 'Building…' : 'Start placement check →'}
+          {busy ? 'Building…' : 'Start Starter Diagnosis →'}
         </button>
         {error ? <p className="form-error">{error}</p> : null}
       </section>
@@ -137,7 +137,7 @@ export default function PlacementCheck() {
           ) : null}
         </section>
       ) : (
-        <p className="form-hint">No finished placement check yet on this login.</p>
+        <p className="form-hint">No finished Starter Diagnosis yet on this login.</p>
       )}
     </div>
   )

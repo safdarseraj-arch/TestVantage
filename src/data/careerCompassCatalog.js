@@ -1,5 +1,5 @@
 /**
- * Career Compass — college & branch catalog (IIT / NIT / IIIT / Medical).
+ * Career Guide — college & branch catalog (IIT / NIT / IIIT / Medical).
  * Cutoffs = General closing ranks (JoSAA / CSAB / MCC), last 3 counselling years.
  * Placement figures = published TPO / NIRF numbers when verified; otherwise Not available.
  * Catalog ballparks are Indicative/unverified — Gemini must not invent typical packages.

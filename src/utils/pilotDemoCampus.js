@@ -195,10 +195,14 @@ export function ensurePilotDemoCampus() {
     }
   }
 
-  const staff =
-    getUserById('demo-staff') ||
-    loadUsers().find((u) => String(u.email).toLowerCase() === 'staff@testvantage.com')
-  if (staff?.role === 'teacher') {
+  const schoolManagers = [
+    getUserById('demo-school'),
+    getUserById('demo-staff'),
+    loadUsers().find((u) => String(u.email).toLowerCase() === 'school@testvantage.com'),
+    loadUsers().find((u) => String(u.email).toLowerCase() === 'staff@testvantage.com'),
+  ].filter((u, i, arr) => u?.role === 'teacher' && arr.findIndex((x) => x?.id === u.id) === i)
+
+  for (const staff of schoolManagers) {
     const attach = attachTeacherFromSchoolInvite(staff.id, {
       schoolId,
       campusName: PILOT_DEMO_CAMPUS_NAME,

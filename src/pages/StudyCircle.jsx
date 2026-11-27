@@ -52,7 +52,7 @@ export default function StudyCircle() {
     const circle = createStudyCircle({
       ownerKey,
       name: displayName,
-      title: title || 'Study Circle',
+      title: title || 'Study Groups',
     })
     setActiveCode(circle.code)
     setTitle('')
@@ -85,9 +85,9 @@ export default function StudyCircle() {
     <div className="page student-portal-page tv-compete-page">
       <header className="tv-compete-hero" style={{ '--tv-accent': '#1d4ed8' }}>
         <Link to="/prepare" className="insight-page-back">
-          ← Prepare centre
+          ← Practice Hub
         </Link>
-        <p className="insight-page-eyebrow">Study Circle</p>
+        <p className="insight-page-eyebrow">Study Groups</p>
         <h1>Peer rooms with a Cohort Code</h1>
         <p className="insight-page-lead">
           Create or join a small competition room — member leaderboard synced across devices when
@@ -163,7 +163,7 @@ export default function StudyCircle() {
         <section className="card create-section">
           <h2>Member board · {activeCode}</h2>
           <p className="form-hint">
-            Ranked by Merit Points, then today’s score. Members should open Peer Pulse or Merit
+            Ranked by Merit Points, then today’s score. Members should open Peer Match or Merit
             Stride once so stats publish.
           </p>
           {board.length === 0 ? (

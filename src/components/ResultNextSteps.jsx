@@ -65,7 +65,7 @@ export default function ResultNextSteps({
             🎯
           </span>
           <span className="si-next-step-text">
-            <strong>Form Forecast</strong>
+            <strong>Rank Forecast</strong>
             <small>Exam Fit and Revision Ladder</small>
           </span>
         </Link>

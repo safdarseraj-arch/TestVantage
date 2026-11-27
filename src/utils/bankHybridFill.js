@@ -24,6 +24,7 @@ const SAVED_KEYS = [
   'chapter',
   'topic',
   'toughnessLevel',
+  'idealTimeSeconds',
   'source',
   'examIds',
   'correctIndex',

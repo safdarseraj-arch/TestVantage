@@ -9,6 +9,8 @@ import { loadAdminAccount } from './auth.js'
 import { persistInviteCode } from './invites.js'
 import { DEMO_STUDENT_EMAIL, DEMO_STUDENT_ID } from './demoStudentAccess.js'
 import { ensurePilotDemoCampus } from './pilotDemoCampus.js'
+import { upsertPartner } from './referralStore.js'
+import { PARTNER_TYPES } from './referralConstants.js'
 
 export {
   DEMO_SAMPLE_TEST_IDS,
@@ -51,9 +53,29 @@ export const DEMO_ACCOUNTS = [
     hint: 'Teacher home — classes, papers, lecture set',
   },
   {
+    /** School dashboard login (School Management hub). */
+    id: 'demo-school',
+    key: 'school',
+    label: 'School',
+    email: 'school@testvantage.com',
+    password: 'school123',
+    role: 'teacher',
+    home: '/admin/schools',
+    permissions: [
+      PERMS.MANAGE_SCHOOLS,
+      PERMS.ASSIGN_TESTS,
+      PERMS.VIEW_STUDENT_RESULTS,
+      PERMS.CREATE_PAPER,
+      PERMS.UPLOAD_QUESTIONS,
+      PERMS.ACCESS_MAIN_QUESTION_BANK,
+    ],
+    hint: 'School dashboard — campuses, classes, roster, exams · /admin/schools',
+  },
+  {
+    /** Legacy alias — same campus manager as School (kept so old “Try as staff” still works). */
     id: 'demo-staff',
     key: 'staff',
-    label: 'Staff',
+    label: 'School staff',
     email: 'staff@testvantage.com',
     password: 'staff123',
     role: 'teacher',
@@ -66,7 +88,19 @@ export const DEMO_ACCOUNTS = [
       PERMS.UPLOAD_QUESTIONS,
       PERMS.ACCESS_MAIN_QUESTION_BANK,
     ],
-    hint: 'School-invited staff — campus bank, assign tests, results',
+    hint: 'Same as School login — School Management hub',
+    hiddenFromTryButtons: true,
+  },
+  {
+    id: 'demo-ambassador',
+    key: 'ambassador',
+    label: 'Ambassador',
+    email: 'ambassador@testvantage.com',
+    password: 'ambassador123',
+    role: 'user',
+    home: '/earn',
+    becomeAmbassador: true,
+    hint: 'Refer & Earn — share kit, mentor page, ledger · /earn',
   },
 ]
 
@@ -147,7 +181,8 @@ function reservedDemoEmail(email) {
 }
 
 function demoUserRow(demo) {
-  const isStudent = demo.role === 'user'
+  const isStudentLike = demo.role === 'user'
+  const isSchoolManager = demo.key === 'school' || demo.key === 'staff'
   return {
     id: demo.id,
     name: `Demo ${demo.label}`,
@@ -158,11 +193,12 @@ function demoUserRow(demo) {
     profileComplete: true,
     selfRegistered: false,
     isDemo: true,
-    allowAllMocks: isStudent,
+    allowAllMocks: isStudentLike && !demo.becomeAmbassador,
+    isAmbassador: Boolean(demo.becomeAmbassador),
     createdBy: 'demo-seed',
-    profile: isStudent
+    profile: isStudentLike
       ? { ...STUDENT_PROFILE }
-      : demo.key === 'staff'
+      : isSchoolManager
         ? { ...STAFF_PROFILE }
         : { ...TEACHER_PROFILE },
   }
@@ -209,14 +245,32 @@ export function ensureDemoAccounts() {
   for (const demo of DEMO_ACCOUNTS) {
     if (demo.role === 'admin') continue
     persistInviteCode(demo.id)
+    if (demo.becomeAmbassador) {
+      try {
+        upsertPartner({
+          userId: demo.id,
+          name: `Demo ${demo.label}`,
+          email: demo.email,
+          partnerType: PARTNER_TYPES.STUDENT,
+          displayName: 'Demo Ambassador',
+        })
+      } catch {
+        /* referral store optional in some hosts */
+      }
+    }
   }
-  // Seed Pilot Demo Campus after demo users exist so staff can link into classes.
+  // Seed Pilot Demo Campus after demo users exist so school login can open a campus.
   try {
     ensurePilotDemoCampus()
   } catch {
     /* localStorage may be unavailable in some test hosts */
   }
   return DEMO_ACCOUNTS
+}
+
+/** Accounts shown as “Try as …” buttons (hides legacy aliases). */
+export function getDemoTryAccounts() {
+  return DEMO_ACCOUNTS.filter((d) => !d.hiddenFromTryButtons)
 }
 
 export function getDemoAccount(key) {

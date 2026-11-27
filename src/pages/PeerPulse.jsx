@@ -28,7 +28,7 @@ export default function PeerPulse() {
           setTick((t) => t + 1)
         }
       } catch {
-        if (!cancelled) setSyncNote('Working offline — open Peer Pulse again when the app server is running.')
+        if (!cancelled) setSyncNote('Working offline — open Peer Match again when the app server is running.')
       }
     })()
     return () => {
@@ -64,9 +64,9 @@ export default function PeerPulse() {
     <div className="page student-portal-page tv-compete-page">
       <header className="tv-compete-hero" style={{ '--tv-accent': '#0f766e' }}>
         <Link to="/prepare" className="insight-page-back">
-          ← Prepare centre
+          ← Practice Hub
         </Link>
-        <p className="insight-page-eyebrow">Peer Pulse</p>
+        <p className="insight-page-eyebrow">Peer Match</p>
         <h1>Friendly competition that keeps you honest</h1>
         <p className="insight-page-lead">
           Share your Spar Code with a friend. Compare streak, accuracy, Merit Points, and today’s
@@ -76,7 +76,7 @@ export default function PeerPulse() {
 
       <section className="card create-section">
         <h2>Your Spar Code</h2>
-        <p className="form-hint">Send this to a friend so they can link you in Peer Pulse.</p>
+        <p className="form-hint">Send this to a friend so they can link you in Peer Match.</p>
         <div className="tv-code-display" aria-live="polite">
           {snap.myCode}
         </div>
@@ -131,7 +131,7 @@ export default function PeerPulse() {
         {error && <p className="form-error">{error}</p>}
         {!snap.peer && (
           <p className="form-hint" style={{ marginTop: '0.75rem' }}>
-            Both of you should open Peer Pulse while signed in so Spar Codes publish to the shared
+            Both of you should open Peer Match while signed in so Spar Codes publish to the shared
             directory. Keep the bottom terminal panel running (F5 / Start TestVantages).
           </p>
         )}
@@ -142,7 +142,7 @@ export default function PeerPulse() {
           <h2>Pulse nudge</h2>
           <p>{snap.nudge}</p>
           <Link to="/todays-drill" className="btn btn-primary btn-sm">
-            Open Today’s Drill →
+            Open Daily Challenge →
           </Link>
         </section>
       )}
@@ -206,8 +206,8 @@ export default function PeerPulse() {
       </section>
 
       <p className="form-hint">
-        Also earn points on <Link to="/merit-stride">Merit Stride</Link> · climb with{' '}
-        <Link to="/form-forecast">Form Forecast</Link>.
+        Also earn points on <Link to="/merit-stride">Rewards</Link> · climb with{' '}
+        <Link to="/form-forecast">Rank Forecast</Link>.
       </p>
     </div>
   )

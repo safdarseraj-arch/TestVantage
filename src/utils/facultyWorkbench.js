@@ -178,7 +178,7 @@ export function defaultWatermarkForName(name) {
   const first = String(name ?? '')
     .trim()
     .split(/\s+/)[0]
-  if (!first) return 'TestVantage · confidential'
+  if (!first) return 'TestVantages · confidential'
   return `${first} · confidential`
 }
 

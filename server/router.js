@@ -39,6 +39,12 @@ import {
   saveExamSession,
 } from './stores/examSessions.js'
 import { listAttempts, saveAttemptRecord } from './stores/attempts.js'
+import { buildPeerStatsPayload } from './diagnosticsPeer.js'
+import {
+  getDiagnosticReport,
+  listDiagnosticReports,
+  saveDiagnosticReport,
+} from './stores/diagnosticReports.js'
 import { loadOrgData, saveOrgData } from './stores/orgData.js'
 import { loadCustomTestsData, saveCustomTestsData } from './stores/customTestsData.js'
 import {
@@ -643,6 +649,56 @@ export async function handleApiRequest(req, res) {
       const limit = Number(url.searchParams.get('limit')) || 200
       const attempts = await listAttempts({ ownerKeys, limit })
       sendJson(res, 200, { attempts, count: attempts.length })
+      return
+    }
+
+    // Auto diagnostic reports (generated client-side after submit, synced when live)
+    if (req.method === 'POST' && path === '/api/diagnostics/reports') {
+      const body = await readJsonBody(req, Math.min(SCALE.maxBodyBytes, 8 * 1024 * 1024))
+      const report = body?.report ?? body
+      if (!report?.attemptId) {
+        sendJson(res, 400, { error: 'report.attemptId required' })
+        return
+      }
+      const saved = saveDiagnosticReport(report)
+      sendJson(res, 202, { ok: true, attemptId: saved.attemptId, savedAt: saved.savedAt })
+      return
+    }
+
+    if (req.method === 'GET' && path.startsWith('/api/diagnostics/reports/')) {
+      const attemptId = decodeURIComponent(path.slice('/api/diagnostics/reports/'.length).split('/')[0] || '')
+      if (!attemptId) {
+        sendJson(res, 400, { error: 'Use /api/diagnostics/reports/:attemptId' })
+        return
+      }
+      const row = getDiagnosticReport(attemptId)
+      if (!row) {
+        sendJson(res, 404, { error: 'Report not found' })
+        return
+      }
+      sendJson(res, 200, { report: row })
+      return
+    }
+
+    if (req.method === 'GET' && path === '/api/diagnostics/reports') {
+      const ownerKey = url.searchParams.get('ownerKey')?.trim() || undefined
+      const limit = Number(url.searchParams.get('limit')) || 50
+      const reports = listDiagnosticReports({ ownerKey, limit })
+      sendJson(res, 200, { reports, count: reports.length })
+      return
+    }
+
+    // Live diagnostic peer bands (Top 1% / Top 10% / Top 25% / Top 500 / All)
+    if (req.method === 'GET' && path.startsWith('/api/diagnostics/peer-stats/')) {
+      const testId = decodeURIComponent(path.slice('/api/diagnostics/peer-stats/'.length).split('/')[0] || '')
+      if (!testId) {
+        sendJson(res, 400, { error: 'Use /api/diagnostics/peer-stats/:testId' })
+        return
+      }
+      const limit = Number(url.searchParams.get('limit')) || 5000
+      const attempts = await listAttempts({ limit: Math.min(Math.max(limit, 50), 20000) })
+      const payload = buildPeerStatsPayload(attempts, testId)
+      sendJson(res, 200, payload)
       return
     }
 

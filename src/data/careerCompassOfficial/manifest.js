@@ -1,5 +1,5 @@
 /**
- * Official Career Compass data sources — attribution for NTA / JoSAA / CSAB / MCC.
+ * Official Career Guide data sources — attribution for NTA / JoSAA / CSAB / MCC.
  * Live scrape is limited; snapshots use published counselling benchmarks (2024–2026).
  */
 

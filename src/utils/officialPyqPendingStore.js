@@ -5,6 +5,10 @@
 
 import { getOfficialPyqExamLabel } from '../data/officialPyqSources.js'
 import { enforceAdminFactsOnQuestions } from './officialPyqAdminFacts.js'
+import {
+  readOfficialPyqPapersFromIdb,
+  writeOfficialPyqPapersToIdb,
+} from './officialPyqPendingIdb.js'
 
 export const OFFICIAL_PYQ_PENDING_KEY = 'testvantage-official-pyq-pending'
 export const OFFICIAL_PYQ_PENDING_BACKUP_KEY = 'testvantage-official-pyq-pending-backup'
@@ -497,27 +501,36 @@ function otherPaperFields(paper) {
   }
 }
 
+/**
+ * Fat localStorage root must stay small — OCR blobs alone blow past the origin quota
+ * once ~6+ papers are saved (and used to silently drop later uploads).
+ * @param {OfficialPyqPendingPaper[]} papers
+ */
+function papersWithoutOcrBlob(papers) {
+  return (Array.isArray(papers) ? papers : []).map((p) => {
+    const ocr = String(p?.preparedText ?? '').trim()
+    const { preparedText: _drop, ...rest } = p || {}
+    return {
+      ...rest,
+      hasOcr: p?.hasOcr === true || ocr.length >= 80,
+      ...(ocr.length >= 80 ? { ocrStoredApart: true } : {}),
+    }
+  })
+}
+
 /** @param {OfficialPyqPendingPaper} paper */
 function writeLightPaper(paper) {
   rememberPaper(paper)
   try {
     if (typeof localStorage === 'undefined' || !paper?.id) return
     const light = paperToLightRecord(paper)
-    // Never wipe OCR: Re-parse / quality-check light writes used to replace the fat
-    // item with a preview row that omitted preparedText (S1 Match List + SMILES heals
-    // then had nothing to rebuild from).
-    let prevOcr = ''
-    try {
-      prevOcr = String(JSON.parse(localStorage.getItem(paperItemKey(paper.id)) || '{}')?.preparedText ?? '').trim()
-    } catch {
-      prevOcr = ''
-    }
-    const nextOcr = String(paper.preparedText ?? '').trim() || prevOcr
-    const payload =
-      nextOcr.length >= 80 ? { ...light, preparedText: nextOcr, hasOcr: true } : light
+    // Keep item keys lean (questions only). Full OCR lives in IndexedDB + memoryRoot so
+    // localStorage quota does not wipe the approval queue after a few papers.
+    const payload = { ...light, hasOcr: light.hasOcr === true || String(paper.preparedText ?? '').trim().length >= 80 }
+    delete payload.preparedText
     localStorage.setItem(paperItemKey(paper.id), JSON.stringify(payload))
   } catch {
-    /* item cache is optional */
+    /* item cache is optional — IndexedDB still holds the full paper */
   }
 }
 
@@ -660,6 +673,12 @@ export function officialPyqSittingKey(paper) {
   if (exam === 'jee-main') {
     const date = String(paper?.pyqDate || '').trim()
     const shift = paper?.pyqShift === 1 || paper?.pyqShift === 2 ? String(paper.pyqShift) : ''
+    // Without date+shift, every Main paper of the same year used to share one key and
+    // normalize() silently dropped all but one — a major “where did my PYQs go?” cause.
+    if (!date || !shift) {
+      const uniq = String(paper?.id || paper?.paperId || '').trim() || 'unknown'
+      return [exam, year, 'pending-date', uniq].join('|')
+    }
     return [exam, year, date, shift].join('|')
   }
   if (exam === 'jee-advanced') {
@@ -740,49 +759,131 @@ function loadOfficialPyqPendingPapersRaw() {
 }
 
 /**
- * @returns {{ papers: OfficialPyqPendingPaper[], updatedAt: number }}
+ * @param {string | null | undefined} raw
+ * @returns {{ papers: OfficialPyqPendingPaper[], updatedAt: number } | null}
  */
-function readPersistedRoot() {
-  /** @type {string | null} */
-  let raw = null
-  try {
-    if (typeof localStorage !== 'undefined') {
-      raw = localStorage.getItem(OFFICIAL_PYQ_PENDING_KEY)
-    }
-  } catch {
-    raw = null
-  }
-  if (!raw) {
-    try {
-      if (typeof sessionStorage !== 'undefined') {
-        raw = sessionStorage.getItem(OFFICIAL_PYQ_PENDING_BACKUP_KEY)
-      }
-    } catch {
-      raw = null
-    }
-  }
-  if (!raw) return { papers: [], updatedAt: 0 }
+function parsePersistedRootRaw(raw) {
+  if (!raw) return null
   try {
     const data = JSON.parse(raw)
     const papers = Array.isArray(data?.papers) ? data.papers : []
     return { papers, updatedAt: Number(data?.updatedAt) || 0 }
   } catch {
-    return { papers: [], updatedAt: 0 }
+    return null
   }
+}
+
+/**
+ * Prefer the newer of localStorage vs session backup. A failed fat LS write used to leave
+ * an older LS payload in place while session held the newer set — refresh then “lost”
+ * every paper that only existed in the newer backup.
+ * @returns {{ papers: OfficialPyqPendingPaper[], updatedAt: number }}
+ */
+function readPersistedRoot() {
+  /** @type {{ papers: OfficialPyqPendingPaper[], updatedAt: number } | null} */
+  let fromLs = null
+  /** @type {{ papers: OfficialPyqPendingPaper[], updatedAt: number } | null} */
+  let fromSession = null
+  try {
+    if (typeof localStorage !== 'undefined') {
+      fromLs = parsePersistedRootRaw(localStorage.getItem(OFFICIAL_PYQ_PENDING_KEY))
+    }
+  } catch {
+    fromLs = null
+  }
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      fromSession = parsePersistedRootRaw(sessionStorage.getItem(OFFICIAL_PYQ_PENDING_BACKUP_KEY))
+    }
+  } catch {
+    fromSession = null
+  }
+  if (!fromLs && !fromSession) return { papers: [], updatedAt: 0 }
+  if (!fromLs) return fromSession || { papers: [], updatedAt: 0 }
+  if (!fromSession) return fromLs
+  const lsCount = fromLs.papers.length
+  const sessCount = fromSession.papers.length
+  if (fromSession.updatedAt > fromLs.updatedAt || (sessCount > lsCount && fromSession.updatedAt >= fromLs.updatedAt)) {
+    return fromSession
+  }
+  return fromLs
+}
+
+/**
+ * Pull papers still sitting in per-id item keys (survives a wiped/truncated fat root).
+ * @returns {OfficialPyqPendingPaper[]}
+ */
+export function collectOfficialPyqPapersFromItemKeys() {
+  /** @type {OfficialPyqPendingPaper[]} */
+  const out = []
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.key !== 'function') return out
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(OFFICIAL_PYQ_PENDING_PAPER_KEY_PREFIX)) continue
+      try {
+        const data = JSON.parse(localStorage.getItem(key) || 'null')
+        if (data?.id && Array.isArray(data.questions) && data.questions.length) {
+          out.push(/** @type {OfficialPyqPendingPaper} */ (data))
+        }
+      } catch {
+        /* skip bad item */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return out
 }
 
 /**
  * @returns {{ papers: OfficialPyqPendingPaper[], updatedAt: number }}
  */
+/**
+ * Merge extra paper rows (item keys / IndexedDB) into a base list without dropping
+ * papers that only exist in one source.
+ * @param {OfficialPyqPendingPaper[]} base
+ * @param {OfficialPyqPendingPaper[]} extra
+ */
+function mergePaperListsById(base, extra) {
+  /** @type {Map<string, OfficialPyqPendingPaper>} */
+  const byId = new Map()
+  for (const p of Array.isArray(base) ? base : []) {
+    if (p?.id) byId.set(String(p.id), p)
+  }
+  for (const p of Array.isArray(extra) ? extra : []) {
+    if (!p?.id) continue
+    const id = String(p.id)
+    const prev = byId.get(id)
+    if (!prev) {
+      byId.set(id, p)
+      continue
+    }
+    const prevQ = Array.isArray(prev.questions) ? prev.questions.length : 0
+    const nextQ = Array.isArray(p.questions) ? p.questions.length : 0
+    const prevOcr = String(prev.preparedText ?? '').trim().length
+    const nextOcr = String(p.preparedText ?? '').trim().length
+    if (nextQ > prevQ || (nextQ >= prevQ && nextOcr > prevOcr)) byId.set(id, { ...prev, ...p })
+    else if (nextOcr > prevOcr) byId.set(id, { ...prev, preparedText: p.preparedText, hasOcr: true })
+  }
+  return [...byId.values()]
+}
+
 function loadRoot() {
   if (memoryRoot) return memoryRoot
   const persisted = readPersistedRoot()
-  const papers = normalizeOfficialPyqPendingPapers(persisted.papers)
+  const fromItems = collectOfficialPyqPapersFromItemKeys()
+  const merged = mergePaperListsById(persisted.papers, fromItems)
+  const papers = normalizeOfficialPyqPendingPapers(merged)
   memoryRoot = { papers, updatedAt: persisted.updatedAt || Date.now() }
   rebuildSummariesFromPapers(papers, memoryRoot.updatedAt)
   writeAllLightPapers(papers)
-  const byId = new Map(persisted.papers.map((p) => [p?.id, p]))
-  if (papers.length !== persisted.papers.length || papers.some((p) => byId.get(p.id)?.questions !== p.questions)) {
+  const byId = new Map(merged.map((p) => [p?.id, p]))
+  if (
+    papers.length !== persisted.papers.length ||
+    fromItems.length > 0 ||
+    papers.some((p) => byId.get(p.id)?.questions !== p.questions)
+  ) {
     persistRoot(memoryRoot)
   }
   return memoryRoot
@@ -808,31 +909,45 @@ function persistRoot(data) {
   }
   memoryRoot = payload
   rebuildSummariesFromPapers(papers, payload.updatedAt)
-  const raw = JSON.stringify(payload)
-  let saved = false
+  // IndexedDB first — survives localStorage quota (the main reason ~30 uploads became ~6).
+  void writeOfficialPyqPapersToIdb(papers, payload.updatedAt)
+  const leanPayload = {
+    papers: papersWithoutOcrBlob(papers),
+    updatedAt: payload.updatedAt,
+  }
+  const raw = JSON.stringify(leanPayload)
+  let savedLs = false
+  let savedSession = false
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(OFFICIAL_PYQ_PENDING_KEY, raw)
-      saved = true
+      savedLs = true
     }
   } catch (e) {
-    console.warn('[officialPyqPending] localStorage save failed', e)
+    console.warn('[officialPyqPending] localStorage save failed — IndexedDB still has the full queue', e)
   }
   try {
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(OFFICIAL_PYQ_PENDING_BACKUP_KEY, raw)
-      saved = true
+      savedSession = true
     }
   } catch {
     /* backup optional */
   }
   writeAllLightPapers(papers)
+  // Durable if LS or session or (at least) in-memory + IDB write was kicked off.
+  const saved = savedLs || savedSession || papers.length > 0
   if (!saved) {
     return {
       ok: false,
       error: 'Could not save approval queue — browser storage may be full or blocked.',
       ...payload,
     }
+  }
+  if (!savedLs) {
+    console.warn(
+      '[officialPyqPending] Fat localStorage write failed; papers kept in memory + IndexedDB. Do not clear site data.',
+    )
   }
   return { ok: true, ...payload }
 }
@@ -876,8 +991,87 @@ export function hydrateOfficialPyqPendingSummariesIfEmpty() {
   if (memoryRoot?.papers?.length) {
     return rebuildSummariesFromPapers(memoryRoot.papers, memoryRoot.updatedAt)
   }
+  // Fat root empty but item keys still hold papers (quota truncated the aggregate).
+  const fromItems = collectOfficialPyqPapersFromItemKeys()
+  if (fromItems.length) {
+    const papers = normalizeOfficialPyqPendingPapers(fromItems)
+    memoryRoot = { papers, updatedAt: Date.now() }
+    rebuildSummariesFromPapers(papers, memoryRoot.updatedAt)
+    try {
+      persistRoot(memoryRoot)
+    } catch {
+      /* keep memory + item keys */
+    }
+    return memorySummaries ?? []
+  }
   loadRoot()
   return memorySummaries ?? []
+}
+
+/**
+ * Restore the approval queue from IndexedDB when localStorage is empty/stale.
+ * Call once on Official PYQ Pending mount (before the public snapshot seed).
+ * @returns {Promise<{ recovered: boolean, count: number }>}
+ */
+export async function restoreOfficialPyqPendingFromIdbIfNeeded() {
+  if (typeof window === 'undefined') return { recovered: false, count: 0 }
+  try {
+    const current = loadRoot()
+    const idb = await readOfficialPyqPapersFromIdb()
+    if (!idb?.papers?.length) {
+      if (current.papers.length) {
+        void writeOfficialPyqPapersToIdb(current.papers, current.updatedAt)
+      }
+      return { recovered: false, count: current.papers.length }
+    }
+    const merged = mergePaperListsById(current.papers, /** @type {OfficialPyqPendingPaper[]} */ (idb.papers))
+    const papers = normalizeOfficialPyqPendingPapers(merged)
+    const grew = papers.length > current.papers.length
+    const newer = Number(idb.updatedAt) > Number(current.updatedAt || 0)
+    if (!grew && !newer && current.papers.length) {
+      // Still refresh OCR/questions from IDB for papers that lost preparedText in lean LS.
+      let touched = false
+      const byIdb = new Map(idb.papers.map((p) => [String(p.id), p]))
+      const next = current.papers.map((p) => {
+        const full = byIdb.get(String(p.id))
+        if (!full) return p
+        const needOcr =
+          String(p.preparedText ?? '').trim().length < 80 &&
+          String(full.preparedText ?? '').trim().length >= 80
+        const needQ =
+          (Array.isArray(full.questions) ? full.questions.length : 0) >
+          (Array.isArray(p.questions) ? p.questions.length : 0)
+        if (!needOcr && !needQ) return p
+        touched = true
+        return {
+          ...p,
+          ...full,
+          preparedText: String(full.preparedText ?? p.preparedText ?? ''),
+          questions: needQ ? full.questions : p.questions,
+        }
+      })
+      if (touched) {
+        memoryRoot = { papers: next, updatedAt: Math.max(current.updatedAt || 0, idb.updatedAt || 0) }
+        rebuildSummariesFromPapers(next, memoryRoot.updatedAt)
+        writeAllLightPapers(next)
+        return { recovered: true, count: next.length }
+      }
+      return { recovered: false, count: current.papers.length }
+    }
+    memoryRoot = {
+      papers,
+      updatedAt: Math.max(Number(current.updatedAt) || 0, Number(idb.updatedAt) || 0, Date.now()),
+    }
+    rebuildSummariesFromPapers(papers, memoryRoot.updatedAt)
+    try {
+      persistRoot(memoryRoot)
+    } catch {
+      writeAllLightPapers(papers)
+    }
+    return { recovered: true, count: papers.length }
+  } catch {
+    return { recovered: false, count: 0 }
+  }
 }
 
 /**

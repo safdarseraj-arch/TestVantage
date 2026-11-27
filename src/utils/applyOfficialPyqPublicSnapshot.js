@@ -157,6 +157,18 @@ export async function applyOfficialPyqPublicSnapshotOnce() {
   } catch {
     existing = null
   }
+  const existingCount = Array.isArray(existing?.papers) ? existing.papers.length : 0
+  // Never reseed / overwrite a queue that already has the user's uploads. The public
+  // snapshot only has ~6 Advanced papers — applying it over a larger queue made it
+  // look like “30+ PYQs vanished” down to those six.
+  if (existingCount > 0) {
+    try {
+      sessionStorage.setItem(APPLY_FLAG, restoredAt)
+    } catch {
+      /* optional */
+    }
+    return { ok: true, skipped: true, pending: existingCount }
+  }
   const mergedPapers = mergeOfficialPyqSnapshotIntoPapers(existing?.papers, incoming)
   const papers = mergedPapers.papers
   const merged = {

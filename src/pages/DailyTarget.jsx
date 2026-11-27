@@ -41,11 +41,11 @@ export default function DailyTarget() {
     <div className="page prepare-mode-page daily-target-page">
       <PreparePageHero
         modeId="daily-target"
-        lead="Pick up to three weak chapters from your attempts, set a question count, and drill them in Syllabus Practice. Today’s Drill stays a mixed habit set — this page is the backlog clearer."
+        lead="Pick up to three weak chapters from your attempts, set a question count, and drill them in Syllabus Practice. Daily Challenge stays a mixed habit set — this page is the backlog clearer."
         actions={
           <>
             <Link to="/todays-drill" className="btn btn-ghost btn-sm">
-              Today’s Drill
+              Daily Challenge
             </Link>
             <Link to="/form-forecast" className="btn btn-ghost btn-sm">
               Revision Ladder
@@ -115,7 +115,7 @@ export default function DailyTarget() {
           <p className="form-hint">
             Finish a mock or practice first so we can see weak chapters.{' '}
             <Link to="/mock-test">Build a mock</Link> or open{' '}
-            <Link to="/form-forecast">Form Forecast</Link>.
+            <Link to="/form-forecast">Rank Forecast</Link>.
           </p>
         ) : (
           <>

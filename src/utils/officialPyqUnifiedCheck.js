@@ -104,6 +104,19 @@ function cardHasFigure(q) {
   }
 }
 
+/** True when solution text expects a drawing. */
+function solutionMentionsFigure(solution) {
+  return /\b(?:figure|diagram|graph|shown below|as shown|see (?:the )?(?:fig|figure))\b/i.test(
+    String(solution ?? ''),
+  )
+}
+
+function solutionHasFigure(solution) {
+  const s = String(solution ?? '')
+  return /\\includegraphics|!\[[^\]]*\]\([^)]+\)|cdn\.mathpix|original-crop|data:image\//i.test(s)
+}
+
+
 /** Where one question's scan text ends: the next Q number, a section heading, the next stem/paragraph, the printed "Answer: [0.7 to 0.8]" / "Ans. +1" key, Sol., or a starred next item (*86.). */
 const QUESTION_END =
   /\b[Qq]\s*\.?\s*\d{1,2}\b|\\item\s*\[\s*[Qq]|\\section\*?\{|\bQuestion Stem\b|\b(?:Paragraph|PARAGRAPH)\b|\b(?:Answer|Ans)\.?\s*[:.]?\s*(?:\[|\(|\$|[+\u2212\uFF0B-]?\s*\d|[A-D]\b)|\bSol\.\s|\*\s*\d{1,2}\./i
@@ -306,7 +319,8 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
       if (reasons.length) fails.push({ n, reason: reasons[0] })
       return
     }
-    for (const part of [text, passage, ...opts]) {
+    const solution = String(q.solution ?? '')
+    for (const part of [text, passage, ...opts, solution]) {
       const draw = mathDrawFailure(part)
       if (draw) {
         reasons.push(draw === 'draw failure' ? 'The math did not draw' : draw === 'leftover TeX' ? 'TeX is still showing after drawing' : draw)
@@ -343,6 +357,9 @@ export function reviewOfficialPyqCards(questions, ocr = '', facts = null, checkO
     if (!adminSlots && OPENING.test(text.trim()) && !passage) reasons.push('This question has no passage')
     if (/shown in the figure/i.test(text) && !cardHasFigure(q)) {
       reasons.push('The question says shown in the figure, and there is no figure')
+    }
+    if (solutionMentionsFigure(solution) && !solutionHasFigure(solution)) {
+      reasons.push('The solution needs a figure — crop from the page and place on Solution')
     }
     const answer = answerNotInOptions(q)
     if (answer) reasons.push(answer)

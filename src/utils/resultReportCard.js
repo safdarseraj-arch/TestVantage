@@ -136,7 +136,7 @@ export function buildReportCardHtml(model) {
 </style>
 </head>
 <body>
-  <p class="eyebrow">TestVantage · Parent / student report</p>
+  <p class="eyebrow">TestVantages · Parent / student report</p>
   <h1>${escapeHtml(model.title)}</h1>
   <p class="note">${escapeHtml(model.studentName)}${model.studentEmail ? ` · ${escapeHtml(model.studentEmail)}` : ''} · ${escapeHtml(when)}</p>
   <div class="hero">
@@ -150,7 +150,7 @@ export function buildReportCardHtml(model) {
   <table><thead><tr><th>Subject</th><th>Marks</th><th>%</th></tr></thead><tbody>${subjectRows}</tbody></table>
   <h2>Focus chapters</h2>
   <table><thead><tr><th>Chapter</th><th>Accuracy</th><th>Detail</th></tr></thead><tbody>${weakRows}</tbody></table>
-  <p class="note">Ranks and AIR are estimates from this attempt’s marks curve — not an official NTA rank. Open the full Result page in TestVantage for charts and coaching.</p>
+  <p class="note">Ranks and AIR are estimates from this attempt’s marks curve — not an official NTA rank. Open the full Result page in TestVantages for charts and coaching.</p>
   <p class="no-print note">Tip: use your browser Print → Save as PDF to keep a copy.</p>
 </body>
 </html>`
@@ -162,7 +162,7 @@ export function buildReportCardHtml(model) {
  */
 export function buildReportCardPlainText(model) {
   const lines = [
-    `TestVantage report — ${model.title}`,
+    `TestVantages report — ${model.title}`,
     `Student: ${model.studentName}`,
     `Score: ${model.score}/${model.maxScore} (${model.pct}%)`,
     `Accuracy: ${model.accuracy}%`,
@@ -182,7 +182,7 @@ export function buildReportCardPlainText(model) {
       lines.push(`  · ${w.chapter}: ${w.accuracy}% accuracy, ${w.wrong} wrong`)
     }
   }
-  lines.push('', 'Full charts: open Result in TestVantage (http://127.0.0.1:5173/).')
+  lines.push('', 'Full charts: open Result in TestVantages (http://127.0.0.1:5173/).')
   return lines.join('\n')
 }
 

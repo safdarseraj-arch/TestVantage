@@ -74,7 +74,7 @@ export default function FeatureHighlightCarousel({ compact = false, className = 
     >
       <div className="tv-feature-carousel-top">
         <p id={regionId} className="tv-feature-carousel-kicker">
-          Platform highlights
+          TestVantages highlights
           {paused ? <span className="tv-feature-carousel-paused"> · Paused</span> : null}
         </p>
         <div className="tv-feature-carousel-controls">

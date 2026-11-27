@@ -184,7 +184,7 @@ export default function InsightCoachPanel({
 
       <p className="ic-form-vs-day form-hint">
         <strong>Practice form vs exam day:</strong> {view.formVsExamDay}{' '}
-        <Link to="/career-compass">Career Compass →</Link>
+        <Link to="/career-compass">Career Guide →</Link>
       </p>
 
       <div className="si-coach-actions">

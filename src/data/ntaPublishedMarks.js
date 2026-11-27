@@ -1,5 +1,5 @@
 /**
- * Published NTA-compiled marks at percentile for Form Forecast year columns.
+ * Published NTA-compiled marks at percentile for Rank Forecast year columns.
  * 2024: in-repo Jan+Apr session PDFs.
  * 2025: Jan+Apr shift tables compiled from NTA scorecards.
  * Other years: Gemini-verified overlay only when a real table is cited.
@@ -253,7 +253,7 @@ export function isPublishedCompleteYear(examId, year) {
   return Boolean(rec?.published && rec?.complete && rec.points?.length)
 }
 
-/** Complete published years in the Form Forecast grid, oldest first. */
+/** Complete published years in the Rank Forecast grid, oldest first. */
 export function getCompletePublishedYears(examId = JEE_MAIN) {
   return PERCENTILE_GRID_YEARS.filter((y) => isPublishedCompleteYear(examId, y))
 }

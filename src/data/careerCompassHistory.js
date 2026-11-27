@@ -1,5 +1,5 @@
 /**
- * Career Compass — NTA historical marks ↔ percentile ↔ AIR (General / All India).
+ * Career Guide — NTA historical marks ↔ percentile ↔ AIR (General / All India).
  *
  * JEE Main 2024 moderate curve: calibrated from Jan + April 2024 session percentile-vs-marks PDFs.
  * Other years stay as history; 2027 rank/percentile trend uses the latest two complete years.

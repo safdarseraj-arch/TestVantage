@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { getPrepareModeById } from '../data/studentPrepareModes'
 
 /**
- * Professional page header for each prepare mode (matches Prepare Centre branding).
+ * Professional page header for each prepare mode (matches Practice Hub branding).
  * @param {{
  *   modeId: string
  *   lead?: import('react').ReactNode
@@ -25,7 +25,7 @@ export default function PreparePageHero({ modeId, lead, actions, backTo = '/prep
       <div className="prepare-page-hero-glow" aria-hidden="true" />
       <div className="prepare-page-hero-top">
         <Link to={backTo} className="prepare-page-back">
-          ← Prepare centre
+          ← Practice Hub
         </Link>
         {actions ? <div className="prepare-page-actions">{actions}</div> : null}
       </div>

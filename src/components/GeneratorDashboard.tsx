@@ -150,7 +150,7 @@ export default function GeneratorDashboard() {
             Question Bank
           </Link>
           <span aria-hidden="true"> · </span>
-          TestVantage
+          TestVantages
         </p>
         <h1 className="gen-dash-title">Hybrid AI</h1>
         <p className="gen-dash-subtitle">

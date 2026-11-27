@@ -579,40 +579,66 @@ function averagePositiveTime(times) {
 }
 
 /**
+ * @param {{ correct: number, wrong: number, unattempted: number }[]} grades
+ */
+function bandAccuracyFromGrades(grades) {
+  const n = grades.length
+  if (!n) {
+    return { correctPct: null, wrongPct: null, skippedPct: null, sampleSize: 0 }
+  }
+  let correct = 0
+  let wrong = 0
+  let unattempted = 0
+  for (const g of grades) {
+    correct += g.correct
+    wrong += g.wrong
+    unattempted += g.unattempted
+  }
+  const correctPct = Math.round((correct / n) * 1000) / 10
+  const wrongPct = Math.round((wrong / n) * 1000) / 10
+  let skippedPct = Math.round((unattempted / n) * 1000) / 10
+  const sum = correctPct + wrongPct + skippedPct
+  if (Math.abs(sum - 100) > 0.2) skippedPct = Math.max(0, Math.round((100 - correctPct - wrongPct) * 10) / 10)
+  return { correctPct, wrongPct, skippedPct, sampleSize: n }
+}
+
+/**
+ * Top fraction of attempts by total score (SchoolLog Top 10% / Top 25%).
+ * @param {{ score: number, data: object }[]} ranked
+ * @param {number} pct
+ */
+function topScoreSlice(ranked, pct) {
+  if (!ranked.length) return []
+  const n = Math.max(1, Math.ceil((pct / 100) * ranked.length))
+  return ranked.slice(0, n)
+}
+
+/**
  * Per-question peer response + time stats across stored attempts for one test.
+ * Includes SchoolLog-style Top 10% / Top 25% / All accuracy bands and correct-solver times.
  * @param {string} testId
  * @param {import('../data/tests').Question[]} [questions]
- * @returns {Map<string, {
- *   questionId: string
- *   appearedTo: number
- *   correct: number
- *   wrong: number
- *   skipped: number
- *   correctPct: number
- *   wrongPct: number
- *   skippedPct: number
- *   studentCount: number
- *   avgTimeSeconds: number | null
- *   top10TimeSeconds: number | null
- *   top25TimeSeconds: number | null
- *   top50TimeSeconds: number | null
- *   timeSampleSize: number
- * }>}
  */
 export function buildPerQuestionPeerStats(testId, questions = []) {
   const attempts = getAllStudentAttempts().filter((a) => a.testId === testId)
   const responseMap = new Map()
   const timeMap = new Map()
+  const correctTimeMap = new Map()
+  /** @type {{ score: number, data: object }[]} */
+  const ranked = []
 
   for (const q of questions) {
-    responseMap.set(q.id, { correct: 0, wrong: 0, unattempted: 0, total: 0 })
+    responseMap.set(q.id, { correct: 0, wrong: 0, unattempted: 0, total: 0, optionWrong: {} })
     timeMap.set(q.id, [])
+    correctTimeMap.set(q.id, [])
   }
 
   for (const attempt of attempts) {
     const data = attemptToResultData(attempt)
     const qTimes = data?.questionTimes ?? {}
     const perQ = data?.result?.perQuestion ?? []
+    const score = Number(data?.result?.score ?? attempt.score ?? 0)
+    ranked.push({ score, data })
     for (const pq of perQ) {
       const id = pq.questionId
       const row = responseMap.get(id)
@@ -620,25 +646,77 @@ export function buildPerQuestionPeerStats(testId, questions = []) {
         row.total++
         if (pq.grade === 'correct') row.correct++
         else if (pq.grade === 'unattempted') row.unattempted++
-        else row.wrong++
+        else {
+          row.wrong++
+          const opt = pq.userAnswerLabel || pq.selectedOption || pq.userAnswer
+          if (opt != null && String(opt).trim()) {
+            const key = String(opt).trim()
+            row.optionWrong[key] = (row.optionWrong[key] || 0) + 1
+          }
+        }
       }
       const sec = Number(qTimes[id] ?? pq.timeSpentSeconds ?? 0)
       if (sec > 0 && timeMap.has(id)) timeMap.get(id).push(sec)
+      if (sec > 0 && pq.grade === 'correct' && correctTimeMap.has(id)) {
+        correctTimeMap.get(id).push(sec)
+      }
     }
   }
+
+  ranked.sort((a, b) => b.score - a.score)
+  const top1Attempts = topScoreSlice(ranked, 1)
+  const top10Attempts = topScoreSlice(ranked, 10)
+  const top25Attempts = topScoreSlice(ranked, 25)
+  const top500Attempts = ranked.slice(0, Math.min(500, ranked.length))
 
   const studentCount = attempts.length
   const out = new Map()
 
   for (const q of questions) {
-    const row = responseMap.get(q.id) ?? { correct: 0, wrong: 0, unattempted: 0, total: 0 }
+    const row = responseMap.get(q.id) ?? {
+      correct: 0,
+      wrong: 0,
+      unattempted: 0,
+      total: 0,
+      optionWrong: {},
+    }
     const times = timeMap.get(q.id) ?? []
+    const correctTimes = correctTimeMap.get(q.id) ?? []
     const denom = row.total > 0 ? row.total : studentCount || 1
     const correctPct = Math.round((row.correct / denom) * 100)
     const wrongPct = Math.round((row.wrong / denom) * 100)
     let skippedPct = Math.round((row.unattempted / denom) * 100)
     const sum = correctPct + wrongPct + skippedPct
     if (sum !== 100 && denom > 0) skippedPct = Math.max(0, 100 - correctPct - wrongPct)
+
+    /** @param {{ score: number, data: object }[]} slice */
+    const gradesForBand = (slice) =>
+      slice.map((att) => {
+        const pq = (att.data?.result?.perQuestion ?? []).find((p) => p.questionId === q.id)
+        if (!pq || pq.grade === 'unattempted') return { correct: 0, wrong: 0, unattempted: 1 }
+        if (pq.grade === 'correct') return { correct: 1, wrong: 0, unattempted: 0 }
+        return { correct: 0, wrong: 1, unattempted: 0 }
+      })
+
+    /** @param {{ score: number, data: object }[]} slice */
+    const correctTimesInBand = (slice) => {
+      const secs = []
+      for (const att of slice) {
+        const pq = (att.data?.result?.perQuestion ?? []).find((p) => p.questionId === q.id)
+        if (pq?.grade !== 'correct') continue
+        const sec = Number(
+          att.data?.questionTimes?.[q.id] ?? pq.timeSpentSeconds ?? 0,
+        )
+        if (sec > 0) secs.push(sec)
+      }
+      return secs
+    }
+
+    const bandTop1 = bandAccuracyFromGrades(gradesForBand(top1Attempts))
+    const bandTop10 = bandAccuracyFromGrades(gradesForBand(top10Attempts))
+    const bandTop25 = bandAccuracyFromGrades(gradesForBand(top25Attempts))
+    const bandTop500 = bandAccuracyFromGrades(gradesForBand(top500Attempts))
+    const bandAll = bandAccuracyFromGrades(gradesForBand(ranked))
 
     out.set(q.id, {
       questionId: q.id,
@@ -650,11 +728,29 @@ export function buildPerQuestionPeerStats(testId, questions = []) {
       wrongPct,
       skippedPct,
       studentCount,
+      optionWrong: { ...(row.optionWrong || {}) },
       avgTimeSeconds: averagePositiveTime(times),
       top10TimeSeconds: avgFastestFraction(times, 10),
       top25TimeSeconds: avgFastestFraction(times, 25),
       top50TimeSeconds: avgFastestFraction(times, 50),
       timeSampleSize: times.filter((t) => t > 0).length,
+      /** SchoolLog + go-live national bands */
+      accuracyBands: {
+        top1: bandTop1,
+        top10: bandTop10,
+        top25: bandTop25,
+        top500: bandTop500,
+        all: bandAll,
+      },
+      /** Time spent by students who marked correct */
+      correctSolverTimes: {
+        top1: averagePositiveTime(correctTimesInBand(top1Attempts)),
+        top10: averagePositiveTime(correctTimesInBand(top10Attempts)),
+        top25: averagePositiveTime(correctTimesInBand(top25Attempts)),
+        top500: averagePositiveTime(correctTimesInBand(top500Attempts)),
+        all: averagePositiveTime(correctTimes),
+        sampleSize: correctTimes.length,
+      },
     })
   }
 

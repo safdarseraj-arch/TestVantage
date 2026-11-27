@@ -37,6 +37,12 @@ import {
   buildBioClockInsight,
   buildScoreFloorCeilingBand,
 } from '../utils/resultAdvancedAnalytics.js'
+import {
+  buildDiagnosticAnalyticsPack,
+  buildPersonalFixQueue,
+  buildRetestDelta,
+} from '../utils/diagnosticQuestionAnalytics.js'
+import { getAllStudentAttempts } from '../utils/attemptHistory.js'
 import AttemptQualityMatrix from './AttemptQualityMatrix.jsx'
 import WhatIfScoreSimulator from './WhatIfScoreSimulator.jsx'
 
@@ -48,9 +54,9 @@ function ChartEmpty({ message }) {
   )
 }
 
-function ChartCard({ title, subtitle, children, className = '' }) {
+function ChartCard({ title, subtitle, children, className = '', ...rest }) {
   return (
-    <div className={`rcx-card card ${className}`.trim()}>
+    <div className={`rcx-card card ${className}`.trim()} {...rest}>
       <div className="rcx-card-head">
         <h3>{title}</h3>
         {subtitle ? <p>{subtitle}</p> : null}
@@ -71,9 +77,18 @@ function tipLabel(tip, i) {
  *   test: import('../data/tests').Test
  *   attempts?: import('../utils/attemptHistory.js').Attempt[]
  *   scoreComparison?: object | null
+ *   onOpenQuestion?: (questionId: string) => void
+ *   attemptId?: string | null
  * }} props
  */
-export default function ResultChartsPanel({ data, test, attempts = [], scoreComparison = null }) {
+export default function ResultChartsPanel({
+  data,
+  test,
+  attempts = [],
+  scoreComparison = null,
+  onOpenQuestion,
+  attemptId = null,
+}) {
   const result = data?.result
   const examPatternId = test?.examPatternId ?? data?.examPatternId
   const questionTimes = data?.questionTimes ?? {}
@@ -181,6 +196,77 @@ export default function ResultChartsPanel({ data, test, attempts = [], scoreComp
     [result, questionTimes, paperDurationSec, questions],
   )
 
+  const diagnosticStudentPack = useMemo(() => {
+    const testId = test?.id ?? data?.testId
+    if (!result?.perQuestion?.length || !testId) {
+      return { trap: null, fixQueue: null, retest: null, tabs: null }
+    }
+    // Cohort is device-wide for this paper (same source as peer / question-level stats).
+    let samePaper = getAllStudentAttempts().filter((a) => a.testId === testId)
+    if (samePaper.length < 2) {
+      samePaper = (attempts || []).filter((a) => a.testId === testId)
+    }
+    const pack =
+      samePaper.length >= 2
+        ? buildDiagnosticAnalyticsPack(samePaper, {
+            testId,
+            studentPerQuestion: result.perQuestion,
+            studentQuestionTimes: questionTimes,
+          })
+        : null
+    const trap =
+      pack?.student ||
+      {
+        ready: false,
+        takeaway:
+          'When more classmates finish this same paper, High-mistake and High-skip rates appear here.',
+        trapFallRate: null,
+        timeSinkRate: null,
+        tabASeen: 0,
+        tabBSeen: 0,
+      }
+    const fixQueue = pack?.tabs
+      ? buildPersonalFixQueue({
+          perQuestion: result.perQuestion,
+          tabs: pack.tabs,
+          limit: 8,
+        })
+      : {
+          ready: false,
+          items: [],
+          takeaway:
+            'When more classmates finish this paper, your High-mistake / High-skip fix list appears here.',
+        }
+
+    const priorSamePaper = (attempts || []).filter((a) => {
+      if (a.testId !== testId) return false
+      if (attemptId && a.id === attemptId) return false
+      // Prefer older attempts than the current one when timestamps exist
+      const curAt = Number(data?.submittedAt) || 0
+      const aAt = Number(a.submittedAt) || 0
+      if (curAt && aAt) return aAt < curAt
+      return true
+    })
+    const retest = buildRetestDelta({
+      currentPerQuestion: result.perQuestion,
+      priorAttempts: priorSamePaper,
+    })
+
+    return { trap, fixQueue, retest, tabs: pack?.tabs || null }
+  }, [
+    attempts,
+    test?.id,
+    data?.testId,
+    data?.submittedAt,
+    result,
+    questionTimes,
+    attemptId,
+  ])
+
+  const trapMetrics = diagnosticStudentPack.trap
+  const fixQueue = diagnosticStudentPack.fixQueue
+  const retestDelta = diagnosticStudentPack.retest
+
   const totalOutcome = donut.reduce((s, d) => s + d.value, 0)
   const trendIsWithinTest = trend.length > 0 && trend.every((p) => p.withinTest)
   const hasMarketAvg = subjectBars.some((b) => b.marketAvgPct != null)
@@ -243,6 +329,152 @@ export default function ResultChartsPanel({ data, test, attempts = [], scoreComp
             paperDurationSec={paperDurationSec}
             questions={questions}
           />
+        </ChartCard>
+
+        <ChartCard
+          title="High mistake & High skip — fix first"
+          subtitle={
+            trapMetrics?.ready
+              ? `High mistake ${trapMetrics.trapFallRate ?? '—'}% · High skip ${trapMetrics.timeSinkRate ?? '—'}% — redo these before the next mock`
+              : 'Questions classmates miss or skip that you also missed — open and fix'
+          }
+          className="rcx-span-2"
+          data-testid="result-high-mistake-skip"
+        >
+          {trapMetrics?.ready ? (
+            <div className="rcx-band-kpis" style={{ marginBottom: '0.65rem' }}>
+              <div>
+                <strong>
+                  {trapMetrics.trapFallRate != null ? `${trapMetrics.trapFallRate}%` : '—'}
+                </strong>
+                <span className="form-hint" style={{ display: 'block' }}>
+                  High mistake ({trapMetrics.tabAWrongAttempt}/{trapMetrics.tabASeen})
+                </span>
+              </div>
+              <div>
+                <strong>
+                  {trapMetrics.timeSinkRate != null ? `${trapMetrics.timeSinkRate}%` : '—'}
+                </strong>
+                <span className="form-hint" style={{ display: 'block' }}>
+                  High skip ({trapMetrics.tabBTimeSinkSkip}/{trapMetrics.tabBSeen})
+                </span>
+              </div>
+            </div>
+          ) : null}
+          {!fixQueue?.ready || !fixQueue.items?.length ? (
+            <ChartEmpty
+              message={
+                fixQueue?.takeaway ||
+                trapMetrics?.takeaway ||
+                'When more classmates finish this paper, your fix list appears here.'
+              }
+            />
+          ) : (
+            <ul className="rcx-fix-queue">
+              {fixQueue.items.map((item) => (
+                <li key={item.questionId} className="rcx-fix-queue-item">
+                  <div>
+                    <strong>
+                      {item.index != null ? `Q${item.index}` : 'Question'} · {item.reasonLabel}
+                    </strong>
+                    <span className="form-hint" style={{ display: 'block' }}>
+                      {(item.subject || '—').toString()}
+                      {item.chapter ? ` · ${item.chapter}` : ''} · peer {item.peerStrugglePct}% · you{' '}
+                      {item.grade}
+                    </span>
+                  </div>
+                  <div className="rcx-fix-queue-actions">
+                    {typeof onOpenQuestion === 'function' ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => onOpenQuestion(item.questionId)}
+                      >
+                        Open
+                      </button>
+                    ) : null}
+                    <Link
+                      to={item.reason === 'high_skip' ? '/high-skip' : '/high-mistake'}
+                      className="btn btn-ghost btn-sm"
+                    >
+                      {item.reason === 'high_skip' ? 'High skip' : 'High mistake'}
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title="Re-test delta"
+          subtitle="Improvement on the same question IDs vs your earlier attempt(s)"
+          className="rcx-span-2"
+        >
+          {!retestDelta?.ready ? (
+            <ChartEmpty message={retestDelta?.takeaway || 'No overlapping re-test questions yet.'} />
+          ) : (
+            <>
+              <div className="rcx-band-kpis">
+                <div>
+                  <strong>
+                    {retestDelta.improvementPct != null ? `${retestDelta.improvementPct}%` : '—'}
+                  </strong>
+                  <span className="form-hint" style={{ display: 'block' }}>
+                    Improved ({retestDelta.improved}/{retestDelta.comparable})
+                  </span>
+                </div>
+                <div>
+                  <strong>{retestDelta.regressed}</strong>
+                  <span className="form-hint" style={{ display: 'block' }}>
+                    Regressed
+                  </span>
+                </div>
+                <div>
+                  <strong>{retestDelta.held}</strong>
+                  <span className="form-hint" style={{ display: 'block' }}>
+                    Unchanged / still miss
+                  </span>
+                </div>
+              </div>
+              {retestDelta.items?.length ? (
+                <ul className="rcx-retest-list">
+                  {retestDelta.items.slice(0, 6).map((it) => (
+                    <li key={it.questionId}>
+                      <strong>{it.index != null ? `Q${it.index}` : 'Q?'}</strong>{' '}
+                      <span
+                        className={`rcx-retest-chip rcx-retest-chip--${it.change}`}
+                      >
+                        {it.change === 'improved'
+                          ? 'Improved'
+                          : it.change === 'regressed'
+                            ? 'Regressed'
+                            : it.change}
+                      </span>{' '}
+                      <span className="form-hint">
+                        {it.previousGrade} → {it.currentGrade}
+                      </span>
+                      {typeof onOpenQuestion === 'function' ? (
+                        <>
+                          {' '}
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => onOpenQuestion(it.questionId)}
+                          >
+                            View
+                          </button>
+                        </>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="form-hint" style={{ marginBottom: 0 }}>
+                {retestDelta.takeaway}
+              </p>
+            </>
+          )}
         </ChartCard>
 
         <ChartCard
@@ -366,7 +598,7 @@ export default function ResultChartsPanel({ data, test, attempts = [], scoreComp
         {dreamGap?.ready && (
           <ChartCard
             title="Dream-college gap"
-            subtitle="What-if silly fixes × Career Compass cutoffs"
+            subtitle="What-if silly fixes × Career Guide cutoffs"
             className="rcx-span-2 rcx-dream-gap"
           >
             <div className="rcx-dream-body">
@@ -394,7 +626,7 @@ export default function ResultChartsPanel({ data, test, attempts = [], scoreComp
                 )}
               </div>
               <Link to="/career-compass" className="btn btn-ghost btn-sm">
-                Open Career Compass →
+                Open Career Guide →
               </Link>
             </div>
           </ChartCard>

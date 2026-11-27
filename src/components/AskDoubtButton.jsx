@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-/** Compact link from a result question to Ask Your Doubt, without copying stem text. */
+/** Compact link from a result question to Ask a Doubt, without copying stem text. */
 export default function AskDoubtButton({ questionId, subject, chapter, compact = true }) {
   const params = new URLSearchParams()
   params.set('ask', '1')

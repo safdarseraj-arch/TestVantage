@@ -51,6 +51,9 @@ const DETAIL_TABS = [
  *   title?: string
  *   subtitle?: string
  *   peerStatsByQuestionId?: Map<string, object>
+ *   questionsById?: Map<string, object> | Record<string, object>
+ *   sessionTelemetry?: object | null
+ *   demoTimeline?: boolean
  *   initialQuestionId?: string | null
  *   wrongReasons?: Record<string, string>
  *   autoErrorTypes?: Record<string, string>
@@ -63,6 +66,9 @@ export default function ResultQuestionWisePanel({
   title = 'Question-wise analysis',
   subtitle = 'Tap any question number to view it here — your result is colour-coded.',
   peerStatsByQuestionId,
+  questionsById,
+  sessionTelemetry = null,
+  demoTimeline = false,
   initialQuestionId = null,
   wrongReasons = {},
   autoErrorTypes = {},
@@ -141,6 +147,15 @@ export default function ResultQuestionWisePanel({
     if (!selected || !peerStatsByQuestionId) return null
     return peerStatsByQuestionId.get(selected.questionId) ?? null
   }, [selected, peerStatsByQuestionId])
+
+  const selectedQuestion = useMemo(() => {
+    if (!selected) return null
+    if (questionsById instanceof Map) return questionsById.get(selected.questionId) ?? null
+    if (questionsById && typeof questionsById === 'object') {
+      return questionsById[selected.questionId] ?? null
+    }
+    return null
+  }, [selected, questionsById])
 
   useEffect(() => {
     if (initialQuestionId) {
@@ -412,6 +427,20 @@ export default function ResultQuestionWisePanel({
                     <QuestionPeerStatsBlock
                       peer={selectedPeer}
                       yourTimeSeconds={selected.timeSpentSeconds}
+                      yourGrade={selected.grade}
+                      question={
+                        selectedQuestion
+                          ? { ...selectedQuestion, id: selected.questionId }
+                          : {
+                              id: selected.questionId,
+                              toughnessLevel: selected.toughnessLevel,
+                              difficulty: selected.difficulty,
+                              idealTimeSeconds: selected.idealTimeSeconds,
+                              maxMarks: selected.maxMarks,
+                            }
+                      }
+                      sessionTelemetry={sessionTelemetry}
+                      demoTimeline={demoTimeline}
                     />
                   </div>
                 )}

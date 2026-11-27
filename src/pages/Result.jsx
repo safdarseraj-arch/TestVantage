@@ -22,6 +22,7 @@ import { getTestById } from '../data/tests'
 import WeakChaptersPanel from '../components/WeakChaptersPanel'
 import ResultNextSteps from '../components/ResultNextSteps'
 import ResultShareReport from '../components/ResultShareReport'
+import AutoDiagnosticReportBanner from '../components/AutoDiagnosticReportBanner'
 import PlanAdherencePanel from '../components/PlanAdherencePanel'
 import RoughSheetPanel from '../components/RoughSheetPanel'
 import { buildChapterSubjectMap, buildWeakTopics } from '../utils/testAnalysis'
@@ -128,13 +129,13 @@ export default function Result() {
         <h1>Result unavailable</h1>
         <p className="lead">
           This attempt was saved without enough detail to reopen analysis. Take the test again from
-          Prepare centre.
+          Practice Hub.
         </p>
         <Link to="/my-results" className="btn btn-ghost">
           My results
         </Link>
         <Link to="/prepare" className="btn btn-primary">
-          Prepare centre
+          Practice Hub
         </Link>
       </div>
     )
@@ -324,7 +325,21 @@ export default function Result() {
         />
       )}
 
-      <ResultShareReport data={data} test={test} studentName={data.userName} />
+      <AutoDiagnosticReportBanner
+        attemptId={attemptId || storedAttempt?.id || null}
+        test={test}
+        data={data}
+        studentName={data.userName}
+        attempts={attempts}
+      />
+
+      <ResultShareReport
+        data={data}
+        test={test}
+        studentName={data.userName}
+        attempts={attempts}
+        attemptId={attemptId || storedAttempt?.id || null}
+      />
 
       <PlanAdherencePanel
         plan={examPlan}
@@ -363,7 +378,7 @@ export default function Result() {
 
       <p className="si-ff-hint form-hint">
         For practice AIR, Exam Fit, and Revision Ladder across all mocks, open{' '}
-        <Link to="/form-forecast">Form Forecast</Link>.
+        <Link to="/form-forecast">Rank Forecast</Link>.
       </p>
 
       <ResultAnalysisDashboard

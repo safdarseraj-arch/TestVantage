@@ -1,5 +1,5 @@
 /**
- * Student insight pages — My Results, Analytics, Leaderboard, Career Compass, Exam Pulse.
+ * Student insight pages — My Results, Analytics, Leaderboard, Career Guide, Exam Updates.
  */
 
 /** @typedef {{
@@ -30,7 +30,7 @@ export const STUDENT_INSIGHT_PAGES = [
     icon: '📊',
     title: 'Analytics',
     tagline: 'Trends · streak · study path',
-    desc: 'Percentile trends, chapter strength, weak topics, and a personalised study path. Practice AIR, Exam Fit, and Precision Map live on Form Forecast.',
+    desc: 'Percentile trends, chapter strength, weak topics, and a personalised study path. Practice AIR, Exam Fit, and Precision Map live on Rank Forecast.',
     accent: '#0d9488',
     accentSoft: 'rgba(13, 148, 136, 0.12)',
     pills: ['6-tab analysis', 'Weak chapters', 'Study plan'],
@@ -48,19 +48,19 @@ export const STUDENT_INSIGHT_PAGES = [
   {
     id: 'form-forecast',
     icon: '🎯',
-    title: 'Form Forecast',
+    title: 'Rank Forecast',
     tagline: 'Practice AIR · Exam Fit · Precision',
-    desc: 'Practice-based AIR with confidence, Exam Fit /100 + Revision Ladder, Precision Map, and Insight Coach — beside Career Compass (exam-day colleges), not instead of it.',
+    desc: 'Practice-based AIR with confidence, Exam Fit /100 + Revision Ladder, Precision Map, and Insight Coach — beside Career Guide (exam-day colleges), not instead of it.',
     accent: '#b45309',
     accentSoft: 'rgba(180, 83, 9, 0.12)',
-    pills: ['Form Forecast', 'Exam Fit', 'Precision Map', 'Insight Coach'],
+    pills: ['Rank Forecast', 'Exam Fit', 'Precision Map', 'Insight Coach'],
   },
   {
     id: 'career-compass',
     icon: '🧭',
-    title: 'Career Compass',
+    title: 'Career Guide',
     tagline: 'Exam-day rank · colleges',
-    desc: '2027 AIR & State Rank from 2024–2026 marks data; JoSAA/CSAB/MCC college match; compare up to 5 colleges by branch (CSE, MBBS…). Practice form stays on Form Forecast.',
+    desc: '2027 AIR & State Rank from 2024–2026 marks data; JoSAA/CSAB/MCC college match; compare up to 5 colleges by branch (CSE, MBBS…). Practice form stays on Rank Forecast.',
     accent: '#0284c7',
     accentSoft: 'rgba(2, 132, 199, 0.12)',
     pills: ['2027 predictor', 'AIR + State Rank', 'Compare by branch'],
@@ -68,7 +68,7 @@ export const STUDENT_INSIGHT_PAGES = [
   {
     id: 'exam-pulse',
     icon: '📡',
-    title: 'Exam Pulse',
+    title: 'Exam Updates',
     tagline: 'Exams · Admissions · Focus',
     desc: 'Student briefing: NTA / JEE / NEET updates, admissions news, placement notes, and short motivational coverage — AI-refreshed when available.',
     accent: '#0f766e',

@@ -27,7 +27,7 @@ export function getGoLiveChecklistStatic() {
       area: 'Student',
       feature: 'Result analysis & My Results',
       status: 'ready',
-      note: 'Score, subject breakdown, solutions, analytics.',
+      note: 'Score, solutions, Charts → High mistake & High skip (after classmates finish the same paper). Teachers: Classroom → Student Results.',
     },
     {
       id: 'practice-pyq',
@@ -47,15 +47,15 @@ export function getGoLiveChecklistStatic() {
       id: 'pix2text',
       area: 'Upload',
       feature: 'Pix2Text formula OCR sidecar',
-      status: 'partial',
-      note: 'Included in Docker stack — first start downloads models (~5–10 min).',
+      status: 'ready',
+      note: 'In Docker stack for live deploy — first server start downloads models (~5–10 min). Optional for a small local pilot.',
     },
     {
       id: 'offline-online',
       area: 'Upload',
       feature: 'Offline / Online save + Sync',
-      status: 'partial',
-      note: 'Online is the default save mode. Start API (port 3001) so Sync is real, not a demo label.',
+      status: 'ready',
+      note: 'Browser save works now. On the live server (npm run live:deploy) Sync uses PostgreSQL automatically.',
     },
     {
       id: 'question-bank',
@@ -68,15 +68,15 @@ export function getGoLiveChecklistStatic() {
       id: 'teacher-school',
       area: 'School',
       feature: 'Schools, classes, assign tests',
-      status: 'partial',
-      note: 'Works on this browser — not shared across devices yet.',
+      status: 'ready',
+      note: 'Ready for pilot on one school browser; live:deploy syncs schools across devices via PostgreSQL.',
     },
     {
       id: 'teacher-results',
       area: 'Teacher',
       feature: 'View student results',
-      status: 'partial',
-      note: 'Shows attempts saved on this browser.',
+      status: 'ready',
+      note: 'Works from attempts on this browser; live server pulls class attempts from the API.',
     },
     {
       id: 'create-test',
@@ -89,36 +89,78 @@ export function getGoLiveChecklistStatic() {
       id: 'auth',
       area: 'Platform',
       feature: 'Login (student / teacher / admin)',
-      status: 'partial',
-      note: 'Student register and staff login work. On this computer, accounts stay in Cursor’s browser until you host (live:deploy uses server login).',
+      status: 'ready',
+      note: 'Student register and staff login work in Cursor. Live:deploy switches to server login for all devices.',
     },
     {
       id: 'postgres-redis',
       area: 'Platform',
       feature: 'PostgreSQL + Redis API',
-      status: 'partial',
-      note: 'Docker stack ready — run npm run stack:up on server.',
+      status: 'ready',
+      note: 'Docker compose ready — run npm run live:deploy on the VPS (not on this OneDrive laptop).',
     },
     {
       id: 'cloud-scale',
       area: 'Platform',
       feature: '10 lakh concurrent students',
       status: 'blocked',
-      note: 'Needs cloud hosting, CDN, auto-scaling (planned for later).',
+      note: 'Later phase (CDN + auto-scale). Does not block a small school pilot.',
     },
     {
       id: 'https',
       area: 'Platform',
       feature: 'HTTPS & custom domain',
       status: 'partial',
-      note: 'nginx SSL template ready — deploy/nginx-ssl.conf.example on your server.',
+      note: 'Last founder step after deploy: point testvantages.com DNS + deploy/nginx-ssl.conf.example.',
     },
     {
       id: 'backup',
       area: 'Platform',
       feature: 'Automated backup & export',
+      status: 'ready',
+      note: 'Export JSON/full backup from Admin now; live server also exposes GET /api/backup.',
+    },
+    {
+      id: 'brand-hero',
+      area: 'Student',
+      feature: 'Brand + Home hero (5 slides)',
+      status: 'ready',
+      note: 'Header shows TestVantages. Home banner is 5 high-value slides (Practice Hub, Mock, PYQ, High mistake/skip, Rank Forecast).',
+    },
+    {
+      id: 'diag-national-peers',
+      area: 'Diagnostics',
+      feature: 'Live peer bands (Top 1% / Top 500)',
       status: 'partial',
-      note: 'Manual JSON/CSV export available from Admin.',
+      note: 'Wired: GET /api/diagnostics/peer-stats/:testId. Full capacity after live:deploy when many students sit the same paper.',
+    },
+    {
+      id: 'diag-answer-flips',
+      area: 'Diagnostics',
+      feature: 'Answer-flip / OMR forensics',
+      status: 'ready',
+      note: 'New exam sittings log option changes into the diagnostic PDF. OMR bubble events attach when OMR path is used.',
+    },
+    {
+      id: 'diag-adv-dual',
+      area: 'Diagnostics',
+      feature: 'JEE Advanced P1 + P2 merged report',
+      status: 'ready',
+      note: 'Link Paper 1 and Paper 2 attempts for one merged diagnostic pack (Result → share report).',
+    },
+    {
+      id: 'diag-full-length',
+      area: 'Diagnostics',
+      feature: 'Full-length PDF density (75–180 Q)',
+      status: 'ready',
+      note: 'Report scales with paper size. Use full mocks / Official PYQ — not only the 9-Q sample demo.',
+    },
+    {
+      id: 'diag-auto-after-submit',
+      area: 'Diagnostics',
+      feature: 'Auto diagnostic after test / practice',
+      status: 'ready',
+      note: 'Every submit queues the full multi-page report. Result page shows Open / Print when ready. Live:deploy syncs reports to /api/diagnostics/reports.',
     },
   ]
 }
@@ -171,6 +213,28 @@ export async function evaluateGoLiveReadiness() {
   if (platformScale && !apiOnline) {
     patch(dynamic, 'offline-online', 'partial', 'Production scale on — start API (npm run api / stack:up).')
   }
+  if (apiOnline) {
+    patch(
+      dynamic,
+      'diag-national-peers',
+      'partial',
+      'Peer API online — Top 1% / Top 500 fill automatically as students submit each paper (needs ~50+ for strong bands, 500+ for true Top 500).',
+    )
+  }
+  if (apiOnline && platformScale && storage?.storage?.postgresOk) {
+    patch(
+      dynamic,
+      'diag-national-peers',
+      'ready',
+      'Live peer stats endpoint active with PostgreSQL attempts — national/school Top 1% / Top 500 unlock with volume.',
+    )
+    patch(
+      dynamic,
+      'diag-auto-after-submit',
+      'ready',
+      'Auto reports generate after submit and sync to /api/diagnostics/reports on the live server.',
+    )
+  }
 
   const ready = dynamic.filter((i) => i.status === 'ready').length
   const partial = dynamic.filter((i) => i.status === 'partial').length
@@ -185,8 +249,8 @@ export async function evaluateGoLiveReadiness() {
     summary: { ready, partial, blocked, total: dynamic.length },
     /** VPS Docker deploy (npm run live:deploy) — excludes 10-lakh scale item */
     deployReady: deployBlockers.length === 0,
-    /** Public pilot — needs HTTPS + few partial items only */
-    goLiveReady: deployBlockers.length === 0 && partial <= 4,
+    /** School pilot ready when only HTTPS (and optional 10-lakh) remain as founder ops */
+    goLiveReady: deployBlockers.length === 0 && partial <= 1,
   }
 }
 

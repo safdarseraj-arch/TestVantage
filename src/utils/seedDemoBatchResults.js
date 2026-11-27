@@ -7,7 +7,7 @@ import { saveAttempt, getAllStudentAttempts } from './attemptHistory.js'
 import { scoreToPercentile } from './percentile.js'
 import { allowAutoDemoSeed } from './prodSafety.js'
 
-export const DEMO_BATCH_SEED_KEY = 'testvantage-demo-batch-results-v3'
+export const DEMO_BATCH_SEED_KEY = 'testvantage-demo-batch-results-v4'
 export const DEMO_BATCH_TEST_ID = 'jee-main-full-demo'
 export const DEMO_BATCH_TEST_TITLE = 'Sample classroom — JEE Main (practice only)'
 
@@ -193,26 +193,70 @@ export function seedDemoBatchResults(opts = {}) {
       const chapterStats = buildChapterStats(s.scorePct, subName, i + si)
       Object.assign(byChapter, chapterStats)
       const subjectId = subName === 'Maths' ? 'mathematics' : subName.toLowerCase()
+      // Shared question IDs across the batch so Tab A / Tab B diagnostics can aggregate.
       for (const [chapter, st] of Object.entries(chapterStats)) {
-        for (let qi = 0; qi < st.correct; qi++) {
+        const totalSlots = st.correct + st.wrong + st.unattempted
+        let slot = 0
+        for (let qi = 0; qi < st.correct; qi += 1, slot += 1) {
+          const sec = 40 + ((i + qi) % 5) * 8
           perQuestion.push({
-            questionId: `demo-${i}-${subjectId}-${chapter}-c${qi}`,
+            questionId: `demo-${subjectId}-${chapter}-q${slot}`,
+            index: perQuestion.length + 1,
             subject: subjectId,
             chapter,
             grade: 'correct',
             marks: 4,
             maxMarks: 4,
+            timeSpentSeconds: sec,
+            difficulty: slot < 2 ? 'Easy' : slot < 4 ? 'Medium' : 'Hard',
           })
         }
-        for (let qi = 0; qi < st.wrong; qi++) {
+        for (let qi = 0; qi < st.wrong; qi += 1, slot += 1) {
+          const sec = 55 + ((i + qi) % 6) * 12
+          const opt = ['B', 'C', 'D'][(i + qi) % 3]
           perQuestion.push({
-            questionId: `demo-${i}-${subjectId}-${chapter}-w${qi}`,
+            questionId: `demo-${subjectId}-${chapter}-q${slot}`,
+            index: perQuestion.length + 1,
             subject: subjectId,
             chapter,
             grade: 'wrong',
             marks: -1,
             maxMarks: 4,
+            timeSpentSeconds: sec,
+            userAnswerLabel: opt,
+            selectedOption: opt,
+            difficulty: slot < 2 ? 'Easy' : slot < 4 ? 'Medium' : 'Hard',
           })
+        }
+        for (let qi = 0; qi < st.unattempted; qi += 1, slot += 1) {
+          // Mix quick intimidation skips and long time-sink skips for Tab B signals.
+          const sec = (i + qi) % 3 === 0 ? 8 + (i % 4) : 95 + ((i + qi) % 5) * 10
+          perQuestion.push({
+            questionId: `demo-${subjectId}-${chapter}-q${slot}`,
+            index: perQuestion.length + 1,
+            subject: subjectId,
+            chapter,
+            grade: 'unattempted',
+            marks: 0,
+            maxMarks: 4,
+            timeSpentSeconds: sec,
+            difficulty: slot < 2 ? 'Easy' : slot < 4 ? 'Medium' : 'Hard',
+          })
+        }
+        // Pad to a stable slot count if chapter mix is short (keeps IDs aligned).
+        while (slot < Math.max(6, totalSlots)) {
+          perQuestion.push({
+            questionId: `demo-${subjectId}-${chapter}-q${slot}`,
+            index: perQuestion.length + 1,
+            subject: subjectId,
+            chapter,
+            grade: 'unattempted',
+            marks: 0,
+            maxMarks: 4,
+            timeSpentSeconds: 12,
+            difficulty: 'Medium',
+          })
+          slot += 1
         }
       }
     }
@@ -240,8 +284,12 @@ export function seedDemoBatchResults(opts = {}) {
       estimatedAIR: Math.max(1200, Math.round(18000 * (1 - s.scorePct) + 800)),
       tabViolations: i % 5 === 0 ? 1 : 0,
       submitReason: 'submit',
-      questionTimes: {},
-      visitedIds: [],
+      questionTimes: Object.fromEntries(
+        perQuestion
+          .filter((pq) => Number(pq.timeSpentSeconds) > 0)
+          .map((pq) => [pq.questionId, pq.timeSpentSeconds]),
+      ),
+      visitedIds: perQuestion.map((pq) => pq.questionId),
       startedAt,
       submittedAt,
       result: {

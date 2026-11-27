@@ -58,7 +58,7 @@ export default function GoLiveGuide() {
             Print / Save as PDF
           </button>
           <Link to="/tour" className="btn btn-ghost btn-sm golive-screen-only">
-            TestVantages Tour
+            Product Tour
           </Link>
         </>
       }

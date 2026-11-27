@@ -1007,7 +1007,7 @@ export default function CareerCompass() {
               {refreshing ? 'Updating…' : 'Refresh data'}
             </button>
             <Link to="/form-forecast" className="btn btn-ghost btn-sm">
-              Form Forecast
+              Rank Forecast
             </Link>
             <Link to="/analytics" className="btn btn-primary btn-sm">
               My analytics
@@ -1044,7 +1044,7 @@ export default function CareerCompass() {
         {formatCompassUpdatedAt(meta.updatedAt)}
       </p>
 
-      <div className="cc-tabs" role="tablist" aria-label="Career Compass sections">
+      <div className="cc-tabs" role="tablist" aria-label="Career Guide sections">
         {[
           { id: 'predict', label: '1 · Rank & college' },
           { id: 'compare', label: '2 · Compare by branch' },

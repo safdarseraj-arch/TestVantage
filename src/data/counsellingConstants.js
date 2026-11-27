@@ -1,5 +1,5 @@
 /**
- * Career Compass / Form Forecast counselling tables.
+ * Career Guide / Rank Forecast counselling tables.
  * Rank prediction stays local. Gemini only fills/refreshes structured data.
  * These tables are Indicative (compiled NTA-style curves + optional Gemini fill) - not a live NTA API.
  */
@@ -65,10 +65,10 @@ export const PLACEMENT_OFFICIAL_NOTE =
   'From a published institute placement report or NIRF graduate-outcome table. Not a guaranteed package. Always re-check the college T&P page.'
 
 export const COLLEGE_DETAIL_SOURCE_NOTE =
-  'College facts are compiled from the Career Compass catalog plus Gemini fill when available. Fees, quotas, and websites can change - confirm on the official site.'
+  'College facts are compiled from the Career Guide catalog plus Gemini fill when available. Fees, quotas, and websites can change - confirm on the official site.'
 
 export const GEMINI_FILL_HINT =
-  'If Gemini is offline we keep the last filled tables. Admin can refresh from Career Compass → Update data.'
+  'If Gemini is offline we keep the last filled tables. Admin can refresh from Career Guide → Update data.'
 
 export const TYPE_LABELS = {
   iit: 'IIT',

@@ -15,7 +15,7 @@ export default function ProfileGate({ children }) {
   const { session, isUser, isTeacher, isAdmin } = useAuth()
   const { pathname } = useLocation()
 
-  // Earn / Campus Earn stay open so new ambassadors can see their share code
+  // Earn / Campus Referrals stay open so new ambassadors can see their share code
   // before finishing the longer student/teacher profile form.
   if (
     pathname.startsWith('/onboarding') ||

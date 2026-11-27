@@ -592,6 +592,57 @@
 
 /* Peer response + time tables (Your vs correct tab) */
 
+.rqw-crowd-hint {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.rqw-crowd-hint strong {
+  display: block;
+  font-size: 0.86rem;
+  margin-bottom: 0.2rem;
+}
+
+.rqw-crowd-hint p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.rqw-crowd-hint--urgent {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.rqw-crowd-hint--urgent strong {
+  color: #991b1b;
+}
+
+.rqw-crowd-hint--warn {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.rqw-crowd-hint--warn strong {
+  color: #9a3412;
+}
+
+.rqw-crowd-hint--ok {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.rqw-crowd-hint--ok strong {
+  color: #166534;
+}
+
+.rqw-crowd-hint--neutral {
+  background: #f8fafc;
+}
+
 .rqw-peer-stats {
   display: flex;
   flex-direction: column;
@@ -665,6 +716,164 @@
 .rqw-peer-cohort-hint {
   margin: 0.45rem 0 0;
   font-size: 0.78rem;
+}
+
+.rqw-peer-stats--pro {
+  gap: 1rem;
+}
+
+.rqw-diag-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
+  align-items: center;
+}
+
+.rqw-tough,
+.rqw-ideal,
+.rqw-pace {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.rqw-tough--1,
+.rqw-tough--2 {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.rqw-tough--3 {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.rqw-tough--4,
+.rqw-tough--5 {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.rqw-pace--ok {
+  border-color: #bbf7d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.rqw-pace--slow {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.rqw-accuracy-report {
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  padding: 0.85rem 0.9rem;
+  background: #f8fbff;
+}
+
+.rqw-accuracy-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  align-items: baseline;
+  margin-bottom: 0.55rem;
+}
+
+.rqw-accuracy-head h4 {
+  margin: 0;
+}
+
+.rqw-self-status {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #475569;
+}
+
+.rqw-accuracy-table thead th {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.rqw-time-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 0.85rem;
+}
+
+.rqw-timeline-card,
+.rqw-correct-time-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 0.85rem 0.9rem;
+  background: #fff;
+}
+
+.rqw-time-total {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
+.rqw-timeline-label {
+  margin: 0 0 0.35rem;
+}
+
+.rqw-visit-timeline {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  border-left: 2px solid #bfdbfe;
+}
+
+.rqw-visit-timeline li {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  align-items: center;
+  padding: 0.35rem 0 0.35rem 0.85rem;
+  font-size: 0.88rem;
+  color: #1e293b;
+}
+
+.rqw-visit-dot {
+  position: absolute;
+  left: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #93c5fd;
+}
+
+.rqw-visit-n {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.rqw-correct-time-chart {
+  width: 100%;
+  min-height: 180px;
+}
+
+@media (max-width: 900px) {
+  .rqw-time-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* —— Why I got it wrong —— */

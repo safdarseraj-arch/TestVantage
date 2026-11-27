@@ -14,6 +14,7 @@ import {
 } from '../utils/examProgressStore'
 import { isPlatformScaleEnabled } from '../config/platform.js'
 import { submitAttemptRemote } from '../utils/examApi.js'
+import { queueAutoDiagnosticAfterSubmit } from '../utils/autoDiagnosticReport.js'
 import { formatTime } from '../utils/formatTime'
 import { recordGlobalScore } from '../utils/leaderboard'
 import { awardMeritFromAttempt } from '../utils/meritStrideStore'
@@ -108,7 +109,30 @@ function createEmptySessionTelemetry() {
     firstSeenAt: /** @type {Record<string, number>} */ ({}),
     answerAt: /** @type {Record<string, number>} */ ({}),
     visitCounts: /** @type {Record<string, number>} */ ({}),
+    /** Option changes for go-live answer-flip forensics */
+    answerFlips: /** @type {{ t: number, questionId: string, from: unknown, to: unknown }[]} */ ([]),
+    /** Optional OMR bubble events (filled when OMR path is used) */
+    omrEvents: /** @type {{ t: number, questionId: string, bubble?: string, action?: string }[]} */ ([]),
   }
+}
+
+function answersEqualForFlip(a, b) {
+  if (a === b) return true
+  if (a == null && b == null) return true
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false
+    const sa = [...a].map(String).sort()
+    const sb = [...b].map(String).sort()
+    return sa.every((v, i) => v === sb[i])
+  }
+  if (typeof a === 'object' && typeof b === 'object' && a && b) {
+    try {
+      return JSON.stringify(a) === JSON.stringify(b)
+    } catch {
+      return false
+    }
+  }
+  return String(a) === String(b)
 }
 
 export default function Exam() {
@@ -458,6 +482,27 @@ export default function Exam() {
     [elapsedExamSeconds],
   )
 
+  const trackAnswerFlip = useCallback(
+    (questionId, fromValue, toValue) => {
+      if (!questionId) return
+      if (answersEqualForFlip(fromValue, toValue)) return
+      const blankFrom = fromValue == null || fromValue === '' || (Array.isArray(fromValue) && !fromValue.length)
+      const blankTo = toValue == null || toValue === '' || (Array.isArray(toValue) && !toValue.length)
+      // First fill is not a "flip" — only changes / clears after an answer existed
+      if (blankFrom && !blankTo) return
+      const tel = sessionTelemetryRef.current
+      if (!Array.isArray(tel.answerFlips)) tel.answerFlips = []
+      if (tel.answerFlips.length >= 800) return
+      tel.answerFlips.push({
+        t: elapsedExamSeconds(),
+        questionId,
+        from: fromValue ?? null,
+        to: toValue ?? null,
+      })
+    },
+    [elapsedExamSeconds],
+  )
+
   const recordQuestionTime = useCallback(() => {
     if (!q) return
     const elapsed = Math.round((Date.now() - questionEnteredAtRef.current) / 1000)
@@ -735,6 +780,17 @@ export default function Exam() {
     } catch (err) {
       console.warn('Merit / drill progress update failed', err)
     }
+    // Auto-build exhaustive diagnostic (test + practice). Does not block Result navigation.
+    try {
+      queueAutoDiagnosticAfterSubmit({
+        attemptId,
+        test,
+        data: { ...payload, ownerKey },
+        studentName: session?.name ?? payload.userName,
+      })
+    } catch (err) {
+      console.warn('Auto diagnostic queue failed', err)
+    }
     navigate(`/result/${test.id}?attempt=${attemptId}`)
 // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -821,6 +877,8 @@ export default function Exam() {
         firstSeenAt: { ...(saved.sessionTelemetry?.firstSeenAt ?? {}) },
         answerAt: { ...(saved.sessionTelemetry?.answerAt ?? {}) },
         visitCounts: { ...(saved.sessionTelemetry?.visitCounts ?? {}) },
+        answerFlips: [...(saved.sessionTelemetry?.answerFlips ?? [])],
+        omrEvents: [...(saved.sessionTelemetry?.omrEvents ?? [])],
       }
       lastTelemetrySubjectRef.current = null
       setAnswers(saved.answers ?? {})
@@ -1185,11 +1243,14 @@ export default function Exam() {
       const id = detail?.questionId
       if (!id) return
       trackAnswerMoment(id)
-      setAnswers((prev) => ({ ...prev, [id]: detail.value ?? null }))
+      setAnswers((prev) => {
+        trackAnswerFlip(id, prev[id], detail.value ?? null)
+        return { ...prev, [id]: detail.value ?? null }
+      })
     }
     window.addEventListener(EXAM_INTEGER_ANSWER_EVENT, onIntegerAnswer)
     return () => window.removeEventListener(EXAM_INTEGER_ANSWER_EVENT, onIntegerAnswer)
-  }, [trackAnswerMoment])
+  }, [trackAnswerMoment, trackAnswerFlip])
 
   useEffect(() => {
     /** @param {Event} ev */
@@ -1206,19 +1267,24 @@ export default function Exam() {
         if (!Number.isInteger(row) || !Number.isInteger(col)) return
         setAnswers((prev) => {
           const cur = normalizeMatrixAnswerKey(/** @type {Record<number, number[]>} */ (prev[id]))
-          return { ...prev, [id]: toggleMatrixGridCell(cur, row, col) }
+          const next = toggleMatrixGridCell(cur, row, col)
+          trackAnswerFlip(id, prev[id], next)
+          return { ...prev, [id]: next }
         })
         return
       }
       if (detail.mode === 'option') {
         const optionIndex = detail.optionIndex
         if (!Number.isInteger(optionIndex)) return
-        setAnswers((prev) => ({ ...prev, [id]: optionIndex }))
+        setAnswers((prev) => {
+          trackAnswerFlip(id, prev[id], optionIndex)
+          return { ...prev, [id]: optionIndex }
+        })
       }
     }
     window.addEventListener(EXAM_MATRIX_ANSWER_EVENT, onMatrixAnswer)
     return () => window.removeEventListener(EXAM_MATRIX_ANSWER_EVENT, onMatrixAnswer)
-  }, [trackAnswerMoment])
+  }, [trackAnswerMoment, trackAnswerFlip])
 
   useEffect(() => {
     /** @param {Event} ev */
@@ -1237,14 +1303,16 @@ export default function Exam() {
           if (pos >= 0) cur.splice(pos, 1)
           else cur.push(value)
           cur.sort((a, b) => a - b)
+          trackAnswerFlip(id, prev[id], cur)
           return { ...prev, [id]: cur }
         }
+        trackAnswerFlip(id, prev[id], value)
         return { ...prev, [id]: value }
       })
     }
     window.addEventListener(EXAM_MCQ_ANSWER_EVENT, onMcqAnswer)
     return () => window.removeEventListener(EXAM_MCQ_ANSWER_EVENT, onMcqAnswer)
-  }, [trackAnswerMoment])
+  }, [trackAnswerMoment, trackAnswerFlip])
 
   if (!test) {
     return (

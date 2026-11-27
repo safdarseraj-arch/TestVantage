@@ -53,7 +53,7 @@ export default function Leaderboard() {
         actions={
           <>
             <Link to="/form-forecast" className="btn btn-ghost btn-sm">
-              Form Forecast
+              Rank Forecast
             </Link>
             <Link to="/my-results" className="btn btn-ghost btn-sm">
               My results

@@ -781,3 +781,154 @@
     min-width: 140px;
   }
 }
+
+/* Auto diagnostic after submit */
+.auto-diag-banner {
+  margin: 0 0 1rem;
+  border: 1px solid #bbf7d0;
+  background: linear-gradient(135deg, #f0fdf4 0%, #f8fafc 100%);
+}
+
+.auto-diag-banner-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.auto-diag-banner h2 {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.auto-diag-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Sample test analysis banner */
+.demo-analysis-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #bfdbfe;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  color: #1e3a8a;
+  font-size: 0.92rem;
+}
+
+.demo-analysis-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.demo-analysis-legend {
+  margin-bottom: 1rem;
+}
+
+.demo-analysis-legend summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.demo-analysis-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem 1.25rem;
+  margin-top: 0.75rem;
+}
+
+.demo-analysis-legend-grid h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.demo-analysis-legend-grid ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  color: #334155;
+}
+
+/* Demo parent/student report card */
+.demo-report-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  margin: 1rem 0 1.25rem;
+}
+
+.demo-report-legend h2,
+.demo-report-preview h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.demo-report-legend-block {
+  margin-top: 0.85rem;
+}
+
+.demo-report-legend-block h3,
+.demo-report-kpi-summary h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.demo-report-legend-block ul,
+.demo-report-kpi-summary ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.demo-report-kpi-summary {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.demo-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.demo-report-preview-head {
+  margin-bottom: 0.65rem;
+}
+
+.demo-report-iframe {
+  width: 100%;
+  min-height: 980px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+@media (max-width: 900px) {
+  .demo-report-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-report-iframe {
+    min-height: 720px;
+  }
+}

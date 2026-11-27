@@ -115,7 +115,21 @@ const QuickRevision = lazyPage(() => import('./pages/QuickRevision'), 'Quick Rev
 const FormulaPocket = lazyPage(() => import('./pages/FormulaPocket'), 'Formula Sheet')
 const DailyTarget = lazyPage(() => import('./pages/DailyTarget'), 'Today’s Target')
 const DailyPracticeSheet = lazyPage(() => import('./pages/DailyPracticeSheet'), 'Daily Practice Sheet')
-const PlacementCheck = lazyPage(() => import('./pages/PlacementCheck'), 'Placement check')
+const DiagnosticDrillHighMistake = lazyPage(
+  () =>
+    import('./pages/DiagnosticDrillPage').then((m) => ({
+      default: m.HighMistakeQuestionsPage,
+    })),
+  'High mistake',
+)
+const DiagnosticDrillHighSkip = lazyPage(
+  () =>
+    import('./pages/DiagnosticDrillPage').then((m) => ({
+      default: m.HighSkipQuestionsPage,
+    })),
+  'High skip',
+)
+const PlacementCheck = lazyPage(() => import('./pages/PlacementCheck'), 'Starter Diagnosis')
 const TestSeries = lazyPage(() => import('./pages/TestSeries'), 'Series calendar')
 const Doubts = lazyPage(() => import('./pages/Doubts'), 'Ask Your Doubt')
 const StudentMockTest = lazyPage(() => import('./pages/StudentMockTest'), 'Mock test')
@@ -131,6 +145,8 @@ const PracticeSimilarPyqBank = lazyPage(
 )
 const SiteMap = lazyPage(() => import('./pages/SiteMap'), 'Site map')
 const GoLiveGuide = lazyPage(() => import('./pages/GoLiveGuide'), 'Go live guide')
+const DemoReportCard = lazyPage(() => import('./pages/DemoReportCard'), 'Demo report card')
+const DemoTestAnalysis = lazyPage(() => import('./pages/DemoTestAnalysis'), 'Demo test analysis')
 const PaperPatterns = lazyPage(() => import('./pages/PaperPatterns'), 'Paper patterns')
 const GeneratorDashboard = lazyPage(
   () => import('./components/GeneratorDashboard.jsx'),
@@ -350,7 +366,15 @@ export default function App() {
         <Route path="formula-sheet" element={withSuspense(<FormulaPocket />, 'Loading formula sheet…')} />
         <Route path="daily-target" element={withSuspense(<DailyTarget />, 'Loading today’s target…')} />
         <Route path="daily-sheet" element={withSuspense(<DailyPracticeSheet />, 'Loading daily sheet…')} />
-        <Route path="placement-check" element={withSuspense(<PlacementCheck />, 'Loading placement check…')} />
+        <Route
+          path="high-mistake"
+          element={withSuspense(<DiagnosticDrillHighMistake />, 'Loading High mistake…')}
+        />
+        <Route
+          path="high-skip"
+          element={withSuspense(<DiagnosticDrillHighSkip />, 'Loading High skip…')}
+        />
+        <Route path="placement-check" element={withSuspense(<PlacementCheck />, 'Loading Starter Diagnosis…')} />
         <Route path="test-series" element={withSuspense(<TestSeries />, 'Loading series calendar…')} />
         <Route path="doubts" element={withSuspense(<Doubts />, 'Loading doubts…')} />
         <Route path="mock-test" element={withSuspense(<StudentMockTest />, 'Loading mock test…')} />
@@ -411,6 +435,14 @@ export default function App() {
         <Route path="exam/:testId" element={withSuspense(<Exam />, 'Loading exam…')} />
         <Route path="result/:testId" element={withSuspense(<Result />, 'Loading result…')} />
         <Route path="my-results" element={withSuspense(<MyResults />, 'Loading results…')} />
+        <Route
+          path="demo/report-card"
+          element={withSuspense(<DemoReportCard />, 'Loading demo report card…')}
+        />
+        <Route
+          path="demo/test-analysis"
+          element={withSuspense(<DemoTestAnalysis />, 'Loading sample analysis…')}
+        />
         <Route path="analytics" element={withSuspense(<Analytics />, 'Loading analytics…')} />
         <Route path="leaderboard" element={withSuspense(<Leaderboard />, 'Loading leaderboard…')} />
         <Route

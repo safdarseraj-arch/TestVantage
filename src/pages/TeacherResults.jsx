@@ -16,6 +16,7 @@ import {
 import PortalPage from '../components/PortalPage.jsx'
 import OrgServerSyncPanel from '../components/OrgServerSyncPanel.jsx'
 import ClassroomDiagnosticHeatmap from '../components/ClassroomDiagnosticHeatmap.jsx'
+import DiagnosticQuestionTabs from '../components/DiagnosticQuestionTabs.jsx'
 
 /** @typedef {'overall'|'Physics'|'Chemistry'|'Maths'} RankBy */
 
@@ -159,11 +160,18 @@ export default function TeacherResults() {
       )}
 
       {attempts.length > 0 && (
-        <ClassroomDiagnosticHeatmap
-          attempts={attempts}
-          title="Classroom diagnostic heatmap"
-          subtitle="Cohort failure rate by chapter / subject — use for re-teach priorities."
-        />
+        <>
+          <DiagnosticQuestionTabs
+            attempts={attempts}
+            title="Question diagnostics"
+            subtitle="High-mistake, high-skip, and combined-struggle questions — teach these first."
+          />
+          <ClassroomDiagnosticHeatmap
+            attempts={attempts}
+            title="Classroom diagnostic heatmap"
+            subtitle="Cohort failure rate by chapter / subject — use for re-teach priorities."
+          />
+        </>
       )}
 
       {batchSummary.count > 0 && (

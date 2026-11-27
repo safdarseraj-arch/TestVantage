@@ -60,6 +60,11 @@ export default function SchoolSetup() {
         </Link>
       }
     >
+      <p className="form-hint" style={{ marginTop: 0 }}>
+        Demo school login: open <Link to="/login">Login</Link> → <strong>Try as school</strong> (
+        <code>school@testvantage.com</code> / <code>school123</code>). This page is the school
+        dashboard. Open a campus card for classes, roster, attendance, fees, and exams.
+      </p>
       <OrgServerSyncPanel onRefresh={refresh} onMessage={(type, text) => setMsg({ type, text })} />
 
       <div className="school-stats-strip">

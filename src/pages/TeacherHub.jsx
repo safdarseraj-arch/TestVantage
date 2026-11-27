@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import PortalPage from '../components/PortalPage.jsx'
@@ -96,8 +97,17 @@ function greetingLine(name) {
 /**
  * Teacher landing hub after login — everyday teaching tools, not server deployment.
  */
+const FIRST_RUN_KEY = 'tv_teacher_hub_first_run_dismissed'
+
 export default function TeacherHub() {
   const { isAdmin, isTeacher, isLoggedIn, hasPermission, session } = useAuth()
+  const [firstRunHidden, setFirstRunHidden] = useState(() => {
+    try {
+      return typeof localStorage !== 'undefined' && localStorage.getItem(FIRST_RUN_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
 
   if (!isLoggedIn) {
     return <Navigate to="/login" state={{ from: '/teacher' }} replace />
@@ -119,21 +129,33 @@ export default function TeacherHub() {
 
   const accessMain = isAdmin || canAccessMainQuestionBank(session)
   const cards = PRIMARY_CARDS.filter((card) => card.perms.some((p) => hasPermission(p)))
-  const showFirstRun = Boolean(profile?.personalVaultOwned) && hasPermission(PERMS.UPLOAD_QUESTIONS)
+  const showFirstRun =
+    !firstRunHidden &&
+    Boolean(profile?.personalVaultOwned) &&
+    hasPermission(PERMS.UPLOAD_QUESTIONS)
+
+  const dismissFirstRun = () => {
+    try {
+      localStorage.setItem(FIRST_RUN_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+    setFirstRunHidden(true)
+  }
 
   return (
     <PortalPage
       role="teacher"
       eyebrow="Teacher home"
       title={greetingLine(fullName)}
-      subtitle={`${fullName} — question bank, lecture plan, papers, and PDF in one calm place.`}
+      subtitle="Personal Vault, lecture plan, and papers — student mocks stay under Practice."
       actions={
         <>
           <Link to="/earn#promo-gallery" className="btn btn-primary btn-sm">
             Refer &amp; earn
           </Link>
           <Link to="/profile" className="btn btn-ghost btn-sm">
-            Profile &amp; branding
+            Profile
           </Link>
         </>
       }
@@ -141,17 +163,7 @@ export default function TeacherHub() {
     >
       <section className="teacher-hub-hero">
         <div>
-          <p className="teacher-hub-hero-kicker">Welcome back</p>
-          <h2 className="teacher-hub-hero-name">{fullName}</h2>
-          <p className="teacher-hub-hero-lead">
-            Start with your bank, plan a lecture, or make a paper. Student mocks stay under Prepare.
-          </p>
-          <p className="form-hint" style={{ marginTop: '0.65rem' }}>
-            Want to promote TestVantage? Open{' '}
-            <Link to="/earn#promo-gallery">Refer &amp; earn</Link> for share templates, approved
-            reels, and WhatsApp / social share.
-          </p>
-          {subjects.length || standards.length ? (
+          {(subjects.length || standards.length || exams.length) ? (
             <div className="teacher-hub-welcome-chips">
               {subjects.map((s) => (
                 <span key={s} className="teacher-hub-welcome-chip">
@@ -159,12 +171,34 @@ export default function TeacherHub() {
                 </span>
               ))}
               {standards.map((s) => (
-                <span key={s} className="teacher-hub-welcome-chip teacher-hub-welcome-chip--muted">
+                <span key={`st-${s}`} className="teacher-hub-welcome-chip teacher-hub-welcome-chip--muted">
                   {s}
                 </span>
               ))}
+              {exams.map((label) => (
+                <span key={`ex-${label}`} className="teacher-hub-welcome-chip teacher-hub-welcome-chip--muted">
+                  {label}
+                </span>
+              ))}
             </div>
-          ) : null}
+          ) : (
+            <p className="teacher-hub-hero-lead">
+              Pick a tool below, or upload questions to your Personal Vault.
+            </p>
+          )}
+          {facultyMode === FACULTY_ONBOARDING_MODES.SCHOOL && profile?.campusName ? (
+            <p className="form-hint" style={{ marginTop: '0.55rem' }}>
+              {FACULTY_MODE_LABELS[facultyMode]} · <strong>{profile.campusName}</strong>
+              {profile.department ? ` · ${profile.department}` : ''}
+            </p>
+          ) : (
+            <p className="form-hint" style={{ marginTop: '0.55rem' }}>
+              {FACULTY_MODE_LABELS[facultyMode]}
+              {facultyMode === FACULTY_ONBOARDING_MODES.INDEPENDENT
+                ? ' · Join a school anytime from Profile'
+                : ''}
+            </p>
+          )}
         </div>
         <Link to={questionBankUploadUrl({ owner: 'teacher', from: 'teacher' })} className="btn btn-primary">
           Upload questions
@@ -173,92 +207,62 @@ export default function TeacherHub() {
 
       {showFirstRun ? (
         <section className="card teacher-first-run" aria-label="Get started">
-          <h2>Get started in 3 steps</h2>
+          <div className="teacher-workbench-strip-head">
+            <h2>Get started</h2>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={dismissFirstRun}>
+              Dismiss
+            </button>
+          </div>
           <ol className="teacher-first-run-list">
             <li>
-              <Link to="/question-bank?hub=view&view=draft&owner=teacher">Open your Personal Vault</Link>
+              <Link to="/question-bank?hub=view&view=draft&owner=teacher">Open Personal Vault</Link>
             </li>
             <li>
               <Link to={questionBankUploadUrl({ owner: 'teacher', from: 'teacher' })}>
-                Upload a few questions
+                Upload questions
               </Link>
             </li>
             <li>
-              <Link to="/create-test?pool=mine">Make a paper from your vault</Link>
+              <Link to="/create-test?pool=mine">Make a paper</Link>
             </li>
           </ol>
         </section>
       ) : null}
 
-      <section className="card teacher-workbench-strip" aria-label="Faculty workbench">
-        <div className="teacher-workbench-strip-head">
-          <h2>Faculty workbench</h2>
-          <span className="teacher-hub-welcome-chip">
-            {FACULTY_MODE_LABELS[facultyMode] || 'Teacher'}
+      <details className="card teacher-workbench-strip" aria-label="Faculty workbench details">
+        <summary className="teacher-workbench-summary">
+          <span>Vault &amp; plan rights</span>
+          <span className="form-hint">
+            {entitlementSummary.onLabels.length} on
+            {entitlementSummary.offCount ? ` · ${entitlementSummary.offCount} locked` : ''}
+            {entitlements ? ` · OCR ${entitlementSummary.ocrQuota}/mo` : ''}
           </span>
-        </div>
+        </summary>
         <p className="form-hint">{personalVaultBlurb(facultyMode)}</p>
-        {facultyMode === FACULTY_ONBOARDING_MODES.SCHOOL && profile?.campusName ? (
-          <p className="form-hint">
-            Campus: <strong>{profile.campusName}</strong>
-            {profile.department ? ` · ${profile.department}` : ''}
-            {profile.schoolInviteCode ? ` · invite ${profile.schoolInviteCode}` : ''}
-          </p>
-        ) : null}
-        {facultyMode === FACULTY_ONBOARDING_MODES.INDEPENDENT ? (
-          <p className="form-hint">
-            Joining a partner school later? Open{' '}
-            <Link to="/profile">Profile</Link> and switch to <strong>School-invited</strong> with your
-            principal’s code (demo: SCHOOL-DEMO).
-          </p>
-        ) : null}
-        {exams.length ? (
-          <div className="teacher-hub-welcome-chips">
-            {exams.map((label) => (
-              <span key={label} className="teacher-hub-welcome-chip teacher-hub-welcome-chip--muted">
-                {label}
-              </span>
-            ))}
-          </div>
-        ) : null}
-        {profile?.watermarkText || profile?.paperHeaderText ? (
-          <p className="form-hint">
-            {profile.paperHeaderText ? <>Header: {profile.paperHeaderText}. </> : null}
-            {profile.watermarkText ? <>Watermark: {profile.watermarkText}.</> : null}
-          </p>
+        {!accessMain && hasPermission(PERMS.UPLOAD_QUESTIONS) ? (
+          <p className="form-hint">Uploads stay in your vault and also reach the admin Review queue.</p>
         ) : null}
         {entitlements ? (
-          <>
-            <p className="form-hint">
-              <strong>{entitlementSummary.onLabels.length}</strong> content rights on
-              {entitlementSummary.offCount
-                ? ` · ${entitlementSummary.offCount} locked by plan`
-                : ''}
-              {' · '}
-              OCR quota {entitlementSummary.ocrQuota} pages / month
-            </p>
-            <ul className="teacher-entitlement-list">
-              {entitlementSummary.onLabels.map((label) => (
-                <li key={label} className="is-on">
-                  {label}
-                </li>
-              ))}
-            </ul>
-          </>
+          <ul className="teacher-entitlement-list">
+            {entitlementSummary.onLabels.map((label) => (
+              <li key={label} className="is-on">
+                {label}
+              </li>
+            ))}
+          </ul>
         ) : (
           <p className="form-hint">
-            Finish <Link to="/onboarding/teacher">faculty onboarding</Link> or update Profile to set
-            pathway entitlements.
+            Finish <Link to="/onboarding/teacher">faculty onboarding</Link> to set pathway rights.
           </p>
         )}
-      </section>
-
-      {!accessMain && hasPermission(PERMS.UPLOAD_QUESTIONS) ? (
-        <p className="form-hint teacher-hub-scope-note">
-          You are in <strong>your Personal Vault</strong> (teacher-owned IP). Uploads also reach the
-          admin Review queue.
-        </p>
-      ) : null}
+        {(profile?.watermarkText || profile?.paperHeaderText) && (
+          <p className="form-hint">
+            Branding set in <Link to="/profile">Profile</Link>
+            {profile.paperHeaderText ? ` · ${profile.paperHeaderText}` : ''}
+            {profile.watermarkText ? ` · ${profile.watermarkText}` : ''}
+          </p>
+        )}
+      </details>
 
       {cards.length > 0 ? (
         <div className="teacher-hub-grid teacher-hub-grid--six">
